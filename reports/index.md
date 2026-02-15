@@ -5,6 +5,8 @@
 
 ## 2026 年
 
+- [2026-02-15 - Carbon Footprint: AI 排出量算定方法論のアップデート](2026/2026-02-15-carbon-footprint-ai-emissions-methodology.md)
+- [2026-02-15 - Google SecOps SOAR: Release 6.3.75 / 6.3.76](2026/2026-02-15-google-secops-soar-release-6-3-75-76.md)
 - [2026-02-14 - Google SecOps SIEM: Release 6.3.75 / 6.3.76](2026/2026-02-14-google-secops-siem-release-6-3-75-76.md)
 - [2026-02-13 - Google Distributed Cloud for VMware: バージョン 1.34.100-gke.93 リリース](2026/2026-02-13-google-distributed-cloud-vmware-1-34-100.md)
 - [2026-02-13 - Google Cloud VMware Engine: ve2 ノードタイプが大阪リージョンで利用可能に](2026/2026-02-13-vmware-engine-ve2-osaka.md)
