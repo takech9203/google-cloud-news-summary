@@ -5,7 +5,7 @@
 **機能**: Notion データコネクタ (データフェデレーション)
 **ステータス**: Public Preview
 
-[このアップデートのインフォグラフィックを見る](infographic/20260209-gemini-enterprise-notion-connector.html)
+[このアップデートのインフォグラフィックを見る](https://takech9203.github.io/google-cloud-news-summary/20260209-gemini-enterprise-notion-connector.html)
 
 ## 概要
 
@@ -235,7 +235,7 @@ Gemini Enterprise 自体は上記に加え、東京 (asia-northeast1)、ロン�
 
 ## 参考リンク
 
-- [インフォグラフィック](infographic/20260209-gemini-enterprise-notion-connector.html)
+- [インフォグラフィック](https://takech9203.github.io/google-cloud-news-summary/20260209-gemini-enterprise-notion-connector.html)
 - [公式リリースノート](https://docs.cloud.google.com/release-notes#February_09_2026)
 - [Notion データストア概要](https://docs.cloud.google.com/gemini/enterprise/docs/notion)
 - [サードパーティデータソースの接続](https://docs.cloud.google.com/gemini/enterprise/docs/connect-third-party-data-source)

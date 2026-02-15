@@ -5,7 +5,7 @@
 **機能**: Layout Parser v1.6 (pretrained-layout-parser-v1.6-2026-01-13)
 **ステータス**: Preview (Release Candidate)
 
-[このアップデートのインフォグラフィックを見る](infographic/20260209-document-ai-layout-parser-v1-6.html)
+[このアップデートのインフォグラフィックを見る](https://takech9203.github.io/google-cloud-news-summary/20260209-document-ai-layout-parser-v1-6.html)
 
 ## 概要
 
@@ -347,7 +347,7 @@ Vertex AI Gemini API のグローバルエンドポイントを使用するた�
 
 ## 参考リンク
 
-- [インフォグラフィック](infographic/20260209-document-ai-layout-parser-v1-6.html)
+- [インフォグラフィック](https://takech9203.github.io/google-cloud-news-summary/20260209-document-ai-layout-parser-v1-6.html)
 - [公式リリースノート](https://docs.cloud.google.com/release-notes#February_09_2026)
 - [Document AI Release Notes](https://cloud.google.com/document-ai/docs/release-notes)
 - [Layout Parser ドキュメント](https://cloud.google.com/document-ai/docs/layout-parse-chunk)

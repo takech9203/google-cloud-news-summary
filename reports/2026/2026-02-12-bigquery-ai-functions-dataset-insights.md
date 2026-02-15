@@ -5,7 +5,7 @@
 **機能**: AI 関数 (AI.GENERATE / AI.GENERATE_TABLE / AI.CLASSIFY) およびデータセットインサイト、パイプライン実行
 **ステータス**: GA (AI.GENERATE / AI.GENERATE_TABLE フィールド説明、パイプライン実行) / Preview (データセットインサイト、AI.CLASSIFY マルチカテゴリ)
 
-[このアップデートのインフォグラフィックを見る](infographic/20260212-bigquery-ai-functions-dataset-insights.html)
+[このアップデートのインフォグラフィックを見る](https://takech9203.github.io/google-cloud-news-summary/20260212-bigquery-ai-functions-dataset-insights.html)
 
 ## 概要
 
@@ -393,7 +393,7 @@ AI.GENERATE および AI.CLASSIFY は、Gemini モデルをサポートするす
 
 ## 参考リンク
 
-- [インフォグラフィック](infographic/20260212-bigquery-ai-functions-dataset-insights.html)
+- [インフォグラフィック](https://takech9203.github.io/google-cloud-news-summary/20260212-bigquery-ai-functions-dataset-insights.html)
 - [公式リリースノート](https://cloud.google.com/release-notes#February_12_2026)
 - [BigQuery リリースノート](https://docs.cloud.google.com/bigquery/docs/release-notes)
 - [AI.GENERATE 関数ドキュメント](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-ai-generate)

@@ -5,7 +5,7 @@
 **機能**: HTTP コネクション
 **ステータス**: Preview (プレビュー)
 
-<!-- INFOGRAPHIC_URL_PLACEHOLDER -->
+📊 [このアップデートのインフォグラフィックを見る](https://takech9203.github.io/google-cloud-news-summary/20260212-developer-connect-http-connections.html)
 
 ## 概要
 
@@ -271,6 +271,7 @@ HTTP コネクションの対応リージョンの詳細は、以下のドキュ
 
 ## 参考リンク
 
+- 📊 [インフォグラフィック](https://takech9203.github.io/google-cloud-news-summary/20260212-developer-connect-http-connections.html)
 - [公式リリースノート](https://cloud.google.com/release-notes#February_12_2026)
 - [HTTP コネクション概要](https://cloud.google.com/developer-connect/docs/http-connections)
 - [HTTP コネクションの設定方法](https://cloud.google.com/developer-connect/docs/configure-http-connections)

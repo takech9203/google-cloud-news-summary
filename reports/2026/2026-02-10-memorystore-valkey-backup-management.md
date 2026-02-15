@@ -5,7 +5,7 @@
 **機能**: Google Cloud コンソールでのバックアップ管理
 **ステータス**: GA (Generally Available)
 
-[このアップデートのインフォグラフィックを見る](infographic/20260210-memorystore-valkey-backup-management.html)
+[このアップデートのインフォグラフィックを見る](https://takech9203.github.io/google-cloud-news-summary/20260210-memorystore-valkey-backup-management.html)
 
 ## 概要
 
@@ -321,7 +321,7 @@ Memorystore for Valkey は全世界 40 以上のリージョンで利用可能�
 
 ## 参考リンク
 
-- [インフォグラフィック](infographic/20260210-memorystore-valkey-backup-management.html)
+- [インフォグラフィック](https://takech9203.github.io/google-cloud-news-summary/20260210-memorystore-valkey-backup-management.html)
 - [公式リリースノート](https://cloud.google.com/release-notes#February_10_2026)
 - [バックアップの管理 - ドキュメント](https://cloud.google.com/memorystore/docs/valkey/manage-backups)
 - [バックアップの概要 - ドキュメント](https://cloud.google.com/memorystore/docs/valkey/backups)

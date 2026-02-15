@@ -5,7 +5,7 @@
 **機能**: カスタム組織ポリシーによる内部範囲制御 / BYO IPv6 グローバルユニキャストアドレス
 **ステータス**: GA
 
-[このアップデートのインフォグラフィックを見る](infographic/20260210-vpc-custom-org-policies-byo-ipv6.html)
+[このアップデートのインフォグラフィックを見る](https://takech9203.github.io/google-cloud-news-summary/20260210-vpc-custom-org-policies-byo-ipv6.html)
 
 ## 概要
 
@@ -298,7 +298,7 @@ VPC ネットワーク自体の使用に対する追加料金はありません�
 
 ## 参考リンク
 
-- [インフォグラフィック](infographic/20260210-vpc-custom-org-policies-byo-ipv6.html)
+- [インフォグラフィック](https://takech9203.github.io/google-cloud-news-summary/20260210-vpc-custom-org-policies-byo-ipv6.html)
 - [公式リリースノート](https://cloud.google.com/release-notes#February_10_2026)
 - [Manage VPC resources by using custom organization policies](https://cloud.google.com/vpc/docs/custom-constraints)
 - [Create and use IPv6 sub-prefixes](https://cloud.google.com/vpc/docs/create-ipv6-sub-prefixes)

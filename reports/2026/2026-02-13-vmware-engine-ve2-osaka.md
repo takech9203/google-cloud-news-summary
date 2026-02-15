@@ -5,7 +5,7 @@
 **機能**: ve2 ノードタイプの大阪リージョン (asia-northeast2) 対応
 **ステータス**: Available (リージョン拡張)
 
-[このアップデートのインフォグラフィックを見る](infographic/20260213-vmware-engine-ve2-osaka.html)
+[このアップデートのインフォグラフィックを見る](https://takech9203.github.io/google-cloud-news-summary/20260213-vmware-engine-ve2-osaka.html)
 
 ## 概要
 
@@ -273,7 +273,7 @@ ve2 ノードが利用可能なリージョンの完全なリストについて�
 
 ## 参考リンク
 
-- [インフォグラフィック](infographic/20260213-vmware-engine-ve2-osaka.html)
+- [インフォグラフィック](https://takech9203.github.io/google-cloud-news-summary/20260213-vmware-engine-ve2-osaka.html)
 - [公式リリースノート](https://cloud.google.com/vmware-engine/docs/release-notes)
 - [VMware Engine ノードタイプ ドキュメント](https://cloud.google.com/vmware-engine/docs/concepts-node-types)
 - [VMware Engine プライベートクラウド](https://cloud.google.com/vmware-engine/docs/concepts-private-cloud)

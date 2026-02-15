@@ -5,7 +5,7 @@
 **機能**: GLM 5 Experimental
 **ステータス**: Experimental
 
-📊 [このアップデートのインフォグラフィックを見る](infographic/20260210-vertex-ai-glm-5.html)
+📊 [このアップデートのインフォグラフィックを見る](https://takech9203.github.io/google-cloud-news-summary/20260210-vertex-ai-glm-5.html)
 
 ## 概要
 
@@ -274,7 +274,7 @@ GLM 5 の利用可能リージョンはリリースノートに明記されて�
 
 ## 参考リンク
 
-- 📊 [インフォグラフィック](infographic/20260210-vertex-ai-glm-5.html)
+- 📊 [インフォグラフィック](https://takech9203.github.io/google-cloud-news-summary/20260210-vertex-ai-glm-5.html)
 - [公式リリースノート](https://docs.cloud.google.com/release-notes#February_10_2026)
 - [Generative AI on Vertex AI リリースノート](https://docs.cloud.google.com/vertex-ai/generative-ai/docs/release-notes)
 - [Model Garden の概要](https://docs.cloud.google.com/vertex-ai/generative-ai/docs/model-garden/explore-models)

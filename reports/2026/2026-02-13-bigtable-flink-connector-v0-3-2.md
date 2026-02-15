@@ -5,7 +5,7 @@
 **機能**: Flink Bigtable Connector v0.3.2
 **ステータス**: GA (Generally Available)
 
-[このアップデートのインフォグラフィックを見る](infographic/20260213-bigtable-flink-connector-v0-3-2.html)
+[このアップデートのインフォグラフィックを見る](https://takech9203.github.io/google-cloud-news-summary/20260213-bigtable-flink-connector-v0-3-2.html)
 
 ## 概要
 
@@ -236,7 +236,7 @@ Flink Bigtable Connector は Bigtable が利用可能なすべてのリージョ
 
 ## 参考リンク
 
-- [このアップデートのインフォグラフィック](infographic/20260213-bigtable-flink-connector-v0-3-2.html)
+- [このアップデートのインフォグラフィック](https://takech9203.github.io/google-cloud-news-summary/20260213-bigtable-flink-connector-v0-3-2.html)
 - [公式リリースノート](https://cloud.google.com/release-notes#February_13_2026)
 - [Flink Bigtable Connector ドキュメント](https://cloud.google.com/bigtable/docs/flink-connector)
 - [Flink Bigtable Connector GitHub リポジトリ](https://github.com/google/flink-connector-gcp/blob/main/connectors/bigtable/README.md)

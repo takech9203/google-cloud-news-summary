@@ -5,7 +5,7 @@
 **機能**: Flow Analyzer レイテンシモード
 **ステータス**: GA (Generally Available)
 
-[このアップデートのインフォグラフィックを見る](infographic/20260213-network-intelligence-center-flow-analyzer-latency.html)
+[このアップデートのインフォグラフィックを見る](https://takech9203.github.io/google-cloud-news-summary/20260213-network-intelligence-center-flow-analyzer-latency.html)
 
 ## 概要
 
@@ -284,7 +284,7 @@ Flow Analyzer は VPC Flow Logs が利用可能なすべてのリージョンで
 
 ## 参考リンク
 
-- [インフォグラフィック](infographic/20260213-network-intelligence-center-flow-analyzer-latency.html)
+- [インフォグラフィック](https://takech9203.github.io/google-cloud-news-summary/20260213-network-intelligence-center-flow-analyzer-latency.html)
 - [公式リリースノート](https://docs.cloud.google.com/release-notes#February_13_2026)
 - [Flow Analyzer 概要ドキュメント](https://cloud.google.com/network-intelligence-center/docs/flow-analyzer/overview)
 - [トラフィックフローの分析方法](https://cloud.google.com/network-intelligence-center/docs/flow-analyzer/analyze-traffic-flows)

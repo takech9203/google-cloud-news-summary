@@ -5,7 +5,7 @@
 **機能**: `gcloud beta app migrate-to-run` コマンドによる Cloud Run への移行
 **ステータス**: Preview
 
-📊 [このアップデートのインフォグラフィックを見る](infographic/20260212-app-engine-to-cloud-run-migration.html)
+📊 [このアップデートのインフォグラフィックを見る](https://takech9203.github.io/google-cloud-news-summary/20260212-app-engine-to-cloud-run-migration.html)
 
 ## 概要
 
@@ -325,7 +325,7 @@ Cloud Run の全リージョン一覧は [Cloud Run のロケーション](https
 
 ## 参考リンク
 
-- 📊 [インフォグラフィック](infographic/20260212-app-engine-to-cloud-run-migration.html)
+- 📊 [インフォグラフィック](https://takech9203.github.io/google-cloud-news-summary/20260212-app-engine-to-cloud-run-migration.html)
 - [公式リリースノート](https://docs.cloud.google.com/release-notes#February_12_2026)
 - [App Engine Standard から Cloud Run への移行ガイド](https://docs.cloud.google.com/appengine/migration-center/run/migrate-app-engine-standard-to-run)
 - [gcloud beta app migrate-to-run リファレンス](https://docs.cloud.google.com/sdk/gcloud/reference/beta/app/migrate-to-run)

@@ -5,7 +5,7 @@
 **機能**: セキュリティ脆弱性修正 (GCP-2026-010) およびインフラストラクチャセキュリティ更新
 **ステータス**: Security Bulletin (GCP-2026-010)
 
-[このアップデートのインフォグラフィックを見る](infographic/20260213-apigee-x-security-bulletin-gcp-2026-010.html)
+[このアップデートのインフォグラフィックを見る](https://takech9203.github.io/google-cloud-news-summary/20260213-apigee-x-security-bulletin-gcp-2026-010.html)
 
 ## 概要
 
@@ -257,7 +257,7 @@ Apigee X はグローバルに利用可能であり、ロールアウトはす�
 
 ## 参考リンク
 
-- [インフォグラフィック](infographic/20260213-apigee-x-security-bulletin-gcp-2026-010.html)
+- [インフォグラフィック](https://takech9203.github.io/google-cloud-news-summary/20260213-apigee-x-security-bulletin-gcp-2026-010.html)
 - [公式リリースノート (Apigee X)](https://cloud.google.com/apigee/docs/release-notes#February_10_2026)
 - [Apigee セキュリティ速報](https://cloud.google.com/apigee/docs/security-bulletins/security-bulletins)
 - [Google Cloud セキュリティ速報 (GCP-2026-010)](https://cloud.google.com/support/bulletins)

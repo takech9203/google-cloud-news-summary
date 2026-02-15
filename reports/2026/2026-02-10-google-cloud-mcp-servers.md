@@ -5,7 +5,7 @@
 **機能**: リモート MCP (Model Context Protocol) サーバー
 **ステータス**: Preview
 
-[このアップデートのインフォグラフィックを見る](infographic/20260210-google-cloud-mcp-servers.html)
+[このアップデートのインフォグラフィックを見る](https://takech9203.github.io/google-cloud-news-summary/20260210-google-cloud-mcp-servers.html)
 
 ## 概要
 
@@ -326,7 +326,7 @@ Google Cloud リモート MCP エンドポイントはグローバルまたは�
 
 ## 参考リンク
 
-- [インフォグラフィック](infographic/20260210-google-cloud-mcp-servers.html)
+- [インフォグラフィック](https://takech9203.github.io/google-cloud-news-summary/20260210-google-cloud-mcp-servers.html)
 - [公式リリースノート](https://cloud.google.com/release-notes#February_10_2026)
 - [Google Cloud MCP サーバー概要](https://cloud.google.com/mcp/overview)
 - [サポート対象プロダクト一覧](https://cloud.google.com/mcp/supported-products)

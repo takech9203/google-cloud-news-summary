@@ -5,7 +5,7 @@
 **機能**: TPU スライス / パーティションの状態監視メトリクス
 **ステータス**: Beta (新機能)
 
-[このアップデートのインフォグラフィックを見る](infographic/20260213-gke-tpu-slice-health-monitoring.html)
+[このアップデートのインフォグラフィックを見る](https://takech9203.github.io/google-cloud-news-summary/20260213-gke-tpu-slice-health-monitoring.html)
 
 ## 概要
 
@@ -274,7 +274,7 @@ TPU スライスヘルスモニタリングメトリクスは、GKE で TPU が�
 
 ## 参考リンク
 
-- [このアップデートのインフォグラフィック](infographic/20260213-gke-tpu-slice-health-monitoring.html)
+- [このアップデートのインフォグラフィック](https://takech9203.github.io/google-cloud-news-summary/20260213-gke-tpu-slice-health-monitoring.html)
 - [公式リリースノート](https://cloud.google.com/release-notes#February_13_2026)
 - [GKE で TPU を使用する](https://cloud.google.com/kubernetes-engine/docs/how-to/tpus)
 - [GKE システムメトリクス](https://cloud.google.com/monitoring/api/metrics_kubernetes#kubernetes-kubernetes)

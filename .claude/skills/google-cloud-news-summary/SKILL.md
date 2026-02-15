@@ -341,9 +341,13 @@ echo "$INFOGRAPHIC_BASE_URL"
 - CI/CD 環境: GitHub Repository Variables で設定
 - ローカル環境: `export INFOGRAPHIC_BASE_URL=https://your-user.github.io/your-repo` のように設定
 
-テンプレート内の `{INFOGRAPHIC_BASE_URL}` を取得した値で置換し、`{YYYYMMDD}-{slug}.html` と組み合わせて完全な URL を生成する。
+**重要**: `INFOGRAPHIC_BASE_URL` には GitHub Pages のベース URL のみを設定し、`/infographic` などのサブディレクトリは含めない。
 
-**例**: `https://your-user.github.io/your-repo/20260115-january-15-2026.html`
+テンプレート内の `{INFOGRAPHIC_URL}` プレースホルダーは、`{INFOGRAPHIC_BASE_URL}/{YYYYMMDD}-{slug}.html` の形式で置換する。
+
+**例**:
+- 環境変数: `INFOGRAPHIC_BASE_URL=https://takech9203.github.io/google-cloud-news-summary`
+- 生成される URL: `https://takech9203.github.io/google-cloud-news-summary/20260115-january-15-2026.html`
 
 **出力先**: `reports/{YYYY}/{YYYY}-{MM}-{DD}-{slug}.md` (プロジェクトルートからの相対パス)
 - レポートは published の年に対応するフォルダに作成

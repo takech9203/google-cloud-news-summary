@@ -5,7 +5,7 @@
 **機能**: InstanceV3 モニタリングリソース、セキュリティ修正、信頼性向上
 **ステータス**: GA (一般提供)
 
-[このアップデートのインフォグラフィックを見る](infographic/20260209-cloud-data-fusion-v6-11-1-1.html)
+[このアップデートのインフォグラフィックを見る](https://takech9203.github.io/google-cloud-news-summary/20260209-cloud-data-fusion-v6-11-1-1.html)
 
 ## 概要
 
@@ -339,7 +339,7 @@ Cloud Data Fusion v6.11.1.1 は、Cloud Data Fusion がサポートするすべ�
 
 ## 参考リンク
 
-- [インフォグラフィック](infographic/20260209-cloud-data-fusion-v6-11-1-1.html)
+- [インフォグラフィック](https://takech9203.github.io/google-cloud-news-summary/20260209-cloud-data-fusion-v6-11-1-1.html)
 - [公式リリースノート](https://docs.cloud.google.com/data-fusion/docs/release-notes)
 - [メトリクスの概要](https://docs.cloud.google.com/data-fusion/docs/concepts/metrics-overview)
 - [パイプラインログの表示](https://docs.cloud.google.com/data-fusion/docs/how-to/view-datafusion-logs)
