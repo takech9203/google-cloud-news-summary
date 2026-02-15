@@ -1,0 +1,97 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  GitHub Actions OIDC provider and IAM role for Google Cloud News Summary CI/CD.
+
+Parameters:
+  RoleName:
+    Type: String
+    Default: GitHubActions-GoogleCloudNewsSummary
+    Description: Name of the IAM role
+
+  GitHubOrg:
+    Type: String
+    Description: GitHub repository owner/org (e.g. myorg)
+
+  GitHubRepo:
+    Type: String
+    Description: GitHub repository name (e.g. google-cloud-news-summary)
+
+  OIDCProviderArn:
+    Type: String
+    Default: ""
+    Description: (Optional) Existing OIDC Provider ARN. If not specified, a new provider will be created.
+
+Conditions:
+  CreateOIDCProvider: !Equals [!Ref OIDCProviderArn, ""]
+
+Resources:
+  GitHubOIDCProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: CreateOIDCProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      Tags:
+        - Key: Purpose
+          Value: GitHub Actions OIDC
+
+  BedrockInvokePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub '${RoleName}-BedrockInvoke'
+      Description: Allow invoking Anthropic Claude models via Bedrock (including global cross-region inference)
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: BedrockInvokeModel
+            Effect: Allow
+            Action:
+              - bedrock:InvokeModel
+              - bedrock:InvokeModelWithResponseStream
+            Resource:
+              - arn:aws:bedrock:*:*:inference-profile/global.anthropic.claude-*
+              - arn:aws:bedrock:*::foundation-model/anthropic.claude-*
+              - arn:aws:bedrock:*::foundation-model/us.anthropic.claude-*
+              - arn:aws:bedrock:::foundation-model/anthropic.claude-*
+
+  CICDRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref RoleName
+      ManagedPolicyArns:
+        - !Ref BedrockInvokePolicy
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !If
+                - CreateOIDCProvider
+                - !GetAtt GitHubOIDCProvider.Arn
+                - !Ref OIDCProviderArn
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub: !Sub 'repo:${GitHubOrg}/${GitHubRepo}:*'
+      Tags:
+        - Key: Purpose
+          Value: Google Cloud News Summary CI/CD - GitHub Actions
+
+Outputs:
+  RoleArn:
+    Description: IAM Role ARN to set as AWS_ROLE_ARN in GitHub repository variables
+    Value: !GetAtt CICDRole.Arn
+
+  RoleName:
+    Description: IAM Role name
+    Value: !Ref RoleName
+
+  OIDCProviderArn:
+    Description: GitHub OIDC Provider ARN (created or existing)
+    Value: !If
+      - CreateOIDCProvider
+      - !GetAtt GitHubOIDCProvider.Arn
+      - !Ref OIDCProviderArn
