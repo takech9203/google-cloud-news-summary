@@ -1,0 +1,41 @@
+# Google Cloud ニュースレポート一覧
+
+このページは、Google Cloud の最新ニュースとアップデートに関するレポートの一覧です。
+
+
+## 2026 年
+
+- [2026-02-14 - Google SecOps SIEM: Release 6.3.75 / 6.3.76](2026/2026-02-14-google-secops-siem-release-6-3-75-76.md)
+- [2026-02-13 - Google Distributed Cloud for VMware: バージョン 1.34.100-gke.93 リリース](2026/2026-02-13-google-distributed-cloud-vmware-1-34-100.md)
+- [2026-02-13 - Google Cloud VMware Engine: ve2 ノードタイプが大阪リージョンで利用可能に](2026/2026-02-13-vmware-engine-ve2-osaka.md)
+- [2026-02-13 - Google Distributed Cloud (software only) for bare metal: 1.34.100-gke.93 リリース - NodePoolClaim Taint の可変化](2026/2026-02-13-google-distributed-cloud-bare-metal-1-34-100.md)
+- [2026-02-13 - Dataproc Serverless for Apache Spark: 新ランタイムバージョンリリース](2026/2026-02-13-dataproc-serverless-spark-runtime.md)
+- [2026-02-13 - Network Intelligence Center: Flow Analyzer レイテンシモード GA](2026/2026-02-13-network-intelligence-center-flow-analyzer-latency.md)
+- [2026-02-13 - Bigtable: Flink Bigtable Connector v0.3.2 GA](2026/2026-02-13-bigtable-flink-connector-v0-3-2.md)
+- [2026-02-13 - Google Kubernetes Engine: TPU スライスヘルスモニタリングメトリクス](2026/2026-02-13-gke-tpu-slice-health-monitoring.md)
+- [2026-02-13 - Apigee X: セキュリティ脆弱性 CVE-2025-13292 および複数の CVE 修正](2026/2026-02-13-apigee-x-security-bulletin-gcp-2026-010.md)
+- [2026-02-12 - BigQuery: AI 関数アップデートとデータセットインサイト](2026/2026-02-12-bigquery-ai-functions-dataset-insights.md)
+- [2026-02-12 - Looker Studio: Pro 機能拡張 (課金アカウント変更 + 検索パラメータ追加)](2026/2026-02-12-looker-studio-pro-enhancements.md)
+- [2026-02-12 - Compute Engine: インスタンスフレキシビリティ GA およびインスタントスナップショット整合性グループ Preview](2026/2026-02-12-compute-engine-instance-flexibility-snapshots.md)
+- [2026-02-12 - App Engine Standard Environment: Cloud Run への移行コマンド (Preview)](2026/2026-02-12-app-engine-to-cloud-run-migration.md)
+- [2026-02-12 - Oracle Database@Google Cloud: リージョン拡張 (ロンドン、メルボルン、デリー)](2026/2026-02-12-oracle-database-google-cloud-region-expansion.md)
+- [2026-02-12 - Developer Connect: HTTP コネクション対応](2026/2026-02-12-developer-connect-http-connections.md)
+- [2026-02-12 - Google SecOps: Advanced Joins in Search](2026/2026-02-12-google-secops-advanced-joins.md)
+- [2026-02-12 - Gemini Enterprise: モバイルアプリ Private GA](2026/2026-02-12-gemini-enterprise-mobile-app.md)
+- [2026-02-12 - Cloud Build: asia-southeast3 (Bangkok) リージョン追加](2026/2026-02-12-cloud-build-asia-southeast3.md)
+- [2026-02-11 - Cloud KMS: Autokey for Projects (Public Preview)](2026/2026-02-11-cloud-kms-autokey-for-projects.md)
+- [2026-02-11 - Buildpacks / Cloud Run: osonly24 ランタイム GA](2026/2026-02-11-buildpacks-cloud-run-osonly24-ga.md)
+- [2026-02-11 - Cloud Deploy: Cloud Run ワーカープール GA](2026/2026-02-11-cloud-deploy-cloud-run-worker-pools.md)
+- [2026-02-11 - VPC Service Controls: Managed Lustre Preview サポート](2026/2026-02-11-vpc-service-controls-managed-lustre.md)
+- [2026-02-10 - Google Cloud: 複数サービスの MCP サーバー Preview リリース](2026/2026-02-10-google-cloud-mcp-servers.md)
+- [2026-02-10 - Memorystore for Valkey: バックアップ管理が GA](2026/2026-02-10-memorystore-valkey-backup-management.md)
+- [2026-02-10 - Cloud SQL for MySQL: Vertex AI 統合と Model Endpoint Management の GA](2026/2026-02-10-cloud-sql-mysql-vertex-ai-integration.md)
+- [2026-02-10 - Virtual Private Cloud: カスタム組織ポリシーの内部範囲対応と BYO IPv6 サポート](2026/2026-02-10-vpc-custom-org-policies-byo-ipv6.md)
+- [2026-02-10 - Generative AI on Vertex AI: GLM 5 Experimental リリース](2026/2026-02-10-vertex-ai-glm-5.md)
+- [2026-02-09 - Cloud Data Fusion: v6.11.1.1 GA リリース (InstanceV3 モニタリングリソース導入)](2026/2026-02-09-cloud-data-fusion-v6-11-1-1.md)
+- [2026-02-09 - Looker: 26.2 リリース](2026/2026-02-09-looker-26-2-release.md)
+- [2026-02-09 - Resource Manager: Network Connectivity カスタム制約](2026/2026-02-09-resource-manager-network-connectivity-constraints.md)
+- [2026-02-09 - Google SecOps: ルール可観測性強化と Marketplace コネクタアップデート](2026/2026-02-09-secops-rule-observability-marketplace.md)
+- [2026-02-09 - Gemini Enterprise: Notion データコネクタ (Public Preview)](2026/2026-02-09-gemini-enterprise-notion-connector.md)
+- [2026-02-09 - Document AI: Layout Parser v1.6 (Gemini 3 Flash) Preview](2026/2026-02-09-document-ai-layout-parser-v1-6.md)
+- [2026-02-09 - Spanner: Graph クエリ可視化の操作性向上](2026/2026-02-09-spanner-graph-query-visualization.md)
