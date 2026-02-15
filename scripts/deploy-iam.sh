@@ -18,7 +18,7 @@ STACK_NAME="google-cloud-news-summary-github-iam"
 REGION="us-east-1"
 ROLE_NAME="GitHubActions-GoogleCloudNewsSummary"
 GITHUB_ORG=""
-GITHUB_REPO=""
+GITHUB_REPO="google-cloud-news-summary"
 OIDC_PROVIDER_ARN=""
 
 usage() {
@@ -27,9 +27,9 @@ Usage: $0 -o ORG -r REPO [OPTIONS]
 
 Required:
   -o, --org ORG               GitHub owner/org
-  -r, --repo REPO             GitHub repository name
 
 Optional:
+  -r, --repo REPO             GitHub repository name (default: google-cloud-news-summary)
   -n, --role-name NAME        IAM role name (default: GitHubActions-GoogleCloudNewsSummary)
   -s, --stack-name NAME       CloudFormation stack name (default: google-cloud-news-summary-github-iam)
   -R, --region REGION         AWS region (default: us-east-1)
@@ -71,10 +71,7 @@ if [[ -z "$GITHUB_ORG" ]]; then
   usage
 fi
 
-if [[ -z "$GITHUB_REPO" ]]; then
-  echo "Error: -r/--repo is required."
-  usage
-fi
+# GITHUB_REPO has a default value, so no validation needed
 
 TEMPLATE="${SCRIPT_DIR}/cfn-github-oidc-iam.yaml"
 PARAMS="RoleName=${ROLE_NAME} GitHubOrg=${GITHUB_ORG} GitHubRepo=${GITHUB_REPO}"
