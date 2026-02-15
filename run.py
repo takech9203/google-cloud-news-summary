@@ -38,8 +38,9 @@ from claude_agent_sdk.types import (
 
 # Default prompt for the skill
 DEFAULT_PROMPT = (
-    "Run the google-cloud-news-summary skill to report Google Cloud news from the past week. "
-    "Make sure to invoke the Skill tool with skill='google-cloud-news-summary'."
+    "Report Google Cloud news from the past week. "
+    "Fetch the RSS feed, filter updates, check for duplicates, "
+    "and delegate report creation to subagents."
 )
 
 # Model configuration with fallback
@@ -432,7 +433,11 @@ def is_throttling_error(error: Exception) -> bool:
 
 
 async def run_skill(prompt: str = DEFAULT_PROMPT) -> list[str]:
-    """Run the aws-news-summary skill using Claude Agent SDK.
+    """Run the google-cloud-news-summary skill using Claude Agent SDK with subagents.
+
+    The orchestrator handles RSS feed fetching, parsing, filtering, and
+    duplicate checking, then delegates individual report creation to
+    'report-generator' subagents via the Task tool for parallel execution.
 
     Args:
         prompt: The prompt to send to the skill. Defaults to DEFAULT_PROMPT.
@@ -441,19 +446,36 @@ async def run_skill(prompt: str = DEFAULT_PROMPT) -> list[str]:
         List of newly created report file paths (relative to project_dir).
     """
     print_separator()
-    print("Google Cloud News Summary Automation")
+    print("Google Cloud News Summary Automation (Subagent Mode)")
     print_separator()
     current_time = datetime.now()
     print(f"Start time: {current_time.isoformat()}")
     print(f"Prompt: {prompt[:80]}{'...' if len(prompt) > 80 else ''}")
     print()
 
-    # Add current date context to prompt to help Claude understand the timeline
+    # Add current date context and orchestrator instructions
     prompt_with_context = f"""Current date and time: {current_time.strftime('%Y-%m-%d %H:%M:%S %Z')} (JST)
 
-{prompt}
+You are the orchestrator for Google Cloud news report generation.
+Your job is to:
 
-Note: Please check the current date using the 'date' command before processing to ensure accurate date filtering."""
+1. FETCH the RSS feed: Run `curl -L -s "https://cloud.google.com/feeds/gcp-release-notes.xml" > /tmp/gcp_release_notes.xml`
+2. PARSE the feed: Run `python3 .claude/skills/google-cloud-news-summary/scripts/parse_gcp_release_notes.py --days {{DAYS}} --feed /tmp/gcp_release_notes.xml` (adjust --days based on the user's request; default 7)
+3. FILTER: Remove excluded update types (doc-only updates, minor UI changes). Read the skill definition (.claude/skills/google-cloud-news-summary/SKILL.md) for exclusion rules.
+4. CHECK DUPLICATES: Use Glob to check `reports/{{YYYY}}/*.md` for existing reports. Skip updates that already have reports (match by date and slug).
+5. DELEGATE: For each remaining update, use the 'report-generator' subagent via the Task tool. Provide the update details (title, date, URL, summary, categories) and the output file path (reports/{{YYYY}}/{{YYYY}}-{{MM}}-{{DD}}-{{slug}}.md).
+   BATCH RULES:
+   - Delegate in batches of at most 5 subagents at a time.
+   - Wait for each batch to complete (collect TaskOutput for all tasks in the batch) before launching the next batch.
+   - When collecting TaskOutput, set timeout to 600000 (10 minutes) to allow enough time for report generation.
+   - CRITICAL: When you receive TaskOutput results, respond with ONLY a brief one-line confirmation per task (e.g. "Task X: done"). Do NOT repeat or summarize the subagent's output. This is essential to avoid "Prompt is too long" errors that prevent subsequent batches from running.
+   - After each batch completes, immediately proceed to the next batch until all updates are processed.
+6. BLOG LINKS (optional): After reports are created, fetch the Google Cloud Blog feed and add relevant blog links to reports if found.
+
+User's request: {prompt}
+
+Note: Check the current date using the 'date' command before processing to ensure accurate date filtering.
+Important: When delegating to subagents, include ALL relevant information about the update item so the subagent can work independently."""
 
     # Show logging mode
     if logger.debug:
@@ -518,6 +540,36 @@ Note: Please check the current date using the 'date' command before processing t
             "AWS_REGION": aws_region,
         }
 
+        # Define the report-generator subagent prompt
+        report_subagent_prompt = (
+            "You are a Google Cloud news report generator specialist. "
+            "When given an update item (title, date, URL, summary, categories) "
+            "and an output file path:\n"
+            "1. Read the skill definition from "
+            ".claude/skills/google-cloud-news-summary/SKILL.md "
+            "(invoke the Skill tool with skill='google-cloud-news-summary')\n"
+            "2. Read the report template from "
+            ".claude/skills/google-cloud-news-summary/report_template.md\n"
+            "3. Fetch the Release Notes page details using curl\n"
+            "4. Search Google Developer Knowledge MCP for related documentation\n"
+            "5. Collect pricing information if applicable\n"
+            "6. Collect Before/After context\n"
+            "7. Create a comprehensive report following the template\n"
+            "8. Include a Mermaid architecture diagram when appropriate\n"
+            "9. Save the report to the specified output path\n\n"
+            "Follow the skill's information collection priority:\n"
+            "- Required: Release Notes details, overview, key features\n"
+            "- Important: MCP document search, Before/After context\n"
+            "- Recommended: Pricing info, related services\n"
+            "- Optional: Detailed setup steps, use case implementations\n\n"
+            "Do NOT skip sections that have data available. "
+            "Do NOT fill sections with speculation - only use confirmed information.\n\n"
+            "For the INFOGRAPHIC_URL placeholder, use the environment variable "
+            "INFOGRAPHIC_BASE_URL if available, otherwise leave the placeholder.\n\n"
+            "Make sure to invoke the Skill tool with "
+            "skill='google-cloud-news-summary'."
+        )
+
         for model_index, current_model in enumerate(models_to_try):
             print(f"Executing with model: {current_model}")
             print()
@@ -534,9 +586,9 @@ Note: Please check the current date using the 'date' command before processing t
                         flush=True,
                     )
 
-            # Configure Claude Agent SDK options
-            # Use only project-level MCP settings (not user-level)
-            # to avoid loading MCP servers from ~/.claude/settings.json
+            # Configure Claude Agent SDK options with report-generator subagent
+            # The orchestrator handles RSS fetching, parsing, filtering,
+            # and duplicate checking, then delegates report creation to subagents.
             options = ClaudeAgentOptions(
                 model=current_model,
                 fallback_model=(
@@ -557,6 +609,7 @@ Note: Please check the current date using the 'date' command before processing t
                     "Grep",
                     "Bash",
                     "WebFetch",
+                    "Task",
                     "mcp__google-developer-knowledge__search_documents",
                     "mcp__google-developer-knowledge__get_document",
                     "mcp__google-developer-knowledge__batch_get_documents",
@@ -564,6 +617,35 @@ Note: Please check the current date using the 'date' command before processing t
                     "mcp__cloud-cost__compare_pricing",
                     "mcp__cloud-cost__list_services",
                 ],
+                agents={
+                    "report-generator": AgentDefinition(
+                        description=(
+                            "Generates a detailed Google Cloud news report "
+                            "from a single update item. Use for each update "
+                            "that needs a report. Provide the update details "
+                            "(title, date, URL, summary, categories) and "
+                            "the output file path."
+                        ),
+                        prompt=report_subagent_prompt,
+                        tools=[
+                            "Skill",
+                            "Read",
+                            "Write",
+                            "Edit",
+                            "MultiEdit",
+                            "Glob",
+                            "Grep",
+                            "Bash",
+                            "WebFetch",
+                            "mcp__google-developer-knowledge__search_documents",
+                            "mcp__google-developer-knowledge__get_document",
+                            "mcp__google-developer-knowledge__batch_get_documents",
+                            "mcp__cloud-cost__get_pricing",
+                            "mcp__cloud-cost__compare_pricing",
+                            "mcp__cloud-cost__list_services",
+                        ],
+                    ),
+                },
                 stderr=_on_stderr,
             )
 
@@ -574,6 +656,7 @@ Note: Please check the current date using the 'date' command before processing t
             skipped_reports: list[str] = []
             msg_count = 0
             current_task = ""
+            result_received = False  # Track if ResultMessage was received
 
             logger.log_verbose(f"Starting query execution at {logger.elapsed()}")
             last_message_time = time.time()
@@ -723,6 +806,11 @@ Note: Please check the current date using the 'date' command before processing t
                                     skill_name = tool_input.get("skill", "") if isinstance(tool_input, dict) else ""
                                     print(f"\n  [Skill invoked: {skill_name}] ({logger.elapsed()})", flush=True)
 
+                                # Task - subagent delegation
+                                elif tool_name == "Task":
+                                    desc = tool_input.get("description", "") if isinstance(tool_input, dict) else ""
+                                    print(f"\n  -> Subagent task: {desc[:80]} ({logger.elapsed()})", flush=True)
+
                                 # Google Cloud docs search
                                 elif "mcp__google-developer-knowledge" in str(tool_name):
                                     if "search" in tool_name:
@@ -755,6 +843,7 @@ Note: Please check the current date using the 'date' command before processing t
 
                     elif isinstance(message, ResultMessage):
                         subtype = getattr(message, "subtype", None)
+                        result_received = True
                         if subtype == "success":
                             print(f"\n\nCompleted! ({report_count} reports, {msg_count} messages, {logger.elapsed()})")
                         elif subtype == "error_during_execution":
@@ -857,6 +946,20 @@ Note: Please check the current date using the 'date' command before processing t
 
             except Exception as e:
                 error_str = str(e)
+
+                # If ResultMessage was already received, the task completed
+                # successfully but the CLI process exited with non-zero code.
+                # This is a known SDK issue - treat as success.
+                if result_received and "exit code" in error_str:
+                    logger.log_warn(
+                        f"CLI exited with error after ResultMessage: {error_str[:200]}"
+                    )
+                    print(
+                        f"\n  (CLI exit code error ignored - task already completed)",
+                        flush=True,
+                    )
+                    break
+
                 logger.log_error(f"Exception at {logger.elapsed()}: {type(e).__name__}: {error_str[:200]}")
 
                 if is_throttling_error(e) and model_index < len(models_to_try) - 1:
@@ -975,10 +1078,8 @@ def _report_to_infographic_path(report_path: str) -> str:
 async def generate_infographics(report_paths: list[str]) -> list[str]:
     """Generate infographics using Claude Agent SDK subagents.
 
-    A single query() call is made with an 'infographic-generator' subagent
-    defined via AgentDefinition. The main agent is instructed to delegate
-    each report to the subagent via the Task tool, which Claude can run
-    in parallel automatically.
+    Processes reports in batches of BATCH_SIZE, making a separate query()
+    call per batch to avoid "Prompt is too long" errors.
 
     Args:
         report_paths: List of report file paths relative to project_dir.
@@ -986,6 +1087,8 @@ async def generate_infographics(report_paths: list[str]) -> list[str]:
     Returns:
         List of created infographic file paths.
     """
+    BATCH_SIZE = 5
+
     if not report_paths:
         print("No reports to generate infographics for.")
         return []
@@ -1012,25 +1115,6 @@ async def generate_infographics(report_paths: list[str]) -> list[str]:
     print_separator()
     print()
 
-    # Build the task list for the orchestrator prompt
-    task_lines = []
-    for i, rp in enumerate(targets, 1):
-        html_path = _report_to_infographic_path(rp)
-        task_lines.append(f"  {i}. Report: '{rp}' -> Output: '{html_path}'")
-    task_list = "\n".join(task_lines)
-
-    orchestrator_prompt = (
-        f"You have {len(targets)} report(s) that each need an infographic.\n"
-        f"For EACH report below, use the 'infographic-generator' subagent "
-        f"via the Task tool to generate the infographic. "
-        f"Delegate ALL of them so they run in parallel.\n\n"
-        f"Reports to process:\n{task_list}\n\n"
-        f"For each task, tell the subagent:\n"
-        f"- Which report file to read\n"
-        f"- Where to save the output HTML\n"
-        f"Wait for all subagents to complete, then summarize the results."
-    )
-
     subagent_prompt = (
         "You are an infographic generator specialist. "
         "When given a report file path and output path:\n"
@@ -1052,139 +1136,217 @@ async def generate_infographics(report_paths: list[str]) -> list[str]:
         "AWS_REGION": os.environ.get("AWS_REGION", "us-east-1"),
     }
 
-    for model_index, current_model in enumerate(models_to_try):
-        infographic_stderr: list[str] = []
+    # Process in batches
+    total_batches = (len(targets) + BATCH_SIZE - 1) // BATCH_SIZE
+    for batch_idx in range(total_batches):
+        batch_start = batch_idx * BATCH_SIZE
+        batch_end = min(batch_start + BATCH_SIZE, len(targets))
+        batch = targets[batch_start:batch_end]
 
-        def _on_infographic_stderr(line: str) -> None:
-            infographic_stderr.append(line)
-
-        options = ClaudeAgentOptions(
-            model=current_model,
-            fallback_model=(
-                FALLBACK_MODEL if current_model == PRIMARY_MODEL else None
-            ),
-            env=bedrock_env,
-            cwd=str(project_dir),
-            setting_sources=["project"],
-            # Task tool is required for subagent invocation
-            allowed_tools=[
-                "Skill",
-                "Read",
-                "Write",
-                "Edit",
-                "MultiEdit",
-                "Glob",
-                "Bash",
-                "Task",
-            ],
-            agents={
-                "infographic-generator": AgentDefinition(
-                    description=(
-                        "Generates an infographic HTML file from a report. "
-                        "Use for each report that needs an infographic."
-                    ),
-                    prompt=subagent_prompt,
-                    tools=[
-                        "Skill",
-                        "Read",
-                        "Write",
-                        "Edit",
-                        "MultiEdit",
-                        "Glob",
-                        "Bash",
-                    ],
-                ),
-            },
-            stderr=_on_infographic_stderr,
+        print(
+            f"  Batch {batch_idx + 1}/{total_batches} "
+            f"({len(batch)} reports)"
         )
 
-        try:
-            msg_count = 0
-            start_time = time.time()
+        # Build task list for this batch
+        task_lines = []
+        for i, rp in enumerate(batch, 1):
+            html_path = _report_to_infographic_path(rp)
+            task_lines.append(
+                f"  {i}. Report: '{rp}' -> Output: '{html_path}'"
+            )
+        task_list = "\n".join(task_lines)
 
-            async for message in query(
-                prompt=orchestrator_prompt, options=options
-            ):
-                msg_count += 1
+        orchestrator_prompt = (
+            f"You have {len(batch)} report(s) that each need an "
+            f"infographic.\n"
+            f"For EACH report below, use the 'infographic-generator' "
+            f"subagent via the Task tool to generate the infographic. "
+            f"Delegate ALL of them so they run in parallel.\n"
+            f"When collecting TaskOutput, set timeout to 600000.\n\n"
+            f"Reports to process:\n{task_list}\n\n"
+            f"For each task, tell the subagent:\n"
+            f"- Which report file to read\n"
+            f"- Where to save the output HTML\n"
+            f"Wait for all subagents to complete, then confirm done."
+        )
 
-                if isinstance(message, AssistantMessage):
-                    content = getattr(message, "content", [])
-                    for block in (
-                        content if isinstance(content, list) else []
-                    ):
-                        if isinstance(block, ToolUseBlock):
-                            tool_name = block.name
-                            tool_input = (
-                                block.input
-                                if hasattr(block, "input")
-                                else {}
-                            )
-                            if tool_name == "Task":
-                                desc = (
-                                    tool_input.get("description", "")
-                                    if isinstance(tool_input, dict)
-                                    else ""
+        for model_index, current_model in enumerate(models_to_try):
+            infographic_stderr: list[str] = []
+
+            def _on_infographic_stderr(line: str) -> None:
+                infographic_stderr.append(line)
+
+            options = ClaudeAgentOptions(
+                model=current_model,
+                fallback_model=(
+                    FALLBACK_MODEL
+                    if current_model == PRIMARY_MODEL
+                    else None
+                ),
+                env=bedrock_env,
+                cwd=str(project_dir),
+                setting_sources=["project"],
+                allowed_tools=[
+                    "Skill",
+                    "Read",
+                    "Write",
+                    "Edit",
+                    "MultiEdit",
+                    "Glob",
+                    "Bash",
+                    "Task",
+                ],
+                agents={
+                    "infographic-generator": AgentDefinition(
+                        description=(
+                            "Generates an infographic HTML file from "
+                            "a report. Use for each report that needs "
+                            "an infographic."
+                        ),
+                        prompt=subagent_prompt,
+                        tools=[
+                            "Skill",
+                            "Read",
+                            "Write",
+                            "Edit",
+                            "MultiEdit",
+                            "Glob",
+                            "Bash",
+                        ],
+                    ),
+                },
+                stderr=_on_infographic_stderr,
+            )
+
+            try:
+                msg_count = 0
+                start_time = time.time()
+                infographic_result_received = False
+
+                async for message in query(
+                    prompt=orchestrator_prompt, options=options
+                ):
+                    msg_count += 1
+
+                    if isinstance(message, AssistantMessage):
+                        content = getattr(message, "content", [])
+                        for block in (
+                            content
+                            if isinstance(content, list)
+                            else []
+                        ):
+                            if isinstance(block, ToolUseBlock):
+                                tool_name = block.name
+                                tool_input = (
+                                    block.input
+                                    if hasattr(block, "input")
+                                    else {}
                                 )
-                                print(
-                                    f"  -> Subagent task: {desc[:80]}",
-                                    flush=True,
-                                )
-                            elif tool_name == "Write":
-                                file_path = (
-                                    tool_input.get("file_path", "")
-                                    if isinstance(tool_input, dict)
-                                    else ""
-                                )
-                                if "infographic/" in file_path:
-                                    fname = file_path.split("/")[-1]
+                                if tool_name == "Task":
+                                    desc = (
+                                        tool_input.get(
+                                            "description", ""
+                                        )
+                                        if isinstance(
+                                            tool_input, dict
+                                        )
+                                        else ""
+                                    )
                                     print(
-                                        f"  -> Creating: {fname}",
+                                        f"    -> {desc[:80]}",
                                         flush=True,
                                     )
+                                elif tool_name == "Write":
+                                    file_path = (
+                                        tool_input.get(
+                                            "file_path", ""
+                                        )
+                                        if isinstance(
+                                            tool_input, dict
+                                        )
+                                        else ""
+                                    )
+                                    if "infographic/" in file_path:
+                                        fname = (
+                                            file_path.split("/")[-1]
+                                        )
+                                        print(
+                                            f"    -> Creating: "
+                                            f"{fname}",
+                                            flush=True,
+                                        )
 
-                elif isinstance(message, ResultMessage):
-                    subtype = getattr(message, "subtype", None)
-                    if subtype == "success":
-                        elapsed = time.time() - start_time
+                    elif isinstance(message, ResultMessage):
+                        subtype = getattr(message, "subtype", None)
+                        infographic_result_received = True
+                        if subtype == "success":
+                            elapsed = time.time() - start_time
+                            print(
+                                f"    Done ({msg_count} msgs, "
+                                f"{elapsed:.0f}s)"
+                            )
+                        elif subtype == "error_during_execution":
+                            error_msg = getattr(
+                                message, "error", None
+                            )
+                            print(
+                                f"    Error: {error_msg}"
+                                if error_msg
+                                else "    Error during execution"
+                            )
+
+                # Check which infographics were created in this batch
+                for rp in batch:
+                    html_path = _report_to_infographic_path(rp)
+                    if (project_dir / html_path).exists():
+                        created.append(html_path)
+                    else:
+                        name = Path(rp).stem
                         print(
-                            f"  Orchestrator done "
-                            f"({msg_count} msgs, {elapsed:.0f}s)"
-                        )
-                    elif subtype == "error_during_execution":
-                        error_msg = getattr(message, "error", None)
-                        print(
-                            f"  Error: {error_msg}"
-                            if error_msg
-                            else "  Error during execution"
+                            f"    Warning: {html_path} not created"
                         )
 
-            # Check which infographics were actually created
-            for rp in targets:
-                html_path = _report_to_infographic_path(rp)
-                if (project_dir / html_path).exists():
-                    created.append(html_path)
+                break  # Success, exit model retry loop
+
+            except Exception as e:
+                error_str = str(e)
+
+                if (
+                    infographic_result_received
+                    and "exit code" in error_str
+                ):
+                    print(
+                        f"    (CLI exit code error ignored)"
+                    )
+                    for rp in batch:
+                        html_path = _report_to_infographic_path(rp)
+                        if (project_dir / html_path).exists():
+                            created.append(html_path)
+                    break
+
+                if (
+                    is_throttling_error(e)
+                    and model_index < len(models_to_try) - 1
+                ):
+                    print(
+                        f"    Throttled, retrying with fallback..."
+                    )
+                    continue
                 else:
-                    name = Path(rp).stem
-                    print(f"  Warning: {html_path} not created ({name})")
-
-            break  # Success, exit model retry loop
-
-        except Exception as e:
-            if is_throttling_error(e) and model_index < len(models_to_try) - 1:
-                print(
-                    f"  Throttled on {current_model}, "
-                    f"retrying with fallback..."
-                )
-                continue
-            else:
-                print(
-                    f"  Error: {type(e).__name__}: {str(e)[:100]}"
-                )
-                if infographic_stderr:
-                    print("  CLI stderr (last 20 lines):")
-                    for sl in infographic_stderr[-20:]:
-                        print(f"    {sl}")
-                break
+                    print(
+                        f"    Error: {type(e).__name__}: "
+                        f"{str(e)[:100]}"
+                    )
+                    if infographic_stderr:
+                        for sl in infographic_stderr[-10:]:
+                            print(f"      {sl}")
+                    # Check created files even on error
+                    for rp in batch:
+                        html_path = _report_to_infographic_path(rp)
+                        if (project_dir / html_path).exists():
+                            created.append(html_path)
+                    break
 
     print()
     print_separator()

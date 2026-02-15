@@ -40,6 +40,13 @@
 - GitHub Actions: `.github/workflows/`
 - 毎日自動実行され、新しいレポートとインフォグラフィックを生成
 
+### Subagent アーキテクチャ
+
+`run.py` はレポート作成とインフォグラフィック作成の両方で subagent パターンを採用しています。
+
+- Phase 1 (レポート作成): オーケストレーターが RSS 取得・パース・フィルタリング・重複チェックを行い、`report-generator` subagent に個別レポート作成を委譲 (並列実行)
+- Phase 2 (インフォグラフィック作成): `infographic-generator` subagent に個別インフォグラフィック作成を委譲 (並列実行)
+
 ## MCP サーバー
 
 このプロジェクトでは Google Developer Knowledge MCP server を使用しています。
