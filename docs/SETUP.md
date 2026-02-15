@@ -18,6 +18,10 @@
   - [ステップ 1: GitHub リポジトリ変数を設定](#ステップ-1-github-リポジトリ変数を設定)
   - [ステップ 2: ワークフロー設定を確認](#ステップ-2-ワークフロー設定を確認)
   - [ステップ 3: ワークフローをテスト](#ステップ-3-ワークフローをテスト)
+- [パート 4: GitHub Pages セットアップ](#パート-4-github-pages-セットアップ)
+  - [ステップ 1: GitHub Pages を有効化](#ステップ-1-github-pages-を有効化)
+  - [ステップ 2: INFOGRAPHIC\_BASE\_URL を設定](#ステップ-2-infographic_base_url-を設定)
+  - [ステップ 3: デプロイを確認](#ステップ-3-デプロイを確認)
 - [トラブルシューティング](#トラブルシューティング)
   - [よくある問題](#よくある問題)
     - ["Not authorized to perform sts:AssumeRoleWithWebIdentity"](#not-authorized-to-perform-stsassumerolewithwebidentity)
@@ -315,6 +319,67 @@ steps:
 2. **Google Cloud News Summary** ワークフローを選択
 3. **Run workflow** → **Run workflow** をクリック
 
+## パート 4: GitHub Pages セットアップ
+
+このプロジェクトでは、生成されたインフォグラフィック (HTML ファイル) を GitHub Pages で公開します。
+
+```mermaid
+flowchart LR
+    A(["📋 GitHub Actions"]) --> B["📊 インフォグラフィック生成"]
+    B --> C["📂 infographic/ ディレクトリ"]
+    C --> D["🚀 gh-pages ブランチにデプロイ"]
+    D --> E(["🌐 GitHub Pages で公開"])
+
+    style A fill:#E8F1FF,stroke:#4A90E2,stroke-width:2px,color:#333333
+    style E fill:#E8F1FF,stroke:#4A90E2,stroke-width:2px,color:#333333
+    style B fill:#FFE0B2,stroke:#FFCC80,stroke-width:2px,color:#5D4037
+    style C fill:#DCEDC8,stroke:#C5E1A5,stroke-width:2px,color:#33691E
+    style D fill:#FFE0B2,stroke:#FFCC80,stroke-width:2px,color:#5D4037
+```
+
+### ステップ 1: GitHub Pages を有効化
+
+1. リポジトリ → **Settings** → **Pages** に移動
+2. **Source** セクションで以下を設定する。
+   - **Branch**: `gh-pages`
+   - **Folder**: `/ (root)`
+3. **Save** をクリック
+
+数分後、ページが公開されます。以下のような URL が表示されます。
+
+```
+Your site is published at https://<username>.github.io/<repository>/
+```
+
+### ステップ 2: INFOGRAPHIC_BASE_URL を設定
+
+**重要**: `INFOGRAPHIC_BASE_URL` には GitHub Pages のベース URL のみを設定し、`/infographic` などのサブディレクトリは含めないでください。
+
+1. リポジトリ → **Settings** → **Secrets and variables** → **Actions** に移動
+2. **Variables** タブで `INFOGRAPHIC_BASE_URL` を確認
+3. 値が以下の形式であることを確認する。
+   - ✅ 正しい例: `https://yourusername.github.io/google-cloud-news-summary`
+   - ❌ 間違った例: `https://yourusername.github.io/google-cloud-news-summary/infographic`
+
+既に設定済みの場合は、値が正しいことを確認してください。
+
+### ステップ 3: デプロイを確認
+
+1. **Actions** タブで最新のワークフロー実行を確認
+2. `deploy-pages` ジョブが成功していることを確認
+3. ブラウザで以下の URL にアクセスする。
+   - インデックスページ: `https://<username>.github.io/<repository>/`
+   - 個別のインフォグラフィック: `https://<username>.github.io/<repository>/20260214-*.html`
+
+**デプロイの流れ**:
+
+GitHub Actions ワークフローは以下の 2 つのジョブで構成されています。
+
+1. **generate-reports**: レポートとインフォグラフィックを生成し、main ブランチにコミット
+2. **deploy-pages**: インフォグラフィックを `gh-pages` ブランチにデプロイ
+
+`deploy-pages` ジョブは `generate-reports` ジョブの完了後に実行され、`infographic/` ディレクトリ内のすべての HTML ファイルを `gh-pages` ブランチの root にコピーします。
+
 ## トラブルシューティング
 
 ### よくある問題
@@ -342,6 +407,19 @@ steps:
 
 - GitHub Actions のワークフロー設定で `permissions.contents: write` が設定されていることを確認
 - ブランチ保護ルールを確認 (main ブランチが保護されている場合、Actions からのプッシュを許可する設定が必要)
+
+#### GitHub Pages が表示されない
+
+- **Settings → Pages** で GitHub Pages が有効化されていることを確認
+- Source が `gh-pages` ブランチの `/ (root)` に設定されていることを確認
+- **Actions** タブで `deploy-pages` ジョブが成功していることを確認
+- `gh-pages` ブランチが存在し、HTML ファイルが含まれていることを確認
+
+#### インフォグラフィックへのリンクが 404 エラーになる
+
+- `INFOGRAPHIC_BASE_URL` の値を確認 (末尾に `/infographic` が含まれていないこと)
+- GitHub Pages の URL と `INFOGRAPHIC_BASE_URL` が一致していることを確認
+- レポート内のリンクが絶対 URL (例: `https://yourusername.github.io/repository/20260214-*.html`) であることを確認
 
 ### OIDC トークンクレームの確認
 
