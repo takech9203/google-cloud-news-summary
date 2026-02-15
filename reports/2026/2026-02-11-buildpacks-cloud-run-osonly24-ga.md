@@ -5,7 +5,7 @@
 **機能**: osonly24 ランタイム (OS only runtime) の一般提供開始
 **ステータス**: GA (Generally Available)
 
-[このアップデートのインフォグラフィックを見る](../../infographic/20260211-buildpacks-cloud-run-osonly24-ga.html)
+[このアップデートのインフォグラフィックを見る](https://takech9203.github.io/google-cloud-news-summary/20260211-buildpacks-cloud-run-osonly24-ga.html)
 
 ## 概要
 
@@ -283,7 +283,7 @@ osonly24 ランタイムは Cloud Run が利用可能なすべてのリージョ
 
 ## 参考リンク
 
-- [このアップデートのインフォグラフィック](../../infographic/20260211-buildpacks-cloud-run-osonly24-ga.html)
+- [このアップデートのインフォグラフィック](https://takech9203.github.io/google-cloud-news-summary/20260211-buildpacks-cloud-run-osonly24-ga.html)
 - [公式リリースノート (Buildpacks)](https://cloud.google.com/docs/buildpacks/release-notes#February_11_2026)
 - [公式リリースノート (Cloud Run)](https://cloud.google.com/run/docs/release-notes#February_11_2026)
 - [OS only ランタイムの設定 (Configure the OS only runtime)](https://cloud.google.com/docs/buildpacks/osonly)

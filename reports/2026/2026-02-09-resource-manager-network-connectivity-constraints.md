@@ -5,7 +5,7 @@
 **機能**: Network Connectivity リソースへのカスタム組織ポリシー制約
 **ステータス**: Feature
 
-[このアップデートのインフォグラフィックを見る](../../infographic/20260209-resource-manager-network-connectivity-constraints.html)
+[このアップデートのインフォグラフィックを見る](https://takech9203.github.io/google-cloud-news-summary/20260209-resource-manager-network-connectivity-constraints.html)
 
 ## 概要
 
@@ -332,7 +332,7 @@ Organization Policy Service (カスタム制約を含む) は無料で提供さ�
 
 ## 参考リンク
 
-- [このアップデートのインフォグラフィック](../../infographic/20260209-resource-manager-network-connectivity-constraints.html)
+- [このアップデートのインフォグラフィック](https://takech9203.github.io/google-cloud-news-summary/20260209-resource-manager-network-connectivity-constraints.html)
 - [公式リリースノート](https://cloud.google.com/release-notes#February_09_2026)
 - [NCC カスタム組織ポリシーのドキュメント](https://cloud.google.com/network-connectivity/docs/network-connectivity-center/how-to/org-policy-constraints)
 - [Cloud Interconnect カスタム制約のドキュメント](https://cloud.google.com/network-connectivity/docs/interconnect/how-to/custom-constraints)

@@ -5,7 +5,7 @@
 **機能**: NodePoolClaim リソースの spec.taints フィールドが可変 (Mutable) に対応
 **ステータス**: Feature / Announcement
 
-📊 [このアップデートのインフォグラフィックを見る](https://takech9203.github.io/google-cloud-news-summary/infographic/20260213-google-distributed-cloud-bare-metal-1-34-100.html)
+📊 [このアップデートのインフォグラフィックを見る](https://takech9203.github.io/google-cloud-news-summary/20260213-google-distributed-cloud-bare-metal-1-34-100.html)
 
 ## 概要
 
@@ -289,7 +289,7 @@ Google Distributed Cloud (software only) for bare metal のクラスタは vCPU 
 
 ## 参考リンク
 
-- 📊 [インフォグラフィック](https://takech9203.github.io/google-cloud-news-summary/infographic/20260213-google-distributed-cloud-bare-metal-1-34-100.html)
+- 📊 [インフォグラフィック](https://takech9203.github.io/google-cloud-news-summary/20260213-google-distributed-cloud-bare-metal-1-34-100.html)
 - [公式リリースノート](https://docs.cloud.google.com/release-notes#February_13_2026)
 - [Google Distributed Cloud (software only) for bare metal リリースノート](https://cloud.google.com/kubernetes-engine/distributed-cloud/bare-metal/docs/release-notes)
 - [クラスタ構成フィールドリファレンス](https://cloud.google.com/kubernetes-engine/distributed-cloud/bare-metal/docs/reference/cluster-config-ref)

@@ -5,7 +5,7 @@
 **機能**: Graph クエリ可視化の右クリックコンテキストメニュー
 **ステータス**: Feature (機能改善)
 
-[このアップデートのインフォグラフィックを見る](../../infographic/20260209-spanner-graph-query-visualization.html)
+[このアップデートのインフォグラフィックを見る](https://takech9203.github.io/google-cloud-news-summary/20260209-spanner-graph-query-visualization.html)
 
 ## 概要
 
@@ -227,7 +227,7 @@ Spanner Graph のクエリ可視化は Spanner Studio (Google Cloud コンソー
 
 ## 参考リンク
 
-- [このアップデートのインフォグラフィック](../../infographic/20260209-spanner-graph-query-visualization.html)
+- [このアップデートのインフォグラフィック](https://takech9203.github.io/google-cloud-news-summary/20260209-spanner-graph-query-visualization.html)
 - [公式リリースノート](https://cloud.google.com/release-notes#February_09_2026)
 - [Work with Spanner Graph visualizations](https://cloud.google.com/spanner/docs/graph/work-with-visualizations)
 - [Spanner Graph overview](https://cloud.google.com/spanner/docs/graph/overview)

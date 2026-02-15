@@ -5,7 +5,7 @@
 **機能**: メンテナンスリリース 6.3.75 / 6.3.76
 **ステータス**: 6.3.75 全リージョン提供開始 / 6.3.76 第1フェーズ展開中
 
-📊 [このアップデートのインフォグラフィックを見る](https://takech9203.github.io/google-cloud-news-summary/infographic/20260214-google-secops-siem-release-6-3-75-76.html)
+📊 [このアップデートのインフォグラフィックを見る](https://takech9203.github.io/google-cloud-news-summary/20260214-google-secops-siem-release-6-3-75-76.html)
 
 ## 概要
 
@@ -109,7 +109,7 @@ Google SecOps SIEM のリリースは以下の 2 段階で展開される。リ�
 
 ## 参考リンク
 
-- 📊 [インフォグラフィック](https://takech9203.github.io/google-cloud-news-summary/infographic/20260214-google-secops-siem-release-6-3-75-76.html)
+- 📊 [インフォグラフィック](https://takech9203.github.io/google-cloud-news-summary/20260214-google-secops-siem-release-6-3-75-76.html)
 - [Google Cloud Release Notes](https://docs.cloud.google.com/release-notes#February_14_2026)
 - [Google SecOps SIEM 概要ドキュメント](https://docs.cloud.google.com/chronicle/docs/overview)
 - [Google SecOps リリース展開計画](https://docs.cloud.google.com/chronicle/docs/soar/overview-and-introduction/soar-gradual-release)

@@ -5,7 +5,7 @@
 **機能**: ルール可観測性の強化 (メタデータ、ビジュアルインジケーター、ダッシュボード) および Marketplace コネクタ v15.0-v22.0
 **ステータス**: Feature / Change
 
-[このアップデートのインフォグラフィックを見る](../../infographic/20260209-secops-rule-observability-marketplace.html)
+[このアップデートのインフォグラフィックを見る](https://takech9203.github.io/google-cloud-news-summary/20260209-secops-rule-observability-marketplace.html)
 
 ## 概要
 
@@ -202,7 +202,7 @@ Google SecOps のルールリプレイは、ルールタイプに応じて以下
 
 ## 参考リンク
 
-- [このアップデートのインフォグラフィック](../../infographic/20260209-secops-rule-observability-marketplace.html)
+- [このアップデートのインフォグラフィック](https://takech9203.github.io/google-cloud-news-summary/20260209-secops-rule-observability-marketplace.html)
 - [公式リリースノート (Google SecOps)](https://cloud.google.com/chronicle/docs/release-notes#February_09_2026)
 - [公式リリースノート (Google SecOps Marketplace)](https://cloud.google.com/chronicle/docs/soar/marketplace-integrations/release-notes)
 - [Understand rule replays and MTTD](https://cloud.google.com/chronicle/docs/detection/rule-replays)
