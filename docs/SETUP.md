@@ -73,13 +73,14 @@ sequenceDiagram
 以下のスクリプトで、GitHub OIDC プロバイダー、Bedrock 用 IAM ポリシー、IAM ロールを CloudFormation スタックとして一括作成できます。
 
 ```bash
-./scripts/deploy-iam.sh -o <OWNER> -r <REPO>
+./scripts/deploy-iam.sh -o <OWNER>
 ```
 
 - `<OWNER>`: GitHub リポジトリのオーナー/org (例: `myorg`)
-- `<REPO>`: GitHub リポジトリ名 (例: `google-cloud-news-summary`)
 
-**自動検出機能**: スクリプトは自動的に既存の GitHub Actions OIDC プロバイダーを検出します。既存のプロバイダーが見つかった場合は、それを使用します（新規作成をスキップ）。見つからない場合は、新しいプロバイダーを作成します。
+リポジトリ名はデフォルトで `google-cloud-news-summary` が使用されます。別のリポジトリ名を使用する場合は `-r` オプションで指定できます。
+
+**自動検出機能**: スクリプトは自動的に既存の GitHub Actions OIDC プロバイダーを検出します。既存のプロバイダーが見つかった場合は、それを使用します (新規作成をスキップ)。見つからない場合は、新しいプロバイダーを作成します。
 
 #### オプション
 
@@ -97,16 +98,19 @@ sequenceDiagram
 **カスタマイズオプション**:
 
 ```bash
+# カスタムリポジトリ名を指定
+./scripts/deploy-iam.sh -o myorg -r my-custom-repo
+
 # カスタムロール名とリージョンを指定
-./scripts/deploy-iam.sh -o myorg -r google-cloud-news-summary \
+./scripts/deploy-iam.sh -o myorg \
   -n MyCustomRole -R us-west-2
 
 # カスタムスタック名を指定
-./scripts/deploy-iam.sh -o myorg -r google-cloud-news-summary \
+./scripts/deploy-iam.sh -o myorg \
   -s my-custom-stack
 
-# 明示的に OIDC プロバイダー ARN を指定（自動検出をオーバーライド）
-./scripts/deploy-iam.sh -o myorg -r google-cloud-news-summary \
+# 明示的に OIDC プロバイダー ARN を指定 (自動検出をオーバーライド)
+./scripts/deploy-iam.sh -o myorg \
   -p arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com
 ```
 
