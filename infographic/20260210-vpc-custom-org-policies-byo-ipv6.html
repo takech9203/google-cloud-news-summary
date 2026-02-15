@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VPC: カスタム組織ポリシーの内部範囲対応と BYO IPv6 サポート</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    /* Google Cloud Light Theme Base Styles */
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; min-width: 280px; }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2, .section-title {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 12px 0;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--gc-outline);
+      text-align: right;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card.teal { border-left-color: var(--gc-teal); }
+    .card.green { border-left-color: var(--gc-green); }
+    .card.purple { border-left-color: var(--gc-purple); }
+    .card.orange { border-left-color: var(--gc-orange); }
+    .card.red { border-left-color: var(--gc-red); }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); color: #FFFFFF; }
+
+    /* Before/After */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h4 {
+      color: var(--gc-red);
+      margin: 0 0 12px 0;
+      font-size: 15px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box h4 {
+      color: var(--gc-green);
+      margin: 0 0 12px 0;
+      font-size: 15px;
+    }
+
+    .before-box ul, .after-box ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+      line-height: 1.8;
+    }
+
+    /* Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.teal-grad {
+      background: linear-gradient(135deg, #00ACC1, #00838F);
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    /* Flow diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+      font-size: 14px;
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Mermaid */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* Code blocks */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      background: #1E1E1E;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Note/Warning boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .teal-box {
+      background: var(--gc-teal-tint);
+      border-left: 4px solid var(--gc-teal);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Use case card */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-800);
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .usecase-card p {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* Feature grid */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    /* Two column grid */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .header { flex-direction: column; }
+      .subtitle { text-align: left; margin-top: 8px; }
+      h1 { font-size: 24px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .two-col { grid-template-columns: 1fr; }
+      .flow-diagram { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); }
+    }
+
+    /* Links */
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    /* List styles */
+    .content-list {
+      margin: 8px 0;
+      padding-left: 0;
+      list-style: none;
+    }
+
+    .content-list li {
+      padding: 4px 0;
+      font-size: 14px;
+      line-height: 1.7;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .content-list li::before {
+      content: none;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 6px 0;
+      font-size: 14px;
+    }
+  </style>
+  <!-- highlight.js -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>&#x2601;&#xFE0F; Virtual Private Cloud: カスタム組織ポリシーの内部範囲対応と BYO IPv6 サポート</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">VPC</span>
+          <span class="badge" style="background: var(--gc-teal);">Networking</span>
+          <span class="badge-ga">GA</span>
+        </div>
+      </div>
+      <div class="subtitle">
+        2026-02-10 (カスタム組織ポリシー)<br>
+        2026-02-09 (BYO IPv6)
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>&#x1F4CB; 概要</h2>
+      <p>Google Cloud Virtual Private Cloud (VPC) に <span class="highlight">2 つのネットワーク管理機能</span>が追加されました。</p>
+
+      <div class="two-col" style="margin-top: 16px;">
+        <div class="teal-box">
+          <strong>&#x1F3DB;&#xFE0F; カスタム組織ポリシーの内部範囲対応</strong>
+          <p style="font-size: 14px; margin-top: 8px;"><code>networkconnectivity.googleapis.com/InternalRange</code> リソースに対して、Common Expression Language (CEL) を使用したきめ細かな制約を定義可能に。組織全体の IP アドレス管理ガバナンスを統一的に適用できます。</p>
+        </div>
+        <div class="teal-box">
+          <strong>&#x1F310; BYO IPv6 グローバルユニキャストアドレス</strong>
+          <p style="font-size: 14px; margin-top: 8px;">自社所有の IPv6 GUA をサブネットの内部 IPv6 アドレス範囲に割り当て可能に。GUA はプライベートに使用され、Google 提供の ULA と同様に機能します。</p>
+        </div>
+      </div>
+
+      <h3>Before / After</h3>
+      <div class="before-after">
+        <div class="before-box">
+          <h4>&#x274C; アップデート前の課題</h4>
+          <ul>
+            <li>カスタム組織ポリシーは VPC の Network、Subnetwork、Route などに対応していたが、InternalRange リソースの制約手段がなかった</li>
+            <li>IPv6 内部サブネット範囲は Google 提供の ULA (<code>fd20::/20</code>) に限定されていた</li>
+            <li>オンプレミス/マルチクラウド環境の既存 IPv6 GUA との統一管理が困難だった</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h4>&#x2705; アップデート後の改善</h4>
+          <ul>
+            <li>InternalRange の各フィールドに対してカスタム制約を定義し、組織全体の IP アドレス管理ポリシーを強制可能に</li>
+            <li>自社所有 IPv6 GUA をサブネットの内部 IPv6 アドレス範囲として割り当て可能に</li>
+            <li>BYOIP で提供される内部サブネット範囲はインターネットにアドバタイズされず、ULA と同じ方法で使用可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>&#x1F5FA;&#xFE0F; アーキテクチャ図</h2>
+      <p>カスタム組織ポリシーによる内部範囲の制御と、BYOIP を使用した IPv6 GUA のサブネットへの割り当てフローを示します。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph OrgPolicy["&#x1F3DB;&#xFE0F; Organization Policy Service"]
+        Admin(["&#x1F464; 組織ポリシー管理者"])
+        CustomConstraint["&#x1F4CB; カスタム制約&lt;br/&gt;(CEL 条件)"]
+        Policy["&#x1F4DC; 組織ポリシー"]
+    end
+
+    subgraph VPCNetwork["&#x2601;&#xFE0F; VPC Network"]
+        subgraph InternalRanges["&#x1F512; Internal Ranges"]
+            IR1["&#x1F4CD; 内部範囲 A&lt;br/&gt;(IPv4: 10.0.0.0/16)"]
+            IR2["&#x1F4CD; 内部範囲 B&lt;br/&gt;(IPv6 GUA: BYO)"]
+        end
+        subgraph Subnets["&#x1F310; Subnets"]
+            Sub1["&#x1F4E6; サブネット 1&lt;br/&gt;(IPv4 + ULA IPv6)"]
+            Sub2["&#x1F4E6; サブネット 2&lt;br/&gt;(IPv4 + BYO IPv6 GUA)"]
+        end
+    end
+
+    subgraph BYOIP["&#x1F511; BYOIP"]
+        PDP["&#x1F4C4; Public Delegated Prefix"]
+        SubPrefix["&#x1F4C4; Sub-prefix&lt;br/&gt;(INTERNAL_IPV6_&lt;br/&gt;SUBNETWORK_CREATION)"]
+    end
+
+    Admin --> CustomConstraint
+    CustomConstraint --> Policy
+    Policy -.->|"制約を適用"| InternalRanges
+    IR1 --> Sub1
+    IR2 --> Sub2
+    PDP --> SubPrefix
+    SubPrefix -->|"GUA を内部範囲&lt;br/&gt;として割り当て"| Sub2
+
+    classDef orgpolicy fill:none,stroke:#CCCCCC,stroke-width:2px,color:#666666
+    classDef vpc fill:none,stroke:#CCCCCC,stroke-width:2px,color:#666666
+    classDef byoip fill:none,stroke:#E1BEE7,stroke-width:2px,color:#666666
+    classDef admin fill:#E3F2FD,stroke:#BBDEFB,stroke-width:2px,color:#1565C0
+    classDef constraint fill:#F3E5F5,stroke:#7B61FF,stroke-width:2px,color:#333333
+    classDef policy fill:#E8F1FF,stroke:#4A90E2,stroke-width:2px,color:#333333
+    classDef range fill:#FFF3E0,stroke:#FF9800,stroke-width:2px,color:#333333
+    classDef subnet fill:#E9F7EC,stroke:#66BB6A,stroke-width:2px,color:#333333
+    classDef prefix fill:#DCEDC8,stroke:#C5E1A5,stroke-width:2px,color:#33691E
+
+    class OrgPolicy orgpolicy
+    class VPCNetwork vpc
+    class BYOIP byoip
+    class Admin admin
+    class CustomConstraint constraint
+    class Policy policy
+    class IR1,IR2 range
+    class Sub1,Sub2 subnet
+    class PDP,SubPrefix prefix
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>&#x2B50; 主要機能</h2>
+
+      <div class="card">
+        <h3>&#x1F3DB;&#xFE0F; 1. カスタム組織ポリシーによる InternalRange の制御</h3>
+        <ul class="content-list">
+          <li><span>&#x2192;</span> <code>networkconnectivity.googleapis.com/InternalRange</code> リソースがカスタム制約の対象に追加</li>
+          <li><span>&#x2192;</span> CEL 条件を使用して、内部範囲の作成・更新に対するきめ細かな制約を定義可能</li>
+          <li><span>&#x2192;</span> 制約は組織、フォルダ、プロジェクトの各レベルで適用可能</li>
+          <li><span>&#x2192;</span> ポリシーの継承により、上位で設定した制約が下位のリソースにも自動適用</li>
+        </ul>
+      </div>
+
+      <div class="card teal">
+        <h3>&#x1F310; 2. BYO IPv6 グローバルユニキャストアドレスの内部利用</h3>
+        <ul class="content-list">
+          <li><span>&#x2192;</span> 自社所有の IPv6 GUA をサブネットの内部 IPv6 アドレス範囲として割り当て可能</li>
+          <li><span>&#x2192;</span> <code>INTERNAL_IPV6_SUBNETWORK_CREATION</code> モードの Sub-prefix を使用して GUA を内部範囲に変換</li>
+          <li><span>&#x2192;</span> GUA はプライベートに使用され、インターネットにはアドバタイズされない</li>
+          <li><span>&#x2192;</span> Google 提供の ULA と同様に、VM ネットワークインターフェース、フォワーディングルール、内部ロードバランサーで使用可能</li>
+        </ul>
+      </div>
+
+      <div class="card purple">
+        <h3>&#x1F4DD; 3. 内部範囲リソースの制約可能フィールド</h3>
+        <ul class="content-list">
+          <li><span>&#x2192;</span> allocationOptions、ipCidrRange、network、usage、peering、overlaps、immutable などのフィールドを制約可能</li>
+          <li><span>&#x2192;</span> CEL 条件で評価し、ALLOW または DENY アクションを設定可能</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>&#x1F4D0; 技術仕様</h2>
+
+      <h3>カスタム組織ポリシー: 制約可能フィールド一覧</h3>
+      <p><code>networkconnectivity.googleapis.com/InternalRange</code> の制約可能フィールドは以下の通りです。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>フィールド</th>
+            <th>説明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>resource.allocationOptions.allocationStrategy</code></td><td>IP アドレスブロックの割り当て戦略</td></tr>
+          <tr><td><code>resource.allocationOptions.firstAvailableRangesLookupSize</code></td><td>RANDOM_FIRST_N_AVAILABLE 戦略でのルックアップサイズ</td></tr>
+          <tr><td><code>resource.description</code></td><td>内部範囲の説明</td></tr>
+          <tr><td><code>resource.excludeCidrRanges</code></td><td>除外する CIDR 範囲</td></tr>
+          <tr><td><code>resource.immutable</code></td><td>不変性の設定</td></tr>
+          <tr><td><code>resource.ipCidrRange</code></td><td>割り当てられた IP CIDR ブロック</td></tr>
+          <tr><td><code>resource.migration.source</code></td><td>移行元サブネット</td></tr>
+          <tr><td><code>resource.migration.target</code></td><td>移行先サブネット</td></tr>
+          <tr><td><code>resource.name</code></td><td>内部範囲の名前</td></tr>
+          <tr><td><code>resource.network</code></td><td>関連付けられた VPC ネットワーク</td></tr>
+          <tr><td><code>resource.overlaps</code></td><td>オーバーラップの許可設定</td></tr>
+          <tr><td><code>resource.peering</code></td><td>ピアリングタイプ (FOR_SELF、FOR_PEER、NOT_SHARED)</td></tr>
+          <tr><td><code>resource.prefixLength</code></td><td>プレフィックス長</td></tr>
+          <tr><td><code>resource.targetCidrRange</code></td><td>自動割り当ての対象 CIDR 範囲</td></tr>
+          <tr><td><code>resource.usage</code></td><td>使用タイプ (FOR_VPC、EXTERNAL_TO_VPC、FOR_MIGRATION)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>BYO IPv6: Sub-prefix のモード</h3>
+      <p>BYO IPv6 で使用する Sub-prefix のモードと仕様は以下の通りです。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>モード</th>
+            <th>用途</th>
+            <th>アクセスタイプ</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>INTERNAL_IPV6_SUBNETWORK_CREATION</code></td>
+            <td>内部サブネット範囲への GUA 割り当て</td>
+            <td>Internal (プライベート利用)</td>
+          </tr>
+          <tr>
+            <td><code>EXTERNAL_IPV6_SUBNETWORK_CREATION</code></td>
+            <td>外部サブネット範囲への GUA 割り当て</td>
+            <td>External (インターネットルーティング可能)</td>
+          </tr>
+          <tr>
+            <td><code>EXTERNAL_IPV6_FORWARDING_RULE_CREATION</code></td>
+            <td>フォワーディングルールへの GUA 割り当て</td>
+            <td>External</td>
+          </tr>
+          <tr>
+            <td><code>DELEGATION</code></td>
+            <td>さらなるサブ分割のための委譲</td>
+            <td>-</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup Guide -->
+    <div class="section">
+      <h2>&#x2699;&#xFE0F; 設定方法</h2>
+
+      <h3>前提条件</h3>
+      <div class="note-box">
+        <ul class="content-list" style="margin: 0;">
+          <li><span>&#x2705;</span> Organization Policy Administrator (<code>roles/orgpolicy.policyAdmin</code>) IAM ロールが付与されていること</li>
+          <li><span>&#x2705;</span> 組織 ID を把握していること</li>
+          <li><span>&#x2705;</span> BYO IPv6 の場合: BYOIP の Public Delegated Prefix が作成済みであること</li>
+        </ul>
+      </div>
+
+      <h3>ステップ 1: カスタム制約の定義例</h3>
+      <p>内部範囲の使用タイプを <code>FOR_VPC</code> に限定するカスタム制約の YAML 定義例です。</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">YAML</span>
+          <span class="code-title">カスタム制約定義</span>
+        </div>
+        <pre><code class="language-yaml">name: organizations/ORGANIZATION_ID/customConstraints/custom.internalRangeUsageForVpc
+resourceTypes:
+  - networkconnectivity.googleapis.com/InternalRange
+condition: "resource.usage == 'FOR_VPC'"
+actionType: ALLOW
+methodTypes:
+  - CREATE
+  - UPDATE
+displayName: Restrict internal ranges to VPC usage only
+description: Internal ranges must have usage type set to FOR_VPC.</code></pre>
+      </div>
+
+      <h3>ステップ 2: カスタム制約を作成して適用する</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">gcloud CLI</span>
+        </div>
+        <pre><code class="language-bash"># カスタム制約を設定
+gcloud org-policies set-custom-constraint internalRangeConstraint.yaml
+
+# ポリシーを作成して適用
+gcloud org-policies set-policy internalRangePolicy.yaml</code></pre>
+      </div>
+
+      <h3>ステップ 3: BYO IPv6 GUA をサブネットの内部範囲として割り当てる</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">BYO IPv6 サブネット作成</span>
+        </div>
+        <pre><code class="language-bash"># Sub-prefix を内部サブネット作成モードで作成
+gcloud compute public-delegated-prefixes delegated-sub-prefixes create SUB_PREFIX_NAME \
+    --public-delegated-prefix=PARENT_PDP_NAME \
+    --range=IPV6_RANGE \
+    --mode=INTERNAL_IPV6_SUBNETWORK_CREATION \
+    --region=REGION
+
+# BYO IPv6 GUA を使用してサブネットを作成
+gcloud compute networks subnets create SUBNET_NAME \
+    --network=NETWORK_NAME \
+    --stack-type=IPV4_IPV6 \
+    --ipv6-access-type=INTERNAL \
+    --region=REGION \
+    --range=PRIMARY_IPV4_RANGE \
+    --ip-collection=SUB_PREFIX_NAME \
+    --internal-ipv6-prefix=IPV6_CIDR_RANGE</code></pre>
+      </div>
+      <div class="note-box">
+        <strong>&#x1F4A1; ヒント:</strong> <code>--ip-collection</code> で Sub-prefix を指定し、<code>--internal-ipv6-prefix</code> で具体的な <code>/64</code> IPv6 CIDR 範囲を指定します。範囲を省略した場合、Google Cloud が Sub-prefix のブロックからランダムに <code>/64</code> 範囲を割り当てます。
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>&#x1F4C8; メリット</h2>
+      <div class="two-col">
+        <div>
+          <h3>&#x1F4BC; ビジネス面</h3>
+          <div class="card green">
+            <strong>ガバナンスの強化</strong>
+            <p style="font-size: 14px; margin-top: 6px;">カスタム組織ポリシーにより、組織全体の IP アドレス管理ルールをコードとして定義し、自動的に適用できます。</p>
+          </div>
+          <div class="card green">
+            <strong>マルチクラウド・ハイブリッド対応</strong>
+            <p style="font-size: 14px; margin-top: 6px;">BYO IPv6 により、既存の IPv6 アドレス体系を Google Cloud でも継続利用でき、運用の一貫性を確保できます。</p>
+          </div>
+        </div>
+        <div>
+          <h3>&#x2699;&#xFE0F; 技術面</h3>
+          <div class="card teal">
+            <strong>きめ細かな制御</strong>
+            <p style="font-size: 14px; margin-top: 6px;">CEL 条件を使用して、内部範囲の CIDR ブロック、ピアリングタイプ、使用タイプなど個別のフィールドに対する制約を定義可能。</p>
+          </div>
+          <div class="card teal">
+            <strong>アドレス体系の統一</strong>
+            <p style="font-size: 14px; margin-top: 6px;">オンプレミスやマルチクラウド環境で使用している IPv6 GUA を Google Cloud の内部ネットワークでもそのまま利用でき、ルーティング設計が簡素化されます。</p>
+          </div>
+          <div class="card teal">
+            <strong>ULA と同等の機能</strong>
+            <p style="font-size: 14px; margin-top: 6px;">BYO IPv6 GUA は VM ネットワークインターフェース、内部ロードバランサー、Private Service Connect エンドポイントで使用可能。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>&#x26A0;&#xFE0F; デメリット・制約事項</h2>
+
+      <h3>制限事項</h3>
+      <div class="warning-box">
+        <ul class="content-list" style="margin: 0;">
+          <li><span>&#x26A0;&#xFE0F;</span> カスタム制約はルート (Route) リソースに対しては CREATE メソッドでのみ適用される</li>
+          <li><span>&#x26A0;&#xFE0F;</span> BYOIP の IPv6 アドレスはプロジェクト間で移動できない</li>
+          <li><span>&#x26A0;&#xFE0F;</span> BYOIP のプロビジョニングには数週間かかり、短縮できない</li>
+          <li><span>&#x26A0;&#xFE0F;</span> Public Delegated Prefix は Public Advertised Prefix から最大 3 回までサブ委譲可能</li>
+        </ul>
+      </div>
+
+      <h3>考慮すべき点</h3>
+      <div class="warning-box">
+        <ul class="content-list" style="margin: 0;">
+          <li><span>&#x1F4A1;</span> カスタム組織ポリシーの条件が既存リソースに違反している場合、既存リソースは影響を受けないが、違反を解消する変更以外のリソース更新はブロックされる</li>
+          <li><span>&#x1F4A1;</span> BYO IPv6 GUA を内部用途で使用する場合、同じアドレス範囲をインターネット向けに使用することはできない</li>
+          <li><span>&#x1F4A1;</span> Policy Simulator を使用して、新しいポリシーが既存リソースに与える影響を事前にテストすることを推奨</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>&#x1F3AF; ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>&#x1F3E2; ユースケース 1: 組織全体の IP アドレス設計ポリシーの強制</h4>
+        <p><strong>シナリオ:</strong> 大規模な組織で複数のチームが VPC ネットワークを運用しており、IP アドレス範囲の重複や不適切な割り当てを防ぎたい場合。</p>
+        <div class="code-block" style="margin-top: 12px;">
+          <div class="code-header">
+            <span class="code-lang">YAML</span>
+            <span class="code-title">内部範囲を 10.0.0.0/8 に限定する制約</span>
+          </div>
+          <pre><code class="language-yaml">name: organizations/123456789/customConstraints/custom.restrictInternalRangeCidr
+resourceTypes:
+  - networkconnectivity.googleapis.com/InternalRange
+condition: "resource.ipCidrRange.startsWith('10.')"
+actionType: ALLOW
+methodTypes:
+  - CREATE
+displayName: Restrict internal ranges to 10.0.0.0/8
+description: Internal ranges must use addresses from the 10.0.0.0/8 block.</code></pre>
+        </div>
+        <p style="margin-top: 8px;"><strong>効果:</strong> すべてのプロジェクトで内部範囲が <code>10.0.0.0/8</code> ブロック内に限定され、アドレス体系の一貫性が保証されます。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>&#x1F310; ユースケース 2: ハイブリッドクラウド環境での IPv6 アドレス統一</h4>
+        <p><strong>シナリオ:</strong> オンプレミスと Google Cloud のハイブリッド環境で、既に保有している IPv6 GUA を使用して統一的なアドレス体系を構築したい場合。</p>
+        <p style="margin-top: 8px;"><strong>効果:</strong> オンプレミスで使用している IPv6 GUA を Google Cloud のサブネットの内部範囲として割り当てることで、Cloud VPN や Cloud Interconnect を介した通信時にアドレス変換なしでルーティングが可能になります。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>&#x1F4B0; 料金</h2>
+      <div class="note-box">
+        <p style="margin: 0;">VPC ネットワーク自体の使用に対する追加料金はありません。BYOIP の利用に関しても、IPv6 アドレスの使用自体には追加料金はかかりません。ただし、ネットワークトラフィックの Egress やロードバランサーの使用などには通常の料金が適用されます。</p>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#x1F517; 関連サービス・機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <strong>&#x1F3DB;&#xFE0F; Organization Policy Service</strong>
+          <p style="font-size: 14px; margin-top: 6px;">カスタム制約の作成と管理を行う基盤サービス。組織、フォルダ、プロジェクトレベルでポリシーを適用可能。</p>
+        </div>
+        <div class="card teal">
+          <strong>&#x1F511; BYOIP (Bring Your Own IP)</strong>
+          <p style="font-size: 14px; margin-top: 6px;">自社所有の IP アドレスを Google Cloud で使用するための仕組み。IPv4 と IPv6 の両方に対応。</p>
+        </div>
+        <div class="card green">
+          <strong>&#x1F504; Cloud Interconnect / Cloud VPN</strong>
+          <p style="font-size: 14px; margin-top: 6px;">オンプレミスとの接続サービス。BYO IPv6 GUA を使用したハイブリッド構成で重要な役割を果たす。</p>
+        </div>
+        <div class="card orange">
+          <strong>&#x1F310; VPC Network Peering</strong>
+          <p style="font-size: 14px; margin-top: 6px;">VPC ネットワーク間の接続。内部範囲のピアリングタイプ設定と関連。</p>
+        </div>
+        <div class="card purple">
+          <strong>&#x1F4E1; Shared VPC</strong>
+          <p style="font-size: 14px; margin-top: 6px;">組織内で VPC ネットワークを共有する仕組み。カスタム組織ポリシーと組み合わせてガバナンスを強化可能。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>&#x1F4DD; まとめ</h2>
+      <p>今回の VPC アップデートは、<span class="highlight">エンタープライズ環境でのネットワークガバナンスと IPv6 移行を大幅に強化する</span>ものです。カスタム組織ポリシーの内部範囲対応により、IP アドレス管理に関する組織全体のルールをコードとして定義・適用でき、BYO IPv6 GUA の内部利用により、ハイブリッドクラウドやマルチクラウド環境でのアドレス体系の統一が可能になります。</p>
+      <p>大規模な VPC ネットワークを運用している組織や IPv6 移行を計画している組織は、これらの機能を積極的に評価・導入することを推奨します。</p>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>&#x1F4CE; 出典:</strong></p>
+      <ul style="list-style: none; padding: 0; margin: 4px 0 0 0;">
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/release-notes#February_10_2026" target="_blank" rel="noopener noreferrer">Google Cloud Release Notes (February 10, 2026)</a></li>
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/vpc/docs/custom-constraints" target="_blank" rel="noopener noreferrer">Manage VPC resources by using custom organization policies</a></li>
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/vpc/docs/create-ipv6-sub-prefixes" target="_blank" rel="noopener noreferrer">Create and use IPv6 sub-prefixes</a></li>
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/vpc/docs/subnets" target="_blank" rel="noopener noreferrer">Subnets - IPv6 ranges</a></li>
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/vpc/docs/internal-ranges" target="_blank" rel="noopener noreferrer">Internal ranges overview</a></li>
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/vpc/docs/bring-your-own-ip" target="_blank" rel="noopener noreferrer">Bring your own IP</a></li>
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/vpc/network-pricing" target="_blank" rel="noopener noreferrer">VPC pricing</a></li>
+      </ul>
+      <p style="margin-top: 12px; font-size: 11px; color: #AAAAAA;">Generated on 2026-02-15 | #VPC #OrganizationPolicy #IPv6 #BYOIP #Networking #Security #Governance #HybridCloud</p>
+    </footer>
+
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>
