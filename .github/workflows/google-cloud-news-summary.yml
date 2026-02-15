@@ -1,0 +1,116 @@
+name: Google Cloud News Summary
+
+on:
+  schedule:
+    # Run daily at 06:00 JST (21:00 UTC previous day)
+    - cron: '0 21 * * *'
+  workflow_dispatch:
+    inputs:
+      debug:
+        description: 'Enable debug mode'
+        required: false
+        default: 'false'
+
+permissions:
+  id-token: write
+  contents: write
+
+jobs:
+  generate-reports:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Verify AWS credentials
+        run: |
+          aws sts get-caller-identity
+
+      - name: Configure MCP server API key
+        run: |
+          sed -i 's/YOUR_API_KEY/${{ secrets.GCP_DEVELOPER_KNOWLEDGE_API_KEY }}/' .mcp.json
+
+      - name: Run Google Cloud News Summary
+        env:
+          DEBUG: ${{ github.event.inputs.debug || '1' }}
+          INFOGRAPHIC_BASE_URL: ${{ vars.INFOGRAPHIC_BASE_URL }}
+        run: |
+          python run.py --debug
+
+      - name: Update index files
+        run: |
+          python -c "from run import generate_reports_index; from pathlib import Path; generate_reports_index(Path('reports'))"
+          python -c "from run import generate_infographic_index; from pathlib import Path; generate_infographic_index(Path('infographic'))"
+
+      - name: Commit and push changes
+        run: |
+          git config --local user.name "Google Cloud News Bot"
+          git config --local user.email "gcp-news-bot@users.noreply.github.com"
+          
+          if [ -n "$(git status --porcelain reports/ infographic/)" ]; then
+            git add reports/ infographic/
+            git commit -m "docs(reports): add reports for $(date -u +"%Y-%m-%d")" -m "[skip ci]"
+            git pull --rebase origin ${{ github.ref_name }}
+            git push origin HEAD:${{ github.ref_name }}
+          else
+            echo "No new reports or infographics to commit."
+          fi
+
+  deploy-pages:
+    needs: generate-reports
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Prepare GitHub Pages
+        run: |
+          mkdir -p public
+          cp infographic/*.html public/ 2>/dev/null || true
+          python -c "from run import generate_infographic_index; from pathlib import Path; generate_infographic_index(Path('public'))"
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./public
+          force_orphan: true
