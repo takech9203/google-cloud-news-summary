@@ -5,6 +5,10 @@
 
 ## 2026 年
 
+- [2026-02-17 - BigQuery: Global Queries (Preview)](2026/2026-02-17-bigquery-global-queries.md)
+- [2026-02-17 - Bigtable: Admin API MCP Server (Preview)](2026/2026-02-17-bigtable-admin-api-mcp-server.md)
+- [2026-02-16 - Document AI: Layout Parser Web Interface (Preview)](2026/2026-02-16-document-ai-layout-parser-web-interface.md)
+- [2026-02-16 - Cloud Composer: 新ビルドリリースと Airflow 3 環境スナップショット対応](2026/2026-02-16-cloud-composer-airflow3-snapshots.md)
 - [2026-02-15 - Carbon Footprint: AI 排出量算定方法論のアップデート](2026/2026-02-15-carbon-footprint-ai-emissions-methodology.md)
 - [2026-02-15 - Google SecOps SOAR: Release 6.3.75 / 6.3.76](2026/2026-02-15-google-secops-soar-release-6-3-75-76.md)
 - [2026-02-14 - Google SecOps SIEM: Release 6.3.75 / 6.3.76](2026/2026-02-14-google-secops-siem-release-6-3-75-76.md)
@@ -23,6 +27,7 @@
 - [2026-02-12 - Oracle Database@Google Cloud: リージョン拡張 (ロンドン、メルボルン、デリー)](2026/2026-02-12-oracle-database-google-cloud-region-expansion.md)
 - [2026-02-12 - Developer Connect: HTTP コネクション対応](2026/2026-02-12-developer-connect-http-connections.md)
 - [2026-02-12 - Google SecOps: Advanced Joins in Search](2026/2026-02-12-google-secops-advanced-joins.md)
+- [2026-02-12 - Cloud Logging: Log Analytics のオンデマンドスロット対応](2026/2026-02-12-cloud-logging-on-demand-slots.md)
 - [2026-02-12 - Gemini Enterprise: モバイルアプリ Private GA](2026/2026-02-12-gemini-enterprise-mobile-app.md)
 - [2026-02-12 - Cloud Build: asia-southeast3 (Bangkok) リージョン追加](2026/2026-02-12-cloud-build-asia-southeast3.md)
 - [2026-02-11 - Cloud KMS: Autokey for Projects (Public Preview)](2026/2026-02-11-cloud-kms-autokey-for-projects.md)
@@ -32,6 +37,7 @@
 - [2026-02-11 - VPC Service Controls: Managed Lustre Preview サポート](2026/2026-02-11-vpc-service-controls-managed-lustre.md)
 - [2026-02-11 - Google SecOps Marketplace: 統合インテグレーションアップデート (CiscoUmbrella v15.0 / Palo Alto Cortex XDR v22.0 / Google Threat Intelligence v9.0)](2026/2026-02-11-google-secops-marketplace-integration-updates.md)
 - [2026-02-11 - BigQuery: パイプライン実行方法の GA](2026/2026-02-11-bigquery-pipeline-execution-methods.md)
+- [2026-02-11 - Dataplex: Metadata Change Feeds](2026/2026-02-11-dataplex-metadata-change-feeds.md)
 - [2026-02-10 - Google Cloud: 複数サービスの MCP サーバー Preview リリース](2026/2026-02-10-google-cloud-mcp-servers.md)
 - [2026-02-10 - Memorystore for Valkey: バックアップ管理が GA](2026/2026-02-10-memorystore-valkey-backup-management.md)
 - [2026-02-10 - Container-Optimized OS (COS): 複数イメージのセキュリティ・機能アップデート](2026/2026-02-10-container-optimized-os-security-updates.md)
