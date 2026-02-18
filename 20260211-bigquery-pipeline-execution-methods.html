@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BigQuery: パイプライン実行方法の GA</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    /* Google Cloud Light Theme Base Styles */
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+    .header-left { flex: 1; min-width: 280px; }
+    .header-right { text-align: right; padding-top: 4px; }
+
+    h1 {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+    .badge { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); color: #FFFFFF; }
+    .badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+
+    /* Sections */
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green { border-left-color: var(--gc-green); }
+    .card-red { border-left-color: var(--gc-red); }
+    .card-purple { border-left-color: var(--gc-purple); }
+    .card-orange { border-left-color: var(--gc-orange); }
+    .card-teal { border-left-color: var(--gc-teal); }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    /* Before/After */
+    .before-after-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+    .before-box h3 { color: var(--gc-red); }
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+    .after-box h3 { color: var(--gc-green); }
+    .before-box ul, .after-box ul {
+      margin: 8px 0 0 16px;
+      font-size: 14px;
+    }
+    .before-box li, .after-box li { margin-bottom: 4px; }
+
+    /* Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 16px 0;
+    }
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+    .stat-card.green { background: linear-gradient(135deg, var(--gc-green), #1E8E3E); }
+    .stat-card.purple { background: linear-gradient(135deg, var(--gc-purple), #7B1FA2); }
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Feature cards */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .feature-title {
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      font-size: 16px;
+      margin-bottom: 4px;
+    }
+
+    /* Use case */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+    .usecase-card h3 {
+      color: var(--gc-blue-800);
+      margin-bottom: 8px;
+    }
+    .usecase-label {
+      display: inline-block;
+      background: var(--gc-blue-600);
+      color: #FFFFFF;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+    .usecase-steps {
+      background: var(--gc-surface);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-top: 8px;
+    }
+    .usecase-steps ol {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* Note/Warning boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Mermaid */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Code blocks */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+    .code-title {
+      color: #AAAAAA;
+    }
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      background: #1E1E1E;
+      border-radius: 0;
+    }
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    /* Inline code */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Flow diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Region grid */
+    .region-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .region-item {
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .region-code {
+      font-family: 'Roboto Mono', monospace;
+      font-size: 12px;
+      color: var(--gc-blue-800);
+      background: var(--gc-blue-50);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    /* Related services */
+    .related-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .related-item {
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 14px;
+    }
+    .related-item strong {
+      color: var(--gc-blue-800);
+    }
+
+    /* Steps */
+    .step-container {
+      margin: 16px 0;
+    }
+    .step {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .step-number {
+      background: var(--gc-blue-600);
+      color: #FFFFFF;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    .step-content {
+      flex: 1;
+      padding-top: 4px;
+    }
+    .step-content strong {
+      color: var(--gc-on-surface);
+    }
+
+    /* Merits/Demerits */
+    .merit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    /* Footer */
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+    footer a:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+    footer ul {
+      list-style: none;
+      padding: 0;
+      margin: 8px 0;
+    }
+    footer li {
+      margin-bottom: 4px;
+    }
+
+    /* Links */
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      h1 { font-size: 28px; }
+      .before-after-grid { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .merit-grid { grid-template-columns: 1fr; }
+      .header { flex-direction: column; }
+      .header-right { text-align: left; margin-top: 8px; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>BigQuery: パイプライン実行方法の GA</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">BigQuery</span>
+          <span class="badge-ga">GA</span>
+          <span class="badge">Pipeline</span>
+          <span class="badge">Dataform</span>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="subtitle">2026-02-11</div>
+        <div class="subtitle">Pipeline Execution Methods</div>
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>&#x1F4CB; 概要</h2>
+      <p>BigQuery パイプラインにおいて、<span class="highlight">3 つの異なる実行方法</span>が一般提供 (GA) となった。具体的には「すべてのタスクを実行」「選択したタスクを実行」「選択したタグでタスクを実行」の 3 つの方法でパイプラインを実行できるようになった。</p>
+      <p style="margin-top: 12px;">BigQuery パイプラインは <strong>Dataform</strong> を基盤として動作するデータ処理の自動化機能であり、SQL クエリ、ノートブック、データプレパレーションなどのコードアセットを順序立てて実行できる。今回の GA により、パイプライン内のタスクをより柔軟に制御して実行できるようになり、大規模なデータ変換ワークフローの運用効率が向上する。</p>
+      <p style="margin-top: 12px;">この機能は、データエンジニアやデータアナリストが日常的にパイプラインを運用・デバッグする際に特に有用である。特定のタスクだけを再実行したり、タグベースで関連するタスク群をまとめて実行したりすることで、開発・テスト・本番運用のすべてのフェーズで効率的な作業が可能になる。</p>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value">3</div>
+        <div class="stat-label">実行方法が GA</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-value">40+</div>
+        <div class="stat-label">対応リージョン数</div>
+      </div>
+      <div class="stat-card purple">
+        <div class="stat-value">GA</div>
+        <div class="stat-label">本番環境で安心して利用可能</div>
+      </div>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>&#x1F504; Before / After</h2>
+      <div class="before-after-grid">
+        <div class="before-box">
+          <h3>&#x274C; アップデート前の課題</h3>
+          <ul>
+            <li>すべてのタスクを一括実行する方法のみが GA として提供</li>
+            <li>特定のタスクだけを再実行したい場合でも、パイプライン全体を実行する必要がある場面があった</li>
+            <li>タグベースでの実行選択がプレビュー段階で、本番ワークロードでの使用にリスクがあった</li>
+            <li>パイプラインのデバッグや部分的なリトライが効率的に行えなかった</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>&#x2705; アップデート後の改善</h3>
+          <ul>
+            <li>3 つの実行方法 (全タスク、選択タスク、タグベース) がすべて GA で本番環境で安心して使用可能</li>
+            <li>特定のタスクのみを選択して実行でき、依存関係の自動包含オプションも利用可能</li>
+            <li>タグを使ってタスクをグループ化し、論理的な単位でまとめて実行できる</li>
+            <li>インタラクティブジョブとバッチジョブの優先度選択、フルリフレッシュオプションなどの詳細な制御が可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>&#x1F3D7;&#xFE0F; アーキテクチャ図</h2>
+      <p>BigQuery パイプラインの 3 つの実行方法を示す図。ユーザーは実行メニューから目的に応じた実行方法を選択し、パイプライン内のタスクを柔軟に制御できる。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Pipeline["BigQuery パイプライン"]
+        T1["タスク A\n(SQL クエリ)"]
+        T2["タスク B\n(ノートブック)"]
+        T3["タスク C\n(SQL クエリ)\ntag: daily"]
+        T4["タスク D\n(データプレパレーション)\ntag: daily"]
+        T1 --> T2
+        T1 --> T3
+        T3 --> T4
+    end
+
+    User(["ユーザー"]) --> RunMenu{"実行方法の選択"}
+
+    RunMenu -->|"Run all tasks"| AllTasks["全タスク実行\nA, B, C, D"]
+    RunMenu -->|"Select tasks to run"| SelectedTasks["選択タスク実行\n例: タスク B のみ"]
+    RunMenu -->|"Run by tag"| TagTasks["タグベース実行\n例: daily タグ C, D"]
+
+    AllTasks --> Pipeline
+    SelectedTasks --> Pipeline
+    TagTasks --> Pipeline
+
+    Pipeline --> Results["実行結果"]
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>&#x2B50; 主要機能</h2>
+      <div class="feature-grid">
+
+        <div class="card">
+          <div class="feature-title">&#x1F504; 1. 全タスク実行 (Run all tasks)</div>
+          <p>パイプライン内のすべてのタスクを定義された依存関係の順序で実行する。Google Cloud コンソールから <code>Run > Run all tasks</code> で実行可能。</p>
+          <ul style="margin-top: 8px; margin-left: 16px; font-size: 14px;">
+            <li>Dataform API 経由でのプログラマティックな実行もサポート (サービスアカウント認証が必要)</li>
+            <li>API 実行時は <code>compilationResults.create</code> でコンパイル後、<code>workflowInvocations.create</code> で実行をトリガー</li>
+          </ul>
+        </div>
+
+        <div class="card card-green">
+          <div class="feature-title">&#x1F3AF; 2. 選択タスク実行 (Select tasks to run)</div>
+          <p>パイプライン内の特定のタスクを手動で選択して実行できる。</p>
+          <ul style="margin-top: 8px; margin-left: 16px; font-size: 14px;">
+            <li><strong>Include dependencies</strong>: 選択タスクの依存元タスクを自動的に含める</li>
+            <li><strong>Include dependents</strong>: 選択タスクの下流依存タスク (推移的) を自動的に含める</li>
+            <li>タスク名で検索して選択でき、選択したタスクは SQL エディタで直接開くことも可能</li>
+          </ul>
+        </div>
+
+        <div class="card card-purple">
+          <div class="feature-title">&#x1F3F7;&#xFE0F; 3. タグベース実行 (Run by tag)</div>
+          <p>パイプラインのタスクに付与されたタグを基準に実行対象を選択できる。</p>
+          <ul style="margin-top: 8px; margin-left: 16px; font-size: 14px;">
+            <li>単一タグの選択、または複数タグの選択に対応</li>
+            <li>タグベースでも依存関係の自動包含 (Include dependencies / Include dependents) が利用可能</li>
+            <li><code>Run > Run by tag</code> メニューからタグ一覧を表示して選択</li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>&#x2699;&#xFE0F; 技術仕様</h2>
+
+      <h3>実行オプション</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Include dependencies</strong></td>
+            <td>選択タスクの上流依存タスクを自動的に含める</td>
+          </tr>
+          <tr>
+            <td><strong>Include dependents</strong></td>
+            <td>選択タスクの下流依存タスク (推移的) を自動的に含める</td>
+          </tr>
+          <tr>
+            <td><strong>Run with full refresh</strong></td>
+            <td>すべてのテーブルをスクラッチから再構築する</td>
+          </tr>
+          <tr>
+            <td><strong>ジョブ優先度</strong></td>
+            <td>インタラクティブジョブ (デフォルト・高優先度) またはバッチジョブ (低優先度)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>認証方法</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>認証タイプ</th>
+            <th>ステータス</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>サービスアカウント</strong></td>
+            <td><span class="badge-ga" style="font-size: 11px; padding: 2px 8px;">GA</span></td>
+            <td>カスタムサービスアカウントを選択して実行</td>
+          </tr>
+          <tr>
+            <td><strong>ユーザー認証情報</strong></td>
+            <td><span class="badge-preview" style="font-size: 11px; padding: 2px 8px;">Preview</span></td>
+            <td>Google アカウントのユーザー認証情報で実行 (OAuth 認証が必要)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>必要な IAM ロール</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>ロール</th>
+            <th>用途</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>roles/dataform.codeCreator</code></td>
+            <td>パイプラインの作成</td>
+          </tr>
+          <tr>
+            <td><code>roles/dataform.editor</code></td>
+            <td>パイプラインの編集と実行</td>
+          </tr>
+          <tr>
+            <td><code>roles/dataform.Admin</code></td>
+            <td>パイプラインの削除</td>
+          </tr>
+          <tr>
+            <td><code>roles/dataform.Viewer</code></td>
+            <td>パイプラインの表示と実行</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- API Example -->
+    <div class="section">
+      <h2>&#x1F4BB; API による実行例</h2>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">ステップ 1: デフォルトワークスペースのコンパイル結果を作成</span>
+        </div>
+        <pre><code class="language-bash">curl -X POST \
+   -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+   -H "Content-Type: application/json" \
+   -d '{
+      "workspace": "projects/PROJECT_ID/locations/LOCATION/repositories/REPOSITORY_ID/workspaces/default"
+   }' \
+   "https://dataform.googleapis.com/v1/projects/PROJECT_ID/locations/LOCATION/repositories/REPOSITORY_ID/compilationResults"</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">ステップ 2: コンパイル結果を使用してワークフロー呼び出しを作成</span>
+        </div>
+        <pre><code class="language-bash">curl -X POST \
+   -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+   -H "Content-Type: application/json" \
+   -d '{
+      "compilationResult": "COMPILATION_RESULT"
+   }' \
+   "https://dataform.googleapis.com/v1/projects/PROJECT_ID/locations/LOCATION/repositories/REPOSITORY_ID/workflowInvocations"</code></pre>
+      </div>
+    </div>
+
+    <!-- Setup -->
+    <div class="section">
+      <h2>&#x1F6E0;&#xFE0F; 設定方法</h2>
+
+      <div class="note-box">
+        <strong>&#x1F4A1; 前提条件:</strong> Google Cloud プロジェクトで課金が有効 / BigQuery API、Dataform API、Vertex AI API が有効 / 適切な IAM ロール (<code>roles/dataform.editor</code> 以上) が付与済み / BigQuery パイプラインが作成済み
+      </div>
+
+      <div class="step-container">
+        <div class="step">
+          <div class="step-number">1</div>
+          <div class="step-content">
+            <strong>パイプラインの選択</strong>
+            <p style="font-size: 14px; margin-top: 4px;">Google Cloud コンソールで BigQuery ページを開き、Explorer ペインからプロジェクトを展開して <code>Pipelines</code> をクリックし、対象のパイプラインを選択する。</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-number">2</div>
+          <div class="step-content">
+            <strong>実行方法の選択</strong>
+            <p style="font-size: 14px; margin-top: 4px;"><code>Run</code> ボタンをクリックし、以下のいずれかを選択する。</p>
+            <ul style="font-size: 14px; margin: 4px 0 0 16px;">
+              <li><strong>Run all tasks</strong>: すべてのタスクを実行</li>
+              <li><strong>Select tasks to run</strong>: 特定のタスクを選択して実行</li>
+              <li><strong>Run by tag</strong>: タグで絞り込んでタスクを実行</li>
+            </ul>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-number">3</div>
+          <div class="step-content">
+            <strong>認証の設定</strong>
+            <p style="font-size: 14px; margin-top: 4px;">実行時の認証方法を選択する。</p>
+            <ul style="font-size: 14px; margin: 4px 0 0 16px;">
+              <li><strong>Run with selected service account</strong>: カスタムサービスアカウントを選択 (推奨)</li>
+              <li><strong>Run with user credentials</strong>: ユーザー認証情報を使用 (Preview)</li>
+            </ul>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-number">4</div>
+          <div class="step-content">
+            <strong>実行オプションの設定</strong>
+            <p style="font-size: 14px; margin-top: 4px;">必要に応じて以下のオプションを設定する。</p>
+            <ul style="font-size: 14px; margin: 4px 0 0 16px;">
+              <li><code>Include dependencies</code>: 依存元タスクを含める</li>
+              <li><code>Include dependents</code>: 依存先タスクを含める</li>
+              <li><code>Run with full refresh</code>: テーブルを完全に再構築</li>
+              <li>ジョブ優先度の選択 (インタラクティブ / バッチ)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Merits -->
+    <div class="section">
+      <h2>&#x1F4C8; メリット</h2>
+      <div class="merit-grid">
+        <div>
+          <h3>&#x1F4BC; ビジネス面</h3>
+          <div class="card card-green" style="margin-top: 8px;">
+            <div class="feature-title">運用効率の向上</div>
+            <p style="font-size: 14px;">障害発生時に失敗したタスクのみを再実行でき、パイプライン全体の再実行が不要になるため、コスト削減とダウンタイムの短縮が見込める。</p>
+          </div>
+          <div class="card card-green">
+            <div class="feature-title">開発サイクルの短縮</div>
+            <p style="font-size: 14px;">タスク単位やタグ単位でのテスト実行が可能になり、パイプラインの開発・検証プロセスが効率化される。</p>
+          </div>
+          <div class="card card-green">
+            <div class="feature-title">GA の信頼性</div>
+            <p style="font-size: 14px;">プレビューからの昇格により SLA の対象となり、本番ワークロードでの使用に適した安定性が確保される。</p>
+          </div>
+        </div>
+        <div>
+          <h3>&#x1F527; 技術面</h3>
+          <div class="card" style="margin-top: 8px;">
+            <div class="feature-title">柔軟な実行制御</div>
+            <p style="font-size: 14px;">依存関係の自動解決 (Include dependencies / Include dependents) により、タスク間の関係を考慮した部分実行が容易になる。</p>
+          </div>
+          <div class="card">
+            <div class="feature-title">タグベースの管理</div>
+            <p style="font-size: 14px;">タスクにタグを付与して論理グループとして管理・実行でき、大規模パイプラインの運用がシンプルになる。</p>
+          </div>
+          <div class="card">
+            <div class="feature-title">API サポート</div>
+            <p style="font-size: 14px;">Dataform API 経由でのプログラマティックな実行が可能で、CI/CD パイプラインや外部オーケストレーションツールとの統合ができる。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>&#x26A0;&#xFE0F; デメリット・制約事項</h2>
+
+      <h3>制限事項</h3>
+      <div class="error-box" style="margin-top: 8px;">
+        <ul style="margin-left: 16px; font-size: 14px;">
+          <li>パイプラインは Google Cloud コンソールでのみ利用可能 (CLI やその他のインターフェースからの直接操作は不可)</li>
+          <li>パイプライン作成後にリージョンを変更することはできない</li>
+          <li>個々のタスクに対するアクセス制御はサポートされていない (パイプライン単位でのアクセス制御のみ)</li>
+          <li>スケジュール実行が次のスケジュール開始までに完了しない場合、次回のスケジュール実行はスキップされエラーとなる</li>
+          <li>API 経由の実行ではユーザー認証情報による認証がサポートされておらず、サービスアカウントが必須</li>
+        </ul>
+      </div>
+
+      <h3 style="margin-top: 16px;">考慮すべき点</h3>
+      <div class="warning-box" style="margin-top: 8px;">
+        <ul style="margin-left: 16px; font-size: 14px;">
+          <li>Dataform のクォータと制限が適用されるため、大規模パイプラインの場合は事前にクォータの確認が必要</li>
+          <li>パイプラインの実行は BigQuery のコンピュートおよびストレージ料金が発生する</li>
+          <li>ノートブックを含むパイプラインの場合、Colab Enterprise のランタイム料金も発生する</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>&#x1F4A1; ユースケース</h2>
+
+      <div class="usecase-card">
+        <span class="usecase-label">ユースケース 1</span>
+        <h3>&#x1F527; 障害時の部分リトライ</h3>
+        <p style="font-size: 14px;"><strong>シナリオ:</strong> 日次で実行されるデータ変換パイプラインにおいて、5 つのタスクのうちタスク 4 で一時的なエラーが発生した場合。</p>
+        <div class="usecase-steps">
+          <p style="font-size: 13px; font-weight: 600; color: var(--gc-on-surface); margin-bottom: 4px;">実装手順:</p>
+          <ol>
+            <li><code>Run > Select tasks to run</code> を選択</li>
+            <li>失敗したタスク 4 を選択</li>
+            <li><code>Include dependents</code> を有効にして、タスク 4 とその下流タスク (タスク 5) を再実行</li>
+          </ol>
+        </div>
+        <p style="font-size: 14px; margin-top: 8px;"><strong>効果:</strong> パイプライン全体を再実行する場合と比較して、既に成功しているタスク 1-3 の再実行コストを削減できる。また、再実行の所要時間も大幅に短縮される。</p>
+      </div>
+
+      <div class="usecase-card">
+        <span class="usecase-label">ユースケース 2</span>
+        <h3>&#x1F3F7;&#xFE0F; タグを使ったドメイン別のデータ更新</h3>
+        <p style="font-size: 14px;"><strong>シナリオ:</strong> 複数のビジネスドメイン (売上、在庫、顧客) のデータ変換タスクが 1 つのパイプラインに含まれており、売上データのソースのみが更新された場合。</p>
+        <div class="usecase-steps">
+          <p style="font-size: 13px; font-weight: 600; color: var(--gc-on-surface); margin-bottom: 4px;">実装手順:</p>
+          <ol>
+            <li>各タスクにドメイン別のタグ (<code>sales</code>, <code>inventory</code>, <code>customer</code>) を付与</li>
+            <li><code>Run > Run by tag</code> を選択</li>
+            <li><code>sales</code> タグを選択して実行</li>
+          </ol>
+        </div>
+        <p style="font-size: 14px; margin-top: 8px;"><strong>効果:</strong> 変更のあったドメインに関連するタスクのみを実行でき、不要なデータ処理を回避してコストと時間を節約できる。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>&#x1F4B0; 料金</h2>
+      <p>BigQuery パイプラインの実行には、BigQuery のコンピュート料金とストレージ料金が適用される。<span class="highlight">パイプライン機能自体に追加料金はない</span>。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>料金タイプ</th>
+            <th>説明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>オンデマンド料金</strong></td>
+            <td>クエリで処理されたデータ量 (TiB) に基づく課金</td>
+          </tr>
+          <tr>
+            <td><strong>容量ベース料金 (Editions)</strong></td>
+            <td>スロット (コンピュートリソース) の使用量に基づく課金。Standard、Enterprise、Enterprise Plus の各エディションが利用可能</td>
+          </tr>
+          <tr>
+            <td><strong>ストレージ料金</strong></td>
+            <td>BigQuery に保存されたデータ量に基づく課金 (論理バイトまたは物理バイト)</td>
+          </tr>
+          <tr>
+            <td><strong>ノートブック含有パイプライン</strong></td>
+            <td>Colab Enterprise のデフォルトマシンタイプに基づくランタイム料金が追加で発生</td>
+          </tr>
+          <tr>
+            <td><strong>ログ記録</strong></td>
+            <td>各パイプライン実行は Cloud Logging で記録され、Cloud Logging の課金が適用される場合がある</td>
+          </tr>
+        </tbody>
+      </table>
+      <p style="font-size: 14px; margin-top: 8px;">詳細は <a href="https://cloud.google.com/bigquery/pricing" target="_blank" class="gc-link">BigQuery 料金ページ</a> を参照。</p>
+    </div>
+
+    <!-- Regions -->
+    <div class="section">
+      <h2>&#x1F30D; 利用可能リージョン</h2>
+      <p>BigQuery パイプラインは、<span class="highlight">40 以上のリージョン</span>で利用可能。</p>
+      <div class="region-grid">
+        <div class="region-item">&#x1F1FA;&#x1F1F8; 米国 (アイオワ) <span class="region-code">us-central1</span></div>
+        <div class="region-item">&#x1F1FA;&#x1F1F8; 米国 (バージニア北部) <span class="region-code">us-east4</span></div>
+        <div class="region-item">&#x1F1FA;&#x1F1F8; 米国 (オレゴン) <span class="region-code">us-west1</span></div>
+        <div class="region-item">&#x1F1EA;&#x1F1FA; 欧州 (ベルギー) <span class="region-code">europe-west1</span></div>
+        <div class="region-item">&#x1F1EA;&#x1F1FA; 欧州 (フランクフルト) <span class="region-code">europe-west3</span></div>
+        <div class="region-item">&#x1F1EA;&#x1F1FA; 欧州 (ロンドン) <span class="region-code">europe-west2</span></div>
+        <div class="region-item">&#x1F1EF;&#x1F1F5; アジア (東京) <span class="region-code">asia-northeast1</span></div>
+        <div class="region-item">&#x1F1EF;&#x1F1F5; アジア (大阪) <span class="region-code">asia-northeast2</span></div>
+        <div class="region-item">&#x1F1F8;&#x1F1EC; アジア (シンガポール) <span class="region-code">asia-southeast1</span></div>
+        <div class="region-item">&#x1F1E6;&#x1F1FA; アジア (シドニー) <span class="region-code">australia-southeast1</span></div>
+        <div class="region-item">&#x1F1E7;&#x1F1F7; 南米 (サンパウロ) <span class="region-code">southamerica-east1</span></div>
+      </div>
+      <p style="font-size: 14px; margin-top: 12px;">サポートされる全リージョンの一覧は <a href="https://cloud.google.com/bigquery/docs/locations#bqstudio-loc" target="_blank" class="gc-link">BigQuery Studio locations</a> を参照。</p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#x1F517; 関連サービス・機能</h2>
+      <div class="related-grid">
+        <div class="related-item">
+          <strong><a href="https://cloud.google.com/dataform/docs/overview" target="_blank" class="gc-link">Dataform</a></strong>
+          <p style="font-size: 13px; margin-top: 4px;">BigQuery パイプラインの基盤技術。SQL ベースのデータ変換ワークフローを管理・実行する。</p>
+        </div>
+        <div class="related-item">
+          <strong><a href="https://cloud.google.com/logging/docs" target="_blank" class="gc-link">Cloud Logging</a></strong>
+          <p style="font-size: 13px; margin-top: 4px;">パイプラインの実行ログが自動記録され、Cloud Monitoring と連携したアラート設定が可能。</p>
+        </div>
+        <div class="related-item">
+          <strong><a href="https://cloud.google.com/monitoring/docs" target="_blank" class="gc-link">Cloud Monitoring</a></strong>
+          <p style="font-size: 13px; margin-top: 4px;">パイプライン実行の失敗時にログベースのアラートポリシーを設定できる。</p>
+        </div>
+        <div class="related-item">
+          <strong><a href="https://cloud.google.com/colab/docs" target="_blank" class="gc-link">Colab Enterprise</a></strong>
+          <p style="font-size: 13px; margin-top: 4px;">パイプライン内のノートブックタスクの実行ランタイムを提供。</p>
+        </div>
+        <div class="related-item">
+          <strong><a href="https://cloud.google.com/bigquery/docs/bigquery-studio" target="_blank" class="gc-link">BigQuery Studio</a></strong>
+          <p style="font-size: 13px; margin-top: 4px;">パイプラインの作成・管理・実行の統合インターフェース。</p>
+        </div>
+        <div class="related-item">
+          <strong><a href="https://cloud.google.com/dataplex/docs/introduction" target="_blank" class="gc-link">Dataplex Universal Catalog</a></strong>
+          <p style="font-size: 13px; margin-top: 4px;">パイプラインメタデータの管理と検出に対応。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section" style="background: var(--gc-blue-tint); border: 2px solid var(--gc-blue-200);">
+      <h2>&#x1F4DD; まとめ</h2>
+      <p>BigQuery パイプラインの <strong>3 つの実行方法</strong> (全タスク実行、選択タスク実行、タグベース実行) が <span class="highlight">GA</span> となり、本番環境での柔軟なパイプライン運用が可能になった。特に、障害時の部分リトライやドメイン別のタスク実行など、大規模データ変換ワークフローの運用効率を大幅に向上させる機能である。</p>
+      <div class="note-box" style="margin-top: 12px;">
+        <strong>&#x1F4A1; 推奨アクション:</strong> BigQuery パイプラインを使用しているユーザーは、タスクへのタグ付与を検討し、タグベース実行による効率的な運用体制の構築を推奨する。
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>出典:</strong></p>
+      <ul>
+        <li><a href="https://cloud.google.com/release-notes#February_11_2026" target="_blank">公式リリースノート (2026-02-11)</a></li>
+        <li><a href="https://cloud.google.com/bigquery/docs/create-pipelines#run-pipeline" target="_blank">パイプラインの作成と実行</a></li>
+        <li><a href="https://cloud.google.com/bigquery/docs/pipelines-introduction" target="_blank">BigQuery パイプラインの概要</a></li>
+        <li><a href="https://cloud.google.com/bigquery/docs/manage-pipelines" target="_blank">パイプラインの管理</a></li>
+        <li><a href="https://cloud.google.com/bigquery/docs/schedule-pipelines" target="_blank">パイプラインのスケジューリング</a></li>
+        <li><a href="https://cloud.google.com/bigquery/pricing" target="_blank">料金ページ</a></li>
+      </ul>
+      <p style="margin-top: 8px; font-size: 11px; color: var(--gc-outline);">Tags: #BigQuery #Pipeline #Dataform #GA #DataEngineering #ETL #DataTransformation</p>
+    </footer>
+
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

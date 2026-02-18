@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Looker: Self-service Explores 強化・Google Sheets 連携・In-database マージクエリ・コンテンツ認証</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .card-teal {
+      border-left-color: var(--gc-teal);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block {
+      overflow: hidden;
+      padding: 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre:not(.mermaid) {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      border-radius: 0;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 20px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.green {
+      background: linear-gradient(135deg, var(--gc-green), #2E7D32);
+    }
+
+    .stat-card.orange {
+      background: linear-gradient(135deg, var(--gc-orange), #E65100);
+    }
+
+    .stat-card.purple {
+      background: linear-gradient(135deg, var(--gc-purple), #7B1FA2);
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 20px 0;
+    }
+
+    .before-col {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-col {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-col h3, .after-col h3 {
+      margin-top: 0;
+      text-align: center;
+    }
+
+    .before-col ul, .after-col ul {
+      padding-left: 20px;
+      margin: 8px 0;
+    }
+
+    .before-col li, .after-col li {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h3 {
+      color: var(--gc-blue-800);
+      margin-top: 0;
+    }
+
+    .tag-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    .tag {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-800);
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 12px;
+      font-weight: 500;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    footer ul {
+      list-style: none;
+      padding: 0;
+      margin: 8px 0;
+    }
+
+    footer li {
+      margin: 4px 0;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stat-cards { grid-template-columns: 1fr; }
+      .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>📊 Looker: Self-service Explores 強化</h1>
+        <p style="margin: 8px 0 0 0; color: var(--gc-on-surface-variant);">Google Sheets 連携・In-database マージクエリ・コンテンツ認証・ダッシュボードサブスクリプション</p>
+      </div>
+      <div style="text-align: right;">
+        <div class="subtitle">2026-02-17</div>
+        <div style="margin-top: 8px;">
+          <span class="badge">Looker</span>
+          <span class="badge-preview">Preview</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>☁️ 概要</h2>
+      <p>2026 年 2 月 17 日より、Looker において <span class="highlight">5 つの新機能</span> が Preview として段階的にロールアウト。BI プラットフォームとしての Looker のセルフサービス分析能力を大幅に向上させるアップデートである。</p>
+      <p>対象ユーザーは、<strong>データアナリスト</strong>、<strong>BI エンジニア</strong>、<strong>データガバナンス担当者</strong>、<strong>Looker 管理者</strong>、および LookML モデルの設定や Git バージョン管理の知識がないビジネスユーザーである。</p>
+
+      <div class="note-box">
+        <strong>💡 特に注目:</strong> In-database マージクエリにより、従来 Looker メモリ内で 5,000 行の制限付きで実行されていた結合処理が BigQuery データベース側で実行されるようになり、パフォーマンスと処理可能なデータ量の両面で大きな改善をもたらす。
+      </div>
+    </div>
+
+    <!-- Statistics -->
+    <div class="stat-cards">
+      <div class="stat-card">
+        <div class="stat-value">5</div>
+        <div class="stat-label">新機能 (Preview)</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-value">制限なし</div>
+        <div class="stat-label">In-database マージの行数</div>
+      </div>
+      <div class="stat-card orange">
+        <div class="stat-value">5,000行</div>
+        <div class="stat-label">従来のメモリ内マージ制限</div>
+      </div>
+      <div class="stat-card purple">
+        <div class="stat-value">100MB</div>
+        <div class="stat-label">アップロードファイル上限</div>
+      </div>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-col">
+          <h3>❌ Before (従来)</h3>
+          <ul>
+            <li>Self-service Explores で作成したデータを更新する手段がなかった</li>
+            <li>データアップロードは CSV/XLS/XLSX のみ。Google Sheets からの直接取り込み不可</li>
+            <li>マージクエリは Looker メモリ内で実行され、各クエリ 5,000 行の制限あり</li>
+            <li>コンテンツ認証の有効化/無効化、認証取り消し制御不可。LookML ダッシュボード非対応</li>
+            <li>ダッシュボード配信にはスケジュール設定が必要。サブスクリプション形式なし</li>
+          </ul>
+        </div>
+        <div class="after-col">
+          <h3>✅ After (新機能)</h3>
+          <ul>
+            <li>Explore オーナーが元ファイルの最新バージョンでデータ更新可能</li>
+            <li>Google Sheets からのデータアップロードに対応。Google Workspace と連携</li>
+            <li>BigQuery データベース内で直接結合。行数制限なし・高速処理</li>
+            <li>認証の有効化/無効化、カスタム URL、編集時の認証取り消し制御。LookML ダッシュボード対応</li>
+            <li>ダッシュボードサブスクリプションが Preview として利用可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>Self-service Explores のデータフローと、今回のアップデートで強化された各機能の連携を示す。データソースからのアップロード、BigQuery での永続化、In-database マージクエリによるデータベース内結合、コンテンツ認証、およびダッシュボードサブスクリプションによる配信までの一連の流れを表現している。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph データソース
+        A[("CSV / XLS / XLSX")]
+        B[("Google Sheets")]
+    end
+
+    subgraph Looker
+        C["Self-service Explores"]
+        D["Explore クエリ A"]
+        E["Explore クエリ B"]
+        F{"マージクエリ"}
+        G["コンテンツ認証"]
+        H["ダッシュボード"]
+        I["サブスクリプション配信"]
+    end
+
+    subgraph BigQuery
+        J[("BigQuery DB")]
+        K["In-database JOIN"]
+    end
+
+    subgraph 配信先
+        L["Email / Slack"]
+    end
+
+    A -->|アップロード / 更新| C
+    B -->|Google Sheets 連携| C
+    C -->|データ永続化| J
+    D --> F
+    E --> F
+    F -->|In-database マージ| K
+    K -->|結合結果| H
+    C --> G
+    H --> G
+    G -->|認証済み| H
+    H --> I
+    I --> L
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+
+      <div class="feature-grid">
+        <div class="card">
+          <h3>🔄 1. Self-service Explores データ更新</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span>Explore のオーナーが、元ファイルの最新バージョンのデータで Explore を更新可能</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>既存の Explore 設定 (ディメンション、メジャー、アクセス権限など) をそのまま保持</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>更新はオーナーのみが実行可能</span></div>
+        </div>
+
+        <div class="card card-green">
+          <h3>📗 2. Google Sheets アップロード</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span>Google Sheets からのデータアップロードをサポート</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>従来の CSV/XLS/XLSX に加え、Google Sheets が新たなデータソースとして利用可能</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>Google Workspace との連携により、スプレッドシートベースのワークフローからシームレスに BI 分析へ移行</span></div>
+          <div class="warning-box" style="margin-top: 12px;">
+            <strong>⚠️ 前提条件:</strong> Looker 管理者が BigQuery データベースをホストする Google Cloud プロジェクトで必要な API を有効化する必要あり
+          </div>
+        </div>
+
+        <div class="card card-purple">
+          <h3>🚀 3. In-database マージクエリ</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span>同一の BigQuery 接続上にある 2 つのクエリの結果を BigQuery データベース内で直接マージ (結合)</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>従来の Looker メモリ内 LEFT JOIN (5,000 行制限) から BigQuery 側実行へ移行</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>行数制限がなくなり、大幅なパフォーマンス向上が期待できる</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>同一 BigQuery 接続上の 2 つのクエリに対してサポート</span></div>
+        </div>
+
+        <div class="card card-orange">
+          <h3>🛡️ 4. コンテンツ認証の強化</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span>管理者がコンテンツ認証機能の有効化/無効化を制御可能</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>認証プロセス用のカスタム URL を設定可能</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>コンテンツ編集時に認証を自動的に取り消すかどうかを制御可能</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>LookML ダッシュボードが認証対象として新たにサポート</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>未認証の Self-service Explore に基づく Look やダッシュボードに「ungoverned」バッジ表示</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>検索結果を認証ステータスでソート可能</span></div>
+        </div>
+
+        <div class="card card-teal">
+          <h3>📬 5. ダッシュボードサブスクリプション</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span>Preview として段階的にロールアウト中</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>ダッシュボードの定期配信をサブスクリプション形式で管理可能</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3>Self-service Explores の前提条件</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Looker バージョン</td><td>25.20 以降</td></tr>
+          <tr><td>データベース接続</td><td>BigQuery データベースへの接続が必要</td></tr>
+          <tr><td>接続スコープ</td><td>All projects スコープで構成</td></tr>
+          <tr><td>PDT (永続化派生テーブル)</td><td>BigQuery 接続で PDT が有効であること</td></tr>
+          <tr><td>必要な権限</td><td><code>upload_data</code> 権限 (<code>explore</code> 権限を含むロールに自動付与)</td></tr>
+          <tr><td>ファイルサイズ上限</td><td>100 MB 以下</td></tr>
+          <tr><td>対応ファイル形式</td><td>CSV, XLS, XLSX, Google Sheets</td></tr>
+        </tbody>
+      </table>
+
+      <h3>In-database マージクエリの比較</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>従来 (メモリ内マージ)</th><th>新機能 (In-database マージ)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>実行場所</td><td>Looker メモリ</td><td>BigQuery データベース</td></tr>
+          <tr><td>行数制限</td><td>各クエリ 5,000 行</td><td>制限なし</td></tr>
+          <tr><td>パフォーマンス</td><td>大規模データで低下</td><td>BigQuery のスケーラビリティを活用</td></tr>
+          <tr><td>対応接続</td><td>全接続</td><td>同一 BigQuery 接続のみ</td></tr>
+          <tr><td>結合タイプ</td><td>LEFT JOIN 相当</td><td>LEFT JOIN 相当</td></tr>
+          <tr><td>結合対象</td><td>複数クエリ</td><td>2 つのクエリ</td></tr>
+        </tbody>
+      </table>
+
+      <h3>コンテンツ認証の信頼レベル</h3>
+      <table>
+        <thead>
+          <tr><th>レベル</th><th>バッジ</th><th>説明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Ungoverned (非信頼)</td><td><span style="background: var(--gc-yellow); color: #FFFFFF; padding: 2px 8px; border-radius: 8px; font-size: 12px;">ungoverned</span></td><td>Self-service Explores および Self-service Explores ベースのダッシュボードのデフォルト</td></tr>
+          <tr><td>標準 (バッジなし)</td><td>-</td><td>LookML Explore ベースの未認証ダッシュボード・Look のデフォルト</td></tr>
+          <tr><td>Certified (高信頼)</td><td><span style="background: var(--gc-green); color: #FFFFFF; padding: 2px 8px; border-radius: 8px; font-size: 12px;">Certified</span></td><td>手動レビューと認証を経たコンテンツ</td></tr>
+        </tbody>
+      </table>
+
+      <h3>認証に必要な権限</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">権限設定</span>
+          <span class="code-title">certify_content 権限</span>
+        </div>
+        <pre><code class="language-plaintext">certify_content 権限
+- Looker 管理者、または
+- certify_content 権限を含むカスタムロールのユーザー</code></pre>
+      </div>
+    </div>
+
+    <!-- Setup Steps -->
+    <div class="section">
+      <h2>⚙️ 設定方法</h2>
+
+      <h3>前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>Looker 25.20 以降のインスタンスが稼働していること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>BigQuery データベースへの接続が構成済みであること (PDT 有効、All projects スコープ)</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>Google Sheets アップロードを利用する場合は、BigQuery をホストする Google Cloud プロジェクトで必要な API が有効化されていること</span></div>
+
+      <h3>ステップ 1: Self-service Explores の有効化</h3>
+      <div class="card">
+        <div class="icon-text"><span class="arrow">1.</span><span>Looker Admin メニューの General セクションから <strong>Self-service Explores</strong> 管理ページを選択</span></div>
+        <div class="icon-text"><span class="arrow">2.</span><span><strong>Default BigQuery connection</strong> ドロップダウンから、データ保存に使用する BigQuery 接続を選択</span></div>
+        <div class="icon-text"><span class="arrow">3.</span><span><strong>Test connection</strong> ボタンで接続の有効性と PDT の有効化を確認</span></div>
+        <div class="icon-text"><span class="arrow">4.</span><span><strong>Enable data uploads</strong> ボタンをクリック</span></div>
+      </div>
+
+      <h3>ステップ 2: Google Sheets アップロードの設定</h3>
+      <div class="card card-green">
+        <p>Google Sheets からのデータアップロードを有効にする場合、Looker 管理者が BigQuery データベースをホストする Google Cloud プロジェクトで必要な API を有効化する。</p>
+      </div>
+
+      <h3>ステップ 3: コンテンツ認証の設定</h3>
+      <div class="card card-orange">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Looker (original)</strong>: Access Content Certification Labs トグルを有効化</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Looker (Google Cloud core)</strong>: デフォルトで有効</span></div>
+        <p style="margin-top: 12px;">管理者はカスタム URL の設定や、編集時の認証取り消し動作を管理パネルから構成できる。</p>
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+
+      <h3>ビジネス面</h3>
+      <div class="card card-green">
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>セルフサービス分析の拡充</strong>: 技術的な知識がないビジネスユーザーでも、Google Sheets や各種ファイルから直接データをアップロードし、Looker で分析・可視化できる</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>データガバナンスの強化</strong>: コンテンツ認証機能により、組織内で信頼できるデータとコンテンツを明確に区別でき、意思決定の信頼性が向上する</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>大規模データ分析の実現</strong>: In-database マージにより、従来の 5,000 行制限を超える大規模データの統合分析が可能になる</span></div>
+      </div>
+
+      <h3>技術面</h3>
+      <div class="card">
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>パフォーマンス向上</strong>: マージクエリが BigQuery 側で実行されるため、Looker インスタンスのメモリ負荷が軽減され、大規模データの結合処理が高速化される</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>Google Workspace 連携の深化</strong>: Google Sheets との直接連携により、既存のスプレッドシートワークフローと BI 分析のシームレスな統合が実現する</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>柔軟なデータ管理</strong>: Self-service Explore のデータ更新機能により、元データの変更を反映しつつ、Explore の設定を維持できる</span></div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>制限事項</h3>
+      <div class="error-box">
+        <div class="check-item"><span class="cross-icon">✗</span><span>全機能が Preview ステータスであり、限定的なサポートが提供される</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>In-database マージクエリは同一の BigQuery 接続上にある 2 つのクエリのみに対応 (3 つ以上のクエリや異なる接続間のマージは非対応)</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>Self-service Explores のデータは BigQuery に永続化されるため、BigQuery 管理者がアップロードデータを閲覧可能</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>Self-service Explores はインスタンスの移行やシステムバックアップ・リカバリの際にデータが失われる可能性がある</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>アップロードファイルは 100 MB 以下に制限される</span></div>
+      </div>
+
+      <h3>考慮すべき点</h3>
+      <div class="warning-box">
+        <div class="check-item"><span style="color: var(--gc-yellow); font-size: 18px; flex-shrink: 0;">!</span><span>Self-service Explores を無効化すると、既存の Explore へのアクセスや、それに依存する Look・ダッシュボードに影響する</span></div>
+        <div class="check-item"><span style="color: var(--gc-yellow); font-size: 18px; flex-shrink: 0;">!</span><span>BigQuery 接続を変更すると、既存の Self-service Explores とそれに依存するコンテンツに影響する可能性がある</span></div>
+        <div class="check-item"><span style="color: var(--gc-yellow); font-size: 18px; flex-shrink: 0;">!</span><span>コンテンツ認証の「ungoverned」バッジは、Self-service Explore ベースのコンテンツに自動的に表示されるため、ユーザーへの周知が必要</span></div>
+        <div class="check-item"><span style="color: var(--gc-yellow); font-size: 18px; flex-shrink: 0;">!</span><span>Google Sheets アップロードを利用するには、Looker 管理者が Google Cloud プロジェクトで追加の API を有効化する必要がある</span></div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h3>📈 ユースケース 1: マーケティングチームのキャンペーン分析</h3>
+        <p><strong>シナリオ:</strong> マーケティング担当者が Google Sheets で管理しているキャンペーンデータを、BigQuery に格納された売上データと結合して分析したい。</p>
+        <h3>実装ステップ</h3>
+        <div class="flow-diagram">
+          <div class="flow-step">📗 Google Sheets<br/>キャンペーンデータ</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">📊 Self-service<br/>Explores</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">🔗 In-database<br/>マージ</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">📋 ダッシュボード<br/>可視化</div>
+        </div>
+        <div class="success-box">
+          <strong>✅ 効果:</strong> LookML モデルの作成やデータエンジニアへの依頼なしに、マーケティングチームが自律的にデータ分析を実施でき、分析のリードタイムが大幅に短縮される。
+        </div>
+      </div>
+
+      <div class="usecase-card">
+        <h3>🛡️ ユースケース 2: データガバナンス強化による信頼性向上</h3>
+        <p><strong>シナリオ:</strong> データチームが組織内の Looker コンテンツの品質管理を強化し、ユーザーが信頼できるダッシュボードを容易に識別できるようにしたい。</p>
+        <div class="success-box">
+          <strong>✅ 効果:</strong> コンテンツ認証機能と「ungoverned」バッジにより、認証済みの信頼できるコンテンツと未認証のコンテンツが視覚的に区別され、意思決定に利用するデータの信頼性が向上する。認証ステータスでの検索ソートにより、ユーザーは認証済みコンテンツを優先的に利用できる。
+        </div>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>Looker の料金体系は、利用するプラットフォーム (<strong>Looker (original)</strong> または <strong>Looker (Google Cloud core)</strong>) やユーザー数に基づく。</p>
+      <div class="note-box">
+        <strong>💡 ポイント:</strong> 今回の Preview 機能は<span class="highlight">追加料金なし</span>で利用可能。ただし、Self-service Explores のデータは BigQuery に永続化されるため、BigQuery のストレージおよびクエリ処理にかかる費用が別途発生する。In-database マージクエリも BigQuery 側でクエリが実行されるため、BigQuery の利用料金が適用される。
+      </div>
+      <p>詳細は <a href="https://cloud.google.com/looker/pricing" target="_blank" class="gc-link">Looker 料金ページ</a> を参照。</p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>BigQuery</strong>: Self-service Explores のデータ永続化先であり、In-database マージクエリの実行基盤。BigQuery の接続設定 (PDT 有効化、All projects スコープ) が前提条件</span></div>
+      </div>
+      <div class="card card-green">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Google Sheets</strong>: 新たにデータアップロード元として対応。Google Workspace のスプレッドシートから直接 Looker にデータを取り込める</span></div>
+      </div>
+      <div class="card card-purple">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Looker Studio Pro</strong>: Looker (original) および Looker (Google Cloud core) ユーザーは無料で Looker Studio Pro ライセンスを利用可能。レポート配信やコラボレーション機能を補完</span></div>
+      </div>
+      <div class="card card-orange">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>LookML</strong>: Self-service Explores は LookML モデルの設定を不要とする機能だが、より高度なデータモデリングが必要な場合は LookML での定義を推奨</span></div>
+      </div>
+      <div class="card card-teal">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Cloud Monitoring / Cloud Logging</strong>: Looker インスタンスのパフォーマンス監視やログ分析に活用可能</span></div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <p>今回の Looker アップデートは、<span class="highlight">セルフサービス分析</span>、<span class="highlight">データ統合パフォーマンス</span>、<span class="highlight">データガバナンス</span>の 3 つの領域を包括的に強化するものである。特に In-database マージクエリによる 5,000 行制限の撤廃と BigQuery ネイティブな結合処理への移行は、大規模データ分析を行う組織にとって大きな改善となる。</p>
+      <div class="warning-box">
+        <strong>⚠️ 注意:</strong> すべての機能が Preview ステータスであるため、本番環境への導入前に検証環境でのテストを推奨する。
+      </div>
+
+      <div class="tag-list">
+        <span class="tag">Looker</span>
+        <span class="tag">BI</span>
+        <span class="tag">Analytics</span>
+        <span class="tag">BigQuery</span>
+        <span class="tag">Data Governance</span>
+        <span class="tag">Self-service Explores</span>
+        <span class="tag">Merged Results</span>
+        <span class="tag">Content Certification</span>
+        <span class="tag">Google Sheets</span>
+        <span class="tag">Dashboard Subscriptions</span>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>出典:</strong></p>
+      <ul>
+        <li>📎 <a href="https://cloud.google.com/release-notes#February_17_2026" target="_blank" rel="noopener noreferrer">Google Cloud Release Notes (February 17, 2026)</a></li>
+        <li>📎 <a href="https://cloud.google.com/looker/docs/exploring-self-service" target="_blank" rel="noopener noreferrer">Self-service Explores ドキュメント</a></li>
+        <li>📎 <a href="https://cloud.google.com/looker/docs/admin-panel-self-service-explore" target="_blank" rel="noopener noreferrer">Self-service Explores 管理者設定</a></li>
+        <li>📎 <a href="https://cloud.google.com/looker/docs/merged-results" target="_blank" rel="noopener noreferrer">マージクエリ (Merged Results) ドキュメント</a></li>
+        <li>📎 <a href="https://cloud.google.com/looker/docs/content-certification" target="_blank" rel="noopener noreferrer">コンテンツ認証ドキュメント</a></li>
+        <li>📎 <a href="https://cloud.google.com/looker/docs/scheduling-and-sending-dashboards" target="_blank" rel="noopener noreferrer">ダッシュボードのスケジュール配信</a></li>
+        <li>📎 <a href="https://cloud.google.com/looker/pricing" target="_blank" rel="noopener noreferrer">Looker 料金ページ</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline);">Generated on 2026-02-18 | Google Cloud News Summary</p>
+    </footer>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>
