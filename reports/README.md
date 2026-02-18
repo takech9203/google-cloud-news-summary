@@ -5,8 +5,18 @@
 
 ## 2026 年
 
+- [2026-02-18 - SAP on Google Cloud: 新しい SAP HANA マシンタイプ認定 (OLAP/OLTP)](2026/2026-02-18-sap-hana-new-machine-type-certifications.md)
+- [2026-02-17 - Looker: Self-service Explores 強化・Google Sheets 連携・In-database マージクエリ・コンテンツ認証](2026/2026-02-17-looker-self-service-explores-enhancements.md)
+- [2026-02-17 - AlloyDB for PostgreSQL: パフォーマンススナップショット・AI 関数一括処理・リモート MCP サーバー](2026/2026-02-17-alloydb-ai-functions-mcp-server.md)
+- [2026-02-17 - Google Cloud Contact Center as a Service (CCaaS): 2026年2月バグ修正リリース](2026/2026-02-17-ccaas-bug-fixes-february.md)
 - [2026-02-17 - BigQuery: Global Queries (Preview)](2026/2026-02-17-bigquery-global-queries.md)
+- [2026-02-17 - Cloud Trace: トレースシンク機能の非推奨化](2026/2026-02-17-cloud-trace-sinks-deprecated.md)
+- [2026-02-17 - Workflows: asia-southeast3 (Bangkok, Thailand) リージョン対応](2026/2026-02-17-workflows-asia-southeast3.md)
+- [2026-02-17 - Document AI: レガシープロセッサの廃止予定 (2026年6月30日)](2026/2026-02-17-document-ai-legacy-processors-deprecated.md)
 - [2026-02-17 - Bigtable: Admin API MCP Server (Preview)](2026/2026-02-17-bigtable-admin-api-mcp-server.md)
+- [2026-02-17 - Vertex AI Search: Gemini 3 Pro による回答生成 (Preview)](2026/2026-02-17-vertex-ai-search-gemini-3-pro.md)
+- [2026-02-17 - Generative AI on Vertex AI: 画像生成プレビューエンドポイント非推奨化 & Claude Sonnet 4.6 提供開始](2026/2026-02-17-vertex-ai-image-gen-deprecation-claude-sonnet.md)
+- [2026-02-17 - Google Cloud MCP サーバー: 組織ポリシー非推奨化と IAM deny ポリシーへの移行](2026/2026-02-17-google-cloud-mcp-policy-migration.md)
 - [2026-02-16 - Document AI: Layout Parser Web Interface (Preview)](2026/2026-02-16-document-ai-layout-parser-web-interface.md)
 - [2026-02-16 - Cloud Composer: 新ビルドリリースと Airflow 3 環境スナップショット対応](2026/2026-02-16-cloud-composer-airflow3-snapshots.md)
 - [2026-02-15 - Carbon Footprint: AI 排出量算定方法論のアップデート](2026/2026-02-15-carbon-footprint-ai-emissions-methodology.md)
