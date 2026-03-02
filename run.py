@@ -36,9 +36,12 @@ from claude_agent_sdk.types import (
     ToolUseBlock,
 )
 
-# Default prompt for the skill
-DEFAULT_PROMPT = (
-    "Report Google Cloud news from the past week. "
+# Default number of days to look back
+DEFAULT_DAYS = 3
+
+# Default prompt template for the skill
+DEFAULT_PROMPT_TEMPLATE = (
+    "Report Google Cloud news from the past {days} days. "
     "Fetch the RSS feed, filter updates, check for duplicates, "
     "and delegate report creation to subagents."
 )
@@ -432,7 +435,7 @@ def is_throttling_error(error: Exception) -> bool:
     ])
 
 
-async def run_skill(prompt: str = DEFAULT_PROMPT) -> list[str]:
+async def run_skill(prompt: str | None = None, days: int = DEFAULT_DAYS) -> list[str]:
     """Run the google-cloud-news-summary skill using Claude Agent SDK with subagents.
 
     The orchestrator handles RSS feed fetching, parsing, filtering, and
@@ -440,16 +443,22 @@ async def run_skill(prompt: str = DEFAULT_PROMPT) -> list[str]:
     'report-generator' subagents via the Task tool for parallel execution.
 
     Args:
-        prompt: The prompt to send to the skill. Defaults to DEFAULT_PROMPT.
+        prompt: The prompt to send to the skill. If None, uses default based on days.
+        days: Number of days to look back for updates. Defaults to DEFAULT_DAYS.
 
     Returns:
         List of newly created report file paths (relative to project_dir).
     """
+    # Generate default prompt if not provided
+    if prompt is None:
+        prompt = DEFAULT_PROMPT_TEMPLATE.format(days=days)
+
     print_separator()
     print("Google Cloud News Summary Automation (Subagent Mode)")
     print_separator()
     current_time = datetime.now()
     print(f"Start time: {current_time.isoformat()}")
+    print(f"Days to look back: {days}")
     print(f"Prompt: {prompt[:80]}{'...' if len(prompt) > 80 else ''}")
     print()
 
@@ -460,12 +469,12 @@ You are the orchestrator for Google Cloud news report generation.
 Your job is to:
 
 1. FETCH the RSS feed: Run `curl -L -s "https://cloud.google.com/feeds/gcp-release-notes.xml" > /tmp/gcp_release_notes.xml`
-2. PARSE the feed: Run `python3 .claude/skills/google-cloud-news-summary/scripts/parse_gcp_release_notes.py --days {{DAYS}} --feed /tmp/gcp_release_notes.xml` (adjust --days based on the user's request; default 7)
+2. PARSE the feed: Run `python3 .claude/skills/google-cloud-news-summary/scripts/parse_gcp_release_notes.py --days {days} --feed /tmp/gcp_release_notes.xml`
 3. FILTER: Remove excluded update types (doc-only updates, minor UI changes). Read the skill definition (.claude/skills/google-cloud-news-summary/SKILL.md) for exclusion rules.
 4. CHECK DUPLICATES: Use Glob to check `reports/{{YYYY}}/*.md` for existing reports. Skip updates that already have reports (match by date and slug).
 5. DELEGATE: For each remaining update, use the 'report-generator' subagent via the Task tool. Provide the update details (title, date, URL, summary, categories) and the output file path (reports/{{YYYY}}/{{YYYY}}-{{MM}}-{{DD}}-{{slug}}.md).
    BATCH RULES:
-   - Delegate in batches of at most 5 subagents at a time.
+   - Delegate in batches of at most 10 subagents at a time.
    - Wait for each batch to complete (collect TaskOutput for all tasks in the batch) before launching the next batch.
    - When collecting TaskOutput, set timeout to 600000 (10 minutes) to allow enough time for report generation.
    - CRITICAL: When you receive TaskOutput results, respond with ONLY a brief one-line confirmation per task (e.g. "Task X: done"). Do NOT repeat or summarize the subagent's output. This is essential to avoid "Prompt is too long" errors that prevent subsequent batches from running.
@@ -1363,16 +1372,19 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run the google-cloud-news-summary skill using Claude Agent SDK.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
+        epilog=f"""
 Examples:
   python run.py
-      Run with default prompt (report Google Cloud news from the past week)
+      Run with default settings (past {DEFAULT_DAYS} days)
+
+  python run.py --days 7
+      Look back 7 days for updates (useful for catching up after failures)
+
+  python run.py --days 1
+      Look back only 1 day (for daily runs)
 
   python run.py "Vertex AI の最新アップデートを教えて"
       Report only Vertex AI updates
-
-  python run.py --prompt "過去2週間の Google Cloud アップデートをまとめて"
-      Report Google Cloud updates from the past 2 weeks
 
   python run.py --verbose
       Run with verbose logging (timing information)
@@ -1384,13 +1396,19 @@ Examples:
     parser.add_argument(
         "prompt",
         nargs="?",
-        default=DEFAULT_PROMPT,
-        help=f"Prompt to send to the skill (default: '{DEFAULT_PROMPT[:50]}...')",
+        default=None,
+        help="Prompt to send to the skill (optional, overrides --days)",
     )
     parser.add_argument(
         "--prompt", "-p",
         dest="prompt_flag",
         help="Prompt to send to the skill (alternative to positional argument)",
+    )
+    parser.add_argument(
+        "--days",
+        type=int,
+        default=DEFAULT_DAYS,
+        help=f"Number of days to look back for updates (default: {DEFAULT_DAYS})",
     )
     parser.add_argument(
         "--verbose", "-v",
@@ -1423,6 +1441,7 @@ def main() -> None:
 
     # Use --prompt flag if provided, otherwise use positional argument
     prompt = args.prompt_flag if args.prompt_flag else args.prompt
+    days = args.days
 
     # Snapshot existing reports BEFORE Phase 1 so we can detect new ones
     # even if run_skill() raises an exception after reports are written to disk
@@ -1437,7 +1456,7 @@ def main() -> None:
 
     try:
         # Phase 1: Generate reports
-        new_reports = asyncio.run(run_skill(prompt=prompt))
+        new_reports = asyncio.run(run_skill(prompt=prompt, days=days))
     except Exception:
         # run_skill already printed error details.
         # Even if the SDK threw an error, sub-agents may have written
