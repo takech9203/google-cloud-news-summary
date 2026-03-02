@@ -1,8 +1,11 @@
 # {SERVICE_NAME}: {FEATURE_TITLE}
 
-**リリース日**: {RELEASE_DATE}  
-**サービス**: {SERVICE_NAME}  
-**機能**: {FEATURE_TITLE}  
+**リリース日**: {RELEASE_DATE}
+
+**サービス**: {SERVICE_NAME}
+
+**機能**: {FEATURE_TITLE}
+
 **ステータス**: {STATUS}
 
 📊 [このアップデートのインフォグラフィックを見る]({INFOGRAPHIC_URL})

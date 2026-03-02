@@ -1257,8 +1257,15 @@ async def generate_infographics(report_paths: list[str]) -> list[str]:
     }
 
     # バッチ処理
+    # Issue #584 回避策: バッチ間に遅延を入れてレースコンディションを防ぐ
+    BATCH_DELAY_SECONDS = 2
     total_batches = (len(targets) + BATCH_SIZE - 1) // BATCH_SIZE
     for batch_idx in range(total_batches):
+        # 2 バッチ目以降は遅延を入れる
+        if batch_idx > 0:
+            print(f"    (waiting {BATCH_DELAY_SECONDS}s before next batch...)")
+            await asyncio.sleep(BATCH_DELAY_SECONDS)
+
         batch_start = batch_idx * BATCH_SIZE
         batch_end = min(batch_start + BATCH_SIZE, len(targets))
         batch = targets[batch_start:batch_end]
@@ -1412,17 +1419,25 @@ async def generate_infographics(report_paths: list[str]) -> list[str]:
             except Exception as e:
                 error_str = str(e)
 
-                if (
-                    infographic_result_received
-                    and "exit code" in error_str
-                ):
-                    print(
-                        f"    (CLI exit code error ignored)"
-                    )
+                # Issue #584 回避策: "Fatal error in message reader" または
+                # "exit code" エラーは SDK のレースコンディションの可能性が高い。
+                # ファイルが作成されていれば成功とみなす。
+                is_known_sdk_issue = (
+                    "Fatal error in message reader" in error_str
+                    or "exit code" in error_str
+                )
+
+                if is_known_sdk_issue:
+                    print(f"    (SDK error ignored, checking created files...)")
+                    batch_created = 0
                     for rp in batch:
                         html_path = _report_to_infographic_path(rp)
                         if (project_dir / html_path).exists():
                             created.append(html_path)
+                            batch_created += 1
+                    print(f"    -> {batch_created}/{len(batch)} files created in this batch")
+                    # 次のバッチ前に追加の遅延を入れる (Issue #584 回避策)
+                    await asyncio.sleep(1)
                     break
 
                 if (
