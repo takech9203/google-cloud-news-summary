@@ -50,6 +50,29 @@ DEFAULT_PROMPT_TEMPLATE = (
 PRIMARY_MODEL = "global.anthropic.claude-opus-4-6-v1"
 FALLBACK_MODEL = "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
 
+# Common tools for orchestrator and subagents
+COMMON_TOOLS = [
+    "Skill",
+    "Read",
+    "Write",
+    "Edit",
+    "MultiEdit",
+    "Glob",
+    "Grep",
+    "Bash",
+    "WebFetch",
+]
+
+# MCP tools for Google Developer Knowledge
+MCP_TOOLS = [
+    "mcp__google-developer-knowledge__search_documents",
+    "mcp__google-developer-knowledge__get_document",
+    "mcp__google-developer-knowledge__batch_get_documents",
+    "mcp__cloud-cost__get_pricing",
+    "mcp__cloud-cost__compare_pricing",
+    "mcp__cloud-cost__list_services",
+]
+
 
 class Logger:
     """Logger with debug and verbose modes."""
@@ -466,25 +489,16 @@ async def run_skill(prompt: str | None = None, days: int = DEFAULT_DAYS) -> list
     prompt_with_context = f"""Current date and time: {current_time.strftime('%Y-%m-%d %H:%M:%S %Z')} (JST)
 
 You are the orchestrator for Google Cloud news report generation.
-Your job is to:
 
-1. FETCH the RSS feed: Run `curl -L -s "https://cloud.google.com/feeds/gcp-release-notes.xml" > /tmp/gcp_release_notes.xml`
-2. PARSE the feed: Run `python3 .claude/skills/google-cloud-news-summary/scripts/parse_gcp_release_notes.py --days {days} --feed /tmp/gcp_release_notes.xml`
-3. FILTER: Remove excluded update types (doc-only updates, minor UI changes). Read the skill definition (.claude/skills/google-cloud-news-summary/SKILL.md) for exclusion rules.
-4. CHECK DUPLICATES: Use Glob to check `reports/{{YYYY}}/*.md` for existing reports. Skip updates that already have reports (match by date and slug).
-5. DELEGATE: For each remaining update, use the 'report-generator' subagent via the Task tool. Provide the update details (title, date, URL, summary, categories) and the output file path (reports/{{YYYY}}/{{YYYY}}-{{MM}}-{{DD}}-{{slug}}.md).
-   BATCH RULES:
-   - Delegate in batches of at most 10 subagents at a time.
-   - Wait for each batch to complete (collect TaskOutput for all tasks in the batch) before launching the next batch.
-   - When collecting TaskOutput, set timeout to 600000 (10 minutes) to allow enough time for report generation.
-   - CRITICAL: When you receive TaskOutput results, respond with ONLY a brief one-line confirmation per task (e.g. "Task X: done"). Do NOT repeat or summarize the subagent's output. This is essential to avoid "Prompt is too long" errors that prevent subsequent batches from running.
-   - After each batch completes, immediately proceed to the next batch until all updates are processed.
-6. BLOG LINKS (optional): After reports are created, fetch the Google Cloud Blog feed and add relevant blog links to reports if found.
+1. Invoke the Skill tool with skill='google-cloud-news-summary' to get the workflow
+2. Follow steps 1-4 of the skill workflow (FETCH, PARSE with --days {days}, FILTER, CHECK DUPLICATES)
+3. DELEGATE: For each update, use the 'report-generator' subagent via Task tool
+   - Batch size: 10 subagents at a time
+   - Wait for each batch to complete before starting the next
+   - TaskOutput timeout: 600000 (10 minutes)
+   - CRITICAL: When you receive TaskOutput, respond with ONLY a one-line confirmation per task. Do NOT repeat subagent output to avoid "Prompt is too long" errors.
 
-User's request: {prompt}
-
-Note: Check the current date using the 'date' command before processing to ensure accurate date filtering.
-Important: When delegating to subagents, include ALL relevant information about the update item so the subagent can work independently."""
+User's request: {prompt}"""
 
     # Show logging mode
     if logger.debug:
@@ -551,32 +565,11 @@ Important: When delegating to subagents, include ALL relevant information about 
 
         # Define the report-generator subagent prompt
         report_subagent_prompt = (
-            "You are a Google Cloud news report generator specialist. "
-            "When given an update item (title, date, URL, summary, categories) "
-            "and an output file path:\n"
-            "1. Read the skill definition from "
-            ".claude/skills/google-cloud-news-summary/SKILL.md "
-            "(invoke the Skill tool with skill='google-cloud-news-summary')\n"
-            "2. Read the report template from "
-            ".claude/skills/google-cloud-news-summary/report_template.md\n"
-            "3. Fetch the Release Notes page details using curl\n"
-            "4. Search Google Developer Knowledge MCP for related documentation\n"
-            "5. Collect pricing information if applicable\n"
-            "6. Collect Before/After context\n"
-            "7. Create a comprehensive report following the template\n"
-            "8. Include a Mermaid architecture diagram when appropriate\n"
-            "9. Save the report to the specified output path\n\n"
-            "Follow the skill's information collection priority:\n"
-            "- Required: Release Notes details, overview, key features\n"
-            "- Important: MCP document search, Before/After context\n"
-            "- Recommended: Pricing info, related services\n"
-            "- Optional: Detailed setup steps, use case implementations\n\n"
-            "Do NOT skip sections that have data available. "
-            "Do NOT fill sections with speculation - only use confirmed information.\n\n"
-            "For the INFOGRAPHIC_URL placeholder, use the environment variable "
-            "INFOGRAPHIC_BASE_URL if available, otherwise leave the placeholder.\n\n"
-            "Make sure to invoke the Skill tool with "
-            "skill='google-cloud-news-summary'."
+            "You are a Google Cloud news report generator. "
+            "When given an update item and output file path:\n"
+            "1. Invoke the Skill tool with skill='google-cloud-news-summary'\n"
+            "2. Follow the skill's workflow to create the report\n"
+            "3. Save to the specified output path"
         )
 
         for model_index, current_model in enumerate(models_to_try):
@@ -608,51 +601,12 @@ Important: When delegating to subagents, include ALL relevant information about 
                 env=bedrock_env,
                 cwd=str(project_dir),
                 setting_sources=["project"],
-                allowed_tools=[
-                    "Skill",
-                    "Read",
-                    "Write",
-                    "Edit",
-                    "MultiEdit",
-                    "Glob",
-                    "Grep",
-                    "Bash",
-                    "WebFetch",
-                    "Task",
-                    "mcp__google-developer-knowledge__search_documents",
-                    "mcp__google-developer-knowledge__get_document",
-                    "mcp__google-developer-knowledge__batch_get_documents",
-                    "mcp__cloud-cost__get_pricing",
-                    "mcp__cloud-cost__compare_pricing",
-                    "mcp__cloud-cost__list_services",
-                ],
+                allowed_tools=COMMON_TOOLS + ["Task"] + MCP_TOOLS,
                 agents={
                     "report-generator": AgentDefinition(
-                        description=(
-                            "Generates a detailed Google Cloud news report "
-                            "from a single update item. Use for each update "
-                            "that needs a report. Provide the update details "
-                            "(title, date, URL, summary, categories) and "
-                            "the output file path."
-                        ),
+                        description="Generate a report from an update item.",
                         prompt=report_subagent_prompt,
-                        tools=[
-                            "Skill",
-                            "Read",
-                            "Write",
-                            "Edit",
-                            "MultiEdit",
-                            "Glob",
-                            "Grep",
-                            "Bash",
-                            "WebFetch",
-                            "mcp__google-developer-knowledge__search_documents",
-                            "mcp__google-developer-knowledge__get_document",
-                            "mcp__google-developer-knowledge__batch_get_documents",
-                            "mcp__cloud-cost__get_pricing",
-                            "mcp__cloud-cost__compare_pricing",
-                            "mcp__cloud-cost__list_services",
-                        ],
+                        tools=COMMON_TOOLS + MCP_TOOLS,
                     ),
                 },
                 stderr=_on_stderr,
@@ -1125,16 +1079,11 @@ async def generate_infographics(report_paths: list[str]) -> list[str]:
     print()
 
     subagent_prompt = (
-        "You are an infographic generator specialist. "
+        "You are an infographic generator. "
         "When given a report file path and output path:\n"
-        "1. Read the report file\n"
-        "2. Use the creating-infographic skill with the Google Cloud News theme "
-        "(refer to .claude/skills/creating-infographic/themes/google-cloud-news.md)\n"
-        "3. Generate a visually appealing infographic HTML file\n"
-        "4. Include all sections from the report\n"
-        "5. If the report contains Mermaid diagrams, embed them using Mermaid.js\n"
-        "6. Save the output to the specified path\n\n"
-        "Make sure to invoke the Skill tool with skill='creating-infographic'."
+        "1. Invoke the Skill tool with skill='creating-infographic'\n"
+        "2. Follow the skill's workflow to create the infographic\n"
+        "3. Save to the specified output path"
     )
 
     models_to_try = [PRIMARY_MODEL, FALLBACK_MODEL]
@@ -1196,33 +1145,12 @@ async def generate_infographics(report_paths: list[str]) -> list[str]:
                 env=bedrock_env,
                 cwd=str(project_dir),
                 setting_sources=["project"],
-                allowed_tools=[
-                    "Skill",
-                    "Read",
-                    "Write",
-                    "Edit",
-                    "MultiEdit",
-                    "Glob",
-                    "Bash",
-                    "Task",
-                ],
+                allowed_tools=["Skill", "Read", "Write", "Edit", "Glob", "Bash", "Task"],
                 agents={
                     "infographic-generator": AgentDefinition(
-                        description=(
-                            "Generates an infographic HTML file from "
-                            "a report. Use for each report that needs "
-                            "an infographic."
-                        ),
+                        description="Generate an infographic from a report.",
                         prompt=subagent_prompt,
-                        tools=[
-                            "Skill",
-                            "Read",
-                            "Write",
-                            "Edit",
-                            "MultiEdit",
-                            "Glob",
-                            "Bash",
-                        ],
+                        tools=["Skill", "Read", "Write", "Edit", "Glob", "Bash"],
                     ),
                 },
                 stderr=_on_infographic_stderr,
