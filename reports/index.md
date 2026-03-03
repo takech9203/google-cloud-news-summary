@@ -5,10 +5,16 @@
 
 ## 2026 年
 
+- [2026-03-03 - AlloyDB for PostgreSQL: AI 機能群の一般提供 (GA)](2026/2026-03-03-alloydb-ai-features-ga.md)
+- [2026-03-03 - Cloud Build: 認可の脆弱性 CVE-2026-3136 の修正](2026/2026-03-03-cloud-build-cve-2026-3136.md)
 - [2026-03-02 - Google SecOps: SOAR ロール (Cloud IAM) の非推奨化](2026/2026-03-02-google-secops-soar-roles-deprecated.md)
 - [2026-03-02 - AI Hypercomputer / Compute Engine: Flex-start VM Compact Placement Policies GA](2026/2026-03-02-compute-engine-flex-start-compact-placement.md)
+- [2026-03-02 - App Engine Standard Environment: レガシー Mail API から SMTP ベースメールサービスへの移行サポートが GA](2026/2026-03-02-app-engine-mail-api-smtp-migration-ga.md)
+- [2026-03-02 - Looker (Google Cloud core): Google Cloud コンソールでのバックアップ管理が可能に](2026/2026-03-02-looker-core-backup-management-console.md)
 - [2026-03-02 - NetApp Volumes: Network Connectivity Center Producer VPC Spokes (GA)](2026/2026-03-02-netapp-volumes-ncc-producer-vpc.md)
+- [2026-03-02 - Cloud Key Management Service: 鍵および鍵バージョンの削除機能が GA](2026/2026-03-02-cloud-kms-key-deletion-ga.md)
 - [2026-03-02 - Cloud Monitoring: Observability Analytics の SQL クエリでプロジェクト ID に解決されるシステム定義変数が利用可能に](2026/2026-03-02-cloud-monitoring-observability-analytics-sql-variable.md)
+- [2026-03-02 - Cloud Deploy: asia-southeast3 (Bangkok) リージョンのサポート開始](2026/2026-03-02-cloud-deploy-asia-southeast3.md)
 - [2026-03-01 - Google SecOps (SIEM & SOAR): Release 6.3.78 のロールアウト開始](2026/2026-03-01-google-secops-release-6-3-78.md)
 - [2026-02-28 - Google SecOps (SIEM & SOAR): Release 6.3.77 が全リージョンで利用可能に](2026/2026-02-28-google-secops-release-6-3-77.md)
 - [2026-02-27 - Dataflow: C4A マシンシリーズ (Arm) サポート GA](2026/2026-02-27-dataflow-c4a-arm.md)
