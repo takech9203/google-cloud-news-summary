@@ -5,7 +5,13 @@
 
 ## 2026 年
 
+- [2026-03-06 - Looker Studio: CSV コネクタ UI 強化の提供範囲に関する訂正](2026/2026-03-06-looker-studio-csv-connector-correction.md)
+- [2026-03-06 - BigQuery: Pipelines & Connections ページによるデータ統合の効率化](2026/2026-03-06-bigquery-pipelines-connections-preview.md)
 - [2026-03-06 - Oracle Database@Google Cloud: europe-west8 (ミラノ、イタリア) リージョンのサポート開始](2026/2026-03-06-oracle-database-google-cloud-milan-region.md)
+- [2026-03-06 - Bigtable: Agent Development Kit (ADK) ツールが GA](2026/2026-03-06-bigtable-adk-tools-ga.md)
+- [2026-03-06 - BigQuery: エンベディング生成 AI 関数が GA (一般提供) に](2026/2026-03-06-bigquery-embedding-ai-functions-ga.md)
+- [2026-03-06 - Cloud Storage: Storage Insights データセットによるパブリックアクセスオブジェクトの識別機能](2026/2026-03-06-cloud-storage-public-access-insights.md)
+- [2026-03-05 - Google Kubernetes Engine: 2026-R9 リリースチャネル バージョンアップデート](2026/2026-03-05-gke-version-updates-2026-r9.md)
 - [2026-03-05 - Google Kubernetes Engine: H4D マシンシリーズが一般提供開始](2026/2026-03-05-gke-h4d-machine-series-ga.md)
 - [2026-03-05 - Cloud Storage: Storage Insights ObjectRef Functions for BigQuery](2026/2026-03-05-cloud-storage-objectref-bigquery.md)
 - [2026-03-05 - Compute Engine: VM Manager の RHEL 脆弱性スキャンに関する既知の問題](2026/2026-03-05-compute-engine-vm-manager-rhel-scanning-issue.md)
