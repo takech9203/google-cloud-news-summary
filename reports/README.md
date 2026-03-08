@@ -5,6 +5,7 @@
 
 ## 2026 年
 
+- [2026-03-08 - Google SecOps SOAR: Release 6.3.79 のロールアウト開始](2026/2026-03-08-google-secops-soar-release-6-3-79.md)
 - [2026-03-06 - Looker Studio: CSV コネクタ UI 強化の提供範囲に関する訂正](2026/2026-03-06-looker-studio-csv-connector-correction.md)
 - [2026-03-06 - BigQuery: Pipelines & Connections ページによるデータ統合の効率化](2026/2026-03-06-bigquery-pipelines-connections-preview.md)
 - [2026-03-06 - Oracle Database@Google Cloud: europe-west8 (ミラノ、イタリア) リージョンのサポート開始](2026/2026-03-06-oracle-database-google-cloud-milan-region.md)
