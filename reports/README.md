@@ -5,6 +5,9 @@
 
 ## 2026 年
 
+- [2026-03-09 - Cloud Monitoring: PromQL チャートのレジェンドテンプレート設定](2026/2026-03-09-cloud-monitoring-promql-legend-templates.md)
+- [2026-03-09 - Cloud Trace: Telemetry API 使用時の Cloud Trace API 有効化要件](2026/2026-03-09-cloud-trace-telemetry-api-requirement.md)
+- [2026-03-09 - Security Command Center: Risk Engine のデフォルト高価値リソース識別ヒューリスティクスの強化](2026/2026-03-09-security-command-center-risk-engine-heuristics.md)
 - [2026-03-08 - Google SecOps SOAR: Release 6.3.79 のロールアウト開始](2026/2026-03-08-google-secops-soar-release-6-3-79.md)
 - [2026-03-06 - Looker Studio: CSV コネクタ UI 強化の提供範囲に関する訂正](2026/2026-03-06-looker-studio-csv-connector-correction.md)
 - [2026-03-06 - BigQuery: Pipelines & Connections ページによるデータ統合の効率化](2026/2026-03-06-bigquery-pipelines-connections-preview.md)
