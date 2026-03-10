@@ -5,10 +5,19 @@
 
 ## 2026 年
 
+- [2026-03-10 - Compute Engine: MIG オートスケーリングモニタリングチャートの強化](2026/2026-03-10-compute-engine-mig-autoscale-monitoring.md)
+- [2026-03-10 - Google SecOps SIEM: データ処理パイプライン (Data Processing Pipelines)](2026/2026-03-10-secops-siem-data-processing-pipelines.md)
+- [2026-03-09 - Cloud SQL: Data API による管理クエリの実行サポート](2026/2026-03-09-cloud-sql-data-api-admin-queries.md)
+- [2026-03-09 - Storage Transfer Service: エージェントベース転送のマニフェストファイルサイズ制限撤廃](2026/2026-03-09-storage-transfer-service-manifest-limit-removed.md)
 - [2026-03-09 - Cloud Monitoring: PromQL チャートのレジェンドテンプレート設定](2026/2026-03-09-cloud-monitoring-promql-legend-templates.md)
 - [2026-03-09 - Cloud Trace: Telemetry API 使用時の Cloud Trace API 有効化要件](2026/2026-03-09-cloud-trace-telemetry-api-requirement.md)
+- [2026-03-09 - Google Cloud CCaaS: HubSpot Company プロファイル検索と予測キャンペーン制御の強化](2026/2026-03-09-cloud-ccaas-hubspot-predictive-campaigns.md)
+- [2026-03-09 - Looker (Google Cloud core): OAuth 自動構成によるインスタンスセットアップの簡素化](2026/2026-03-09-looker-auto-oauth-configuration.md)
 - [2026-03-09 - Security Command Center: Risk Engine のデフォルト高価値リソース識別ヒューリスティクスの強化](2026/2026-03-09-security-command-center-risk-engine-heuristics.md)
+- [2026-03-09 - Google Cloud VMware Engine: ve2 ノードタイプが us-west2 (Los Angeles) リージョンで利用可能に](2026/2026-03-09-vmware-engine-ve2-us-west2.md)
+- [2026-03-09 - BigQuery: Conversational Analytics 機能強化アップデート](2026/2026-03-09-bigquery-conversational-analytics-updates.md)
 - [2026-03-08 - Google SecOps SOAR: Release 6.3.79 のロールアウト開始](2026/2026-03-08-google-secops-soar-release-6-3-79.md)
+- [2026-03-08 - Dataproc: Iceberg Vacuum 最適化デフォルト有効化、新サブマイナーイメージバージョン、CVE 修正](2026/2026-03-08-dataproc-iceberg-vacuum-image-updates.md)
 - [2026-03-06 - Looker Studio: CSV コネクタ UI 強化の提供範囲に関する訂正](2026/2026-03-06-looker-studio-csv-connector-correction.md)
 - [2026-03-06 - BigQuery: Pipelines & Connections ページによるデータ統合の効率化](2026/2026-03-06-bigquery-pipelines-connections-preview.md)
 - [2026-03-06 - Oracle Database@Google Cloud: europe-west8 (ミラノ、イタリア) リージョンのサポート開始](2026/2026-03-06-oracle-database-google-cloud-milan-region.md)
