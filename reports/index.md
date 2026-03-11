@@ -5,7 +5,10 @@
 
 ## 2026 年
 
+- [2026-03-11 - Oracle Database@Google Cloud: Exadata Database Service にミラノ (europe-west8-a-r1) ゾーン追加](2026/2026-03-11-oracle-database-google-cloud-milan-zone.md)
 - [2026-03-10 - Compute Engine: MIG オートスケーリングモニタリングチャートの強化](2026/2026-03-10-compute-engine-mig-autoscale-monitoring.md)
+- [2026-03-10 - Google Cloud CCaaS: iOS Mobile SDK パッチ (チャット終了後の画面遷移不具合修正)](2026/2026-03-10-ccaas-mobile-sdk-ios-patch.md)
+- [2026-03-10 - Cloud Composer: Turin (europe-west12) リージョンにおける Cloud Composer 3 への移行](2026/2026-03-10-cloud-composer-turin-composer3-migration.md)
 - [2026-03-10 - Google SecOps SIEM: データ処理パイプライン (Data Processing Pipelines)](2026/2026-03-10-secops-siem-data-processing-pipelines.md)
 - [2026-03-09 - Cloud SQL: Data API による管理クエリの実行サポート](2026/2026-03-09-cloud-sql-data-api-admin-queries.md)
 - [2026-03-09 - Storage Transfer Service: エージェントベース転送のマニフェストファイルサイズ制限撤廃](2026/2026-03-09-storage-transfer-service-manifest-limit-removed.md)
