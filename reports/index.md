@@ -5,11 +5,20 @@
 
 ## 2026 年
 
+- [2026-03-12 - Google SecOps: パーサーバージョン管理 (Manage Parser Versions)](2026/2026-03-12-google-secops-parser-version-management.md)
+- [2026-03-12 - Cloud Storage: CMEK を使用したオブジェクトアップロード時の IAM ロール検証の厳格化](2026/2026-03-12-cloud-storage-cmek-upload-enforcement.md)
 - [2026-03-11 - Oracle Database@Google Cloud: Exadata Database Service にミラノ (europe-west8-a-r1) ゾーン追加](2026/2026-03-11-oracle-database-google-cloud-milan-zone.md)
+- [2026-03-11 - Apigee hybrid: v1.15.2 パッチリリース (バグ修正 + セキュリティ修正)](2026/2026-03-11-apigee-hybrid-v1-15-2.md)
+- [2026-03-10 - Apigee Advanced API Security: セキュリティモニタリング条件の GA およびマルチゲートウェイ機能強化](2026/2026-03-10-apigee-security-monitoring-conditions-ga.md)
+- [2026-03-10 - Google Kubernetes Engine (GKE): Managed OpenTelemetry for GKE (Preview)](2026/2026-03-10-gke-managed-opentelemetry.md)
 - [2026-03-10 - Compute Engine: MIG オートスケーリングモニタリングチャートの強化](2026/2026-03-10-compute-engine-mig-autoscale-monitoring.md)
+- [2026-03-10 - Spanner: 楽観的同時実行制御 (Optimistic Concurrency Control) モードのサポート](2026/2026-03-10-spanner-optimistic-concurrency-control.md)
 - [2026-03-10 - Google Cloud CCaaS: iOS Mobile SDK パッチ (チャット終了後の画面遷移不具合修正)](2026/2026-03-10-ccaas-mobile-sdk-ios-patch.md)
+- [2026-03-10 - Cloud Storage: Rapid Bucket が一般提供 (GA) 開始](2026/2026-03-10-cloud-storage-rapid-bucket-ga.md)
+- [2026-03-10 - VPC Service Controls: Managed Lustre インテグレーションが一般提供 (GA) に昇格](2026/2026-03-10-vpc-service-controls-managed-lustre-ga.md)
 - [2026-03-10 - Cloud Composer: Turin (europe-west12) リージョンにおける Cloud Composer 3 への移行](2026/2026-03-10-cloud-composer-turin-composer3-migration.md)
 - [2026-03-10 - Google SecOps SIEM: データ処理パイプライン (Data Processing Pipelines)](2026/2026-03-10-secops-siem-data-processing-pipelines.md)
+- [2026-03-10 - Google Cloud VMware Engine: 管理 VM のクラスタ間マイグレーション機能](2026/2026-03-10-vmware-engine-migrate-management-vms.md)
 - [2026-03-09 - Cloud SQL: Data API による管理クエリの実行サポート](2026/2026-03-09-cloud-sql-data-api-admin-queries.md)
 - [2026-03-09 - Storage Transfer Service: エージェントベース転送のマニフェストファイルサイズ制限撤廃](2026/2026-03-09-storage-transfer-service-manifest-limit-removed.md)
 - [2026-03-09 - Cloud Monitoring: PromQL チャートのレジェンドテンプレート設定](2026/2026-03-09-cloud-monitoring-promql-legend-templates.md)
