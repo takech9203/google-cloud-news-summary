@@ -5,10 +5,23 @@
 
 ## 2026 年
 
+- [2026-03-13 - Document AI: Custom Splitter pretrained-splitter-v1.5-2025-07-14 が GA](2026/2026-03-13-document-ai-custom-splitter-v1-5-ga.md)
 - [2026-03-12 - Google SecOps: パーサーバージョン管理 (Manage Parser Versions)](2026/2026-03-12-google-secops-parser-version-management.md)
+- [2026-03-12 - Looker: IP Allowlist によるアクセス制御](2026/2026-03-12-looker-ip-allowlists.md)
+- [2026-03-12 - Apigee hybrid: バージョン 1.16.0-hotfix.1 リリース](2026/2026-03-12-apigee-hybrid-1-16-0-hotfix-1.md)
+- [2026-03-12 - Cloud Logging: Log Analytics バックフィル操作の一時停止](2026/2026-03-12-cloud-logging-backfill-paused.md)
+- [2026-03-12 - Google Kubernetes Engine (GKE): 2026-R10 バージョンおよびセキュリティアップデート](2026/2026-03-12-gke-version-security-updates-2026-r10.md)
 - [2026-03-12 - Cloud Storage: CMEK を使用したオブジェクトアップロード時の IAM ロール検証の厳格化](2026/2026-03-12-cloud-storage-cmek-upload-enforcement.md)
+- [2026-03-12 - BigQuery: Advanced Runtime が全プロジェクトでデフォルト有効化](2026/2026-03-12-bigquery-advanced-runtime-default.md)
+- [2026-03-11 - BigQuery: クエリ実行グラフが一般提供 (GA) に昇格](2026/2026-03-11-bigquery-query-execution-graph-ga.md)
 - [2026-03-11 - Oracle Database@Google Cloud: Exadata Database Service にミラノ (europe-west8-a-r1) ゾーン追加](2026/2026-03-11-oracle-database-google-cloud-milan-zone.md)
 - [2026-03-11 - Apigee hybrid: v1.15.2 パッチリリース (バグ修正 + セキュリティ修正)](2026/2026-03-11-apigee-hybrid-v1-15-2.md)
+- [2026-03-11 - Cloud Service Mesh: 2026 年 3 月セキュリティパッチリリース (GCP-2026-013)](2026/2026-03-11-cloud-service-mesh-security-patches-march.md)
+- [2026-03-11 - Security Command Center: Risk Engine のデフォルト高価値リソース識別ヒューリスティクス強化](2026/2026-03-11-security-command-center-risk-engine-heuristics.md)
+- [2026-03-11 - Storage Transfer Service: エージェントベース転送のマニフェストファイルサイズ制限撤廃](2026/2026-03-11-storage-transfer-service-manifest-limit-removed.md)
+- [2026-03-11 - Looker (Google Cloud core): OAuth 認証情報の自動管理](2026/2026-03-11-looker-auto-oauth-management.md)
+- [2026-03-11 - Google Cloud Contact Center as a Service (CCaaS): 複数のバグ修正と新機能追加](2026/2026-03-11-ccaas-bug-fixes-features-march.md)
+- [2026-03-11 - Google Cloud VMware Engine: ve2 ノードタイプがロサンゼルスリージョンで利用可能に](2026/2026-03-11-vmware-engine-ve2-los-angeles.md)
 - [2026-03-10 - Apigee Advanced API Security: セキュリティモニタリング条件の GA およびマルチゲートウェイ機能強化](2026/2026-03-10-apigee-security-monitoring-conditions-ga.md)
 - [2026-03-10 - Google Kubernetes Engine (GKE): Managed OpenTelemetry for GKE (Preview)](2026/2026-03-10-gke-managed-opentelemetry.md)
 - [2026-03-10 - Compute Engine: MIG オートスケーリングモニタリングチャートの強化](2026/2026-03-10-compute-engine-mig-autoscale-monitoring.md)
