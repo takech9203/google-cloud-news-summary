@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Composer: ディスクタイプおよびスナップショットバグ修正</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    /* Google Cloud Light Theme Base Styles */
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1 {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 12px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+      text-align: right;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-red {
+      border-left-color: var(--gc-red);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); color: #FFFFFF; }
+    .badge-fixed { background: var(--gc-green); color: #FFFFFF; }
+    .badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.green {
+      background: linear-gradient(135deg, var(--gc-green), #1B8A3E);
+    }
+
+    .stat-card.red {
+      background: linear-gradient(135deg, var(--gc-red), #C5221F);
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Before/After */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h3 { color: var(--gc-red); }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box h3 { color: var(--gc-green); }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* Note & Warning Boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Mermaid */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Code Blocks */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      background: #1E1E1E;
+      border-radius: 0;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Usecase */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+    }
+
+    .usecase h3 {
+      color: var(--gc-blue-800);
+      margin-bottom: 8px;
+    }
+
+    /* Feature cards grid */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    /* Links */
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* Related services */
+    .related-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .related-card {
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .related-card .icon {
+      font-size: 28px;
+      margin-bottom: 8px;
+    }
+
+    .related-card .name {
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      font-size: 14px;
+    }
+
+    .related-card .desc {
+      font-size: 12px;
+      color: var(--gc-outline);
+      margin-top: 4px;
+    }
+
+    /* Footer */
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    footer ul {
+      list-style: none;
+      padding: 0;
+      margin: 8px 0;
+    }
+
+    footer li {
+      margin: 4px 0;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+      .subtitle { text-align: left; }
+      .before-after { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .related-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>Cloud Composer: ディスクタイプおよびスナップショットバグ修正</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Cloud Composer</span>
+          <span class="badge-fixed">FIXED</span>
+          <span class="badge" style="background: var(--gc-orange);">アップグレード不要</span>
+        </div>
+      </div>
+      <div class="subtitle">
+        リリース日: 2026-02-10
+      </div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>Cloud Composer において、<strong>2 件の重要なバグ修正</strong>がリリースされた。1 つ目は、Airflow ワークロードが意図された <span class="highlight">pd-standard</span> ではなく、<span class="highlight">pd-ssd</span> を使用していた問題の修正で、予期しないコスト増加を引き起こす可能性があった。2 つ目は、Cloud Composer 3 において、最近作成されたスナップショットのロード操作が無効な構成エラーで失敗していた問題の修正である。</p>
+      <div class="success-box" style="margin-top: 16px;">
+        <strong>自動適用:</strong> いずれの修正も「アップグレードなしで利用可能」であり、既存の Cloud Composer 環境に対して自動的に適用される。ユーザー側でバージョンアップグレードを行う必要はない。
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card red">
+        <div class="stat-value">~5x</div>
+        <div class="stat-label">pd-ssd は pd-standard と比較して約 5 倍のコスト</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-value">2 件</div>
+        <div class="stat-label">バグ修正 (ディスクタイプ + スナップショット)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">0</div>
+        <div class="stat-label">ユーザー側のアクション不要 (自動適用)</div>
+      </div>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ 修正前 (Before)</h3>
+          <ul style="margin-top: 8px; padding-left: 16px;">
+            <li>Airflow ワークロードが <strong>pd-ssd</strong> (Performance Persistent Disk) を誤使用 -- ディスクストレージコストが意図せず高騰</li>
+            <li style="margin-top: 8px;">Cloud Composer 3 でスナップショットのロード操作が <strong>「invalid configuration」エラー</strong>で失敗 -- 環境の復元・移行が不可能</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ 修正後 (After)</h3>
+          <ul style="margin-top: 8px; padding-left: 16px;">
+            <li>Airflow ワークロードが正しく <strong>pd-standard</strong> を使用 -- ディスクストレージコストが想定通りの水準に</li>
+            <li style="margin-top: 8px;">Cloud Composer 3 のスナップショットロードが<strong>正常動作</strong> -- 環境の復元・移行が確実に実行可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid from source) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>Cloud Composer 環境における修正前後の動作を示す。修正前は Airflow ワークロードが高コストの pd-ssd を使用し、スナップショットのロードがエラーで失敗していた。修正後はそれぞれ正しく動作するようになった。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph before["修正前"]
+        direction TB
+        A1[/"Airflow Worker Pod"/] -->|"ディスク要求"| B1[("pd-ssd\n(Performance SSD)\n高コスト")]
+        C1[/"スナップショット\n(新規作成)"/] -->|"ロード操作"| D1["invalid configuration\nエラー"]
+        style B1 fill:#ffcccc,stroke:#cc0000
+        style D1 fill:#ffcccc,stroke:#cc0000
+    end
+
+    subgraph after["修正後"]
+        direction TB
+        A2[/"Airflow Worker Pod"/] -->|"ディスク要求"| B2[("pd-standard\n(Standard HDD)\n適正コスト")]
+        C2[/"スナップショット\n(新規作成)"/] -->|"ロード操作"| D2["正常に復元完了"]
+        style B2 fill:#ccffcc,stroke:#009900
+        style D2 fill:#ccffcc,stroke:#009900
+    end
+
+    before -->|"バグ修正\n(アップグレード不要)"| after
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚙️ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h3>💾 1. ディスクタイプの修正 (アップグレード不要)</h3>
+          <div class="icon-text"><span style="color: var(--gc-blue-600); font-weight: bold;">→</span><span>Airflow ワークロードで使用される Persistent Disk のタイプが、誤って <strong>pd-ssd</strong> (Performance Persistent Disk / SSD) に設定されていた問題を修正</span></div>
+          <div class="icon-text"><span style="color: var(--gc-blue-600); font-weight: bold;">→</span><span>修正後は意図通り <strong>pd-standard</strong> (Standard Persistent Disk / HDD) が使用される</span></div>
+          <div class="icon-text"><span style="color: var(--gc-blue-600); font-weight: bold;">→</span><span>この修正はアップグレードなしで自動的に適用される</span></div>
+          <div class="icon-text"><span style="color: var(--gc-blue-600); font-weight: bold;">→</span><span>pd-ssd と pd-standard の料金差により、修正前の環境では予期しないコスト増加が発生していた可能性がある</span></div>
+        </div>
+        <div class="card">
+          <h3>📸 2. スナップショットロード操作の修正 (Cloud Composer 3、アップグレード不要)</h3>
+          <div class="icon-text"><span style="color: var(--gc-blue-600); font-weight: bold;">→</span><span>Cloud Composer 3 環境で、最近作成されたスナップショットをロードする際に「invalid configuration」エラーが発生する問題を修正</span></div>
+          <div class="icon-text"><span style="color: var(--gc-blue-600); font-weight: bold;">→</span><span>スナップショットのロード操作が正常に完了するようになった</span></div>
+          <div class="icon-text"><span style="color: var(--gc-blue-600); font-weight: bold;">→</span><span>この修正はアップグレードなしで Cloud Composer 3 環境に自動的に適用される</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specs -->
+    <div class="section">
+      <h2>📐 技術仕様</h2>
+      <h3>Persistent Disk タイプの比較</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>pd-standard (修正後)</th>
+            <th>pd-ssd (修正前・誤使用)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ストレージメディア</td>
+            <td>HDD (ハードディスクドライブ)</td>
+            <td>SSD (ソリッドステートドライブ)</td>
+          </tr>
+          <tr>
+            <td>主な用途</td>
+            <td>シーケンシャル I/O が多いワークロード</td>
+            <td>低レイテンシ・高 IOPS が必要なワークロード</td>
+          </tr>
+          <tr>
+            <td>読み取り IOPS (GiB あたり)</td>
+            <td>0.75</td>
+            <td>30</td>
+          </tr>
+          <tr>
+            <td>書き込み IOPS (GiB あたり)</td>
+            <td>1.5</td>
+            <td>30</td>
+          </tr>
+          <tr>
+            <td>コスト水準</td>
+            <td><strong style="color: var(--gc-green);">低コスト</strong></td>
+            <td><strong style="color: var(--gc-red);">pd-standard の約 5 倍</strong></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top: 24px;">スナップショットに保存されるデータ</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Airflow 構成オーバーライド</td><td>環境に設定されたカスタム Airflow 設定</td></tr>
+          <tr><td>環境変数</td><td>環境に設定された変数</td></tr>
+          <tr><td>PyPI パッケージ一覧</td><td>requirements として保存</td></tr>
+          <tr><td>Airflow データベースバックアップ</td><td>タスク実行状態、DAG 実行履歴を含む</td></tr>
+          <tr><td>バケットフォルダ</td><td>/dags、/data、/plugins フォルダの内容</td></tr>
+          <tr><td>Fernet キー</td><td>環境の暗号化キー</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <h3>ビジネス面</h3>
+      <div class="card card-green">
+        <h3>💰 コスト最適化</h3>
+        <p>pd-ssd から pd-standard への修正により、Persistent Disk のストレージコストが大幅に削減される。pd-ssd は pd-standard と比較して約 5 倍のコストであるため、特にディスク使用量が多い環境では顕著なコスト削減効果がある。</p>
+      </div>
+      <div class="card card-green">
+        <h3>🛡️ 運用の信頼性向上</h3>
+        <p>スナップショットのロード操作が正常に動作するようになり、ディザスタリカバリや環境移行の計画が確実に実行可能になった。</p>
+      </div>
+
+      <h3 style="margin-top: 20px;">技術面</h3>
+      <div class="card card-green">
+        <h3>🔧 自動適用</h3>
+        <p>いずれの修正もアップグレード不要で適用されるため、ユーザー側でのアクション (バージョンアップグレードや環境再作成) が不要。</p>
+      </div>
+      <div class="card card-green">
+        <h3>📦 環境管理の改善</h3>
+        <p>スナップショットによる環境の保存・復元が Cloud Composer 3 で確実に動作するようになり、環境管理のワークフローが安定した。</p>
+      </div>
+    </div>
+
+    <!-- Caveats / Demerits -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <div class="warning-box">
+        <strong>考慮すべき点:</strong>
+        <ul style="margin-top: 8px; padding-left: 16px;">
+          <li>ディスクタイプが pd-ssd から pd-standard に変更されることで、ディスク I/O の性能特性が変わる。ただし、Airflow ワークロードでは一般的にシーケンシャル I/O が中心であり、pd-standard が意図されたディスクタイプであるため、ほとんどのケースでパフォーマンスへの影響はない</li>
+          <li style="margin-top: 8px;">修正前に pd-ssd が使用されていた期間のコスト増分について、Google Cloud の請求書を確認し、必要に応じて Google Cloud サポートに問い合わせることを推奨する</li>
+          <li style="margin-top: 8px;">スナップショット修正は <strong>Cloud Composer 3 環境のみ</strong>が対象であり、Cloud Composer 2 環境には適用されない (Cloud Composer 2 では別の問題が発生していたかは不明)</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+      <div class="usecase">
+        <h3>ユースケース 1: コスト監査と最適化確認</h3>
+        <p><strong>シナリオ:</strong> Cloud Composer 環境を運用しているチームが、過去数か月の請求書を確認し、ディスクストレージのコストが想定より高かったことに気付いた。</p>
+        <p style="margin-top: 8px;"><strong>効果:</strong> バグ修正後、Persistent Disk のコストが pd-standard の水準に戻り、以降の請求額が正常化される。</p>
+        <div class="code-block" style="margin-top: 12px;">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">環境詳細の確認</span>
+          </div>
+          <pre><code class="language-bash"># Cloud Composer 環境の詳細を確認
+gcloud composer environments describe ENVIRONMENT_NAME \
+    --location LOCATION</code></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">請求データでコスト確認 (BigQuery)</span>
+          </div>
+          <pre><code class="language-sql"># 請求データのエクスポートで Persistent Disk コストを確認
+bq query --use_legacy_sql=false '
+SELECT
+  service.description,
+  sku.description,
+  SUM(cost) as total_cost
+FROM `PROJECT.dataset.gcp_billing_export_v1_XXXXX`
+WHERE service.description LIKE "%Composer%"
+  OR sku.description LIKE "%Persistent Disk%"
+GROUP BY 1, 2
+ORDER BY total_cost DESC
+'</code></pre>
+        </div>
+      </div>
+
+      <div class="usecase">
+        <h3>ユースケース 2: Cloud Composer 3 環境のスナップショットによるバックアップ運用</h3>
+        <p><strong>シナリオ:</strong> Cloud Composer 3 環境でスケジュールされたスナップショットを活用し、定期的なバックアップと環境復元のテストを実施したい。</p>
+        <p style="margin-top: 8px;"><strong>効果:</strong> 修正後は最近作成されたスナップショットのロードが「invalid configuration」エラーなく正常に完了し、ディザスタリカバリや環境クローンが確実に実行可能となる。</p>
+        <div class="code-block" style="margin-top: 12px;">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">スナップショットの保存とロード</span>
+          </div>
+          <pre><code class="language-bash"># スナップショットの保存
+gcloud composer environments snapshots save ENVIRONMENT_NAME \
+    --location LOCATION
+
+# スナップショットのロード (修正後は正常に動作)
+gcloud composer environments snapshots load ENVIRONMENT_NAME \
+    --location LOCATION \
+    --snapshot-path gs://BUCKET_NAME/snapshots/SNAPSHOT_NAME</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💵 料金</h2>
+      <p>今回のバグ修正はディスクタイプに直接関係するため、料金への影響が大きい。</p>
+      <h3 style="margin-top: 16px;">Persistent Disk 料金比較 (参考)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>ディスクタイプ</th>
+            <th>月額料金 (GiB あたり)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong style="color: var(--gc-green);">pd-standard (Standard)</strong></td>
+            <td>$0.040</td>
+          </tr>
+          <tr>
+            <td><strong style="color: var(--gc-red);">pd-ssd (Performance SSD)</strong></td>
+            <td>$0.170</td>
+          </tr>
+          <tr>
+            <td>pd-balanced (Balanced)</td>
+            <td>$0.100</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="note-box" style="margin-top: 12px;">
+        <strong>💡 注意:</strong> 上記は参考値であり、リージョンによって異なる。詳細は <a href="https://cloud.google.com/compute/disks-image-pricing" target="_blank" class="gc-link">Compute Engine ディスク料金ページ</a> を参照のこと。Cloud Composer の料金は、環境サイズ (Small / Medium / Large / Extra-Large)、ワークロードの CPU・メモリ・ストレージ、および基盤となる GKE クラスタのリソースによって決まる。
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="related-grid">
+        <div class="related-card">
+          <div class="icon">💾</div>
+          <div class="name">Compute Engine Persistent Disk</div>
+          <div class="desc">Cloud Composer の GKE クラスタで使用されるブロックストレージ。今回正しいディスクタイプが適用された</div>
+        </div>
+        <div class="related-card">
+          <div class="icon">☸️</div>
+          <div class="name">Google Kubernetes Engine (GKE)</div>
+          <div class="desc">Cloud Composer の基盤。Airflow ワークロードは GKE 上の Pod として実行される</div>
+        </div>
+        <div class="related-card">
+          <div class="icon">🪣</div>
+          <div class="name">Cloud Storage</div>
+          <div class="desc">DAG ファイル、プラグイン、データ、スナップショットの保存先バケット</div>
+        </div>
+        <div class="related-card">
+          <div class="icon">📊</div>
+          <div class="name">Cloud Monitoring</div>
+          <div class="desc">環境メトリクス監視。ディスクタイプ変更後のパフォーマンス監視にも活用可能</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- References -->
+    <div class="section">
+      <h2>📚 参考リンク</h2>
+      <ul style="padding-left: 16px;">
+        <li><a href="https://cloud.google.com/release-notes#February_10_2026" target="_blank" class="gc-link">公式リリースノート</a></li>
+        <li><a href="https://cloud.google.com/composer/docs/release-notes" target="_blank" class="gc-link">Cloud Composer リリースノート</a></li>
+        <li><a href="https://cloud.google.com/composer/docs/composer-3/save-load-snapshots" target="_blank" class="gc-link">Cloud Composer スナップショットの保存とロード (Composer 3)</a></li>
+        <li><a href="https://cloud.google.com/composer/docs/composer-2/save-load-snapshots" target="_blank" class="gc-link">Cloud Composer スナップショットの保存とロード (Composer 2)</a></li>
+        <li><a href="https://cloud.google.com/compute/docs/disks/persistent-disks" target="_blank" class="gc-link">Persistent Disk の概要</a></li>
+        <li><a href="https://cloud.google.com/compute/disks-image-pricing" target="_blank" class="gc-link">Compute Engine ディスク料金</a></li>
+        <li><a href="https://cloud.google.com/composer/pricing" target="_blank" class="gc-link">Cloud Composer の料金</a></li>
+      </ul>
+    </div>
+
+    <!-- Summary -->
+    <div class="section" style="background: linear-gradient(135deg, var(--gc-blue-50), var(--gc-surface-container-lowest)); border: 2px solid var(--gc-blue-200);">
+      <h2>📝 まとめ</h2>
+      <p>Cloud Composer の 2 件のバグ修正は、<strong>コスト管理</strong>と<strong>スナップショット運用</strong>の両面で重要なアップデートである。特にディスクタイプの修正は、pd-ssd と pd-standard の料金差 (約 4 倍以上) を考慮すると、影響を受けていた環境では顕著なコスト削減効果がある。いずれの修正もアップグレード不要で自動適用されるため、ユーザー側での対応は不要だが、<strong>過去の請求書を確認してコスト増分がなかったか確認すること</strong>を推奨する。</p>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>タグ:</strong> #CloudComposer #Airflow #PersistentDisk #BugFix #CostOptimization #Snapshot #GKE</p>
+      <p style="margin-top: 8px;">📎 出典:</p>
+      <ul>
+        <li><a href="https://cloud.google.com/release-notes#February_10_2026" target="_blank">https://cloud.google.com/release-notes#February_10_2026</a></li>
+        <li><a href="https://cloud.google.com/composer/docs/release-notes" target="_blank">https://cloud.google.com/composer/docs/release-notes</a></li>
+      </ul>
+      <p style="margin-top: 8px; color: var(--gc-outline);">Generated from: reports/2026/2026-02-10-cloud-composer-disk-type-bugfix.md</p>
+    </footer>
+
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

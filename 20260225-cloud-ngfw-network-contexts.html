@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud NGFW: Network Contexts による効率的なファイアウォールポリシー管理</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    /* Google Cloud Light Theme Base Styles */
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    .header-meta {
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card.green { border-left-color: var(--gc-green); }
+    .card.red { border-left-color: var(--gc-red); }
+    .card.teal { border-left-color: var(--gc-teal); }
+    .card.purple { border-left-color: var(--gc-purple); }
+    .card.orange { border-left-color: var(--gc-orange); }
+    .card.yellow { border-left-color: var(--gc-yellow); }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); color: #FFFFFF; }
+    .badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow { color: var(--gc-blue-600); font-size: 20px; }
+
+    /* Before / After */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .before-box h3, .after-box h3 { margin-top: 0; }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.teal { background: linear-gradient(135deg, var(--gc-teal), #00838F); }
+    .stat-card.green { background: linear-gradient(135deg, var(--gc-green), #1B5E20); }
+    .stat-card.purple { background: linear-gradient(135deg, var(--gc-purple), #6A1B9A); }
+
+    .stat-value { font-size: 36px; font-weight: 700; margin-bottom: 4px; }
+    .stat-label { font-size: 14px; opacity: 0.9; }
+
+    /* Feature cards grid */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    /* Use case cards */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h3 { color: var(--gc-blue-900); margin-top: 0; }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* Note / Warning boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Mermaid */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Code blocks */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang { color: #9CDCFE; font-weight: bold; }
+    .code-title { color: #AAAAAA; }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      background: #1E1E1E;
+      border-radius: 0;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .gc-link { color: var(--gc-blue-600); text-decoration: none; }
+    .gc-link:hover { color: var(--gc-blue-800); text-decoration: underline; }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a { color: var(--gc-blue-600); text-decoration: none; word-break: break-all; }
+    footer a:hover { text-decoration: underline; }
+    footer ul { list-style: none; padding: 0; margin: 8px 0; }
+    footer li { margin: 4px 0; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; }
+      .header-meta { text-align: left; margin-top: 8px; }
+      .before-after { grid-template-columns: 1fr; }
+      .feature-grid { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>🛡️ Cloud NGFW: Network Contexts による効率的なファイアウォールポリシー管理</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Cloud NGFW</span>
+          <span class="badge" style="background: var(--gc-teal);">VPC</span>
+          <span class="badge-ga">GA</span>
+        </div>
+      </div>
+      <div class="header-meta">
+        <div class="subtitle">2026-02-25</div>
+        <div class="subtitle">Network Contexts</div>
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        Cloud NGFW (Cloud Next Generation Firewall) に <span class="highlight">Network Contexts</span> (ネットワークコンテキスト) 機能が GA (一般提供) として追加された。トラフィックの送信元や宛先のネットワークコンテキスト (<strong>INTERNET</strong>、<strong>NON_INTERNET</strong>、<strong>VPC_NETWORKS</strong>、<strong>INTRA_VPC</strong>) に基づいてファイアウォールルールを定義でき、少ないルール数でより効率的にセキュリティ目標を達成できる。
+      </p>
+      <p>
+        階層型ファイアウォールポリシー、グローバルネットワークファイアウォールポリシー、リージョナルネットワークファイアウォールポリシーのルールにおいて、ソースコンビネーションまたはデスティネーションコンビネーションの一部として使用可能。2024 年 12 月に Preview (当時の名称は「Network Scopes」) として公開され、GA に昇格した。
+      </p>
+
+      <!-- Before / After -->
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before (従来)</h3>
+          <div class="icon-text"><span>→</span><span>インターネットと VPC 間トラフィックの区別に、送信元 IP レンジを明示的に指定した複数ルールが必要</span></div>
+          <div class="icon-text"><span>→</span><span>VPC ピアリングや NCC 経由トラフィックの論理的分類手段がなく、IP レンジ管理が煩雑</span></div>
+          <div class="icon-text"><span>→</span><span>ルール数の増大により、管理コストと誤設定リスクが増加</span></div>
+        </div>
+        <div class="after-box">
+          <h3>✅ After (改善後)</h3>
+          <div class="icon-text"><span>→</span><span>INTERNET / NON_INTERNET で 1 つのパラメータでトラフィック区別が可能</span></div>
+          <div class="icon-text"><span>→</span><span>VPC_NETWORKS で最大 250 VPC を対象とした送信元識別が可能</span></div>
+          <div class="icon-text"><span>→</span><span>INTRA_VPC で同一 VPC 内の East-West トラフィックを簡潔に識別</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value">4</div>
+        <div class="stat-label">ネットワークコンテキスト種別</div>
+      </div>
+      <div class="stat-card teal">
+        <div class="stat-value">250</div>
+        <div class="stat-label">VPC_NETWORKS 最大 VPC 数</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-value">3</div>
+        <div class="stat-label">対応ポリシータイプ</div>
+      </div>
+      <div class="stat-card purple">
+        <div class="stat-value">GA</div>
+        <div class="stat-label">Preview から昇格</div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>4 種類のネットワークコンテキストがどのようにトラフィックを分類し、ファイアウォールポリシールールに適用されるかを示す図。インターネットからのトラフィック、VPC 間のトラフィック、同一 VPC 内のトラフィックがそれぞれ異なるコンテキストとして識別される。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Internet["Internet"]
+        ExtUser([External User])
+    end
+
+    subgraph GCP["Google Cloud"]
+        subgraph Policy["Firewall Policy with Network Contexts"]
+            R1["Rule: INTERNET context\n- Ingress: Allow HTTPS\n- Egress: Restrict destinations"]
+            R2["Rule: NON_INTERNET context\n- Internal traffic policies"]
+            R3["Rule: VPC_NETWORKS context\n- Cross-VPC policies"]
+            R4["Rule: INTRA_VPC context\n- Same-VPC policies"]
+        end
+
+        subgraph VPCA["VPC Network A"]
+            VM1["VM Instance A"]
+        end
+
+        subgraph VPCB["VPC Network B"]
+            VM2["VM Instance B"]
+        end
+
+        Peering["VPC Peering /\nNCC Hub"]
+    end
+
+    ExtUser -->|"INTERNET"| R1
+    R1 --> VM1
+    VPCA <-->|"INTRA_VPC"| R4
+    R4 --> VM1
+    VPCB -->|"VPC_NETWORKS"| R3
+    R3 --> VM1
+    VM2 -->|"NON_INTERNET"| R2
+    R2 --> VM1
+    VPCA <--> Peering <--> VPCB
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚙️ 主要機能 - 4 種類のネットワークコンテキスト</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h3>🌐 INTERNET コンテキスト</h3>
+          <p>インターネット経由で到着/送出されるトラフィックを識別。</p>
+          <div class="icon-text"><span class="arrow">→</span><span><strong>Ingress</strong>: Google Maglev 経由でルーティングされた VM ネットワークインターフェースへのパケット</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span><strong>Egress</strong>: デフォルトインターネットゲートウェイを next hop とする静的ルート経由のパケット (Google API/サービス向けは除外)</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>Ingress ソース / Egress デスティネーション両方で使用可能</span></div>
+        </div>
+        <div class="card teal">
+          <h3>🔒 NON_INTERNET コンテキスト</h3>
+          <p>インターネットを経由しないすべてのトラフィックを識別 (INTERNET と相互排他)。</p>
+          <div class="icon-text"><span class="arrow">→</span><span>サブネットルート、静的ルート、ポリシーベースルート、特殊ルーティングパス経由のトラフィック</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>Google API/サービスへのレスポンスパケットも含まれる</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>Ingress / Egress 両方向で使用可能</span></div>
+        </div>
+        <div class="card purple">
+          <h3>🔗 VPC_NETWORKS コンテキスト</h3>
+          <p>特定の送信元 VPC ネットワークからのトラフィックを識別 (NON_INTERNET のサブセット)。</p>
+          <div class="icon-text"><span class="arrow">→</span><span>Ingress ルールのソースコンビネーションでのみ使用可能</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>送信元 VPC リストに<strong>最大 250 VPC</strong> を指定可能</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>VPC ピアリング / NCC ハブ経由で接続された VPC も対象</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>VM、Cloud VPN、Cloud Interconnect、ルーターアプライアンス、PSC エンドポイント等が対象リソース</span></div>
+        </div>
+        <div class="card green">
+          <h3>🏠 INTRA_VPC コンテキスト</h3>
+          <p>同一 VPC ネットワーク内のリソースからのトラフィックを識別 (NON_INTERNET のサブセット)。</p>
+          <div class="icon-text"><span class="arrow">→</span><span>Ingress ルールのソースコンビネーションでのみ使用可能</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>East-West トラフィック (VPC 内部通信) のマイクロセグメンテーションに最適</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specs -->
+    <div class="section">
+      <h2>📐 技術仕様</h2>
+
+      <h3>ネットワークコンテキストの対応表</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>ネットワークコンテキスト</th>
+            <th>ターゲットタイプ</th>
+            <th>Ingress ソース</th>
+            <th>Egress デスティネーション</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>INTERNET</code></td>
+            <td>INSTANCES, INTERNAL_MANAGED_LB</td>
+            <td>✅ 対応</td>
+            <td>✅ 対応</td>
+          </tr>
+          <tr>
+            <td><code>NON_INTERNET</code></td>
+            <td>INSTANCES, INTERNAL_MANAGED_LB</td>
+            <td>✅ 対応</td>
+            <td>✅ 対応</td>
+          </tr>
+          <tr>
+            <td><code>VPC_NETWORKS</code></td>
+            <td>INSTANCES, INTERNAL_MANAGED_LB</td>
+            <td>✅ 対応</td>
+            <td>❌ 非対応</td>
+          </tr>
+          <tr>
+            <td><code>INTRA_VPC</code></td>
+            <td>INSTANCES, INTERNAL_MANAGED_LB</td>
+            <td>✅ 対応</td>
+            <td>❌ 非対応</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>コンテキスト間の関係</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>関係</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>INTERNET</code> と <code>NON_INTERNET</code></td>
+            <td>相互排他 (同時指定不可)</td>
+          </tr>
+          <tr>
+            <td><code>VPC_NETWORKS</code></td>
+            <td>NON_INTERNET のサブセット</td>
+          </tr>
+          <tr>
+            <td><code>INTRA_VPC</code></td>
+            <td>NON_INTERNET のサブセット</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>制約事項</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>制限</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>VPC_NETWORKS の最大 VPC 数</td>
+            <td>250 VPC</td>
+          </tr>
+          <tr>
+            <td>INTERNET コンテキスト</td>
+            <td>ソースセキュアタグとの併用不可</td>
+          </tr>
+          <tr>
+            <td>NON_INTERNET / VPC_NETWORKS / INTRA_VPC</td>
+            <td>Google Threat Intelligence リストおよびジオロケーションソースとの併用不可</td>
+          </tr>
+          <tr>
+            <td>VPC_NETWORKS / INTRA_VPC</td>
+            <td>Egress ルールでは使用不可</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- gcloud CLI Examples -->
+    <div class="section">
+      <h2>💻 設定方法・gcloud CLI コマンド例</h2>
+
+      <h3>前提条件</h3>
+      <div class="note-box">
+        <strong>💡 必要な準備:</strong>
+        <div class="icon-text"><span class="arrow">→</span><span>Compute Engine API が有効であること</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>IAM ロール: <code>compute.securityAdmin</code> または <code>compute.networkAdmin</code></span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>階層型/グローバル/リージョナルネットワークファイアウォールポリシーが作成済みであること</span></div>
+      </div>
+
+      <h3>ステップ 1: ファイアウォールポリシーの確認または作成</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">ポリシー作成と VPC への関連付け</span>
+        </div>
+        <pre><code class="language-bash"># グローバルネットワークファイアウォールポリシーの作成
+gcloud compute network-firewall-policies create my-policy \
+    --global \
+    --description="Policy with network contexts"
+
+# VPC ネットワークへの関連付け
+gcloud compute network-firewall-policies associations create \
+    --firewall-policy=my-policy \
+    --network=my-vpc \
+    --global-firewall-policy \
+    --name=my-association</code></pre>
+      </div>
+
+      <h3>ステップ 2: ネットワークコンテキストを使用したルールの作成</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">INTERNET コンテキスト - Ingress HTTPS 許可</span>
+        </div>
+        <pre><code class="language-bash"># Ingress ルール: インターネットからの HTTPS トラフィックを許可
+gcloud compute network-firewall-policies rules create 100 \
+    --firewall-policy=my-policy \
+    --action=allow \
+    --direction=INGRESS \
+    --src-network-context=INTERNET \
+    --src-ip-ranges=0.0.0.0/0 \
+    --layer4-configs=tcp:443 \
+    --global-firewall-policy \
+    --description="Allow HTTPS from internet"</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">VPC_NETWORKS コンテキスト - 特定 VPC からのトラフィック許可</span>
+        </div>
+        <pre><code class="language-bash"># Ingress ルール: 特定の VPC ネットワークからのトラフィックを許可
+gcloud compute network-firewall-policies rules create 200 \
+    --firewall-policy=my-policy \
+    --action=allow \
+    --direction=INGRESS \
+    --src-network-context=VPC_NETWORKS \
+    --src-networks=projects/my-project/global/networks/vpc-a,projects/my-project/global/networks/vpc-b \
+    --src-ip-ranges=10.0.0.0/8 \
+    --layer4-configs=tcp:8080 \
+    --global-firewall-policy \
+    --description="Allow traffic from specific VPCs"</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">INTERNET コンテキスト - Egress SMTP ブロック</span>
+        </div>
+        <pre><code class="language-bash"># Egress ルール: インターネット向けトラフィックを制限
+gcloud compute network-firewall-policies rules create 300 \
+    --firewall-policy=my-policy \
+    --action=deny \
+    --direction=EGRESS \
+    --dest-network-context=INTERNET \
+    --dest-ip-ranges=0.0.0.0/0 \
+    --layer4-configs=tcp:25 \
+    --global-firewall-policy \
+    --description="Block outbound SMTP to internet"</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">INTRA_VPC コンテキスト - 同一 VPC 内 MySQL 許可</span>
+        </div>
+        <pre><code class="language-bash"># Ingress ルール: 同一 VPC 内トラフィックのみ許可
+gcloud compute network-firewall-policies rules create 400 \
+    --firewall-policy=my-policy \
+    --action=allow \
+    --direction=INGRESS \
+    --src-network-context=INTRA_VPC \
+    --src-ip-ranges=10.0.0.0/8 \
+    --layer4-configs=tcp:3306 \
+    --global-firewall-policy \
+    --description="Allow MySQL only from same VPC"</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">階層型ファイアウォールポリシーでの使用</span>
+        </div>
+        <pre><code class="language-bash"># 階層型ファイアウォールポリシーでの使用
+gcloud compute firewall-policies rules create 100 \
+    --firewall-policy=123456789 \
+    --action=allow \
+    --direction=INGRESS \
+    --src-network-context=NON_INTERNET \
+    --src-ip-ranges=10.0.0.0/8 \
+    --layer4-configs=tcp:443 \
+    --description="Allow internal HTTPS"</code></pre>
+      </div>
+
+      <h3>ステップ 3: ルールの確認</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">ポリシー内ルール一覧表示</span>
+        </div>
+        <pre><code class="language-bash"># ポリシー内のルールを一覧表示
+gcloud compute network-firewall-policies rules list \
+    --firewall-policy=my-policy \
+    --global-firewall-policy</code></pre>
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div class="feature-grid">
+        <div>
+          <h3>💼 ビジネス面</h3>
+          <div class="card green">
+            <div class="icon-text"><span class="arrow">→</span><span><strong>運用コスト削減</strong>: ルール数を大幅に削減でき、ポリシー管理の工数が減少</span></div>
+          </div>
+          <div class="card green">
+            <div class="icon-text"><span class="arrow">→</span><span><strong>セキュリティガバナンスの強化</strong>: インターネット/内部トラフィック分類が明確になり、セキュリティ監査対応が容易に</span></div>
+          </div>
+          <div class="card green">
+            <div class="icon-text"><span class="arrow">→</span><span><strong>コンプライアンス対応</strong>: インターネット境界の明確な定義で、規制要件への適合を証明しやすくなる</span></div>
+          </div>
+        </div>
+        <div>
+          <h3>🔧 技術面</h3>
+          <div class="card">
+            <div class="icon-text"><span class="arrow">→</span><span><strong>ルール数の効率化</strong>: 従来の IP レンジベース複数ルールをネットワークコンテキスト 1 ルールに集約可能</span></div>
+          </div>
+          <div class="card">
+            <div class="icon-text"><span class="arrow">→</span><span><strong>マイクロセグメンテーションの簡素化</strong>: INTRA_VPC で East-West トラフィック制御が容易に</span></div>
+          </div>
+          <div class="card">
+            <div class="icon-text"><span class="arrow">→</span><span><strong>マルチ VPC 管理の改善</strong>: VPC_NETWORKS で最大 250 VPC を一括制御</span></div>
+          </div>
+          <div class="card">
+            <div class="icon-text"><span class="arrow">→</span><span><strong>3 種類のポリシーで利用可能</strong>: 階層型、グローバル、リージョナルの全ファイアウォールポリシーで使用可能</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>制限事項</h3>
+      <div class="error-box">
+        <div class="icon-text"><span>❌</span><span>VPC_NETWORKS と INTRA_VPC は Ingress ルールのソースコンビネーションでのみ使用可能。Egress ルールでは使用不可</span></div>
+        <div class="icon-text"><span>❌</span><span>INTERNET コンテキストはソースセキュアタグとの併用不可</span></div>
+        <div class="icon-text"><span>❌</span><span>NON_INTERNET / VPC_NETWORKS / INTRA_VPC は Google Threat Intelligence リストやジオロケーションソースと併用不可</span></div>
+        <div class="icon-text"><span>❌</span><span>VPC_NETWORKS で指定可能な VPC 数は最大 250 に制限</span></div>
+        <div class="icon-text"><span>❌</span><span>VPC_NETWORKS で指定した VPC が削除された場合、参照は残るがルールは無効になる</span></div>
+      </div>
+
+      <h3>考慮すべき点</h3>
+      <div class="warning-box">
+        <div class="icon-text"><span>⚠️</span><span>既存の IP レンジベースのルールからの移行計画が必要</span></div>
+        <div class="icon-text"><span>⚠️</span><span>ネットワークコンテキストは他のソース/デスティネーションパラメータと組み合わせて使用する必要があり、単独では使用不可</span></div>
+        <div class="icon-text"><span>⚠️</span><span>VPC ピアリングや NCC ハブ経由の接続関係を正確に把握した上でルール設計が必要</span></div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h3>🌐 ユースケース 1: インターネット境界のセキュリティ強化</h3>
+        <p><strong>シナリオ</strong>: Web アプリケーションを公開しており、インターネットからの Ingress トラフィックと内部サービス間のトラフィックに異なるセキュリティポリシーを適用したい場合。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">インターネット境界セキュリティ設定</span>
+          </div>
+          <pre><code class="language-bash"># インターネットからの HTTPS のみ許可
+gcloud compute network-firewall-policies rules create 100 \
+    --firewall-policy=web-policy \
+    --action=allow --direction=INGRESS \
+    --src-network-context=INTERNET \
+    --src-ip-ranges=0.0.0.0/0 \
+    --layer4-configs=tcp:443 --global-firewall-policy
+
+# 内部トラフィックは全ポート許可
+gcloud compute network-firewall-policies rules create 200 \
+    --firewall-policy=web-policy \
+    --action=allow --direction=INGRESS \
+    --src-network-context=NON_INTERNET \
+    --src-ip-ranges=10.0.0.0/8 \
+    --layer4-configs=all --global-firewall-policy</code></pre>
+        </div>
+        <p><strong>効果</strong>: 2 つのルールでインターネット境界のセキュリティポリシーを完結でき、IP レンジの詳細管理が不要になる。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>🔗 ユースケース 2: マルチ VPC 環境でのアクセス制御</h3>
+        <p><strong>シナリオ</strong>: 複数の VPC ネットワークを運用しており、特定の VPC からのアクセスのみを許可する共有サービス VPC を構築したい場合。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">マルチ VPC アクセス制御</span>
+          </div>
+          <pre><code class="language-bash"># 本番 VPC と開発 VPC からのアクセスのみ許可
+gcloud compute network-firewall-policies rules create 100 \
+    --firewall-policy=shared-services-policy \
+    --action=allow --direction=INGRESS \
+    --src-network-context=VPC_NETWORKS \
+    --src-networks=projects/prod/global/networks/prod-vpc,projects/dev/global/networks/dev-vpc \
+    --src-ip-ranges=10.0.0.0/8 \
+    --layer4-configs=tcp:8080,tcp:8443 \
+    --global-firewall-policy</code></pre>
+        </div>
+        <p><strong>効果</strong>: VPC_NETWORKS コンテキストにより、VPC ピアリングや NCC ハブ経由で接続された特定の VPC からのトラフィックのみを許可でき、ゼロトラストアーキテクチャの実現に貢献する。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>🗄️ ユースケース 3: データベースのマイクロセグメンテーション</h3>
+        <p><strong>シナリオ</strong>: データベース VM への接続を同一 VPC 内のアプリケーション VM からのみに制限したい場合。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">データベースマイクロセグメンテーション</span>
+          </div>
+          <pre><code class="language-bash"># 同一 VPC 内からの MySQL 接続のみ許可
+gcloud compute network-firewall-policies rules create 100 \
+    --firewall-policy=db-policy \
+    --action=allow --direction=INGRESS \
+    --src-network-context=INTRA_VPC \
+    --src-ip-ranges=10.0.0.0/8 \
+    --layer4-configs=tcp:3306 \
+    --target-secure-tags=db-servers \
+    --global-firewall-policy</code></pre>
+        </div>
+        <p><strong>効果</strong>: INTRA_VPC コンテキストにより、VPC ピアリング経由や他の VPC からのデータベースアクセスを確実にブロックし、データベース層のセキュリティを強化できる。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <div class="note-box">
+        <p>Network Contexts は Cloud NGFW のファイアウォールポリシールールの機能であり、Cloud NGFW のティア (<strong>Essentials / Standard / Enterprise</strong>) に応じた料金体系の中で提供される。<span class="highlight">Network Contexts 自体の追加料金はない</span>。</p>
+        <p>詳細は <a href="https://cloud.google.com/firewall/pricing" target="_blank" class="gc-link">Cloud NGFW 料金ページ</a> を参照。</p>
+      </div>
+    </div>
+
+    <!-- Available Regions -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <p>Network Contexts はグローバルネットワークファイアウォールポリシーおよびリージョナルネットワークファイアウォールポリシーの両方で利用可能。</p>
+      <div class="card">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>グローバルポリシー</strong>: 全リージョンに適用</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>リージョナルポリシー</strong>: 指定されたリージョンに適用</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>階層型ファイアウォールポリシー</strong>: 組織またはフォルダレベルで適用可能</span></div>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="feature-grid">
+        <div class="card teal">
+          <h3>🌐 VPC (Virtual Private Cloud)</h3>
+          <p>VPC ネットワーク間のトラフィック分類に直接関連。VPC ピアリングや NCC ハブ経由の接続を識別可能。</p>
+        </div>
+        <div class="card red">
+          <h3>🛡️ Cloud NGFW Enterprise</h3>
+          <p>侵入防止サービス (IDS/IPS) や TLS インスペクションと組み合わせて、ネットワークコンテキストに基づいた高度な脅威検出が可能。</p>
+        </div>
+        <div class="card orange">
+          <h3>🔍 Cloud NGFW Standard</h3>
+          <p>FQDN オブジェクト、ジオロケーション、Google Threat Intelligence とネットワークコンテキストを組み合わせた多層防御が可能 (一部制約あり)。</p>
+        </div>
+        <div class="card purple">
+          <h3>🔗 Network Connectivity Center</h3>
+          <p>NCC ハブ経由で接続された VPC 間のトラフィックも VPC_NETWORKS コンテキストで識別可能。</p>
+        </div>
+        <div class="card">
+          <h3>📊 Cloud Logging / Cloud Monitoring</h3>
+          <p>ファイアウォールルールのログ記録を有効にすることで、ネットワークコンテキストに基づくトラフィックパターンの可視化が可能。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <p>
+        Cloud NGFW の Network Contexts は、<span class="highlight">ファイアウォールポリシー管理の効率化とセキュリティ強化を両立する重要なアップデート</span>である。4 種類のネットワークコンテキスト (<strong>INTERNET / NON_INTERNET / VPC_NETWORKS / INTRA_VPC</strong>) を活用することで、従来は多数の IP レンジベースのルールで実現していたトラフィック制御を、論理的で管理しやすい少数のルールに集約できる。
+      </p>
+      <p>
+        特にマルチ VPC 環境やハイブリッドクラウド環境を運用している組織は、既存のファイアウォールポリシーを見直し、Network Contexts を活用したルール最適化を検討することを推奨する。
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>出典:</strong></p>
+      <ul>
+        <li>📎 <a href="https://cloud.google.com/release-notes#February_25_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li>📎 <a href="https://cloud.google.com/firewall/docs/understand-network-contexts" target="_blank" rel="noopener noreferrer">Network Contexts ドキュメント</a></li>
+        <li>📎 <a href="https://cloud.google.com/firewall/docs/firewall-policies-rule-details" target="_blank" rel="noopener noreferrer">ファイアウォールポリシールールの詳細</a></li>
+        <li>📎 <a href="https://cloud.google.com/firewall/docs/use-network-firewall-policies" target="_blank" rel="noopener noreferrer">ネットワークファイアウォールポリシーの使用</a></li>
+        <li>📎 <a href="https://cloud.google.com/firewall/docs/about-firewalls" target="_blank" rel="noopener noreferrer">Cloud NGFW 概要</a></li>
+        <li>📎 <a href="https://cloud.google.com/firewall/pricing" target="_blank" rel="noopener noreferrer">Cloud NGFW 料金ページ</a></li>
+        <li>📎 <a href="https://cloud.google.com/sdk/gcloud/reference/compute/network-firewall-policies/rules/create" target="_blank" rel="noopener noreferrer">gcloud compute network-firewall-policies rules create</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline);">
+        #CloudNGFW #VPC #NetworkSecurity #Firewall #FirewallPolicy #NetworkContexts #MicroSegmentation #ZeroTrust #GA
+      </p>
+    </footer>
+
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>
