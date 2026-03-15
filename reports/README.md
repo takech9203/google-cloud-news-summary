@@ -5,6 +5,8 @@
 
 ## 2026 年
 
+- [2026-03-15 - Google SecOps SOAR: Release 6.3.80 のロールアウト開始](2026/2026-03-15-google-secops-soar-release-6-3-80.md)
+- [2026-03-14 - Google Cloud Contact Center as a Service (CCaaS): Advanced Reporting Dashboards 4.0](2026/2026-03-14-ccaas-advanced-reporting-dashboards-4-0.md)
 - [2026-03-14 - Google SecOps SOAR: Release 6.3.79 が全リージョンで利用可能に](2026/2026-03-14-google-secops-soar-release-6-3-79.md)
 - [2026-03-13 - Dataproc Metastore: Hive Metastore バージョン 1.2.2 および 2.2.0 の非推奨化](2026/2026-03-13-dataproc-metastore-hive-deprecation.md)
 - [2026-03-13 - Apigee UI: 環境スコープの Key Value Maps (KVM) 管理機能](2026/2026-03-13-apigee-ui-kvm-management.md)
