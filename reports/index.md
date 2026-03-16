@@ -5,8 +5,14 @@
 
 ## 2026 年
 
+- [2026-03-16 - Google SecOps: SOAR マイグレーション Phase 2 期限延長 (2026年9月30日まで)](2026/2026-03-16-google-secops-soar-migration-phase2-extension.md)
+- [2026-03-16 - VPC Service Controls: CX Agent Studio インテグレーションの GA サポート](2026/2026-03-16-vpc-service-controls-cx-agent-studio.md)
 - [2026-03-15 - Google SecOps SOAR: Release 6.3.80 のロールアウト開始](2026/2026-03-15-google-secops-soar-release-6-3-80.md)
 - [2026-03-14 - Google Cloud Contact Center as a Service (CCaaS): Advanced Reporting Dashboards 4.0](2026/2026-03-14-ccaas-advanced-reporting-dashboards-4-0.md)
+- [2026-03-14 - Network Intelligence Center: Connectivity Tests - GKE Pod エンドポイント、IP マスカレード、ネットワークポリシー評価](2026/2026-03-14-network-intelligence-center-connectivity-tests-gke-pod.md)
+- [2026-03-14 - Security Command Center: AI Protection が一般提供 (GA) に昇格](2026/2026-03-14-security-command-center-ai-protection-ga.md)
+- [2026-03-14 - Vertex AI: Vector Search 2.0 が一般提供 (GA) 開始](2026/2026-03-14-vertex-ai-vector-search-2-0-ga.md)
+- [2026-03-14 - Looker: 26.4 リリース - Embed Conversational Analytics GA、Gemini 管理画面リデザイン、Preview Features ページ](2026/2026-03-14-looker-26-4-release.md)
 - [2026-03-14 - Google SecOps SOAR: Release 6.3.79 が全リージョンで利用可能に](2026/2026-03-14-google-secops-soar-release-6-3-79.md)
 - [2026-03-13 - Dataproc Metastore: Hive Metastore バージョン 1.2.2 および 2.2.0 の非推奨化](2026/2026-03-13-dataproc-metastore-hive-deprecation.md)
 - [2026-03-13 - Apigee UI: 環境スコープの Key Value Maps (KVM) 管理機能](2026/2026-03-13-apigee-ui-kvm-management.md)
