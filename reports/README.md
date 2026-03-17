@@ -5,8 +5,11 @@
 
 ## 2026 年
 
+- [2026-03-16 - Firestore with MongoDB compatibility: MongoDB API による TTL インデックス管理のサポート](2026/2026-03-16-firestore-mongodb-ttl-indexes.md)
 - [2026-03-16 - Google SecOps: SOAR マイグレーション Phase 2 期限延長 (2026年9月30日まで)](2026/2026-03-16-google-secops-soar-migration-phase2-extension.md)
+- [2026-03-16 - BigQuery: グローバルデフォルトロケーション構成の GA リリース](2026/2026-03-16-bigquery-global-default-location.md)
 - [2026-03-16 - VPC Service Controls: CX Agent Studio インテグレーションの GA サポート](2026/2026-03-16-vpc-service-controls-cx-agent-studio.md)
+- [2026-03-16 - Cloud Build: OCI イメージの Artifact Registry へのアップロード対応](2026/2026-03-16-cloud-build-oci-image-artifact-registry.md)
 - [2026-03-15 - Google SecOps SOAR: Release 6.3.80 のロールアウト開始](2026/2026-03-15-google-secops-soar-release-6-3-80.md)
 - [2026-03-14 - Google Cloud Contact Center as a Service (CCaaS): Advanced Reporting Dashboards 4.0](2026/2026-03-14-ccaas-advanced-reporting-dashboards-4-0.md)
 - [2026-03-14 - Network Intelligence Center: Connectivity Tests - GKE Pod エンドポイント、IP マスカレード、ネットワークポリシー評価](2026/2026-03-14-network-intelligence-center-connectivity-tests-gke-pod.md)
