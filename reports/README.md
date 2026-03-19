@@ -5,7 +5,12 @@
 
 ## 2026 年
 
+- [2026-03-18 - Cloud Database Migration Service: SQL Server 異種マイグレーションにおけるフェイルバック移行ジョブ (Preview)](2026/2026-03-18-dms-sql-server-failback-migration.md)
+- [2026-03-18 - Google Distributed Cloud (software only): バージョン 1.34.200-gke.68 リリースおよびバグ修正](2026/2026-03-18-google-distributed-cloud-1-34-200.md)
+- [2026-03-18 - Google Kubernetes Engine (GKE): バージョンアップデート (2026-R11)](2026/2026-03-18-gke-version-updates-2026-r11.md)
+- [2026-03-17 - Cloud Composer: 2026 年 3 月リリース (Airflow 3.1.7、新ビルド、非推奨化)](2026/2026-03-17-cloud-composer-march-2026-release.md)
 - [2026-03-17 - Cloud Data Fusion: バージョン 6.11.1.2 パッチリリース (バグ修正)](2026/2026-03-17-cloud-data-fusion-v6-11-1-2.md)
+- [2026-03-17 - Dataproc: サブマイナーイメージバージョン更新と CVE 修正](2026/2026-03-17-dataproc-image-updates-cve-fixes.md)
 - [2026-03-17 - Looker: 2026 年 3 月機能ロールアウト](2026/2026-03-17-looker-march-2026-feature-rollout.md)
 - [2026-03-17 - Google Cloud サーバーレスサービス: Ruby 4.0 ランタイム GA](2026/2026-03-17-ruby-4-0-runtime-ga.md)
 - [2026-03-17 - Memorystore for Valkey: 3 つの新リージョン (バンコク、ストックホルム、メキシコ) が利用可能に](2026/2026-03-17-memorystore-valkey-new-regions.md)
