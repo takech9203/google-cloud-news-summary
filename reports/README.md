@@ -5,7 +5,17 @@
 
 ## 2026 年
 
+- [2026-03-20 - Dataproc Serverless for Apache Spark: 新ランタイムバージョン 1.2.76, 2.2.76, 2.3.29, 3.0.12](2026/2026-03-20-dataproc-serverless-spark-runtime-versions.md)
+- [2026-03-20 - Google SecOps: TIN ケースサマリー統合 & Agentic Automation](2026/2026-03-20-google-secops-tin-agentic-automation.md)
+- [2026-03-19 - Compute Engine: ブートディスク操作に iam.serviceAccounts.actAs 権限が必須化 (Breaking Change)](2026/2026-03-19-compute-engine-boot-disk-iam-permission.md)
+- [2026-03-19 - Apigee X: メンテナンスアップデート (バージョン 1-16-0-apigee-6)](2026/2026-03-19-apigee-x-maintenance-update.md)
+- [2026-03-19 - Cloud Trace: Observability バケットのリージョン拡張と SQL クエリアラートポリシー](2026/2026-03-19-cloud-trace-observability-updates.md)
+- [2026-03-19 - Spanner: AI 関数による SQL でのセマンティック操作](2026/2026-03-19-spanner-ai-functions.md)
+- [2026-03-18 - Dataproc: CVE 修正と新サブマイナーイメージバージョンのリリース](2026/2026-03-18-dataproc-cve-fixes-image-versions.md)
 - [2026-03-18 - Cloud Database Migration Service: SQL Server 異種マイグレーションにおけるフェイルバック移行ジョブ (Preview)](2026/2026-03-18-dms-sql-server-failback-migration.md)
+- [2026-03-18 - Memorystore for Valkey: メンテナンスウィンドウとセルフサービスメンテナンスの Google Cloud コンソール対応 (GA)](2026/2026-03-18-memorystore-valkey-maintenance-windows-ga.md)
+- [2026-03-18 - Memorystore: asia-southeast3 (Bangkok) リージョンのサポート開始](2026/2026-03-18-memorystore-asia-southeast3-bangkok.md)
+- [2026-03-18 - Virtual Private Cloud: サービスアタッチメントのターゲットサービス更新機能](2026/2026-03-18-vpc-service-attachment-target-update.md)
 - [2026-03-18 - Google Distributed Cloud (software only): バージョン 1.34.200-gke.68 リリースおよびバグ修正](2026/2026-03-18-google-distributed-cloud-1-34-200.md)
 - [2026-03-18 - Google Kubernetes Engine (GKE): バージョンアップデート (2026-R11)](2026/2026-03-18-gke-version-updates-2026-r11.md)
 - [2026-03-17 - Cloud Composer: 2026 年 3 月リリース (Airflow 3.1.7、新ビルド、非推奨化)](2026/2026-03-17-cloud-composer-march-2026-release.md)
