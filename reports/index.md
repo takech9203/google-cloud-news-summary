@@ -6,6 +6,7 @@
 ## 2026 年
 
 - [2026-03-20 - Dataproc Serverless for Apache Spark: 新ランタイムバージョン 1.2.76, 2.2.76, 2.3.29, 3.0.12](2026/2026-03-20-dataproc-serverless-spark-runtime-versions.md)
+- [2026-03-20 - Looker: モバイルアプリ アップデート (iOS 2.2.0 / Android 2.0.88)](2026/2026-03-20-looker-mobile-app-update.md)
 - [2026-03-20 - Google SecOps: TIN ケースサマリー統合 & Agentic Automation](2026/2026-03-20-google-secops-tin-agentic-automation.md)
 - [2026-03-19 - BigQuery: ルーティンに対するカスタム組織ポリシーのサポート](2026/2026-03-19-bigquery-custom-org-policy-routines.md)
 - [2026-03-19 - Compute Engine: ブートディスク操作に iam.serviceAccounts.actAs 権限が必須化 (Breaking Change)](2026/2026-03-19-compute-engine-boot-disk-iam-permission.md)
