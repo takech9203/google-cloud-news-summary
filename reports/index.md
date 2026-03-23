@@ -5,6 +5,11 @@
 
 ## 2026 年
 
+- [2026-03-23 - Cloud Deploy: デプロイ検証と自動ロールバックアクション (Preview)](2026/2026-03-23-cloud-deploy-deployment-verification.md)
+- [2026-03-23 - Cloud NGFW: Secure Tags の VPC Network Peering サポートが GA](2026/2026-03-23-cloud-ngfw-secure-tags-vpc-peering.md)
+- [2026-03-23 - BigQuery: Cloud Storage / Google Drive ファイルからのデータプレパレーション (GA)](2026/2026-03-23-bigquery-data-preparations-ga.md)
+- [2026-03-23 - Gemini Enterprise: Docusign データコネクタ (Preview)](2026/2026-03-23-gemini-enterprise-docusign-connector.md)
+- [2026-03-20 - Google Distributed Cloud (software only) for VMware: 管理クラスタアップグレード時の --reuse-bootstrap-cluster フラグ必須化](2026/2026-03-20-google-distributed-cloud-vmware-upgrade-flag.md)
 - [2026-03-20 - Dataproc Serverless for Apache Spark: 新ランタイムバージョン 1.2.76, 2.2.76, 2.3.29, 3.0.12](2026/2026-03-20-dataproc-serverless-spark-runtime-versions.md)
 - [2026-03-20 - Looker: モバイルアプリ アップデート (iOS 2.2.0 / Android 2.0.88)](2026/2026-03-20-looker-mobile-app-update.md)
 - [2026-03-20 - Google SecOps: TIN ケースサマリー統合 & Agentic Automation](2026/2026-03-20-google-secops-tin-agentic-automation.md)
