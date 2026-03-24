@@ -5,9 +5,19 @@
 
 ## 2026 年
 
+- [2026-03-24 - Compute Engine: Hyperdisk Balanced High Availability の最大スループットが 2,400 MiB/s に倍増](2026/2026-03-24-compute-engine-hyperdisk-balanced-ha-throughput.md)
+- [2026-03-24 - Cloud Monitoring / Cloud Trace: Telemetry API リージョナルクォータの導入](2026/2026-03-24-telemetry-api-regional-quotas.md)
+- [2026-03-24 - Cloud NGFW: URL フィルタリングサービスが GA](2026/2026-03-24-cloud-ngfw-url-filtering-ga.md)
+- [2026-03-24 - Cloud Storage: Anywhere Cache が Rapid Cache に名称変更](2026/2026-03-24-cloud-storage-rapid-cache-rename.md)
+- [2026-03-23 - Document AI: カスタム分類・スプリッターモデル v1.6 Preview 提供開始](2026/2026-03-23-document-ai-custom-models-v1-6-preview.md)
+- [2026-03-23 - Looker: SDK および API /login エンドポイントのクレデンシャル渡し方法の変更 (破壊的変更)](2026/2026-03-23-looker-sdk-api-login-security-change.md)
 - [2026-03-23 - Cloud Deploy: デプロイ検証と自動ロールバックアクション (Preview)](2026/2026-03-23-cloud-deploy-deployment-verification.md)
+- [2026-03-23 - Google Distributed Cloud: バージョン 1.33.600-gke.39 リリース (VMware / ベアメタル)](2026/2026-03-23-gdc-1-33-600-gke-39.md)
 - [2026-03-23 - Cloud NGFW: Secure Tags の VPC Network Peering サポートが GA](2026/2026-03-23-cloud-ngfw-secure-tags-vpc-peering.md)
 - [2026-03-23 - BigQuery: Cloud Storage / Google Drive ファイルからのデータプレパレーション (GA)](2026/2026-03-23-bigquery-data-preparations-ga.md)
+- [2026-03-23 - Agent Assist: Gemini Enterprise for CX の AI コーチツールが GA](2026/2026-03-23-agent-assist-gemini-enterprise-ai-coach-ga.md)
+- [2026-03-23 - Compute Engine: MIG インスタンス フレキシビリティ ポリシーの拡張 (最小 CPU プラットフォームとディスク定義のオーバーライド)](2026/2026-03-23-compute-engine-mig-instance-flexibility-preview.md)
+- [2026-03-23 - Firestore / Datastore: リージョナルおよびマルチリージョナルエンドポイントが GA](2026/2026-03-23-firestore-regional-endpoints-ga.md)
 - [2026-03-23 - Gemini Enterprise: Docusign データコネクタ (Preview)](2026/2026-03-23-gemini-enterprise-docusign-connector.md)
 - [2026-03-20 - Google Distributed Cloud (software only) for VMware: 管理クラスタアップグレード時の --reuse-bootstrap-cluster フラグ必須化](2026/2026-03-20-google-distributed-cloud-vmware-upgrade-flag.md)
 - [2026-03-20 - Dataproc Serverless for Apache Spark: 新ランタイムバージョン 1.2.76, 2.2.76, 2.3.29, 3.0.12](2026/2026-03-20-dataproc-serverless-spark-runtime-versions.md)
