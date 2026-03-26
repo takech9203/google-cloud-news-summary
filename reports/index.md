@@ -5,11 +5,20 @@
 
 ## 2026 年
 
+- [2026-03-26 - Memorystore for Valkey: 新しい CA モード - Shared CA / Customer-managed CA (Preview)](2026/2026-03-26-memorystore-valkey-ca-modes.md)
+- [2026-03-26 - Vertex AI Search: 回答生成モデルの更新 - Gemini 3.1 Pro / Gemini 3 Flash 追加、Gemini 3 Pro 廃止](2026/2026-03-26-vertex-ai-search-answer-generation-model-update.md)
+- [2026-03-26 - VPC Service Controls: Oracle Database@Google Cloud 統合の GA サポート](2026/2026-03-26-vpc-service-controls-oracle-database.md)
 - [2026-03-25 - Google SecOps (SIEM): サードパーティ API コネクタの資格情報バリデーション](2026/2026-03-25-google-secops-credential-validation.md)
+- [2026-03-25 - AlloyDB for PostgreSQL: PostgreSQL 18 互換性が GA (一般提供)](2026/2026-03-25-alloydb-postgresql-18-ga.md)
+- [2026-03-25 - Cloud Location Finder: サービス有効化とクォータチェックの変更](2026/2026-03-25-cloud-location-finder-quota-change.md)
+- [2026-03-25 - AlloyDB for PostgreSQL (AlloyDB AI): ai.hybrid_search() 関数と RUM エクステンション](2026/2026-03-25-alloydb-ai-hybrid-search-rum.md)
+- [2026-03-25 - BigQuery: Migration Service MCP server (Preview) と Snowflake 移行アセスメント (GA)](2026/2026-03-25-bigquery-migration-tools-update.md)
 - [2026-03-25 - Bigtable: Java クライアント Admin API のモダナイゼーション](2026/2026-03-25-bigtable-java-client-admin-api.md)
+- [2026-03-25 - Google Cloud Contact Center as a Service (CCaaS): Web SDK バージョン 2 シャットダウンのお知らせ](2026/2026-03-25-ccaas-web-sdk-v2-shutdown.md)
 - [2026-03-25 - BigQuery Data Transfer Service: Hive マネージドテーブルのリソースレベルステータスレポート](2026/2026-03-25-bigquery-dts-hive-resource-status.md)
 - [2026-03-25 - Looker: バグ修正および Looker 26.6 リリースアナウンス](2026/2026-03-25-looker-bug-fixes-26-6.md)
 - [2026-03-25 - AlloyDB for PostgreSQL: デフォルト PostgreSQL メジャーバージョンが 17 に変更](2026/2026-03-25-alloydb-postgresql-17-default.md)
+- [2026-03-25 - BigQuery: Gemini for Google Cloud API が EU ジュリスディクションで有効化](2026/2026-03-25-bigquery-gemini-api-eu-jurisdiction.md)
 - [2026-03-25 - Generative AI on Vertex AI: Lyria 3 オーディオ生成 (Public Preview)](2026/2026-03-25-vertex-ai-lyria-3-audio-generation.md)
 - [2026-03-24 - Generative AI on Vertex AI: Imagen / Veo GA エンドポイントの廃止](2026/2026-03-24-vertex-ai-imagen-veo-deprecation.md)
 - [2026-03-24 - Compute Engine: Hyperdisk Balanced High Availability の最大スループットが 2,400 MiB/s に倍増](2026/2026-03-24-compute-engine-hyperdisk-balanced-ha-throughput.md)
@@ -17,6 +26,7 @@
 - [2026-03-24 - Gemini Enterprise: Data Insights agent (GA with allowlist)](2026/2026-03-24-gemini-enterprise-data-insights-agent.md)
 - [2026-03-24 - Cloud Monitoring / Cloud Trace: Telemetry API リージョナルクォータの導入](2026/2026-03-24-telemetry-api-regional-quotas.md)
 - [2026-03-24 - Cloud NGFW: URL フィルタリングサービスが GA](2026/2026-03-24-cloud-ngfw-url-filtering-ga.md)
+- [2026-03-24 - Looker: Looker 26.4 機能アップデート](2026/2026-03-24-looker-26-4-features.md)
 - [2026-03-24 - Cloud Router: BGP ルートポリシー向け Named Sets (Preview)](2026/2026-03-24-cloud-router-named-sets-bgp.md)
 - [2026-03-24 - Gemini Enterprise: Microsoft OneDrive データストアのフィルタリング強化 (Preview)](2026/2026-03-24-gemini-enterprise-onedrive-filtering.md)
 - [2026-03-24 - Cloud Storage: Anywhere Cache が Rapid Cache に名称変更](2026/2026-03-24-cloud-storage-rapid-cache-rename.md)
