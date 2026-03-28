@@ -5,8 +5,12 @@
 
 ## 2026 年
 
+- [2026-03-28 - Google SecOps SOAR: Release 6.3.80 が全リージョンで利用可能に](2026/2026-03-28-google-secops-soar-release-6-3-80.md)
+- [2026-03-27 - Google Distributed Cloud (software only) for bare metal: バージョン 1.32.1000-gke.57 リリース](2026/2026-03-27-google-distributed-cloud-bare-metal-1-32.md)
 - [2026-03-27 - Cloud Composer: Melbourne リージョンが Cloud Composer 3 専用に移行](2026/2026-03-27-cloud-composer-melbourne-composer-3.md)
 - [2026-03-27 - Security Command Center: Risk Engine のデフォルト高価値リソースに対する強化ヒューリスティクス](2026/2026-03-27-security-command-center-risk-engine-heuristics.md)
+- [2026-03-27 - Google Distributed Cloud (software only) for VMware: バージョン 1.33.600-gke.40 / 1.32.1000-gke.57 リリース](2026/2026-03-27-google-distributed-cloud-vmware-1-32-1-33.md)
+- [2026-03-27 - Compute Engine: CrackArmor 脆弱性 (CVE-2026-23268) に対するセキュリティ対応](2026/2026-03-27-compute-engine-crackarmor-cve-2026-23268.md)
 - [2026-03-27 - Document AI: カスタムスプリッターモデル pretrained-splitter-v1.5-2025-07-14 が GA に](2026/2026-03-27-document-ai-custom-splitter-ga.md)
 - [2026-03-26 - Vertex AI Search: 回答生成モデルの更新 - Gemini 3.1 Pro / Gemini 3 Flash 追加、Gemini 3 Pro 廃止](2026/2026-03-26-vertex-ai-search-answer-generation-model-update.md)
 - [2026-03-26 - Memorystore for Valkey: 新しい CA モード - Shared CA / Customer-managed CA (Preview)](2026/2026-03-26-memorystore-valkey-ca-modes.md)
