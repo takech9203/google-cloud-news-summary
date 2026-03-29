@@ -5,6 +5,7 @@
 
 ## 2026 年
 
+- [2026-03-29 - Google SecOps SOAR: Release 6.3.81 が第1フェーズリージョンへ展開開始](2026/2026-03-29-google-secops-soar-release-6-3-81.md)
 - [2026-03-28 - Google SecOps SOAR: Release 6.3.80 が全リージョンで利用可能に](2026/2026-03-28-google-secops-soar-release-6-3-80.md)
 - [2026-03-27 - Google Distributed Cloud (software only) for bare metal: バージョン 1.32.1000-gke.57 リリース](2026/2026-03-27-google-distributed-cloud-bare-metal-1-32.md)
 - [2026-03-27 - Cloud Composer: Melbourne リージョンが Cloud Composer 3 専用に移行](2026/2026-03-27-cloud-composer-melbourne-composer-3.md)
