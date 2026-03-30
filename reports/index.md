@@ -5,6 +5,13 @@
 
 ## 2026 年
 
+- [2026-03-30 - Google Cloud Observability: Telemetry API 自動有効化と Cloud Trace MCP サーバー (Preview)](2026/2026-03-30-google-cloud-observability-telemetry-api-trace-mcp.md)
+- [2026-03-30 - Cloud Database Migration Service: MySQL 同種移行で個別データベースの選択的移行が可能に](2026/2026-03-30-cloud-dms-mysql-individual-database-migration.md)
+- [2026-03-30 - Compute Engine: Guest Agent v20260329.00 - 新テレメトリ拡張とプラグイン設定の強化](2026/2026-03-30-compute-engine-guest-agent-v20260329.md)
+- [2026-03-30 - BigQuery: AI 予測・異常検知関数の GA (一般提供開始)](2026/2026-03-30-bigquery-ai-forecasting-anomaly-detection-ga.md)
+- [2026-03-30 - Virtual Private Cloud (VPC): Private Service Connect エンドポイント単位のアクセス制御が GA](2026/2026-03-30-vpc-private-service-connect-endpoint-control.md)
+- [2026-03-30 - BigQuery: Spanner データに対する非インクリメンタル Materialized View が GA](2026/2026-03-30-bigquery-materialized-views-spanner.md)
+- [2026-03-30 - Cloud CDN: URL マップレベルでのキャッシュポリシー設定が可能に](2026/2026-03-30-cloud-cdn-cache-policies-url-maps.md)
 - [2026-03-29 - Google SecOps SOAR: Release 6.3.81 が第1フェーズリージョンへ展開開始](2026/2026-03-29-google-secops-soar-release-6-3-81.md)
 - [2026-03-28 - Google SecOps SOAR: Release 6.3.80 が全リージョンで利用可能に](2026/2026-03-28-google-secops-soar-release-6-3-80.md)
 - [2026-03-27 - Google Distributed Cloud (software only) for bare metal: バージョン 1.32.1000-gke.57 リリース](2026/2026-03-27-google-distributed-cloud-bare-metal-1-32.md)
