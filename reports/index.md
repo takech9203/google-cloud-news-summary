@@ -5,7 +5,17 @@
 
 ## 2026 年
 
+- [2026-04-02 - Google Cloud CCaaS (CCAI Platform): Mobile SDK バージョン 2.15.2 パッチ (Android)](2026/2026-04-02-ccaas-mobile-sdk-2-15-2.md)
+- [2026-04-02 - Cloud Monitoring: Application Monitoring の新リソースサポートと Kubernetes ダッシュボードの L4/L7 トラフィックメトリクス](2026/2026-04-02-cloud-monitoring-application-monitoring-resources.md)
+- [2026-04-02 - Cloud SQL for SQL Server: Read Pools が GA (一般提供開始)](2026/2026-04-02-cloud-sql-server-read-pools-ga.md)
+- [2026-04-02 - Dataform: フォルダとリポジトリによるコード資産の整理機能が GA](2026/2026-04-02-dataform-folders-repositories-ga.md)
+- [2026-04-02 - Compute Engine: コンテナ起動エージェントの組織ポリシー制約 (Preview)](2026/2026-04-02-compute-engine-container-startup-agent-policy.md)
+- [2026-04-02 - BigQuery: Migration Service - Snowflake SQL to GoogleSQL 翻訳が GA に](2026/2026-04-02-bigquery-migration-snowflake-ga.md)
+- [2026-04-02 - Cloud Logging: ログビューのフィルタ機能拡張 (論理和句、否定、ラベル対応)](2026/2026-04-02-cloud-logging-log-view-filters.md)
+- [2026-04-02 - AlloyDB for PostgreSQL: セカンダリクラスタを持つプライマリクラスタでの Advanced Query Insights 有効化サポート](2026/2026-04-02-alloydb-advanced-query-insights.md)
 - [2026-04-01 - Cloud Database Migration Service: MCP サーバー対応 (Preview)](2026/2026-04-01-cloud-dms-mcp-server-preview.md)
+- [2026-04-01 - Gemini Enterprise: Data connector request count metric が GA に](2026/2026-04-01-gemini-enterprise-data-connector-metrics.md)
+- [2026-04-01 - Google Cloud CCaaS (CCAI Platform): 次期バージョン プレリリースノート](2026/2026-04-01-ccaas-prerelease-april.md)
 - [2026-03-31 - BigQuery: ObjectRef 関数が GA (一般提供) に昇格](2026/2026-03-31-bigquery-objectref-ga.md)
 - [2026-03-31 - Cloud NAT: TCP TIME_WAIT タイムアウトのデフォルト値が 120 秒から 30 秒に変更予定](2026/2026-03-31-cloud-nat-tcp-time-wait-timeout.md)
 - [2026-03-31 - Google SecOps: YARA-L マルチステージクエリが GA](2026/2026-03-31-google-secops-multi-stage-queries-ga.md)
@@ -19,6 +29,7 @@
 - [2026-03-31 - Compute Engine: Hyperdisk ML の最大スループットが約 75% 増加し 2,097,152 MiB/s に](2026/2026-03-31-compute-engine-hyperdisk-ml-throughput.md)
 - [2026-03-31 - Apigee X: Model Context Protocol (MCP) の一般提供開始 (GA)](2026/2026-03-31-apigee-x-mcp-ga.md)
 - [2026-03-31 - Gemini Enterprise: Salesforce データフェデレーションによる接続とコネクタエラーログの可視化](2026/2026-03-31-gemini-enterprise-salesforce-federation.md)
+- [2026-03-31 - Google Cloud Armor: Match Condition Builder - ビジュアル CEL 式ビルダー](2026/2026-03-31-cloud-armor-match-condition-builder.md)
 - [2026-03-31 - Document AI: ファインチューニング済みカスタムエクストラクタのアップグレード機能が Preview 提供開始](2026/2026-03-31-document-ai-custom-extractor-upgrade.md)
 - [2026-03-31 - Oracle Database@Google Cloud: VPC Service Controls サポートが GA に昇格](2026/2026-03-31-oracle-database-vpc-service-controls-ga.md)
 - [2026-03-31 - Cloud Load Balancing: SNI ベースルーティング (プレビュー)](2026/2026-03-31-cloud-load-balancing-sni-routing-preview.md)
