@@ -6,10 +6,13 @@
 ## 2026 年
 
 - [2026-04-04 - Google SecOps: Playbook の Condition / Multi-Choice Question フローの分岐上限が 20 に拡大](2026/2026-04-04-google-secops-playbook-branching.md)
+- [2026-04-04 - Google SecOps SOAR: Release 6.3.81 全リージョン展開完了](2026/2026-04-04-secops-soar-release-6-3-81.md)
 - [2026-04-03 - Generative AI on Vertex AI: RAG Engine Serverless モード](2026/2026-04-03-vertex-ai-rag-engine-serverless-mode.md)
 - [2026-04-03 - Google Cloud Contact Center as a Service (CCaaS): チャットキューメトリクス改善とリピートコンタクトデータ追加](2026/2026-04-03-ccaas-chat-metrics-repeat-contacts.md)
 - [2026-04-03 - Cloud Logging: "ca" マルチリージョンのサポート追加](2026/2026-04-03-cloud-logging-ca-multi-region.md)
 - [2026-04-03 - Cloud Monitoring: Application Monitoring に Services and Workloads タブが追加](2026/2026-04-03-cloud-monitoring-services-workloads-tab.md)
+- [2026-04-03 - Virtual Private Cloud: Hybrid Subnets が General Availability に昇格](2026/2026-04-03-vpc-hybrid-subnets-ga.md)
+- [2026-04-03 - Identity and Access Management: Workforce Identity Federation 拡張属性の非推奨化](2026/2026-04-03-iam-workforce-identity-federation-deprecation.md)
 - [2026-04-03 - Google SecOps: デフォルトパーサー大規模アップデート (2026年4月)](2026/2026-04-03-google-secops-parser-updates-april.md)
 - [2026-04-03 - Gemini Enterprise: Jira / Confluence フェデレーテッドコネクタが GA](2026/2026-04-03-gemini-enterprise-jira-confluence-connectors.md)
 - [2026-04-03 - AlloyDB for PostgreSQL: gcloud alloydb connect コマンド (Preview)](2026/2026-04-03-alloydb-gcloud-connect-preview.md)
