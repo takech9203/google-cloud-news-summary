@@ -5,6 +5,13 @@
 
 ## 2026 年
 
+- [2026-04-06 - BigQuery: AI.AGG 関数によるセマンティック集約 (Preview)](2026/2026-04-06-bigquery-ai-agg-function.md)
+- [2026-04-06 - Apigee API hub: Agent Registry 連携による MCP メタデータサポート (Preview)](2026/2026-04-06-apigee-api-hub-agent-registry-mcp.md)
+- [2026-04-06 - Memorystore for Redis: Remote MCP Server (Preview)](2026/2026-04-06-memorystore-redis-remote-mcp-server.md)
+- [2026-04-06 - Pub/Sub: AI Inference Single Method Transform (SMT) が GA](2026/2026-04-06-pubsub-ai-inference-smt-ga.md)
+- [2026-04-06 - Cloud Logging Libraries: Go クライアントライブラリ v1.14.0 リリース](2026/2026-04-06-cloud-logging-go-v1-14-0.md)
+- [2026-04-05 - Cloud Load Balancing: Certificate Manager 証明書が Google Cloud コンソールで利用可能に (GA)](2026/2026-04-05-cloud-load-balancing-certificate-manager-console.md)
+- [2026-04-05 - Google SecOps SOAR: Release 6.3.82 第 1 フェーズ展開開始](2026/2026-04-05-secops-soar-release-6-3-82.md)
 - [2026-04-04 - Google SecOps: Playbook の Condition / Multi-Choice Question フローの分岐上限が 20 に拡大](2026/2026-04-04-google-secops-playbook-branching.md)
 - [2026-04-04 - Google SecOps SOAR: Release 6.3.81 全リージョン展開完了](2026/2026-04-04-secops-soar-release-6-3-81.md)
 - [2026-04-03 - Generative AI on Vertex AI: RAG Engine Serverless モード](2026/2026-04-03-vertex-ai-rag-engine-serverless-mode.md)
