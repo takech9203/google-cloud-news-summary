@@ -5,6 +5,7 @@
 
 ## 2026 年
 
+- [2026-04-12 - Google SecOps SOAR: Release 6.3.83 第 1 フェーズ展開開始](2026/2026-04-12-secops-soar-release-6-3-83.md)
 - [2026-04-10 - Cloud Load Balancing / Virtual Private Cloud: Published Service Backends](2026/2026-04-10-cloud-load-balancing-published-service-backends.md)
 - [2026-04-10 - Google Cloud Contact Center as a Service (CCaaS): 複数の新機能追加とバグ修正](2026/2026-04-10-ccaas-features-and-fixes.md)
 - [2026-04-10 - BigQuery / Colab Enterprise: SQL セルが一般提供 (GA) に昇格](2026/2026-04-10-bigquery-colab-sql-cells-ga.md)
