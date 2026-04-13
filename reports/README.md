@@ -5,6 +5,12 @@
 
 ## 2026 年
 
+- [2026-04-13 - Cloud NAT: ソースベース NAT ルール (IPv4) が一般提供 (GA) に](2026/2026-04-13-cloud-nat-source-based-nat-rules-ga.md)
+- [2026-04-13 - Cloud Monitoring: Application Monitoring のトポロジマップ機能](2026/2026-04-13-cloud-monitoring-application-topology.md)
+- [2026-04-13 - Memorystore for Valkey: Bloom filters v1.0 および JSON documents v1.0 が GA](2026/2026-04-13-memorystore-valkey-bloom-filters-json-ga.md)
+- [2026-04-13 - Cloud CDN: GKE Gateway における Cloud CDN サポート (Preview)](2026/2026-04-13-cloud-cdn-gke-gateway-preview.md)
+- [2026-04-13 - Bigtable: GoogleSQL Geography 関数とパイプ構文の GA リリース](2026/2026-04-13-bigtable-googlesql-features-ga.md)
+- [2026-04-13 - BigQuery: マネージド AI 関数 (AI.IF, AI.SCORE, AI.CLASSIFY) の GA リリースと最適化モードの Preview](2026/2026-04-13-bigquery-ai-functions-ga.md)
 - [2026-04-12 - Google SecOps SOAR: Release 6.3.83 第 1 フェーズ展開開始](2026/2026-04-12-secops-soar-release-6-3-83.md)
 - [2026-04-10 - Cloud Load Balancing / Virtual Private Cloud: Published Service Backends](2026/2026-04-10-cloud-load-balancing-published-service-backends.md)
 - [2026-04-10 - Google Cloud Contact Center as a Service (CCaaS): 複数の新機能追加とバグ修正](2026/2026-04-10-ccaas-features-and-fixes.md)
