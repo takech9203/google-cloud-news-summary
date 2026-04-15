@@ -5,7 +5,18 @@
 
 ## 2026 年
 
+- [2026-04-15 - Compute Engine: MIG ワークロードポリシーの GA およびインスタンストポロジー表示機能](2026/2026-04-15-compute-engine-workload-policies-ga.md)
+- [2026-04-15 - Gemini Enterprise: Gemini Enterprise Admin / User IAM ロールの導入](2026/2026-04-15-gemini-enterprise-iam-roles.md)
+- [2026-04-15 - BigQuery: EXPORT DATA to AlloyDB (Preview) およびマテリアライズドビューのセキュリティ修正](2026/2026-04-15-bigquery-export-data-alloydb.md)
+- [2026-04-15 - Cloud Composer: Managed Service for Apache Airflow への改名、Airflow 3 GA、MCP サーバー対応](2026/2026-04-15-cloud-composer-airflow3-ga-mcp-server.md)
+- [2026-04-15 - Security Command Center: プロジェクト単位のアクティベーション時にサービスとサービスエージェントが自動プロビジョニング](2026/2026-04-15-security-command-center-project-activation.md)
+- [2026-04-14 - Cloud Run: Worker Pools が General Availability (GA) に昇格](2026/2026-04-14-cloud-run-worker-pools-ga.md)
 - [2026-04-14 - Compute Engine: AMD SEV-SNP ゲストメモリ整合性の脆弱性修正 (CVE-2025-54510)](2026/2026-04-14-compute-engine-amd-sev-snp-cve-2025-54510.md)
+- [2026-04-14 - Google Cloud CCaaS: Advanced Reporting Dashboards の機能強化とバグ修正](2026/2026-04-14-ccaas-reporting-dashboards.md)
+- [2026-04-14 - Security Command Center: Cloud Run Threat Detection が Cloud Run Worker Pools の監視に対応](2026/2026-04-14-security-command-center-cloud-run-threat-detection.md)
+- [2026-04-14 - AlloyDB / Cloud SQL: Gemini Cloud Assist Investigations が Premium Support 契約必須に (Breaking Change)](2026/2026-04-14-gemini-cloud-assist-premium-support.md)
+- [2026-04-14 - Compute Engine: Hyperdisk ML が C3 ベアメタル、C4、C4A ベアメタル、N4A で GA サポート](2026/2026-04-14-compute-engine-hyperdisk-ml-ga.md)
+- [2026-04-14 - Cloud Interconnect: Partner Cross-Cloud Interconnect for AWS が GA、NCC サポートが Preview に](2026/2026-04-14-cloud-interconnect-partner-cci-aws-ga.md)
 - [2026-04-13 - Identity and Access Management (IAM): Privileged Access Manager グラントスケジューリング](2026/2026-04-13-iam-pam-grant-scheduling.md)
 - [2026-04-13 - Cloud NAT: ソースベース NAT ルール (IPv4) が一般提供 (GA) に](2026/2026-04-13-cloud-nat-source-based-nat-rules-ga.md)
 - [2026-04-13 - Cloud Service Mesh: セキュリティパッチリリース (1.28.5-asm.12, 1.27.8-asm.9, 1.26.8-asm.5 / マネージド ローリングアップデート)](2026/2026-04-13-cloud-service-mesh-security-patches-april.md)
