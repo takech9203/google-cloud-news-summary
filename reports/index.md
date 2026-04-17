@@ -5,13 +5,22 @@
 
 ## 2026 年
 
+- [2026-04-17 - NetApp Volumes: Flex Unified サービスレベル / ONTAP-mode / 大容量ボリュームが GA](2026/2026-04-17-netapp-volumes-flex-unified-ga.md)
+- [2026-04-17 - Service Extensions: Secure Web Proxy 向け Authorization Extensions が Preview 提供開始](2026/2026-04-17-service-extensions-swp-authorization.md)
 - [2026-04-16 - BigQuery: AI.KEY_DRIVERS 関数によるキードライバー分析 (統計的に有意なデータセグメントの特定)](2026/2026-04-16-bigquery-ai-key-drivers.md)
+- [2026-04-16 - Security Command Center: AI Protection がエージェントワークロードに対応 (Preview)](2026/2026-04-16-security-command-center-ai-protection-agents.md)
+- [2026-04-16 - Secret Manager: Kubernetes Secrets への統合シークレット同期機能が GA](2026/2026-04-16-secret-manager-secret-sync-gke-ga.md)
 - [2026-04-16 - Dataform: Developer Connect を使用したサードパーティ Git リポジトリ接続 (GA)](2026/2026-04-16-dataform-developer-connect-ga.md)
 - [2026-04-16 - AlloyDB for PostgreSQL: ベクトル検索と ScaNN の大規模改善 (Vector Assist / 4 レベルツリー / 自動チューニング / アダプティブフィルタリング GA)](2026/2026-04-16-alloydb-vector-search-scann-improvements.md)
+- [2026-04-16 - AI Hypercomputer: A3 Mega / A3 High マシンタイプのドキュメント正式対応 (GA)](2026/2026-04-16-ai-hypercomputer-a3-mega-high-ga.md)
 - [2026-04-16 - Bigtable + Pub/Sub: Bigtable サブスクリプションによる Pub/Sub からの直接ストリーミング取り込み](2026/2026-04-16-bigtable-pubsub-subscriptions.md)
 - [2026-04-16 - Cloud SQL: リモート MCP サーバーが GA (一般提供)](2026/2026-04-16-cloud-sql-mcp-server-ga.md)
 - [2026-04-16 - Datastream: AlloyDB for PostgreSQL の概要ページからの自動フローによるストリーム作成](2026/2026-04-16-datastream-alloydb-automated-flow.md)
+- [2026-04-16 - Cloud Run: カスタムスケーリングコントロール (CPU / 同時実行数ターゲット指定) が Preview](2026/2026-04-16-cloud-run-custom-scaling-controls.md)
 - [2026-04-16 - Memorystore for Valkey: セルフマネージド Redis/Valkey マイグレーション (Preview) および Shared/Customer-managed CA モード (GA)](2026/2026-04-16-memorystore-valkey-migration-ca-modes.md)
+- [2026-04-16 - Gemini Cloud Assist: geminicloudassist API の自動有効化によるチャットユーザーのシームレス移行](2026/2026-04-16-gemini-cloud-assist-api-auto-enabled.md)
+- [2026-04-16 - BigQuery: Conversational Analytics の Lakehouse テーブル対応と Colab Data Apps の登場](2026/2026-04-16-bigquery-conversational-analytics-colab-data-apps.md)
+- [2026-04-16 - Compute Engine: インスタントスナップショット整合性グループ GA / Spot VM プリエンプション通知拡張 / CMEK ローテーション GA](2026/2026-04-16-compute-engine-instant-snapshots-cmek-spot.md)
 - [2026-04-15 - Cloud Run: リモート MCP サーバーが GA (一般提供) に昇格](2026/2026-04-15-cloud-run-mcp-server-ga.md)
 - [2026-04-15 - Compute Engine: MIG ワークロードポリシーの GA およびインスタンストポロジー表示機能](2026/2026-04-15-compute-engine-workload-policies-ga.md)
 - [2026-04-15 - BigQuery: マテリアライズドビューのリフレッシュにおけるきめ細かいアクセス制御のセキュリティ修正](2026/2026-04-15-bigquery-materialized-view-security-fix.md)
