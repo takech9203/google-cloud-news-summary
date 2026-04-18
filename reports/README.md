@@ -5,8 +5,18 @@
 
 ## 2026 年
 
+- [2026-04-18 - Cloud SQL for PostgreSQL / SQL Server: Knowledge Catalog 自動統合によるデータディスカバリー](2026/2026-04-18-cloud-sql-knowledge-catalog-integration.md)
+- [2026-04-17 - Cloud SQL for SQL Server: Vertex AI 統合によるベクトルエンベディング生成 (Preview)](2026/2026-04-17-cloud-sql-sqlserver-vertex-ai-integration.md)
+- [2026-04-17 - Dataplex (Knowledge Catalog): データ品質ルールの再利用性 & ディスカバリーエージェント](2026/2026-04-17-dataplex-data-quality-rules-discovery-agent.md)
+- [2026-04-17 - Memorystore for Valkey: Basic Token-Based Authentication](2026/2026-04-17-memorystore-valkey-token-authentication.md)
+- [2026-04-17 - Spanner: Repeatable Read Isolation & Columnar Engine GA](2026/2026-04-17-spanner-repeatable-read-columnar-engine-ga.md)
+- [2026-04-17 - Generative AI on Vertex AI: RAG Cross Corpus Retrieval](2026/2026-04-17-vertex-ai-rag-cross-corpus-retrieval.md)
 - [2026-04-17 - NetApp Volumes: Flex Unified サービスレベル / ONTAP-mode / 大容量ボリュームが GA](2026/2026-04-17-netapp-volumes-flex-unified-ga.md)
+- [2026-04-17 - BigQuery: フォルダによるコードアセット整理機能が GA](2026/2026-04-17-bigquery-folders-code-assets-ga.md)
 - [2026-04-17 - Service Extensions: Secure Web Proxy 向け Authorization Extensions が Preview 提供開始](2026/2026-04-17-service-extensions-swp-authorization.md)
+- [2026-04-17 - AlloyDB for PostgreSQL: Elasticsearch 外部検索統合と AI 関数の拡充](2026/2026-04-17-alloydb-elasticsearch-ai-functions.md)
+- [2026-04-17 - Google Cloud MCP サーバー: 4 サービスで一斉にリモート MCP サーバーを提供開始](2026/2026-04-17-google-cloud-mcp-servers-april.md)
+- [2026-04-17 - Security Command Center: Application Design Center 連携によるプロアクティブセキュリティ評価](2026/2026-04-17-scc-application-design-center.md)
 - [2026-04-16 - BigQuery: AI.KEY_DRIVERS 関数によるキードライバー分析 (統計的に有意なデータセグメントの特定)](2026/2026-04-16-bigquery-ai-key-drivers.md)
 - [2026-04-16 - Security Command Center: AI Protection がエージェントワークロードに対応 (Preview)](2026/2026-04-16-security-command-center-ai-protection-agents.md)
 - [2026-04-16 - Secret Manager: Kubernetes Secrets への統合シークレット同期機能が GA](2026/2026-04-16-secret-manager-secret-sync-gke-ga.md)
@@ -18,6 +28,8 @@
 - [2026-04-16 - Datastream: AlloyDB for PostgreSQL の概要ページからの自動フローによるストリーム作成](2026/2026-04-16-datastream-alloydb-automated-flow.md)
 - [2026-04-16 - Cloud Run: カスタムスケーリングコントロール (CPU / 同時実行数ターゲット指定) が Preview](2026/2026-04-16-cloud-run-custom-scaling-controls.md)
 - [2026-04-16 - Memorystore for Valkey: セルフマネージド Redis/Valkey マイグレーション (Preview) および Shared/Customer-managed CA モード (GA)](2026/2026-04-16-memorystore-valkey-migration-ca-modes.md)
+- [2026-04-16 - Agent Assist (Contact Center AI): Salesforce UI モジュール統合の拡充](2026/2026-04-16-agent-assist-salesforce-integrations.md)
+- [2026-04-16 - Dataplex (Knowledge Catalog): 非構造化データ向け Data Insights](2026/2026-04-16-dataplex-data-insights-unstructured-data.md)
 - [2026-04-16 - Gemini Cloud Assist: geminicloudassist API の自動有効化によるチャットユーザーのシームレス移行](2026/2026-04-16-gemini-cloud-assist-api-auto-enabled.md)
 - [2026-04-16 - BigQuery: Conversational Analytics の Lakehouse テーブル対応と Colab Data Apps の登場](2026/2026-04-16-bigquery-conversational-analytics-colab-data-apps.md)
 - [2026-04-16 - Compute Engine: インスタントスナップショット整合性グループ GA / Spot VM プリエンプション通知拡張 / CMEK ローテーション GA](2026/2026-04-16-compute-engine-instant-snapshots-cmek-spot.md)
