@@ -8,6 +8,7 @@
 - [2026-04-18 - Cloud SQL for PostgreSQL / SQL Server: Knowledge Catalog 自動統合によるデータディスカバリー](2026/2026-04-18-cloud-sql-knowledge-catalog-integration.md)
 - [2026-04-17 - Cloud SQL for SQL Server: Vertex AI 統合によるベクトルエンベディング生成 (Preview)](2026/2026-04-17-cloud-sql-sqlserver-vertex-ai-integration.md)
 - [2026-04-17 - Dataplex (Knowledge Catalog): データ品質ルールの再利用性 & ディスカバリーエージェント](2026/2026-04-17-dataplex-data-quality-rules-discovery-agent.md)
+- [2026-04-17 - Compute Engine: Hyperdisk Balanced High Availability ディスクのゾーンディスクからのクローン作成 (GA)](2026/2026-04-17-compute-engine-hyperdisk-balanced-ha-clone-ga.md)
 - [2026-04-17 - Memorystore for Valkey: Basic Token-Based Authentication](2026/2026-04-17-memorystore-valkey-token-authentication.md)
 - [2026-04-17 - Spanner: Repeatable Read Isolation & Columnar Engine GA](2026/2026-04-17-spanner-repeatable-read-columnar-engine-ga.md)
 - [2026-04-17 - Generative AI on Vertex AI: RAG Cross Corpus Retrieval](2026/2026-04-17-vertex-ai-rag-cross-corpus-retrieval.md)
