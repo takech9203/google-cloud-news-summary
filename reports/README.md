@@ -5,15 +5,21 @@
 
 ## 2026 年
 
+- [2026-04-24 - Database Center: API / MCP / Fleet Insights ほか 7 機能の大型アップデート](2026/2026-04-24-database-center-api-mcp-fleet-insights.md)
+- [2026-04-23 - Google Distributed Cloud (software only): バージョン 1.32.1100-gke.84 リリース (VMware / bare metal)](2026/2026-04-23-google-distributed-cloud-1-32-1100.md)
+- [2026-04-23 - Bigtable: GoogleSQL ウィンドウ関数の一般提供 (GA)](2026/2026-04-23-bigtable-window-functions-ga.md)
+- [2026-04-23 - BigQuery: Simba JDBC ドライバー v1.7.0 アップデート](2026/2026-04-23-bigquery-simba-jdbc-driver-update.md)
 - [2026-04-22 - Cloud Composer (Managed Airflow): Gemini Cloud Assist Investigations による Airflow トラブルシューティング](2026/2026-04-22-cloud-composer-gemini-investigations.md)
 - [2026-04-22 - Agent Registry: エージェントと MCP サーバーの一元カタログが Preview で登場](2026/2026-04-22-agent-registry-preview.md)
 - [2026-04-22 - Identity and Access Management (IAM): Agent Identity Auth Manager (Preview) & Agent Identity GA](2026/2026-04-22-iam-agent-identity-auth-manager.md)
 - [2026-04-22 - Cloud Logging: MCP サーバーが一般提供 (GA) に昇格](2026/2026-04-22-cloud-logging-mcp-server.md)
 - [2026-04-22 - Google Distributed Cloud (software only): バージョン 1.33.700 リリース (VMware / ベアメタル)](2026/2026-04-22-google-distributed-cloud-1-33-700.md)
+- [2026-04-22 - Google Cloud: 主要プロダクトのリブランディング (5 製品一斉名称変更)](2026/2026-04-22-google-cloud-product-rebranding.md)
 - [2026-04-22 - VPC Service Controls: App Topology および Agent Registry の Preview サポート](2026/2026-04-22-vpc-service-controls-app-topology-agent-registry.md)
 - [2026-04-22 - Google SecOps: レガシー SIEM インフラストラクチャの廃止予告と Marketplace 統合アップデート](2026/2026-04-22-google-secops-updates.md)
 - [2026-04-22 - Google Kubernetes Engine: クラスタバージョン更新 (2026-R16)](2026/2026-04-22-gke-version-updates-2026-r16.md)
 - [2026-04-22 - Bigtable: Editions (Enterprise / Enterprise Plus) が一般提供開始](2026/2026-04-22-bigtable-editions.md)
+- [2026-04-22 - Compute Engine: G4 マシンシリーズ Fractional GPU (vGPU) サポートが GA](2026/2026-04-22-compute-engine-g4-fractional-gpus-ga.md)
 - [2026-04-22 - Application Design Center: 新規 GA/Preview コンポーネント、リージョン拡大、コンポジットテンプレート](2026/2026-04-22-application-design-center-components-regions.md)
 - [2026-04-22 - Cloud Hub: Gemini Cloud Assist によるコスト最適化機能強化と App Topology (Preview)](2026/2026-04-22-cloud-hub-cost-optimization-app-topology.md)
 - [2026-04-22 - Cloud Monitoring: Application Monitoring for AI Agent Observability](2026/2026-04-22-cloud-monitoring-ai-agent-observability.md)
