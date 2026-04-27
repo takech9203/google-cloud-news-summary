@@ -5,7 +5,11 @@
 
 ## 2026 年
 
+- [2026-04-27 - Cloud Trace: Cloud Observability (Monitoring, Logging, Trace) SLA の適用対象に](2026/2026-04-27-cloud-trace-sla-coverage.md)
+- [2026-04-27 - Apigee hybrid v1.14.4: サイドカー認証による非 GKE プラットフォーム向け Workload Identity Federation 対応](2026/2026-04-27-apigee-hybrid-v1-14-4-wif-sidecar.md)
+- [2026-04-27 - Cloud Service Mesh: EnvoyFilter API の限定サポート開始 (TRAFFIC_DIRECTOR 実装、Regular チャネル)](2026/2026-04-27-cloud-service-mesh-envoyfilter-support.md)
 - [2026-04-24 - Database Center: API / MCP / Fleet Insights ほか 7 機能の大型アップデート](2026/2026-04-24-database-center-api-mcp-fleet-insights.md)
+- [2026-04-24 - Google Cloud: 2026 年 4 月 主要プロダクト リブランディング](2026/2026-04-24-google-cloud-product-rebranding-april-2026.md)
 - [2026-04-23 - Google Distributed Cloud (software only): バージョン 1.32.1100-gke.84 リリース (VMware / bare metal)](2026/2026-04-23-google-distributed-cloud-1-32-1100.md)
 - [2026-04-23 - Bigtable: GoogleSQL ウィンドウ関数の一般提供 (GA)](2026/2026-04-23-bigtable-window-functions-ga.md)
 - [2026-04-23 - BigQuery: Simba JDBC ドライバー v1.7.0 アップデート](2026/2026-04-23-bigquery-simba-jdbc-driver-update.md)
