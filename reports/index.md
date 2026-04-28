@@ -5,7 +5,14 @@
 
 ## 2026 年
 
+- [2026-04-28 - Cloud Asset Inventory: 新しいリソースタイプの追加 (App Lifecycle Manager, Backup and DR, Parallelstore, Vertex AI)](2026/2026-04-28-cloud-asset-inventory-new-resource-types.md)
+- [2026-04-28 - Gemini Enterprise: カスタム MCP サーバーデータストア (Preview)](2026/2026-04-28-gemini-enterprise-custom-mcp-server.md)
 - [2026-04-27 - Cloud Trace: Cloud Observability (Monitoring, Logging, Trace) SLA の適用対象に](2026/2026-04-27-cloud-trace-sla-coverage.md)
+- [2026-04-27 - Cloud Storage / Compute Engine / GKE: AI zones サポート](2026/2026-04-27-ai-zones-support.md)
+- [2026-04-27 - Google Cloud CCaaS: 次期バージョンプレリリースノート -- HubSpot カスタムフィールドマッピング、ブレークスルー改善、通話スケジューリング強化](2026/2026-04-27-ccaas-prerelease-features.md)
+- [2026-04-27 - Cloud Workstations: ベースイメージに running_timeout 到達前の通知機能を追加](2026/2026-04-27-cloud-workstations-timeout-notification.md)
+- [2026-04-27 - Cloud Load Balancing: Application Load Balancer の新しい URL マップ構成サイズクォータシステム](2026/2026-04-27-cloud-load-balancing-url-map-quota.md)
+- [2026-04-27 - API Gateway: パステンプレートの構文バリデーション強化](2026/2026-04-27-api-gateway-path-validation.md)
 - [2026-04-27 - Apigee hybrid v1.14.4: サイドカー認証による非 GKE プラットフォーム向け Workload Identity Federation 対応](2026/2026-04-27-apigee-hybrid-v1-14-4-wif-sidecar.md)
 - [2026-04-27 - Cloud Service Mesh: EnvoyFilter API の限定サポート開始 (TRAFFIC_DIRECTOR 実装、Regular チャネル)](2026/2026-04-27-cloud-service-mesh-envoyfilter-support.md)
 - [2026-04-24 - Database Center: API / MCP / Fleet Insights ほか 7 機能の大型アップデート](2026/2026-04-24-database-center-api-mcp-fleet-insights.md)
