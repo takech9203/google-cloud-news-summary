@@ -5,8 +5,17 @@
 
 ## 2026 年
 
+- [2026-04-29 - Compute Engine: オートスケーリングイベントのモニタリング機能](2026/2026-04-29-compute-engine-autoscaling-events.md)
+- [2026-04-29 - Google SecOps Marketplace: 複数インテグレーションアップデート](2026/2026-04-29-secops-marketplace-integration-updates.md)
+- [2026-04-29 - BigQuery: ベクトルインデックスの機能強化 (ドリフト統計 / パーティション対応)](2026/2026-04-29-bigquery-vector-index-enhancements.md)
+- [2026-04-29 - Google Kubernetes Engine (GKE): Cloud Storage FUSE CSI ドライバーのマウント遅延バグ修正](2026/2026-04-29-gke-cloud-storage-fuse-csi-fix.md)
+- [2026-04-29 - Dataform: Strict Act-As モードのグローバル強制適用とカスタム組織ポリシー制約の GA](2026/2026-04-29-dataform-strict-act-as-org-policy.md)
 - [2026-04-28 - Cloud Asset Inventory: 新しいリソースタイプの追加 (App Lifecycle Manager, Backup and DR, Parallelstore, Vertex AI)](2026/2026-04-28-cloud-asset-inventory-new-resource-types.md)
+- [2026-04-28 - BigQuery: マテリアライズドビューが CDC 対応テーブルをサポート (GA)](2026/2026-04-28-bigquery-materialized-views-cdc.md)
+- [2026-04-28 - Gemini Enterprise Agent Platform: Live API 多言語トランスクリプション改善 & 非同期ファンクションコーリング](2026/2026-04-28-gemini-live-api-transcription-async.md)
 - [2026-04-28 - Gemini Enterprise: カスタム MCP サーバーデータストア (Preview)](2026/2026-04-28-gemini-enterprise-custom-mcp-server.md)
+- [2026-04-28 - AlloyDB for PostgreSQL: クラスター作成時のロックされた postgres ロール動作変更](2026/2026-04-28-alloydb-locked-postgres-role.md)
+- [2026-04-28 - Managed Service for Apache Spark: ブランド統合の正式発表](2026/2026-04-28-managed-service-apache-spark-branding.md)
 - [2026-04-27 - Cloud Trace: Cloud Observability (Monitoring, Logging, Trace) SLA の適用対象に](2026/2026-04-27-cloud-trace-sla-coverage.md)
 - [2026-04-27 - Cloud Storage / Compute Engine / GKE: AI zones サポート](2026/2026-04-27-ai-zones-support.md)
 - [2026-04-27 - Google Cloud CCaaS: 次期バージョンプレリリースノート -- HubSpot カスタムフィールドマッピング、ブレークスルー改善、通話スケジューリング強化](2026/2026-04-27-ccaas-prerelease-features.md)
