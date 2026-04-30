@@ -5,10 +5,16 @@
 
 ## 2026 年
 
+- [2026-04-30 - Google SecOps: VPC Service Controls 一般提供開始 (GA)](2026/2026-04-30-secops-vpc-service-controls-ga.md)
+- [2026-04-30 - SAP on Google Cloud: BigQuery Connector for SAP バージョン 2.13](2026/2026-04-30-bigquery-connector-sap-v2-13.md)
+- [2026-04-30 - Resource Manager: Remote MCP Server GA](2026/2026-04-30-resource-manager-remote-mcp-server-ga.md)
 - [2026-04-29 - Compute Engine: オートスケーリングイベントのモニタリング機能](2026/2026-04-29-compute-engine-autoscaling-events.md)
 - [2026-04-29 - Google SecOps Marketplace: 複数インテグレーションアップデート](2026/2026-04-29-secops-marketplace-integration-updates.md)
+- [2026-04-29 - Apigee X: メンテナンスアップデート (バージョン 1-17-0-apigee-4)](2026/2026-04-29-apigee-x-maintenance-1-17-0-4.md)
 - [2026-04-29 - BigQuery: ベクトルインデックスの機能強化 (ドリフト統計 / パーティション対応)](2026/2026-04-29-bigquery-vector-index-enhancements.md)
+- [2026-04-29 - Google Kubernetes Engine (GKE): Version Updates 2026-R17](2026/2026-04-29-gke-version-updates-2026-r17.md)
 - [2026-04-29 - Google Kubernetes Engine (GKE): Cloud Storage FUSE CSI ドライバーのマウント遅延バグ修正](2026/2026-04-29-gke-cloud-storage-fuse-csi-fix.md)
+- [2026-04-29 - Confidential Space: H100 GPU (a3-highgpu-1g) サポート GA](2026/2026-04-29-confidential-space-h100-gpu-ga.md)
 - [2026-04-29 - Dataform: Strict Act-As モードのグローバル強制適用とカスタム組織ポリシー制約の GA](2026/2026-04-29-dataform-strict-act-as-org-policy.md)
 - [2026-04-28 - Cloud Asset Inventory: 新しいリソースタイプの追加 (App Lifecycle Manager, Backup and DR, Parallelstore, Vertex AI)](2026/2026-04-28-cloud-asset-inventory-new-resource-types.md)
 - [2026-04-28 - BigQuery: マテリアライズドビューが CDC 対応テーブルをサポート (GA)](2026/2026-04-28-bigquery-materialized-views-cdc.md)
