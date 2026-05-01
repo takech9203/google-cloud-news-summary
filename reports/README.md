@@ -6,7 +6,17 @@
 ## 2026 年
 
 - [2026-04-30 - Google SecOps: VPC Service Controls 一般提供開始 (GA)](2026/2026-04-30-secops-vpc-service-controls-ga.md)
+- [2026-04-30 - Gemini Enterprise: Gemini 3.1 Pro および 3 Flash が Limited Availability で利用可能に](2026/2026-04-30-gemini-enterprise-3-1-pro-flash.md)
+- [2026-04-30 - Bigtable: Bigtable Agent Skills for AI Agents](2026/2026-04-30-bigtable-agent-skills.md)
 - [2026-04-30 - SAP on Google Cloud: BigQuery Connector for SAP バージョン 2.13](2026/2026-04-30-bigquery-connector-sap-v2-13.md)
+- [2026-04-30 - Cloud Load Balancing: リージョナルロードバランサー向けバックエンド Cloud Storage バケット](2026/2026-04-30-cloud-load-balancing-regional-storage-buckets.md)
+- [2026-04-30 - BigQuery: Data Transfer Service - Google Ads MFA 必須化](2026/2026-04-30-bigquery-data-transfer-google-ads-mfa.md)
+- [2026-04-30 - Cloud SQL for MySQL / Cloud SQL for PostgreSQL: ニアゼロダウンタイム計画オペレーション - 対象インスタンスの拡大](2026/2026-04-30-cloud-sql-near-zero-downtime-enhancements.md)
+- [2026-04-30 - Cloud SQL for SQL Server: ブロッキングクエリの表示と終了 (Preview)](2026/2026-04-30-cloud-sql-sql-server-blocking-queries.md)
+- [2026-04-30 - Cortex Framework: Release 7](2026/2026-04-30-cortex-framework-release-7.md)
+- [2026-04-30 - Cloud CDN: GKE Gateway Cloud CDN サポート (GA)](2026/2026-04-30-cloud-cdn-gke-gateway-ga.md)
+- [2026-04-30 - VPC Service Controls: Ingress/Egress ルールにおける IAM ロールサポートの一般提供開始](2026/2026-04-30-vpc-service-controls-iam-roles-ga.md)
+- [2026-04-30 - Cloud Database Migration Service: PostgreSQL 18 サポート (異種データベース移行)](2026/2026-04-30-database-migration-service-postgresql-18.md)
 - [2026-04-30 - Resource Manager: Remote MCP Server GA](2026/2026-04-30-resource-manager-remote-mcp-server-ga.md)
 - [2026-04-29 - Compute Engine: オートスケーリングイベントのモニタリング機能](2026/2026-04-29-compute-engine-autoscaling-events.md)
 - [2026-04-29 - Google SecOps Marketplace: 複数インテグレーションアップデート](2026/2026-04-29-secops-marketplace-integration-updates.md)

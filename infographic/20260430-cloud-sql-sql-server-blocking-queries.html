@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud SQL for SQL Server: ブロッキングクエリの表示と終了 (Preview)</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 12px 0;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--gc-outline);
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge-service { background: var(--gc-blue-600); }
+    .badge-preview { background: var(--gc-orange); }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-red { border-left-color: var(--gc-red); }
+    .card-green { border-left-color: var(--gc-green); }
+    .card-yellow { border-left-color: var(--gc-yellow); }
+    .card-purple { border-left-color: var(--gc-purple); }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h4, .after-box h4 {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .before-box h4 { color: var(--gc-red); }
+    .after-box h4 { color: var(--gc-green); }
+
+    .before-box ul, .after-box ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li { margin-bottom: 6px; }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+
+    .feature-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .feature-card h4 {
+      margin: 0 0 8px 0;
+      font-size: 16px;
+      color: var(--gc-on-surface);
+    }
+
+    .feature-card p, .feature-card ul {
+      margin: 0;
+      font-size: 14px;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .feature-card ul {
+      padding-left: 20px;
+    }
+
+    .feature-card li { margin-bottom: 4px; }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 13px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 13px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      margin: 0 0 8px 0;
+      color: var(--gc-blue-900);
+      font-size: 16px;
+    }
+
+    .usecase-card p {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      background: #1E1E1E;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre:not(.mermaid) code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .steps-list {
+      counter-reset: step-counter;
+      list-style: none;
+      padding: 0;
+    }
+
+    .steps-list li {
+      counter-increment: step-counter;
+      position: relative;
+      padding-left: 44px;
+      margin-bottom: 12px;
+      font-size: 14px;
+    }
+
+    .steps-list li::before {
+      content: counter(step-counter);
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 28px;
+      height: 28px;
+      background: var(--gc-blue-600);
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      font-size: 14px;
+    }
+
+    .merit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .merit-card {
+      background: var(--gc-green-tint);
+      border-radius: 12px;
+      padding: 16px;
+      border: 1px solid rgba(52, 168, 83, 0.3);
+    }
+
+    .merit-card h4 {
+      margin: 0 0 8px 0;
+      color: var(--gc-green);
+      font-size: 14px;
+    }
+
+    .merit-card p {
+      margin: 0;
+      font-size: 13px;
+    }
+
+    .limitation-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      font-size: 14px;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+      font-size: 14px;
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    footer {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    footer a:hover { text-decoration: underline; }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; }
+      .subtitle { text-align: left; margin-top: 8px; }
+      .before-after { grid-template-columns: 1fr; }
+      .merit-grid { grid-template-columns: 1fr; }
+      .stat-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>🗄️ Cloud SQL for SQL Server: ブロッキングクエリの表示と終了</h1>
+        <div>
+          <span class="badge badge-service">Cloud SQL for SQL Server</span>
+          <span class="badge badge-preview">Preview</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-04-30</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>Cloud SQL for SQL Server に、<span class="highlight">ブロッキングクエリを可視化し終了させる</span>オプション機能が Preview として追加されました。特定のアクティブクエリがブロックされたり、予想以上に長時間実行されている場合、そのクエリが他の依存クエリをブロックする連鎖的な問題を引き起こすことがあります。</p>
+      <p>本機能により、データベース管理者はこれらの問題を迅速に特定し、解決することが可能になります。Cloud SQL <span class="highlight">Enterprise Plus エディション</span>の Query Insights ダッシュボード内で提供され、ブロッキング関係をツリー構造で<span class="highlight">最大 3 階層</span>まで可視化できます。</p>
+
+      <div class="note-box">
+        <strong>💡 対象ユーザー:</strong> SQL Server データベースのパフォーマンス管理を担当する DBA やインフラストラクチャエンジニア、およびアプリケーションのレイテンシ問題を調査する開発者
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-value">3 階層</div>
+        <div class="stat-label">ブロッキングツリー可視化深度</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">60 秒</div>
+        <div class="stat-label">ダッシュボード自動更新間隔</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">1 クリック</div>
+        <div class="stat-label">セッション終了操作</div>
+      </div>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>🔄 Before / After</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h4>❌ Before (従来)</h4>
+          <ul>
+            <li>sys.dm_exec_requests 等の DMV を直接クエリする専門知識が必要</li>
+            <li>ブロッキングチェーンの可視化が困難で関係性の把握に時間がかかった</li>
+            <li>KILL コマンドを手動実行する必要があり、コンソールから操作不可</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h4>✅ After (本機能)</h4>
+          <ul>
+            <li>Query Insights ダッシュボードから直感的にブロッキング状態を確認可能</li>
+            <li>ツリー構造で最大 3 階層まで依存関係を即座に把握</li>
+            <li>コンソール上のワンクリック操作でセッション終了が可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>Cloud SQL for SQL Server のブロッキングクエリ検出から終了までのフローを示しています。Query Insights ダッシュボードがブロッキング状態を検知し、管理者がツリー構造で依存関係を確認した上でセッション終了を実行できます。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    A[アクティブクエリ実行] --> B{ブロッキング発生?}
+    B -->|No| C[正常完了]
+    B -->|Yes| D[Query Insights ダッシュボード]
+    D --> E[Active queries タブ]
+    E --> F[Longest running transactions セクション]
+    F --> G[ブロッキングツリー表示 最大3階層]
+    G --> H{対応判断}
+    H -->|セッション終了| I[Terminate session]
+    I --> J[ブロック解除]
+    J --> K[依存クエリ再開]
+    H -->|調査継続| L[待機イベント/リソース分析]
+    L --> M[根本原因特定]
+
+    style D fill:#4285F4,color:#fff
+    style I fill:#EA4335,color:#fff
+    style K fill:#34A853,color:#fff
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <h4>🔍 ブロッキングクエリの可視化</h4>
+          <ul>
+            <li>Active queries タブの Longest running transactions セクションで確認可能</li>
+            <li>⏳ 砂時計アイコン: 他のクエリの完了を待機中 (数字付きは依存クエリ数を表示)</li>
+            <li>🚫 ブロックアイコン: クエリが完了できず他のクエリをブロック中</li>
+            <li>セッション ID を展開して最大 3 階層のブロッキングツリーを調査可能</li>
+          </ul>
+        </div>
+        <div class="feature-card" style="border-left-color: var(--gc-red);">
+          <h4>🛑 セッション終了機能</h4>
+          <ul>
+            <li>コンソールから「Terminate session」をクリックして終了可能</li>
+            <li>確認ダイアログで意図しない終了を防止</li>
+            <li>終了後は Cloud SQL Studio で依存クエリを再実行可能</li>
+          </ul>
+        </div>
+        <div class="feature-card" style="border-left-color: var(--gc-purple);">
+          <h4>💤 スリープ状態セッションの詳細確認</h4>
+          <ul>
+            <li>Active queries タブに表示されないスリープ状態のセッションも調査可能</li>
+            <li>SQL スクリプトで最後に実行されたコマンドを確認</li>
+            <li>sys.dm_exec_connections と sys.dm_exec_sessions を結合して詳細情報を取得</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>📊 技術仕様</h2>
+      <h3>アクティブクエリの詳細情報</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>説明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Session ID</td><td>クエリのセッション識別子</td></tr>
+          <tr><td>Query</td><td>SQL クエリテキスト</td></tr>
+          <tr><td>State of session</td><td>セッションの状態</td></tr>
+          <tr><td>Query duration (seconds)</td><td>クエリの実行時間 (秒)</td></tr>
+          <tr><td>CPU time (ms)</td><td>リクエストが使用した CPU 時間 (ミリ秒)</td></tr>
+          <tr><td>Wait event type</td><td>ブロック時の待機イベントタイプ</td></tr>
+          <tr><td>Wait resource</td><td>ブロック時に待機中のリソース</td></tr>
+          <tr><td>Transaction wait duration (seconds)</td><td>ブロック時の待機時間 (秒)</td></tr>
+          <tr><td>Action</td><td>セッション終了などの操作</td></tr>
+        </tbody>
+      </table>
+
+      <h3>必要な IAM ロール</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>操作</th>
+            <th>必要なロール</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>インスタンスアクティビティの確認</td><td><code>Cloud SQL Viewer</code> (roles/cloudsql.viewer)</td></tr>
+          <tr><td>データベースアクティビティ・長時間トランザクションの確認</td><td><code>Database Insights Viewer</code> (roles/databaseinsights.viewer)</td></tr>
+          <tr><td>セッション終了</td><td><code>Cloud SQL Editor</code> (roles/cloudsql.editor) + <code>Database Insights Operations Admin</code> (roles/databaseinsights.operationsAdmin)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>スリープ状態セッションの調査スクリプト</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">スリープ状態セッションの最終実行コマンド確認</span>
+        </div>
+        <pre><code class="language-sql">SELECT c.session_id, st.text, s.login_name,
+       s.open_transaction_count, s.host_name, s.program_name
+FROM sys.dm_exec_connections AS c
+JOIN sys.dm_exec_sessions AS s ON c.session_id = s.session_id
+CROSS APPLY sys.dm_exec_sql_text(c.most_recent_sql_handle) AS st
+WHERE s.session_id = BLOCKING_SESSION_ID</code></pre>
+      </div>
+    </div>
+
+    <!-- Setup Steps -->
+    <div class="section">
+      <h2>🔧 設定方法</h2>
+
+      <h3>前提条件</h3>
+      <div class="check-item">✅ Cloud SQL Enterprise Plus エディションのインスタンスを使用していること</div>
+      <div class="check-item">✅ Query Insights が有効化されていること</div>
+      <div class="check-item">✅ セッション終了には Cloud SQL Editor + Database Insights Operations Admin ロールが付与されていること</div>
+
+      <h3>ステップ 1: ブロッキングクエリ分析の有効化</h3>
+      <ol class="steps-list">
+        <li>Google Cloud コンソールで Cloud SQL Instances ページに移動</li>
+        <li>対象インスタンス名をクリックして Overview ページを開く</li>
+        <li>「Edit」をクリック</li>
+        <li>「Query insights」セクションを展開</li>
+        <li>「Enable Query insights」と「Enable Enterprise Plus features」の両方を選択</li>
+        <li>「Blocked query analysis」を選択</li>
+        <li>「Save」をクリック</li>
+      </ol>
+
+      <h3>ステップ 2: ブロッキングクエリの特定と終了</h3>
+      <ol class="steps-list">
+        <li>Cloud SQL Instances ページでインスタンスを選択</li>
+        <li>SQL ナビゲーションメニューから「Query insights」をクリック</li>
+        <li>「Active queries」タブをクリック</li>
+        <li>「Longest running transactions」セクションでブロッキング状態のクエリを確認</li>
+        <li>セッション ID を展開してブロッキングツリーを調査 (最大 3 階層)</li>
+        <li>問題のクエリを特定したら「Terminate session」をクリック</li>
+        <li>確認ダイアログで「Confirm」をクリック</li>
+      </ol>
+    </div>
+
+    <!-- Merits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div class="merit-grid">
+        <div class="merit-card">
+          <h4>📉 ダウンタイムの削減</h4>
+          <p>ブロッキング問題を迅速に特定・解決し、アプリケーションの応答時間悪化やサービス停止を最小限に抑制</p>
+        </div>
+        <div class="merit-card">
+          <h4>⚙️ 運用効率の向上</h4>
+          <p>コンソールから直感的に操作でき、専門的な SQL 知識がなくてもブロッキング問題に対処可能</p>
+        </div>
+        <div class="merit-card">
+          <h4>👁️ 可視性の向上</h4>
+          <p>ブロッキングチェーンを最大 3 階層まで視覚的に把握し、根本原因の特定が容易に</p>
+        </div>
+        <div class="merit-card">
+          <h4>⚡ 迅速な問題解決</h4>
+          <p>KILL コマンドの手動実行が不要。コンソールからワンクリックでセッション終了可能</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <div class="warning-box">
+        <strong>制限事項</strong>
+        <div class="limitation-item">❌ Cloud SQL Enterprise Plus エディションのインスタンスでのみ利用可能 (Enterprise エディションではセッション終了不可)</div>
+        <div class="limitation-item">❌ Preview ステータスのため、本番環境での利用にはサポート制限がある可能性</div>
+        <div class="limitation-item">❌ スリープ状態のセッションは Active queries タブに表示されない (別途 SQL スクリプトでの確認が必要)</div>
+        <div class="limitation-item">❌ 長時間実行中の操作はセッション終了に時間がかかる場合あり</div>
+      </div>
+
+      <div class="error-box">
+        <strong>考慮すべき点</strong>
+        <div class="limitation-item">⚠️ セッションの終了はトランザクションのロールバックを引き起こし、実行中のデータ変更が破棄される可能性</div>
+        <div class="limitation-item">⚠️ セッション終了には Cloud SQL Editor + Database Insights Operations Admin の両方のロールが必要</div>
+        <div class="limitation-item">⚠️ ブロッキングの根本原因 (未コミットトランザクション、ロック競合など) は別途調査・解決が必要</div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💼 ユースケース</h2>
+      <div class="usecase-card">
+        <h4>🚨 ユースケース 1: 本番環境でのデッドロック的状況の解消</h4>
+        <p><strong>シナリオ:</strong> 本番環境で複数のバッチ処理が同時に実行され、あるトランザクションが長時間ロックを保持したまま他のトランザクションをブロック。アプリケーションのタイムアウトエラーが増加し、ユーザーからの問い合わせが発生。</p>
+        <div class="flow-diagram">
+          <div class="flow-step">🔍 Query Insights<br/>Active queries</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">🌲 ブロッキング<br/>ツリー確認</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">🛑 Terminate<br/>session</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">🔄 依存クエリ<br/>再実行</div>
+        </div>
+        <p><strong>効果:</strong> 従来は DBA が DMV を直接クエリしてブロッキングチェーンを手動で追跡する必要があったが、コンソールから数クリックで問題を解決でき、<span class="highlight">平均復旧時間 (MTTR) を大幅に短縮</span></p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>📊 ユースケース 2: 定期バッチ処理のパフォーマンス監視</h4>
+        <p><strong>シナリオ:</strong> 夜間バッチ処理中に特定のクエリが予想以上に長時間実行され、後続の処理がタイムアウトする問題が繰り返し発生。</p>
+        <p><strong>効果:</strong> ブロッキングクエリ分析を有効化することで、問題発生時にどのクエリがボトルネックになっているかを即座に特定でき、インデックス追加やクエリ最適化など恒久的な対策に繋げられる。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <div class="note-box">
+        <p>ブロッキングクエリの表示・終了機能自体に<strong>追加料金は発生しません</strong>。ただし、Cloud SQL <strong>Enterprise Plus エディション</strong>のインスタンスが前提条件となります。Enterprise Plus エディションの料金については Cloud SQL の料金ページを参照してください。</p>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <h4>📈 Query Insights</h4>
+          <p>クエリパフォーマンスの診断・分析ツール。ブロッキングクエリ分析はこの機能の拡張として提供。</p>
+        </div>
+        <div class="feature-card" style="border-left-color: var(--gc-yellow);">
+          <h4>🏢 Cloud SQL Enterprise Plus エディション</h4>
+          <p>高度なパフォーマンス、可用性、可観測性を提供するエディション。本機能の利用に必須。</p>
+        </div>
+        <div class="feature-card" style="border-left-color: var(--gc-purple);">
+          <h4>🤖 Database Insights MCP Server</h4>
+          <p>AI を活用したパフォーマンス分析が可能な MCP サーバー (GA)。</p>
+        </div>
+        <div class="feature-card" style="border-left-color: var(--gc-green);">
+          <h4>🖥️ Cloud SQL Studio</h4>
+          <p>SQL クエリの実行環境。セッション終了後のクエリ再実行に使用。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <p>Cloud SQL for SQL Server のブロッキングクエリの表示・終了機能は、データベースのパフォーマンス問題を迅速に特定・解決するための重要なツールです。Enterprise Plus エディションの Query Insights と統合されており、ブロッキング関係をツリー構造で視覚的に把握し、コンソールから直接セッションを終了できるため、DBA の運用負荷を大幅に軽減します。</p>
+      <div class="note-box">
+        <strong>💡 推奨:</strong> 現在 Preview ステータスですが、本番環境でブロッキング問題に悩まされている場合は、Enterprise Plus エディションへのアップグレードとともに本機能の評価を推奨します。
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>タグ:</strong> Cloud SQL, SQL Server, ブロッキングクエリ, Preview, パフォーマンス管理</p>
+      <p>📎 出典:</p>
+      <ul style="list-style: none; padding: 0; margin: 4px 0;">
+        <li>- <a href="https://docs.cloud.google.com/release-notes#April_30_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li>- <a href="https://docs.cloud.google.com/sql/docs/sqlserver/monitor-active-queries" target="_blank" rel="noopener noreferrer">ドキュメント: Monitor active queries</a></li>
+        <li>- <a href="https://docs.cloud.google.com/sql/docs/sqlserver/editions-intro" target="_blank" rel="noopener noreferrer">Cloud SQL Enterprise Plus エディション概要</a></li>
+        <li>- <a href="https://cloud.google.com/sql/pricing" target="_blank" rel="noopener noreferrer">Cloud SQL 料金ページ</a></li>
+      </ul>
+    </footer>
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+    hljs.highlightAll();
+  </script>
+</body>
+</html>
