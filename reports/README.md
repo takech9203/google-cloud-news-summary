@@ -5,6 +5,10 @@
 
 ## 2026 年
 
+- [2026-05-02 - Google SecOps SOAR: Release 6.3.83 全リージョン展開完了](2026/2026-05-02-secops-soar-release-6-3-83.md)
+- [2026-05-01 - Cloud Trace (Google Cloud Observability): オブザーバビリティバケットの対応リージョン拡大](2026/2026-05-01-cloud-trace-observability-buckets-expansion.md)
+- [2026-05-01 - reCAPTCHA: Mobile SDK v18.9.0 for iOS](2026/2026-05-01-recaptcha-mobile-sdk-v18-9-0.md)
+- [2026-05-01 - Container-Optimized OS: 複数イメージのセキュリティ・安定性アップデート (2026年5月)](2026/2026-05-01-container-optimized-os-security-updates-may.md)
 - [2026-04-30 - Google SecOps: VPC Service Controls 一般提供開始 (GA)](2026/2026-04-30-secops-vpc-service-controls-ga.md)
 - [2026-04-30 - Gemini Enterprise: Gemini 3.1 Pro および 3 Flash が Limited Availability で利用可能に](2026/2026-04-30-gemini-enterprise-3-1-pro-flash.md)
 - [2026-04-30 - Bigtable: Bigtable Agent Skills for AI Agents](2026/2026-04-30-bigtable-agent-skills.md)
