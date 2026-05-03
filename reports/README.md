@@ -5,6 +5,7 @@
 
 ## 2026 年
 
+- [2026-05-03 - Google SecOps SOAR: MultiChoiceQuestion ステップの「応答時間超過」オプション強化](2026/2026-05-03-google-secops-multichoice-time-to-respond.md)
 - [2026-05-02 - Google SecOps SOAR: Release 6.3.83 全リージョン展開完了](2026/2026-05-02-secops-soar-release-6-3-83.md)
 - [2026-05-01 - Cloud Trace (Google Cloud Observability): オブザーバビリティバケットの対応リージョン拡大](2026/2026-05-01-cloud-trace-observability-buckets-expansion.md)
 - [2026-05-01 - reCAPTCHA: Mobile SDK v18.9.0 for iOS](2026/2026-05-01-recaptcha-mobile-sdk-v18-9-0.md)
