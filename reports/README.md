@@ -5,7 +5,14 @@
 
 ## 2026 年
 
+- [2026-05-04 - Google Cloud Contact Center as a Service (CCaaS): Version 4.26 Release](2026/2026-05-04-ccaas-4-26.md)
+- [2026-05-04 - Confidential Space: NVIDIA H100 GPU 既知の問題と回避策](2026/2026-05-04-confidential-space-h100-gpu-known-issue.md)
+- [2026-05-04 - Cloud SQL for SQL Server: PolyBase サポート (GA)](2026/2026-05-04-cloud-sql-sqlserver-polybase-ga.md)
+- [2026-05-04 - Network Security Integration: In-band Integration デプロイメントにおけるゾーンアフィニティの有効化](2026/2026-05-04-network-security-integration-zonal-affinity.md)
+- [2026-05-04 - Cloud NGFW: プロジェクト内での組織レベルリソース管理 (Public Preview)](2026/2026-05-04-cloud-ngfw-organization-level-resources.md)
 - [2026-05-03 - Google SecOps SOAR: MultiChoiceQuestion ステップの「応答時間超過」オプション強化](2026/2026-05-03-google-secops-multichoice-time-to-respond.md)
+- [2026-05-03 - Google SecOps SOAR: Release 6.3.84](2026/2026-05-03-secops-soar-release-6-3-84.md)
+- [2026-05-03 - Google Kubernetes Engine (GKE): Kubernetes 1.36 が Rapid チャネルで利用可能に](2026/2026-05-03-gke-kubernetes-1-36-rapid-channel.md)
 - [2026-05-02 - Google SecOps SOAR: Release 6.3.83 全リージョン展開完了](2026/2026-05-02-secops-soar-release-6-3-83.md)
 - [2026-05-01 - Cloud Trace (Google Cloud Observability): オブザーバビリティバケットの対応リージョン拡大](2026/2026-05-01-cloud-trace-observability-buckets-expansion.md)
 - [2026-05-01 - reCAPTCHA: Mobile SDK v18.9.0 for iOS](2026/2026-05-01-recaptcha-mobile-sdk-v18-9-0.md)
