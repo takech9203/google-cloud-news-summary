@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Memorystore for Valkey: 新しいノードタイプが GA</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; min-width: 280px; }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+      text-align: right;
+      white-space: nowrap;
+      padding-top: 8px;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge-service { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); }
+    .badge-db { background: #F4B400; }
+    .badge-cache { background: var(--gc-orange); }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green { border-left-color: var(--gc-green); }
+    .card-purple { border-left-color: var(--gc-purple); }
+    .card-yellow { border-left-color: var(--gc-yellow); }
+    .card-orange { border-left-color: var(--gc-orange); }
+    .card-teal { border-left-color: var(--gc-teal); }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow { color: var(--gc-blue-600); font-size: 20px; }
+
+    /* Before/After */
+    .before-after { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+    .before-box strong, .after-box strong { display: block; margin-bottom: 8px; font-size: 14px; }
+
+    /* Stat cards */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin: 16px 0;
+    }
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+    }
+    .stat-card.green { background: linear-gradient(135deg, var(--gc-green), #1B7A34); }
+    .stat-card.purple { background: linear-gradient(135deg, var(--gc-purple), #7B1FA2); }
+    .stat-card.teal { background: linear-gradient(135deg, var(--gc-teal), #00838F); }
+    .stat-card.orange { background: linear-gradient(135deg, var(--gc-orange), #E65100); }
+    .stat-value { font-size: 32px; font-weight: 700; margin-bottom: 4px; }
+    .stat-label { font-size: 13px; opacity: 0.9; }
+
+    /* Feature cards grid */
+    .feature-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+
+    /* Mermaid */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+    .mermaid { display: flex; justify-content: center; }
+
+    /* Code blocks */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+    .code-lang { color: #9CDCFE; font-weight: bold; }
+    .code-title { color: #AAAAAA; }
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      background: #1E1E1E;
+    }
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code { background: none; border: none; padding: 0; font-size: inherit; color: inherit; }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* Info boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Use case cards */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+    .usecase-card h3 { color: var(--gc-blue-800); margin-top: 0; }
+
+    /* Links */
+    .gc-link { color: var(--gc-blue-600); text-decoration: none; }
+    .gc-link:hover { color: var(--gc-blue-800); text-decoration: underline; }
+
+    /* Flow diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+    .flow-arrow { color: var(--gc-blue-600); font-size: 24px; font-weight: bold; }
+
+    /* Check items */
+    .check-item { display: flex; align-items: flex-start; gap: 8px; margin: 8px 0; }
+    .check-icon { color: var(--gc-green); font-size: 18px; flex-shrink: 0; }
+    .cross-icon { color: var(--gc-red); font-size: 18px; flex-shrink: 0; }
+
+    /* Region grid */
+    .region-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin: 16px 0; }
+    .region-item {
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 14px;
+    }
+    .region-item strong { color: var(--gc-blue-800); }
+
+    /* Related service grid */
+    .related-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 16px 0; }
+
+    /* Pricing note */
+    .pricing-note {
+      background: var(--gc-green-tint);
+      border: 1px solid var(--gc-green);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 14px;
+      margin-top: 12px;
+    }
+
+    /* Node type visual */
+    .node-tier {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+    .node-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+      border: 2px solid var(--gc-outline-variant);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+    .node-card .node-name {
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--gc-on-surface);
+      margin-bottom: 4px;
+    }
+    .node-card .node-spec {
+      font-size: 13px;
+      color: var(--gc-on-surface-variant);
+    }
+    .node-card .node-capacity {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--gc-blue-600);
+      margin: 8px 0 4px;
+    }
+    .node-card.tier-small { border-color: var(--gc-orange); }
+    .node-card.tier-small .node-capacity { color: var(--gc-orange); }
+    .node-card.tier-medium { border-color: var(--gc-blue-600); }
+    .node-card.tier-medium .node-capacity { color: var(--gc-blue-600); }
+    .node-card.tier-large { border-color: var(--gc-green); }
+    .node-card.tier-large .node-capacity { color: var(--gc-green); }
+    .tier-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 12px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      display: inline-block;
+    }
+    .tier-label.small { background: #FFF3E0; color: #E65100; }
+    .tier-label.medium { background: var(--gc-blue-50); color: var(--gc-blue-800); }
+    .tier-label.large { background: var(--gc-green-tint); color: #1B5E20; }
+    .sla-badge {
+      display: inline-block;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-top: 4px;
+    }
+    .sla-yes { background: var(--gc-green-tint); color: #1B5E20; }
+    .sla-no { background: var(--gc-red-tint); color: #B71C1C; }
+
+    footer {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+    footer a { color: var(--gc-blue-600); text-decoration: underline; word-break: break-all; }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; }
+      .subtitle { text-align: left; }
+      .before-after { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .related-grid { grid-template-columns: 1fr; }
+      .node-tier { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 480px) {
+      .stats-grid { grid-template-columns: 1fr; }
+      .node-tier { grid-template-columns: 1fr; }
+      body { padding: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>🗄️ Memorystore for Valkey: 新しいノードタイプが GA</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge badge-service">Memorystore for Valkey</span>
+          <span class="badge badge-ga">GA</span>
+          <span class="badge badge-cache">In-Memory Database</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-04-15</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>Memorystore for Valkey で<span class="highlight">新しいノードタイプが一般提供 (GA)</span> となり、インスタンス作成時に選択できるノードタイプのラインナップが大幅に拡充されました。従来の限られた選択肢に加えて、<span class="highlight">10 種類のノードタイプ</span>が GA として利用可能になり、<span class="highlight">1.25 GB から 110 GB</span> までの幅広い容量帯をカバーできるようになりました。</p>
+      <p>ワークロードの特性に応じて、より細かいリソースサイジングが可能となり、コストパフォーマンスの最適化が実現できます。GA ステータスにより、すべてのノードタイプが SLA の対象となり (shared-core-nano を除く)、本番環境での利用に適した信頼性が保証されます。</p>
+
+      <!-- Before/After -->
+      <h3>Before / After 比較</h3>
+      <div class="before-after">
+        <div class="before-box">
+          <strong>❌ Before (アップデート前)</strong>
+          <div class="check-item"><span class="cross-icon">✗</span><span>利用可能なノードタイプが限られ、過剰または不足するリソースを選択せざるを得ないケースがあった</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>SLA 付きで 1 GB - 3 GB の小規模容量帯を利用するオプションが不足</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>CPU 集約型ワークロードに特化したノードタイプがなく、処理性能が不足するケースがあった</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>Memorystore for Redis からの移行時にサイズ選択に制約</span></div>
+        </div>
+        <div class="after-box">
+          <strong>✅ After (アップデート後)</strong>
+          <div class="check-item"><span class="check-icon">✓</span><span>10 種類のノードタイプから最適なものを選択可能 (1.25 GB - 110 GB)</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>custom-pico / micro / mini により SLA 付きの小規模インスタンス (1-3 GB) を作成可能</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>highcpu-medium により CPU 集約型ワークロードに最適なリソース配分を選択可能</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>Memorystore for Redis からの移行が容易に</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="section">
+      <h2>📊 数字で見るアップデート</h2>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value">10</div>
+          <div class="stat-label">ノードタイプ数</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-value">110 GB</div>
+          <div class="stat-label">最大ノード容量</div>
+        </div>
+        <div class="stat-card orange">
+          <div class="stat-value">1.25 GB</div>
+          <div class="stat-label">最小 SLA 付き容量</div>
+        </div>
+        <div class="stat-card teal">
+          <div class="stat-value">16 vCPU</div>
+          <div class="stat-label">最大 vCPU 数</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Node Type Visual -->
+    <div class="section">
+      <h2>🧩 ノードタイプ一覧</h2>
+      <p>ワークロードの規模と特性に応じて 3 つのカテゴリから最適なノードタイプを選択できます。</p>
+
+      <h3><span class="tier-label small">🔸 小規模ワークロード向け</span></h3>
+      <div class="node-tier">
+        <div class="node-card tier-small">
+          <div class="node-name">shared-core-nano</div>
+          <div class="node-capacity">1.4 GB</div>
+          <div class="node-spec">0.5 vCPU / 接続数 5,000</div>
+          <span class="sla-badge sla-no">SLA なし</span>
+        </div>
+        <div class="node-card tier-small">
+          <div class="node-name">custom-pico</div>
+          <div class="node-capacity">1.25 GB</div>
+          <div class="node-spec">2 vCPU / 接続数 16,000</div>
+          <span class="sla-badge sla-yes">SLA あり</span>
+        </div>
+        <div class="node-card tier-small">
+          <div class="node-name">custom-micro</div>
+          <div class="node-capacity">2.5 GB</div>
+          <div class="node-spec">2 vCPU / 接続数 16,000</div>
+          <span class="sla-badge sla-yes">SLA あり</span>
+        </div>
+        <div class="node-card tier-small">
+          <div class="node-name">custom-mini</div>
+          <div class="node-capacity">3.75 GB</div>
+          <div class="node-spec">2 vCPU / 接続数 16,000</div>
+          <span class="sla-badge sla-yes">SLA あり</span>
+        </div>
+      </div>
+
+      <h3><span class="tier-label medium">🔹 中規模ワークロード向け</span></h3>
+      <div class="node-tier">
+        <div class="node-card tier-medium">
+          <div class="node-name">standard-small</div>
+          <div class="node-capacity">6.5 GB</div>
+          <div class="node-spec">2 vCPU / 接続数 16,000</div>
+          <span class="sla-badge sla-yes">SLA あり</span>
+        </div>
+        <div class="node-card tier-medium">
+          <div class="node-name">highmem-medium</div>
+          <div class="node-capacity">13 GB</div>
+          <div class="node-spec">2 vCPU / 接続数 32,000</div>
+          <span class="sla-badge sla-yes">SLA あり</span>
+        </div>
+        <div class="node-card tier-medium">
+          <div class="node-name">highcpu-medium</div>
+          <div class="node-capacity">13 GB</div>
+          <div class="node-spec">8 vCPU / 接続数 32,000</div>
+          <span class="sla-badge sla-yes">SLA あり</span>
+        </div>
+      </div>
+
+      <h3><span class="tier-label large">🔷 大規模ワークロード向け</span></h3>
+      <div class="node-tier">
+        <div class="node-card tier-large">
+          <div class="node-name">standard-large</div>
+          <div class="node-capacity">26 GB</div>
+          <div class="node-spec">8 vCPU / 接続数 32,000</div>
+          <span class="sla-badge sla-yes">SLA あり</span>
+        </div>
+        <div class="node-card tier-large">
+          <div class="node-name">highmem-xlarge</div>
+          <div class="node-capacity">58 GB</div>
+          <div class="node-spec">8 vCPU / 接続数 64,000</div>
+          <span class="sla-badge sla-yes">SLA あり</span>
+        </div>
+        <div class="node-card tier-large">
+          <div class="node-name">highmem-2xlarge</div>
+          <div class="node-capacity">110 GB</div>
+          <div class="node-spec">16 vCPU / 接続数 64,000</div>
+          <span class="sla-badge sla-yes">SLA あり</span>
+        </div>
+      </div>
+
+      <div class="note-box">
+        <strong>💡 注意:</strong> custom-pico、custom-micro、custom-mini は <strong>Cluster Mode Disabled</strong> インスタンスでのみ利用可能です。shared-core-nano には SLA が適用されないため、本番環境での利用は非推奨です。
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>ノードタイプは小規模、中規模、大規模の 3 つのカテゴリに分類され、それぞれ異なる vCPU 数と容量を持ちます。インスタンス作成後もノードタイプの変更 (垂直スケーリング) やシャード数の増減 (水平スケーリング) により柔軟にリソースを調整できます。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph NodeTypes["Memorystore for Valkey - ノードタイプ一覧"]
+        direction TB
+
+        subgraph SmallTier["小規模ワークロード向け"]
+            Nano["shared-core-nano<br/>0.5 vCPU / 1.4 GB<br/>SLA なし"]
+            Pico["custom-pico<br/>2 vCPU / 1.25 GB<br/>SLA あり"]
+            Micro["custom-micro<br/>2 vCPU / 2.5 GB<br/>SLA あり"]
+            Mini["custom-mini<br/>2 vCPU / 3.75 GB<br/>SLA あり"]
+        end
+
+        subgraph MediumTier["中規模ワークロード向け"]
+            Small["standard-small<br/>2 vCPU / 6.5 GB<br/>SLA あり"]
+            HMmed["highmem-medium<br/>2 vCPU / 13 GB<br/>SLA あり"]
+            HCmed["highcpu-medium<br/>8 vCPU / 13 GB<br/>SLA あり"]
+        end
+
+        subgraph LargeTier["大規模ワークロード向け"]
+            Large["standard-large<br/>8 vCPU / 26 GB<br/>SLA あり"]
+            XL["highmem-xlarge<br/>8 vCPU / 58 GB<br/>SLA あり"]
+            XXL["highmem-2xlarge<br/>16 vCPU / 110 GB<br/>SLA あり"]
+        end
+    end
+
+    subgraph Scaling["スケーリング方式"]
+        Vertical["垂直スケーリング<br/>ノードタイプの変更"]
+        Horizontal["水平スケーリング<br/>シャード数の増減"]
+    end
+
+    NodeTypes --> Scaling
+
+    classDef small fill:#FFF3E0,stroke:#FF9800,stroke-width:2px,color:#333333
+    classDef medium fill:#E8F1FF,stroke:#4A90E2,stroke-width:2px,color:#333333
+    classDef large fill:#E9F7EC,stroke:#66BB6A,stroke-width:2px,color:#333333
+    classDef scaling fill:#F3E5F5,stroke:#7B61FF,stroke-width:2px,color:#333333
+    classDef tier fill:#FAFAFA,stroke:#999999,stroke-width:1px,color:#333333
+
+    class Nano,Pico,Micro,Mini small
+    class Small,HMmed,HCmed medium
+    class Large,XL,XXL large
+    class Vertical,Horizontal scaling
+    class SmallTier,MediumTier,LargeTier tier
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h3>📦 1. 10 種類のノードタイプ</h3>
+          <div class="check-item"><span class="arrow">→</span><span>shared-core-nano から highmem-2xlarge まで、幅広い容量帯をカバーする 10 種類のノードタイプが GA</span></div>
+          <div class="check-item"><span class="arrow">→</span><span>メモリ集約型、CPU 集約型、小規模開発用など、ワークロードの特性に応じた最適な選択が可能</span></div>
+          <div class="check-item"><span class="arrow">→</span><span>shared-core-nano を除くすべてのノードタイプで SLA が適用され、本番環境での利用に適した可用性を保証</span></div>
+        </div>
+
+        <div class="card card-orange">
+          <h3>🔧 2. Custom ノードタイプ (Cluster Mode Disabled 専用)</h3>
+          <div class="check-item"><span class="arrow">→</span><span>custom-pico (1.25 GB)、custom-micro (2.5 GB)、custom-mini (3.75 GB) の 3 種類</span></div>
+          <div class="check-item"><span class="arrow">→</span><span>Memorystore for Redis からの移行時に、1 GB - 3 GB の小規模インスタンスを SLA 付きで作成可能</span></div>
+          <div class="check-item"><span class="arrow">→</span><span>Cluster Mode Disabled インスタンスでのみ利用可能</span></div>
+        </div>
+
+        <div class="card card-purple">
+          <h3>⚙️ 3. High-CPU ノードタイプ</h3>
+          <div class="check-item"><span class="arrow">→</span><span>highcpu-medium は 8 vCPU / 13 GB で、メモリ容量に対して高い処理性能を提供</span></div>
+          <div class="check-item"><span class="arrow">→</span><span>CPU 集約型ワークロード (複雑なデータ構造操作、Lua スクリプト処理など) に最適</span></div>
+          <div class="check-item"><span class="arrow">→</span><span>同じメモリ容量の highmem-medium (2 vCPU) と比較して 4 倍の処理能力</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specs -->
+    <div class="section">
+      <h2>🔩 技術仕様</h2>
+      <h3>ノードタイプ詳細一覧</h3>
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>ノードタイプ</th>
+              <th>vCPU</th>
+              <th>書き込み容量</th>
+              <th>合計容量</th>
+              <th>SLA</th>
+              <th>デフォルト接続数</th>
+              <th>最大接続数</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>shared-core-nano</code></td>
+              <td>0.5</td>
+              <td>1.12 GB</td>
+              <td>1.4 GB</td>
+              <td><span style="color: var(--gc-red);">なし</span></td>
+              <td>5,000</td>
+              <td>5,000</td>
+            </tr>
+            <tr>
+              <td><code>custom-pico</code></td>
+              <td>2</td>
+              <td>1.08 GB</td>
+              <td>1.25 GB</td>
+              <td><span style="color: var(--gc-green);">あり</span></td>
+              <td>16,000</td>
+              <td>32,000</td>
+            </tr>
+            <tr>
+              <td><code>custom-micro</code></td>
+              <td>2</td>
+              <td>2 GB</td>
+              <td>2.5 GB</td>
+              <td><span style="color: var(--gc-green);">あり</span></td>
+              <td>16,000</td>
+              <td>32,000</td>
+            </tr>
+            <tr>
+              <td><code>custom-mini</code></td>
+              <td>2</td>
+              <td>3 GB</td>
+              <td>3.75 GB</td>
+              <td><span style="color: var(--gc-green);">あり</span></td>
+              <td>16,000</td>
+              <td>32,000</td>
+            </tr>
+            <tr>
+              <td><code>standard-small</code></td>
+              <td>2</td>
+              <td>5.2 GB</td>
+              <td>6.5 GB</td>
+              <td><span style="color: var(--gc-green);">あり</span></td>
+              <td>16,000</td>
+              <td>32,000</td>
+            </tr>
+            <tr>
+              <td><code>highmem-medium</code></td>
+              <td>2</td>
+              <td>10.4 GB</td>
+              <td>13 GB</td>
+              <td><span style="color: var(--gc-green);">あり</span></td>
+              <td>32,000</td>
+              <td>64,000</td>
+            </tr>
+            <tr>
+              <td><code>highcpu-medium</code></td>
+              <td>8</td>
+              <td>10.4 GB</td>
+              <td>13 GB</td>
+              <td><span style="color: var(--gc-green);">あり</span></td>
+              <td>32,000</td>
+              <td>64,000</td>
+            </tr>
+            <tr>
+              <td><code>standard-large</code></td>
+              <td>8</td>
+              <td>20.8 GB</td>
+              <td>26 GB</td>
+              <td><span style="color: var(--gc-green);">あり</span></td>
+              <td>32,000</td>
+              <td>64,000</td>
+            </tr>
+            <tr>
+              <td><code>highmem-xlarge</code></td>
+              <td>8</td>
+              <td>46.4 GB</td>
+              <td>58 GB</td>
+              <td><span style="color: var(--gc-green);">あり</span></td>
+              <td>64,000</td>
+              <td>64,000</td>
+            </tr>
+            <tr>
+              <td><code>highmem-2xlarge</code></td>
+              <td>16</td>
+              <td>88 GB</td>
+              <td>110 GB</td>
+              <td><span style="color: var(--gc-green);">あり</span></td>
+              <td>64,000</td>
+              <td>64,000</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>ノードタイプの選択基準</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>ユースケース</th>
+            <th>推奨ノードタイプ</th>
+            <th>理由</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>開発・テスト</td>
+            <td><code>shared-core-nano</code></td>
+            <td>低コスト (SLA なし)</td>
+          </tr>
+          <tr>
+            <td>Redis 移行 (小規模)</td>
+            <td><code>custom-pico</code> / <code>custom-micro</code> / <code>custom-mini</code></td>
+            <td>SLA 付き 1-3 GB</td>
+          </tr>
+          <tr>
+            <td>一般的なキャッシュ</td>
+            <td><code>standard-small</code> / <code>highmem-medium</code></td>
+            <td>バランスの良い性能</td>
+          </tr>
+          <tr>
+            <td>CPU 集約型処理</td>
+            <td><code>highcpu-medium</code></td>
+            <td>高い vCPU 対メモリ比率</td>
+          </tr>
+          <tr>
+            <td>大規模データセット</td>
+            <td><code>highmem-xlarge</code> / <code>highmem-2xlarge</code></td>
+            <td>大容量メモリ</td>
+          </tr>
+          <tr>
+            <td>コスト最適化</td>
+            <td><code>standard-small</code> (水平スケーリング)</td>
+            <td>小ノード分散で高い価格性能比</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup -->
+    <div class="section">
+      <h2>⚙️ 設定方法</h2>
+
+      <h3>前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>Google Cloud プロジェクトが作成済みであること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>Memorystore API が有効化されていること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>ネットワーキングの前提条件 (VPC、PSC 接続など) が設定済みであること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>最新バージョンの gcloud CLI がインストールされていること</span></div>
+
+      <h3>ステップ 1: gcloud CLI の更新</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">gcloud CLI を最新バージョンに更新</span>
+        </div>
+        <pre><code class="language-bash">gcloud components update</code></pre>
+      </div>
+
+      <h3>ステップ 2: ノードタイプを指定してインスタンスを作成</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">highmem-medium でクラスターモードインスタンスを作成</span>
+        </div>
+        <pre><code class="language-bash"># highmem-medium ノードタイプでクラスターモードインスタンスを作成
+gcloud memorystore instances create my-valkey-instance \
+  --location=us-central1 \
+  --project=my-project \
+  --node-type=highmem-medium \
+  --shard-count=3 \
+  --engine-configs=maxmemory-policy=allkeys-lru</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">custom-micro で Cluster Mode Disabled インスタンスを作成</span>
+        </div>
+        <pre><code class="language-bash"># custom-micro ノードタイプで Cluster Mode Disabled インスタンスを作成
+gcloud memorystore instances create my-small-instance \
+  --location=us-central1 \
+  --project=my-project \
+  --node-type=custom-micro \
+  --shard-count=1 \
+  --mode=cluster-disabled</code></pre>
+      </div>
+
+      <h3>ステップ 3: 既存インスタンスのノードタイプを変更 (垂直スケーリング)</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">既存インスタンスのノードタイプを変更</span>
+        </div>
+        <pre><code class="language-bash"># 既存インスタンスのノードタイプを変更 (スケールアップ/ダウン)
+gcloud memorystore instances update INSTANCE_ID \
+  --location=REGION \
+  --project=PROJECT_ID \
+  --node-type=NEW_NODE_TYPE</code></pre>
+      </div>
+
+      <div class="flow-diagram">
+        <div class="flow-step">📋 要件定義</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🔍 ノードタイプ<br/>選択</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🚀 インスタンス<br/>作成</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">📈 モニタリング<br/>& 調整</div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h3>🔄 ユースケース 1: Memorystore for Redis から Valkey への移行</h3>
+        <p><strong>シナリオ:</strong> 現在 2 GB の Memorystore for Redis インスタンスを使用しているアプリケーションを、Memorystore for Valkey に移行。SLA の保証が必要で、Cluster Mode Disabled で運用したい。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">custom-micro (2.5 GB) で Cluster Mode Disabled インスタンスを作成</span>
+          </div>
+          <pre><code class="language-bash">gcloud memorystore instances create my-migrated-cache \
+  --location=asia-northeast1 \
+  --project=my-project \
+  --node-type=custom-micro \
+  --shard-count=1 \
+  --mode=cluster-disabled \
+  --replica-count=1</code></pre>
+        </div>
+        <p><strong>効果:</strong> SLA 付きで既存の Redis インスタンスと同等のサイズ帯を利用でき、ダウンタイムを最小限にした段階的な移行が可能。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>🛒 ユースケース 2: 大規模リアルタイムレコメンデーションエンジン</h3>
+        <p><strong>シナリオ:</strong> EC サイトで数百万ユーザーのセッションデータとレコメンデーションモデルをリアルタイムで処理。高いメモリ容量と水平スケーリングが求められる。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">highmem-xlarge (58 GB) で大規模クラスターを作成</span>
+          </div>
+          <pre><code class="language-bash">gcloud memorystore instances create recommendation-cache \
+  --location=asia-northeast1 \
+  --project=my-project \
+  --node-type=highmem-xlarge \
+  --shard-count=10 \
+  --replica-count=2</code></pre>
+        </div>
+        <p><strong>効果:</strong> 10 シャード x 58 GB = <strong>580 GB</strong> の大容量キャッシュにより、数百万ユーザーのリアルタイムデータ処理が可能。レプリカにより読み取りスループットも確保。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>🎮 ユースケース 3: CPU 集約型の Lua スクリプト処理</h3>
+        <p><strong>シナリオ:</strong> ゲームアプリケーションのランキングシステムで、複雑な Lua スクリプトによるアトミックなスコア集計処理が頻繁に発生。</p>
+        <p><strong>効果:</strong> highcpu-medium (8 vCPU / 13 GB) を使用することで、Lua スクリプトの実行性能が向上。同じメモリ容量の highmem-medium (2 vCPU / 13 GB) と比較して <strong>4 倍の処理能力</strong>で複雑な計算ロジックを実行できる。</p>
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div>
+          <h3>💼 ビジネス面</h3>
+          <div class="card card-green">
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>コスト最適化:</strong> ワークロード規模に合った最適なノードタイプで過剰プロビジョニングを回避し、コスト削減</span></div>
+          </div>
+          <div class="card card-green">
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>移行の容易さ:</strong> custom ノードタイプにより Redis からの移行時に同等サイズ帯 (1-3 GB) を SLA 付きで利用可能</span></div>
+          </div>
+          <div class="card card-green">
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>スケーラビリティ:</strong> 小規模から始めて段階的にスケールアップできる柔軟性</span></div>
+          </div>
+        </div>
+        <div>
+          <h3>🔧 技術面</h3>
+          <div class="card card-teal">
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>パフォーマンス最適化:</strong> highcpu-medium により CPU 集約型ワークロードに最適な処理性能を選択</span></div>
+          </div>
+          <div class="card card-teal">
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>柔軟なスケーリング:</strong> 垂直 (ノードタイプ変更) と水平 (シャード数変更) の両方を組み合わせたリソース管理</span></div>
+          </div>
+          <div class="card card-teal">
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>SLA 保証:</strong> shared-core-nano を除く全ノードタイプで SLA 提供。本番ワークロードに適した可用性</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>制限事項</h3>
+      <div class="warning-box">
+        <div class="check-item"><span class="cross-icon">✗</span><span>shared-core-nano ノードタイプには SLA が適用されないため、本番環境での利用は非推奨</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>custom-pico / custom-micro / custom-mini は Cluster Mode Disabled インスタンスでのみ利用可能。クラスター構成への移行時にはインスタンスの再作成が必要</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>ノードサイズが大きくなるほど vCPU の追加に対する性能向上が線形にスケールしない場合がある</span></div>
+      </div>
+
+      <h3>考慮すべき点</h3>
+      <div class="note-box">
+        <div class="check-item"><span class="arrow">→</span><span>最適なコストパフォーマンスには、大きなノードへのスケールアップよりも小さなノードを追加するスケールアウト戦略が推奨</span></div>
+        <div class="check-item"><span class="arrow">→</span><span>ノードタイプ変更 (垂直スケーリング) 中はインスタンスへの影響がある場合があるため、メンテナンスウィンドウでの実施を推奨</span></div>
+        <div class="check-item"><span class="arrow">→</span><span>maxmemory 設定の変更はデフォルト値からの変更による OOM エラーリスクを考慮</span></div>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>Memorystore for Valkey の料金はノードタイプ、リージョン、およびノード数に基づいて課金されます。各ノードはノードタイプに応じた時間単位の料金が適用されます。</p>
+
+      <h3>料金例 (us-central1 リージョン概算)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>構成例</th>
+            <th>ノード数</th>
+            <th>概算月額料金</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>highmem-medium x 3 シャード (レプリカなし)</td>
+            <td>3</td>
+            <td><strong>約 $337/月</strong></td>
+          </tr>
+          <tr>
+            <td>highmem-medium x 10 シャード (レプリカ 2)</td>
+            <td>30</td>
+            <td><strong>約 $3,370/月</strong></td>
+          </tr>
+          <tr>
+            <td>standard-small x 5 シャード (レプリカ 1)</td>
+            <td>10</td>
+            <td><strong>約 $560/月</strong></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>コスト削減オプション</h3>
+      <div class="pricing-note">
+        💡 <strong>確約利用割引 (CUD):</strong> 1 年間の確約で <strong>20% 割引</strong>、3 年間で <strong>40% 割引</strong>。CUD は Memorystore for Redis Cluster、Redis、Memcached の利用にも適用可能。スケールアウト戦略 (小さなノードを追加) でコストパフォーマンスが向上する場合もあります。
+      </div>
+    </div>
+
+    <!-- Regions -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <p>新しいノードタイプは、Memorystore for Valkey がサポートされている<span class="highlight">すべてのリージョン</span>で利用できます。</p>
+      <div class="region-grid">
+        <div class="region-item">
+          <strong>🇯🇵 日本</strong><br/>
+          asia-northeast1 (東京), asia-northeast2 (大阪)
+        </div>
+        <div class="region-item">
+          <strong>🌏 アジア太平洋</strong><br/>
+          asia-southeast1 (Singapore), asia-south1 (Mumbai) など
+        </div>
+        <div class="region-item">
+          <strong>🇺🇸 米州</strong><br/>
+          us-central1, us-east1, us-west1 など
+        </div>
+        <div class="region-item">
+          <strong>🇪🇺 ヨーロッパ</strong><br/>
+          europe-west1, europe-west3, europe-north1 など
+        </div>
+      </div>
+      <p style="font-size: 14px; color: var(--gc-outline);">最新のリージョン一覧は <a href="https://docs.cloud.google.com/memorystore/docs/valkey/locations" target="_blank" rel="noopener noreferrer" class="gc-link">Memorystore for Valkey のロケーション</a>を参照してください。</p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="related-grid">
+        <div class="card">
+          <h3>🔄 Memorystore for Redis</h3>
+          <p>Memorystore for Valkey の前身サービス。custom ノードタイプにより Redis からの移行パスが改善された。</p>
+        </div>
+        <div class="card card-teal">
+          <h3>🖥️ Compute Engine</h3>
+          <p>Memorystore for Valkey への接続元となる仮想マシン。ノードタイプの vCPU 数は Compute Engine のマシンタイプに類似した概念。</p>
+        </div>
+        <div class="card card-green">
+          <h3>📈 Cloud Monitoring</h3>
+          <p>Memorystore for Valkey のメトリクスをモニタリングし、ノードタイプ変更のタイミングを判断するために使用。</p>
+        </div>
+        <div class="card card-purple">
+          <h3>🔒 VPC / Private Service Connect</h3>
+          <p>Memorystore for Valkey インスタンスへのネットワーク接続に必要な基盤サービス。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- References -->
+    <div class="section">
+      <h2>📚 参考リンク</h2>
+      <ul style="list-style: none; padding: 0;">
+        <li class="check-item" style="margin: 6px 0;"><span class="arrow">→</span><a href="https://cloud.google.com/release-notes#April_15_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート</a></li>
+        <li class="check-item" style="margin: 6px 0;"><span class="arrow">→</span><a href="https://docs.cloud.google.com/memorystore/docs/valkey/instance-node-specification" target="_blank" rel="noopener noreferrer" class="gc-link">Memorystore for Valkey - インスタンスとノードの仕様</a></li>
+        <li class="check-item" style="margin: 6px 0;"><span class="arrow">→</span><a href="https://docs.cloud.google.com/memorystore/docs/valkey/product-overview" target="_blank" rel="noopener noreferrer" class="gc-link">Memorystore for Valkey - プロダクト概要</a></li>
+        <li class="check-item" style="margin: 6px 0;"><span class="arrow">→</span><a href="https://cloud.google.com/memorystore/valkey/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Memorystore for Valkey - 料金</a></li>
+        <li class="check-item" style="margin: 6px 0;"><span class="arrow">→</span><a href="https://docs.cloud.google.com/memorystore/docs/valkey/cuds" target="_blank" rel="noopener noreferrer" class="gc-link">Memorystore for Valkey - 確約利用割引</a></li>
+        <li class="check-item" style="margin: 6px 0;"><span class="arrow">→</span><a href="https://docs.cloud.google.com/memorystore/docs/valkey/locations" target="_blank" rel="noopener noreferrer" class="gc-link">Memorystore for Valkey - ロケーション</a></li>
+      </ul>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>📎 出典: <a href="https://cloud.google.com/release-notes#April_15_2026" target="_blank" rel="noopener noreferrer">https://cloud.google.com/release-notes#April_15_2026</a></p>
+      <p>📎 関連ドキュメント: <a href="https://docs.cloud.google.com/memorystore/docs/valkey/instance-node-specification" target="_blank" rel="noopener noreferrer">https://docs.cloud.google.com/memorystore/docs/valkey/instance-node-specification</a></p>
+      <p style="margin-top: 8px; color: var(--gc-outline);">Generated on 2026-04-16 | Memorystore for Valkey New Node Types GA</p>
+    </footer>
+
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+    hljs.highlightAll();
+  </script>
+</body>
+</html>

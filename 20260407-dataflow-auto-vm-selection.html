@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dataflow: Auto VM Selection (Instance Flexibility) とリソースヒントによる自動 VM 選択</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.3;
+    }
+
+    .header-right {
+      text-align: right;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin: 0 0 8px 0;
+      color: var(--gc-on-surface);
+      font-size: 18px;
+    }
+
+    .card p {
+      margin: 0;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-green {
+      background: var(--gc-green);
+    }
+
+    .badge-orange {
+      background: var(--gc-orange);
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 20px;
+    }
+
+    .before-card h3 {
+      color: var(--gc-red);
+      margin: 0 0 12px 0;
+      font-size: 16px;
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 20px;
+    }
+
+    .after-card h3 {
+      color: var(--gc-green);
+      margin: 0 0 12px 0;
+      font-size: 16px;
+    }
+
+    .before-card ul, .after-card ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .before-card li, .after-card li {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h3 {
+      color: var(--gc-blue-800);
+      margin: 0 0 8px 0;
+      font-size: 18px;
+    }
+
+    .usecase-card p {
+      margin: 0 0 12px 0;
+      font-size: 14px;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; align-items: flex-start; }
+      .header-right { text-align: left; margin-top: 8px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .feature-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>&#9889; Dataflow: Auto VM Selection</h1>
+        <p style="margin: 8px 0 0; color: var(--gc-on-surface-variant);">Instance Flexibility とリソースヒントによる自動 VM 選択</p>
+      </div>
+      <div class="header-right">
+        <div class="subtitle">2026-04-07</div>
+        <span class="badge badge-green">Feature</span>
+        <span class="badge">Dataflow</span>
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>&#128203; 概要</h2>
+      <p>
+        Dataflow において、アクセラレータを必要としないパイプラインステップで
+        <span class="highlight">min_ram</span> または <span class="highlight">cpu_count</span>
+        リソースヒントを使用すると、<strong>Auto VM Selection (Instance Flexibility)</strong> が自動的に有効になります。
+        有効になると、ワーカーは指定された RAM / CPU 要件を満たすキュレーションされたマシンタイプのリストからプロビジョニングされます。
+      </p>
+      <p>
+        この機能は Dataflow の <strong>Right Fitting</strong> 機能の一部として提供され、Apache Beam のリソースヒント機能を活用してパイプライン全体または個別ステップに対してリソース要件を宣言的に指定できます。
+      </p>
+
+      <div class="note-box">
+        <strong>&#128161; 対象ユーザー:</strong> Dataflow でバッチまたはストリーミングパイプラインを実行しており、リソースプール枯渇エラーの回避やコスト最適化を求めるデータエンジニア / ML エンジニア。
+      </div>
+    </div>
+
+    <!-- Before / After -->
+    <div class="section">
+      <h2>&#128260; Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-card">
+          <h3>&#10060; Before</h3>
+          <ul>
+            <li>特定のマシンタイプを手動で指定する必要があった</li>
+            <li>リソースプール枯渇 (<code>RESOURCE_POOL_EXHAUSTED</code>) エラーが発生しやすい</li>
+            <li>マシンタイプの選定ミスにより過剰プロビジョニングまたは不足が発生</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h3>&#9989; After</h3>
+          <ul>
+            <li><code>min_ram</code> / <code>cpu_count</code> を指定するだけで最適な VM を自動選択</li>
+            <li>複数のマシンタイプ候補からプロビジョニングされリソース枯渇を軽減</li>
+            <li>コスト効率の高い VM が自動選択される</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="section">
+      <h2>&#128200; 主なメリット</h2>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value">&#128176;</div>
+          <div class="stat-label">コスト最適化<br>過剰プロビジョニングを削減</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-green), #1B5E20);">
+          <div class="stat-value">&#9889;</div>
+          <div class="stat-label">可用性向上<br>リソースプール枯渇リスク低減</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-purple), #6A1B9A);">
+          <div class="stat-value">&#128736;</div>
+          <div class="stat-label">運用負荷軽減<br>マシンタイプ手動選定が不要</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>&#127959; アーキテクチャ図</h2>
+      <p>リソースヒントに基づいて Auto VM Selection が自動的に有効化され、要件を満たすマシンタイプを自動選択するフローです。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    A[パイプライン定義] --> B{リソースヒントの<br/>設定確認}
+    B -->|min_ram / cpu_count<br/>指定あり| C{アクセラレータ<br/>が必要?}
+    B -->|リソースヒント<br/>なし| D[デフォルトの<br/>マシンタイプ使用]
+    C -->|いいえ| E[Auto VM Selection<br/>自動有効化]
+    C -->|はい| F[Right Fitting<br/>アクセラレータ付き<br/>ワーカープール]
+    E --> G[キュレーションされた<br/>マシンタイプリスト]
+    G --> H[RAM/CPU 要件を<br/>満たす VM を選択]
+    H --> I[ワーカープール<br/>プロビジョニング]
+    F --> I
+    D --> I
+    I --> J[パイプライン実行]
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>&#11088; 主要機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h3>&#9881; Auto VM Selection の自動有効化</h3>
+          <p><code>min_ram</code> または <code>cpu_count</code> リソースヒントを使用し、アクセラレータを必要としないステップでは Auto VM Selection が自動的に有効に。有効化された場合、パイプラインオプションで指定されたマシンタイプは無視されます。</p>
+        </div>
+        <div class="card">
+          <h3>&#128218; キュレーションされたマシンタイプリスト</h3>
+          <p>Dataflow が RAM と CPU の要件を満たすマシンタイプのリストを自動的にキュレーション。複数のマシンタイプ候補からプロビジョニングされるため、リソース可用性が向上します。</p>
+        </div>
+        <div class="card">
+          <h3>&#127919; リソースヒントの柔軟な適用</h3>
+          <p>パイプライン全体にコマンドラインから設定可能。個別のパイプラインステップ (Transform) にプログラムから設定可能。Right Fitting によりステップごとに異なるワーカープールを作成可能。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specs -->
+    <div class="section">
+      <h2>&#128295; 技術仕様</h2>
+      <h3 style="color: var(--gc-on-surface); margin-top: 0;">利用可能なリソースヒント</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>リソースヒント</th>
+            <th>説明</th>
+            <th>設定例</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>min_ram</code></td>
+            <td>ワーカーに必要な最小メモリ量</td>
+            <td><code>min_ram=15GB</code></td>
+          </tr>
+          <tr>
+            <td><code>cpu_count</code></td>
+            <td>ワーカーに必要な CPU コア数</td>
+            <td><code>cpu_count=8</code></td>
+          </tr>
+          <tr>
+            <td><code>accelerator</code></td>
+            <td>GPU アクセラレータの指定 (Auto VM Selection 対象外)</td>
+            <td><code>type:nvidia-l4;count:1;install-nvidia-driver</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 style="color: var(--gc-on-surface);">サポート状況</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>対応 SDK</td>
+            <td>Apache Beam Java SDK, Python SDK (2.31.0 以降)</td>
+          </tr>
+          <tr>
+            <td>Go SDK</td>
+            <td><span style="color: var(--gc-red);">&#10060;</span> リソースヒント非対応</td>
+          </tr>
+          <tr>
+            <td>バッチパイプライン</td>
+            <td><span style="color: var(--gc-green);">&#9989;</span> Right Fitting サポートあり</td>
+          </tr>
+          <tr>
+            <td>ストリーミングパイプライン</td>
+            <td><span style="color: var(--gc-green);">&#9989;</span> <code>--experiments=enable_streaming_rightfitting</code> で有効化</td>
+          </tr>
+          <tr>
+            <td>Dataflow Prime</td>
+            <td><span style="color: var(--gc-green);">&#9989;</span> サポートあり</td>
+          </tr>
+          <tr>
+            <td>FlexRS</td>
+            <td><span style="color: var(--gc-red);">&#10060;</span> 非サポート</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup Guide -->
+    <div class="section">
+      <h2>&#128736; 設定方法</h2>
+
+      <div class="note-box">
+        <strong>&#128203; 前提条件:</strong>
+        <div class="check-item"><span class="check-icon">&#10003;</span><span>Apache Beam SDK 2.31.0 以降がインストールされていること</span></div>
+        <div class="check-item"><span class="check-icon">&#10003;</span><span>Dataflow API が有効化されていること</span></div>
+        <div class="check-item"><span class="check-icon">&#10003;</span><span>適切な IAM 権限が付与されていること</span></div>
+      </div>
+
+      <h3 style="color: var(--gc-on-surface);">Step 1: パイプライン全体にリソースヒントを設定 (コマンドライン)</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">python my_pipeline.py \
+  --runner=DataflowRunner \
+  --resource_hints=min_ram=4GB \
+  --resource_hints=cpu_count=8 \
+  --project=my-project \
+  --region=us-central1 \
+  --temp_location=gs://my-bucket/temp</code></pre>
+
+      <h3 style="color: var(--gc-on-surface);">Step 2: 個別ステップにリソースヒントを設定 (Python)</h3>
+      <span class="code-label">Python</span>
+      <pre><code class="language-python">import apache_beam as beam
+
+# 特定のステップにリソースヒントを設定
+pcoll | beam.ParDo(BigMemFn()).with_resource_hints(
+    min_ram="30GB",
+    cpu_count=16
+)
+
+# 別のステップには異なるリソースヒントを設定
+pcoll | MyPTransform().with_resource_hints(
+    min_ram="4GB",
+    cpu_count=8
+)</code></pre>
+
+      <h3 style="color: var(--gc-on-surface);">Step 3: 個別ステップにリソースヒントを設定 (Java)</h3>
+      <span class="code-label">Java</span>
+      <pre><code class="language-java">// Java SDK でのリソースヒント設定
+pcoll.apply(ParDo.of(new BigMemFn())
+    .setResourceHints(
+        ResourceHints.create()
+            .withMinRam("30GB")
+            .withCpuCount(16)
+    ));
+
+pcoll.apply(MyCompositeTransform.of(...)
+    .setResourceHints(
+        ResourceHints.create()
+            .withMinRam("15GB")
+            .withCpuCount(8)
+    ));</code></pre>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>&#128077; メリット</h2>
+      <div class="feature-grid">
+        <div style="padding: 0;">
+          <h3 style="color: var(--gc-on-surface); margin-top: 0;">&#128188; ビジネス面</h3>
+          <div class="check-item"><span class="check-icon">&#10003;</span><span><strong>コスト最適化</strong> -- 要件に合った適切なサイズの VM が自動選択され、過剰プロビジョニングのコストを削減</span></div>
+          <div class="check-item"><span class="check-icon">&#10003;</span><span><strong>運用負荷の軽減</strong> -- マシンタイプの手動選定が不要になり、開発者はビジネスロジックに集中可能</span></div>
+          <div class="check-item"><span class="check-icon">&#10003;</span><span><strong>可用性の向上</strong> -- 複数のマシンタイプ候補から選択されるため、リソースプール枯渇リスクが低減</span></div>
+        </div>
+        <div style="padding: 0;">
+          <h3 style="color: var(--gc-on-surface); margin-top: 0;">&#128187; 技術面</h3>
+          <div class="check-item"><span class="check-icon">&#10003;</span><span><strong>自動最適化</strong> -- キュレーションされたリストから最適なマシンタイプを選択し、手動チューニングを削減</span></div>
+          <div class="check-item"><span class="check-icon">&#10003;</span><span><strong>Right Fitting 統合</strong> -- 各ステップに異なるリソース要件を設定し、ステップごとに最適なワーカープールを作成</span></div>
+          <div class="check-item"><span class="check-icon">&#10003;</span><span><strong>Fusion 最適化連携</strong> -- 異なるリソースヒントを持つ Transform がフュージョンされる際、リソースヒントの和集合が適用</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>&#9888; デメリット / 制約事項</h2>
+      <div class="warning-box">
+        <strong>&#128679; 制限事項</strong>
+        <div class="check-item"><span class="cross-icon">&#10060;</span><span>Auto VM Selection が有効な場合、パイプラインオプションで指定したマシンタイプは無視される</span></div>
+        <div class="check-item"><span class="cross-icon">&#10060;</span><span>Go SDK ではリソースヒントがサポートされていない</span></div>
+        <div class="check-item"><span class="cross-icon">&#10060;</span><span>FlexRS (Flexible Resource Scheduling) との併用は非サポート</span></div>
+        <div class="check-item"><span class="cross-icon">&#10060;</span><span>Right Fitting 使用時は <code>worker_accelerator</code> サービスオプションを使用しないこと</span></div>
+      </div>
+      <div class="note-box">
+        <strong>&#128161; 考慮すべき点</strong>
+        <ul style="margin: 8px 0 0; padding-left: 20px;">
+          <li>Auto VM Selection はアクセラレータを必要としないステップでのみ自動有効化。GPU が必要な場合はアクセラレータリソースヒントを明示設定</li>
+          <li>ストリーミングパイプラインでは <code>--experiments=enable_streaming_rightfitting</code> を明示的に設定する必要あり</li>
+          <li>異なるリソースヒントの Transform がフュージョンされる場合があるため、リソース分離が必要な場合は Fusion Break を明示的に挿入</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>&#128161; ユースケース</h2>
+
+      <div class="usecase-card">
+        <h3>&#128202; ユースケース 1: 大規模バッチ ETL パイプラインのコスト最適化</h3>
+        <p><strong>シナリオ:</strong> 大量のデータを処理するバッチ ETL パイプラインで、データ読み込みステップ (低メモリ) とデータ変換ステップ (高メモリ) が混在。</p>
+        <span class="code-label">Python</span>
+        <pre><code class="language-python">import apache_beam as beam
+
+with beam.Pipeline(options=pipeline_options) as p:
+    # データ読み込み (低リソース)
+    raw_data = (
+        p
+        | "Read" >> beam.io.ReadFromBigQuery(query=query)
+            .with_resource_hints(min_ram="4GB", cpu_count=2)
+    )
+
+    # データ変換 (高メモリ)
+    transformed = (
+        raw_data
+        | "Transform" >> beam.ParDo(HeavyTransformFn())
+            .with_resource_hints(min_ram="32GB", cpu_count=16)
+    )</code></pre>
+        <div class="success-box" style="margin-top: 12px;">
+          <strong>&#9989; 効果:</strong> 各ステップに最適な VM が自動選択され、低リソースステップでの過剰プロビジョニングを回避しつつ、高メモリステップでは十分なリソースが確保されます。
+        </div>
+      </div>
+
+      <div class="usecase-card">
+        <h3>&#128679; ユースケース 2: リソースプール枯渇エラーの回避</h3>
+        <p><strong>シナリオ:</strong> 特定のマシンタイプ (<code>n2-standard-16</code> など) を指定していたが、ゾーンのリソース不足により <code>RESOURCE_POOL_EXHAUSTED</code> エラーが頻発。</p>
+        <span class="code-label">Bash</span>
+        <pre><code class="language-bash"># 変更前: 特定のマシンタイプを指定
+python my_pipeline.py \
+  --runner=DataflowRunner \
+  --machine_type=n2-standard-16
+
+# 変更後: リソースヒントで要件を指定 (Auto VM Selection が自動有効化)
+python my_pipeline.py \
+  --runner=DataflowRunner \
+  --resource_hints=min_ram=64GB \
+  --resource_hints=cpu_count=16</code></pre>
+        <div class="success-box" style="margin-top: 12px;">
+          <strong>&#9989; 効果:</strong> 複数のマシンタイプ候補から利用可能な VM がプロビジョニングされ、リソースプール枯渇エラーのリスクが大幅に低減されます。
+        </div>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>&#128176; 料金情報</h2>
+      <p>Dataflow の料金は使用したリソース (vCPU、メモリ、ストレージ) に基づいて課金されます。<strong>Auto VM Selection 自体に追加料金はかかりません</strong>が、選択されるマシンタイプによってリソース単価が異なる場合があります。</p>
+      <div class="note-box">
+        <strong>&#128176; 料金構成:</strong> vCPU 時間、メモリ GB 時間、ストレージ GB 時間の各コンポーネントで計算されます。詳細は <a href="https://cloud.google.com/dataflow/pricing" target="_blank" class="gc-link">Dataflow 料金ページ</a> を参照してください。
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#128279; 関連サービス / 機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h3>&#9889; Dataflow Prime</h3>
+          <p>Vertical Autoscaling、Right Fitting、Job Visualizer などの高度な機能を提供するオプション。</p>
+        </div>
+        <div class="card">
+          <h3>&#128203; Apache Beam リソースヒント</h3>
+          <p>Right Fitting の基盤となる機能。パイプラインステップごとにリソース要件を宣言的に指定可能。</p>
+        </div>
+        <div class="card">
+          <h3>&#8596; Horizontal Autoscaling</h3>
+          <p>ワーカー数を自動調整する機能。Right Fitting と組み合わせてストリーミングパイプラインで使用可能。</p>
+        </div>
+        <div class="card">
+          <h3>&#128187; Compute Engine Instance Flexibility</h3>
+          <p>MIG で複数のマシンタイプを指定し、可用性を向上させる機能。Auto VM Selection の基盤技術。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>&#128206; 出典:</strong></p>
+      <ul style="list-style: none; padding: 0; margin: 4px 0;">
+        <li>&#128196; <a href="https://docs.cloud.google.com/release-notes#April_07_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li>&#128214; <a href="https://docs.cloud.google.com/dataflow/docs/guides/right-fitting#auto_vm_selection" target="_blank" rel="noopener noreferrer">Auto VM Selection ドキュメント</a></li>
+        <li>&#128214; <a href="https://docs.cloud.google.com/dataflow/docs/guides/right-fitting" target="_blank" rel="noopener noreferrer">Right Fitting ドキュメント</a></li>
+        <li>&#128214; <a href="https://docs.cloud.google.com/dataflow/docs/guides/enable-dataflow-prime" target="_blank" rel="noopener noreferrer">Dataflow Prime ドキュメント</a></li>
+        <li>&#128176; <a href="https://cloud.google.com/dataflow/pricing" target="_blank" rel="noopener noreferrer">料金ページ</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline);">Generated: 2026-04-08 | #Dataflow #AutoVMSelection #InstanceFlexibility #ResourceHints #RightFitting</p>
+    </footer>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

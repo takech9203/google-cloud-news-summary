@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Artifact Registry: Image Prewarm (手動イメージプリウォーム)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    /* Google Cloud Light Theme Base Styles */
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; }
+
+    h1 {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-devops {
+      background: var(--gc-orange);
+    }
+
+    .badge-api {
+      background: var(--gc-blue-800);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 8px;
+    }
+
+    /* Before/After */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h4 {
+      color: var(--gc-red);
+      font-weight: 600;
+      margin-bottom: 8px;
+      font-size: 16px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box h4 {
+      color: var(--gc-green);
+      font-weight: 600;
+      margin-bottom: 8px;
+      font-size: 16px;
+    }
+
+    .before-box ul, .after-box ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .before-box li, .after-box li {
+      padding: 4px 0;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .before-box li::before { content: "✕ "; color: var(--gc-red); font-weight: bold; }
+    .after-box li::before { content: "✓ "; color: var(--gc-green); font-weight: bold; }
+
+    /* Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    /* Feature cards */
+    .features-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .feature-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .feature-card.orange { border-left-color: var(--gc-orange); }
+    .feature-card.green { border-left-color: var(--gc-green); }
+    .feature-card.purple { border-left-color: var(--gc-purple); }
+
+    .feature-card h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 8px;
+    }
+
+    .feature-card p {
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* Mermaid */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* Code block */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 0;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      background: transparent;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Use case cards */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h3 {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--gc-blue-900);
+      margin-bottom: 8px;
+    }
+
+    .usecase-card .scenario {
+      font-size: 14px;
+      margin-bottom: 8px;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .usecase-card .effect {
+      font-size: 14px;
+      color: var(--gc-green);
+      font-weight: 500;
+    }
+
+    /* Warning box */
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Related services */
+    .related-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .related-item {
+      background: var(--gc-surface);
+      border-radius: 8px;
+      padding: 16px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .related-item h4 {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 4px;
+    }
+
+    .related-item p {
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    /* Merits/Demerits */
+    .merits-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .merit-section h3 {
+      font-size: 17px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .merit-section ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .merit-section li {
+      padding: 6px 0;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* Flow diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      h1 { font-size: 26px; }
+      .before-after, .features-grid, .stats-grid, .merits-grid, .related-grid {
+        grid-template-columns: 1fr;
+      }
+      .header { flex-direction: column; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>📦 Artifact Registry: Image Prewarm</h1>
+        <p class="subtitle">手動イメージプリウォームでコールドスタートレイテンシを大幅削減</p>
+        <div style="margin-top: 12px;">
+          <span class="badge badge-devops">Artifact Registry</span>
+          <span class="badge badge-api">API only</span>
+        </div>
+      </div>
+      <div class="subtitle" style="text-align: right;">
+        <div>2026-04-06</div>
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>Google Cloud は Artifact Registry に<span class="highlight">手動イメージプリウォーム機能</span>を追加しました。コンテナイメージを事前にウォームアップ (プリウォーム) することで、デプロイ時のコールドスタートレイテンシを大幅に削減できます。</p>
+      <p style="margin-top: 12px;">コンテナベースのワークロードでは、イメージのプルに要する時間がデプロイの初期化速度に直接影響します。特に大規模なイメージや、スケールアウト時に多数のノードで同時にイメージをプルする場合、レイテンシが顕著になります。Image Prewarm は、デプロイ前にイメージデータを事前にキャッシュすることで、この問題を解決します。</p>
+
+      <div class="note-box" style="margin-top: 16px;">
+        <strong>🎯 対象ユーザー:</strong> GKE や Cloud Run などでコンテナをデプロイする DevOps エンジニアやプラットフォームチームに特に有益です。
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value">20秒+</div>
+        <div class="stat-label">大規模イメージの従来のプル時間</div>
+      </div>
+      <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-green), #1B5E20);">
+        <div class="stat-value">大幅短縮</div>
+        <div class="stat-label">プリウォーム後のデプロイ時間</div>
+      </div>
+      <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-orange), #E65100);">
+        <div class="stat-value">API</div>
+        <div class="stat-label">現時点での提供方法</div>
+      </div>
+    </div>
+
+    <!-- Before / After -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h4>❌ アップデート前の課題</h4>
+          <ul>
+            <li>デプロイ時に毎回イメージの完全プルが必要で、大規模イメージでは 20 秒以上</li>
+            <li>スケールアウト時に複数ノードで同時プルが発生し、レイテンシ増大</li>
+            <li>Image streaming は自動キャッシュに依存し、初回プルでは恩恵なし</li>
+            <li>イメージのキャッシュ状態を事前に制御する手段がなかった</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h4>✅ アップデート後の改善</h4>
+          <ul>
+            <li>API でイメージを事前にプリウォームし、デプロイ前にキャッシュを準備</li>
+            <li>コールドスタートレイテンシの大幅削減が可能</li>
+            <li>デプロイのタイミングに合わせた計画的なイメージ準備</li>
+            <li>CI/CD パイプラインへの組み込みに適した設計</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>プリウォーム API を事前に呼び出してキャッシュを準備し、その後のデプロイでキャッシュ済みイメージを高速に取得する流れです。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+sequenceDiagram
+    participant User as DevOps エンジニア
+    participant API as Artifact Registry API
+    participant AR as Artifact Registry
+    participant Cache as プリウォームキャッシュ
+    participant GKE as GKE / Cloud Run
+
+    Note over User,GKE: Phase 1: イメージプリウォーム (デプロイ前)
+    User->>API: prewarm リクエスト送信
+    API->>AR: イメージ取得
+    AR->>Cache: イメージデータをキャッシュに配置
+    API-->>User: プリウォーム完了
+
+    Note over User,GKE: Phase 2: デプロイ (高速化)
+    User->>GKE: デプロイリクエスト
+    GKE->>Cache: キャッシュからイメージ取得
+    Cache-->>GKE: 高速レスポンス
+    GKE-->>User: デプロイ完了 (低レイテンシ)
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="features-grid">
+        <div class="feature-card">
+          <h3>📦 手動イメージプリウォーム</h3>
+          <p>API を通じて特定のコンテナイメージを事前にウォームアップ。デプロイ前にイメージデータをキャッシュに配置し、プル時間を短縮します。</p>
+        </div>
+        <div class="feature-card green">
+          <h3>🚀 コールドスタートレイテンシ削減</h3>
+          <p>通常 20 秒以上かかるケースがプリウォーム後は大幅に短縮。Image streaming と組み合わせてさらなる高速化が期待できます。</p>
+        </div>
+        <div class="feature-card orange">
+          <h3>🔧 API ベースの制御</h3>
+          <p>プログラマティックなイメージプリウォームが可能。CI/CD パイプラインへの組み込みに適した設計です。</p>
+        </div>
+        <div class="feature-card purple">
+          <h3>🔗 既存機能との補完</h3>
+          <p>Image streaming やセカンダリブートディスクと組み合わせることで、コンテナデプロイの最適化をさらに推進できます。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specs -->
+    <div class="section">
+      <h2>📐 技術仕様</h2>
+      <h3 style="font-size: 17px; font-weight: 600; color: var(--gc-on-surface); margin-bottom: 12px;">利用条件</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>利用方法</td>
+            <td>API のみ (gcloud CLI / Console 未対応)</td>
+          </tr>
+          <tr>
+            <td>対象リポジトリ</td>
+            <td>Artifact Registry Docker リポジトリ</td>
+          </tr>
+          <tr>
+            <td>認証</td>
+            <td>Artifact Registry への適切な IAM 権限が必要</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 style="font-size: 17px; font-weight: 600; color: var(--gc-on-surface); margin: 20px 0 12px;">関連する既存機能との比較</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>機能</th>
+            <th>特徴</th>
+            <th>制御方法</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Image Prewarm (新機能)</strong></td>
+            <td>手動で事前にキャッシュを準備</td>
+            <td>API</td>
+          </tr>
+          <tr>
+            <td>Image streaming</td>
+            <td>リクエスト時にデータをストリーミング</td>
+            <td>自動 (Container File System API 有効化)</td>
+          </tr>
+          <tr>
+            <td>Secondary boot disk</td>
+            <td>ノードのセカンダリディスクにイメージをプリロード</td>
+            <td>ノードプール設定</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <div class="note-box">
+        <strong>📋 前提条件:</strong>
+        <ul style="margin-top: 8px; padding-left: 20px; font-size: 14px;">
+          <li>Artifact Registry API が有効化されていること</li>
+          <li>対象の Docker リポジトリが Artifact Registry に存在すること</li>
+          <li>適切な IAM 権限が付与されていること</li>
+        </ul>
+      </div>
+
+      <h3 style="font-size: 17px; font-weight: 600; color: var(--gc-on-surface); margin: 20px 0 8px;">ステップ 1: API の有効化</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">Artifact Registry API の有効化</span>
+        </div>
+        <pre><code class="language-bash">gcloud services enable artifactregistry.googleapis.com</code></pre>
+      </div>
+
+      <h3 style="font-size: 17px; font-weight: 600; color: var(--gc-on-surface); margin: 20px 0 8px;">ステップ 2: API を使用したイメージのプリウォーム</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">プリウォーム API の呼び出し</span>
+        </div>
+        <pre><code class="language-bash">curl -X POST \
+  -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Content-Type: application/json" \
+  "https://artifactregistry.googleapis.com/v1/projects/PROJECT_ID/locations/LOCATION/repositories/REPOSITORY/dockerImages/IMAGE:TAG:prewarm"</code></pre>
+      </div>
+      <p style="font-size: 14px; margin-top: 8px;"><code>PROJECT_ID</code>、<code>LOCATION</code>、<code>REPOSITORY</code>、<code>IMAGE</code>、<code>TAG</code> を実際の値に置き換えてください。</p>
+    </div>
+
+    <!-- Merits / Demerits -->
+    <div class="section">
+      <h2>⚖️ メリット・デメリット</h2>
+      <div class="merits-grid">
+        <div class="merit-section">
+          <div class="after-box" style="height: 100%;">
+            <h4 style="color: var(--gc-green); font-weight: 600; margin-bottom: 12px;">✅ メリット</h4>
+            <p style="font-size: 13px; font-weight: 600; color: var(--gc-on-surface); margin: 8px 0 4px;">ビジネス面</p>
+            <ul style="list-style: none; padding: 0;">
+              <li style="padding: 3px 0; font-size: 13px;">✓ デプロイ速度向上でリリースサイクル高速化</li>
+              <li style="padding: 3px 0; font-size: 13px;">✓ スケールアウト時の応答遅延減少</li>
+              <li style="padding: 3px 0; font-size: 13px;">✓ 本番環境へのリリースがより予測可能に</li>
+            </ul>
+            <p style="font-size: 13px; font-weight: 600; color: var(--gc-on-surface); margin: 12px 0 4px;">技術面</p>
+            <ul style="list-style: none; padding: 0;">
+              <li style="padding: 3px 0; font-size: 13px;">✓ CI/CD パイプラインへの統合が容易</li>
+              <li style="padding: 3px 0; font-size: 13px;">✓ 既存機能との補完関係</li>
+              <li style="padding: 3px 0; font-size: 13px;">✓ キャッシュ準備のプログラマティック制御</li>
+            </ul>
+          </div>
+        </div>
+        <div class="merit-section">
+          <div class="before-box" style="height: 100%;">
+            <h4 style="color: var(--gc-red); font-weight: 600; margin-bottom: 12px;">⚠️ デメリット・制約事項</h4>
+            <p style="font-size: 13px; font-weight: 600; color: var(--gc-on-surface); margin: 8px 0 4px;">制限事項</p>
+            <ul style="list-style: none; padding: 0;">
+              <li style="padding: 3px 0; font-size: 13px;">✕ API のみで利用可能 (gcloud CLI / Console 未対応)</li>
+              <li style="padding: 3px 0; font-size: 13px;">✕ GUI でのプリウォーム状態確認不可</li>
+            </ul>
+            <p style="font-size: 13px; font-weight: 600; color: var(--gc-on-surface); margin: 12px 0 4px;">考慮点</p>
+            <ul style="list-style: none; padding: 0;">
+              <li style="padding: 3px 0; font-size: 13px;">✕ キャッシュ有効期間・保持ポリシーの確認が必要</li>
+              <li style="padding: 3px 0; font-size: 13px;">✕ 対象リージョンやフォーマット制約の可能性</li>
+              <li style="padding: 3px 0; font-size: 13px;">✕ 大量プリウォーム時のクォータ・レートリミットに注意</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h3>🛒 ユースケース 1: 大規模スケールアウトの事前準備</h3>
+        <p class="scenario"><strong>シナリオ:</strong> EC サイトのセール開始前に、アプリケーションコンテナを大量にスケールアウトする必要がある。通常のイメージプルでは、数十ノードで同時にプルが発生し、デプロイ完了まで数分を要していた。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">セール開始の30分前にプリウォームを実行</span>
+          </div>
+          <pre><code class="language-bash">curl -X POST \
+  -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Content-Type: application/json" \
+  "https://artifactregistry.googleapis.com/v1/projects/my-project/locations/asia-northeast1/repositories/my-repo/dockerImages/my-app:v2.1.0:prewarm"</code></pre>
+        </div>
+        <p class="effect">→ イメージが事前にキャッシュされ、スケールアウト時のプル時間が大幅短縮。セール開始時のレスポンス遅延を防止。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>🔄 ユースケース 2: CI/CD パイプラインでのデプロイ高速化</h3>
+        <p class="scenario"><strong>シナリオ:</strong> マイクロサービスアーキテクチャで複数のサービスを同時にデプロイする際、各サービスのイメージプルが並列で発生し、デプロイ全体の完了時間が長くなっていた。</p>
+        <p class="effect">→ デプロイステップの前にプリウォームステップを追加することで、キャッシュ済みイメージを使用でき、デプロイ時間を大幅短縮。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>🔒 ユースケース 3: 災害復旧 (DR) シナリオ</h3>
+        <p class="scenario"><strong>シナリオ:</strong> DR リージョンへのフェイルオーバー時、新しいリージョンでのイメージプルがボトルネックとなり、復旧時間 (RTO) が長くなっていた。</p>
+        <p class="effect">→ DR リージョンで定期的にプリウォームを実行しておくことで、フェイルオーバー時のイメージプル時間を削減し、RTO を短縮。</p>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="related-grid">
+        <div class="related-item">
+          <h4>🚀 GKE Image streaming</h4>
+          <p>コンテナイメージをストリーミング方式でプルし、初期化時間を短縮。プリウォームと組み合わせてさらなる効果が期待できます。</p>
+        </div>
+        <div class="related-item">
+          <h4>💾 GKE Secondary boot disk</h4>
+          <p>ノードのセカンダリブートディスクにイメージをプリロード。ノードレベルのキャッシュとして機能します。</p>
+        </div>
+        <div class="related-item">
+          <h4>☁️ Cloud Run</h4>
+          <p>Artifact Registry からイメージをプルしてサーバーレスで実行。プリウォームによりコールドスタートの改善が期待できます。</p>
+        </div>
+        <div class="related-item">
+          <h4>🔨 Cloud Build</h4>
+          <p>CI/CD パイプラインでイメージをビルドした後、プリウォーム API を呼び出す連携が可能です。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section" style="background: var(--gc-blue-tint); border: 2px solid var(--gc-blue-200);">
+      <h2>📝 まとめ</h2>
+      <p>Artifact Registry の Image Prewarm 機能は、コンテナデプロイ時のコールドスタートレイテンシという長年の課題に対する直接的な解決策です。API を通じてイメージを事前にキャッシュすることで、特に<span class="highlight">大規模なスケールアウト</span>や<span class="highlight">計画的なデプロイ</span>において大きな効果が期待できます。</p>
+      <p style="margin-top: 12px;">現時点では API のみの提供ですが、CI/CD パイプラインへの組み込みには十分であり、Image streaming やセカンダリブートディスクと併用することで、コンテナデプロイの最適化をさらに推進できます。</p>
+
+      <div class="warning-box" style="margin-top: 16px;">
+        <strong>💡 推奨アクション:</strong> まずは公式ドキュメントで API の詳細を確認し、開発環境での検証から始めることを推奨します。
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="list-style: none; padding: 0; margin-top: 8px;">
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/artifact-registry/docs/manage/prewarm-images" target="_blank" rel="noopener noreferrer">Artifact Registry ドキュメント - Prewarm images</a></li>
+        <li style="margin: 4px 0;"><a href="https://docs.cloud.google.com/release-notes#April_06_2026" target="_blank" rel="noopener noreferrer">Google Cloud Release Notes - April 06, 2026</a></li>
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/artifact-registry/pricing" target="_blank" rel="noopener noreferrer">Artifact Registry 料金ページ</a></li>
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/kubernetes-engine/docs/how-to/image-streaming" target="_blank" rel="noopener noreferrer">GKE Image streaming ドキュメント</a></li>
+      </ul>
+      <p style="margin-top: 12px; font-size: 11px; color: var(--gc-outline);">Generated on 2026-04-08 | #ArtifactRegistry #ImagePrewarm #ColdStart #GKE #CloudRun</p>
+    </footer>
+
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>
