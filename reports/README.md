@@ -5,6 +5,16 @@
 
 ## 2026 年
 
+- [2026-05-06 - Gemini Enterprise Agent Platform: Audio Track Extraction バグ修正](2026/2026-05-06-gemini-enterprise-agent-platform-audio-fix.md)
+- [2026-05-06 - Google Distributed Cloud (software only) for VMware: バージョン 1.35.0 リリース](2026/2026-05-06-google-distributed-cloud-vmware-1-35-0.md)
+- [2026-05-06 - Secure Source Manager: CODEOWNERS ファイルによるプルリクエスト必須レビュアー定義](2026/2026-05-06-secure-source-manager-codeowners.md)
+- [2026-05-06 - BigQuery: マルチリージョン共有リスティング GA と Data Transfer Service バックフィル制限の変更](2026/2026-05-06-bigquery-multi-region-sharing-data-transfer.md)
+- [2026-05-06 - Google Distributed Cloud (ベアメタル): バージョン 1.35.0 リリース](2026/2026-05-06-google-distributed-cloud-bare-metal-1-35-0.md)
+- [2026-05-06 - Oracle Database@Google Cloud: インドリージョン (ムンバイ・デリー) の Exascale / Base Database Service 対応](2026/2026-05-06-oracle-database-google-cloud-india-regions.md)
+- [2026-05-06 - Cloud Trace: リモート MCP サーバーの tools/call トレーススパン対応拡大](2026/2026-05-06-cloud-trace-mcp-server-spans.md)
+- [2026-05-06 - Cloud Composer: africa-south1 リージョンが Cloud Composer 3 専用に移行](2026/2026-05-06-cloud-composer-africa-south1-composer3.md)
+- [2026-05-05 - Google Cloud VMware Engine: ve2 ノードタイプが europe-west4 (オランダ) で利用可能に](2026/2026-05-05-vmware-engine-ve2-europe-west4.md)
+- [2026-05-05 - Gemini Enterprise: 新規データストアコネクタ (Public Preview)](2026/2026-05-05-gemini-enterprise-data-store-connectors.md)
 - [2026-05-04 - Google Cloud Contact Center as a Service (CCaaS): Version 4.26 Release](2026/2026-05-04-ccaas-4-26.md)
 - [2026-05-04 - Confidential Space: NVIDIA H100 GPU 既知の問題と回避策](2026/2026-05-04-confidential-space-h100-gpu-known-issue.md)
 - [2026-05-04 - Cloud SQL for SQL Server: PolyBase サポート (GA)](2026/2026-05-04-cloud-sql-sqlserver-polybase-ga.md)
