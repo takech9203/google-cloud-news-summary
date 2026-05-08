@@ -5,10 +5,15 @@
 
 ## 2026 年
 
+- [2026-05-07 - Gemini Enterprise Agent Platform: Gemini 3.1 Flash-Lite が一般提供開始](2026/2026-05-07-gemini-3-1-flash-lite-ga.md)
+- [2026-05-07 - Bigtable: Aerospike マイグレーションツール (Preview)](2026/2026-05-07-bigtable-aerospike-migration.md)
+- [2026-05-07 - Gemini Enterprise: Google Sites 用データストア (Preview)](2026/2026-05-07-gemini-enterprise-google-sites-data-store.md)
+- [2026-05-07 - Looker: Looker 26.8 リリース](2026/2026-05-07-looker-26-8-release.md)
 - [2026-05-07 - Apigee API hub: Unified MCP Proxy Configuration in API hub (Preview)](2026/2026-05-07-apigee-api-hub-mcp-proxy.md)
 - [2026-05-06 - Gemini Enterprise Agent Platform: Audio Track Extraction バグ修正](2026/2026-05-06-gemini-enterprise-agent-platform-audio-fix.md)
 - [2026-05-06 - Google Distributed Cloud (software only) for VMware: バージョン 1.35.0 リリース](2026/2026-05-06-google-distributed-cloud-vmware-1-35-0.md)
 - [2026-05-06 - Google Kubernetes Engine (GKE): Pod Snapshots GA / Confidential GKE Nodes ライブマイグレーション / Cloud Storage FUSE 修正](2026/2026-05-06-gke-pod-snapshots-confidential-nodes.md)
+- [2026-05-06 - Gemini Enterprise Agent Platform: Gemini 3.1 Flash Image / Gemini 3 Pro Image アップデート](2026/2026-05-06-gemini-3-1-flash-pro-image-updates.md)
 - [2026-05-06 - Secure Source Manager: CODEOWNERS ファイルによるプルリクエスト必須レビュアー定義](2026/2026-05-06-secure-source-manager-codeowners.md)
 - [2026-05-06 - BigQuery: マルチリージョン共有リスティング GA と Data Transfer Service バックフィル制限の変更](2026/2026-05-06-bigquery-multi-region-sharing-data-transfer.md)
 - [2026-05-06 - Google Distributed Cloud (ベアメタル): バージョン 1.35.0 リリース](2026/2026-05-06-google-distributed-cloud-bare-metal-1-35-0.md)
@@ -16,6 +21,7 @@
 - [2026-05-06 - Google Cloud CCaaS: iOS Mobile SDK v2.15.3 パッチ (チャット終了時クラッシュ修正)](2026/2026-05-06-ccaas-ios-sdk-2-15-3.md)
 - [2026-05-06 - Oracle Database@Google Cloud: インドリージョン (ムンバイ・デリー) の Exascale / Base Database Service 対応](2026/2026-05-06-oracle-database-google-cloud-india-regions.md)
 - [2026-05-06 - Cloud Trace: リモート MCP サーバーの tools/call トレーススパン対応拡大](2026/2026-05-06-cloud-trace-mcp-server-spans.md)
+- [2026-05-06 - Gemini Enterprise: 新規データストア追加 - Mermaid Chart, Blockscout, Open Targets, Apollo GraphOS MCP Tools](2026/2026-05-06-gemini-enterprise-new-data-stores.md)
 - [2026-05-06 - Cloud Composer: africa-south1 リージョンが Cloud Composer 3 専用に移行](2026/2026-05-06-cloud-composer-africa-south1-composer3.md)
 - [2026-05-05 - Google Cloud VMware Engine: ve2 ノードタイプが europe-west4 (オランダ) で利用可能に](2026/2026-05-05-vmware-engine-ve2-europe-west4.md)
 - [2026-05-05 - Google SecOps (SIEM): デフォルトパーサー大規模アップデート (2026年5月)](2026/2026-05-05-google-secops-parser-updates-may.md)
