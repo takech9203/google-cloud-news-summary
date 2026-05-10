@@ -11,6 +11,7 @@
 - [2026-05-08 - Looker / Dataplex: Dataplex Universal Catalog から Knowledge Catalog への名称変更](2026/2026-05-08-looker-dataplex-knowledge-catalog-rename.md)
 - [2026-05-08 - Storage Transfer Service: AWS GovCloud (US) リージョンのサポート](2026/2026-05-08-storage-transfer-service-aws-govcloud.md)
 - [2026-05-08 - Policy Controller: バージョン 1.23.2 リリース](2026/2026-05-08-policy-controller-v1-23-2.md)
+- [2026-05-08 - Gemini Enterprise Agent Platform: Provisioned Throughput 注文ページの改善](2026/2026-05-08-gemini-enterprise-agent-platform-provisioned-throughput.md)
 - [2026-05-08 - Cloud Workstations: ワークステーションクラスタの認可 URL 設定](2026/2026-05-08-cloud-workstations-authorization-url.md)
 - [2026-05-07 - Gemini Enterprise Agent Platform: Gemini 3.1 Flash-Lite が一般提供開始](2026/2026-05-07-gemini-3-1-flash-lite-ga.md)
 - [2026-05-07 - Bigtable: Aerospike マイグレーションツール (Preview)](2026/2026-05-07-bigtable-aerospike-migration.md)
