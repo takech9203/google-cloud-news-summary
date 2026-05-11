@@ -5,6 +5,10 @@
 
 ## 2026 年
 
+- [2026-05-11 - Security Command Center: Compliance Manager プロジェクトレベル有効化と Standard ティア拡張](2026/2026-05-11-security-command-center-compliance-manager-standard-tier.md)
+- [2026-05-11 - AlloyDB for PostgreSQL: Extended Support for EOL メジャーバージョン](2026/2026-05-11-alloydb-extended-support.md)
+- [2026-05-11 - Cloud SQL: Admin API リージョナルエンドポイント対応](2026/2026-05-11-cloud-sql-regional-endpoints.md)
+- [2026-05-11 - Cloud Trace: Observability バケットのサポートリージョン拡大](2026/2026-05-11-cloud-trace-observability-bucket-locations.md)
 - [2026-05-08 - BigQuery Data Transfer Service: 課金ラベルの更新](2026/2026-05-08-bigquery-data-transfer-service-billing-label.md)
 - [2026-05-08 - Gemini Enterprise: Box データストア (データフェデレーション) が GA](2026/2026-05-08-gemini-enterprise-box-data-federation-ga.md)
 - [2026-05-08 - Identity and Access Management: IAM Recommender による Google グループの過剰権限を Privileged Access Manager で修正](2026/2026-05-08-iam-pam-group-remediation.md)
