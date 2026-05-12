@@ -5,8 +5,14 @@
 
 ## 2026 年
 
+- [2026-05-12 - SAP on Google Cloud: BigQuery Connector for SAP バージョン 2.14 が GA](2026/2026-05-12-sap-bigquery-connector-v2-14.md)
+- [2026-05-12 - Apigee API hub: MCP ツールによるエージェント型 AI ワークフロー対応 (Preview)](2026/2026-05-12-apigee-api-hub-mcp-tools-agentic-ai.md)
+- [2026-05-12 - Compute Engine: AMD SEV-SNP セキュリティ脆弱性対応 (GCP-2026-031)](2026/2026-05-12-compute-engine-sev-snp-security-gcp-2026-031.md)
+- [2026-05-11 - Google Distributed Cloud (software only): バージョン 1.34.400-gke.88 リリース](2026/2026-05-11-google-distributed-cloud-1-34-400.md)
+- [2026-05-11 - Google Cloud VMware Engine: Privileged Access Manager (PAM) によるクラスタ削除機能](2026/2026-05-11-vmware-engine-pam-cluster-deletion.md)
 - [2026-05-11 - Security Command Center: Compliance Manager プロジェクトレベル有効化と Standard ティア拡張](2026/2026-05-11-security-command-center-compliance-manager-standard-tier.md)
 - [2026-05-11 - AlloyDB for PostgreSQL: Extended Support for EOL メジャーバージョン](2026/2026-05-11-alloydb-extended-support.md)
+- [2026-05-11 - Gemini Enterprise Agent Platform: Gemma 4 向け Provisioned Throughput の提供開始](2026/2026-05-11-gemini-enterprise-agent-platform-gemma-4-provisioned-throughput.md)
 - [2026-05-11 - Cloud SQL: Admin API リージョナルエンドポイント対応](2026/2026-05-11-cloud-sql-regional-endpoints.md)
 - [2026-05-11 - Cloud Trace: Observability バケットのサポートリージョン拡大](2026/2026-05-11-cloud-trace-observability-bucket-locations.md)
 - [2026-05-08 - BigQuery Data Transfer Service: 課金ラベルの更新](2026/2026-05-08-bigquery-data-transfer-service-billing-label.md)
