@@ -5,9 +5,16 @@
 
 ## 2026 年
 
+- [2026-05-13 - Vertex AI Search: Weight searchable fields (Preview)](2026/2026-05-13-vertex-ai-search-weight-searchable-fields.md)
+- [2026-05-12 - Buildpacks: Generic Builder が google-24 スタックを使用](2026/2026-05-12-buildpacks-generic-builder-google-24.md)
+- [2026-05-12 - BigQuery: AI.COUNT_TOKENS 関数およびトークン使用量表示](2026/2026-05-12-bigquery-ai-count-tokens.md)
 - [2026-05-12 - SAP on Google Cloud: BigQuery Connector for SAP バージョン 2.14 が GA](2026/2026-05-12-sap-bigquery-connector-v2-14.md)
 - [2026-05-12 - Apigee API hub: MCP ツールによるエージェント型 AI ワークフロー対応 (Preview)](2026/2026-05-12-apigee-api-hub-mcp-tools-agentic-ai.md)
+- [2026-05-12 - Compute Engine: AMD Zen 2 マイクロオペレーションキャッシュ脆弱性対応 (GCP-2026-032)](2026/2026-05-12-compute-engine-zen2-security-gcp-2026-032.md)
 - [2026-05-12 - Compute Engine: AMD SEV-SNP セキュリティ脆弱性対応 (GCP-2026-031)](2026/2026-05-12-compute-engine-sev-snp-security-gcp-2026-031.md)
+- [2026-05-12 - Cloud SQL: ネットワークアーキテクチャアップグレードコマンド再有効化](2026/2026-05-12-cloud-sql-network-architecture-upgrade.md)
+- [2026-05-12 - Gemini Enterprise: GitLab データストア接続 (Preview)](2026/2026-05-12-gemini-enterprise-gitlab-data-store.md)
+- [2026-05-12 - Apigee X: セキュリティアップデート バージョン 1-17-0-apigee-7](2026/2026-05-12-apigee-x-security-update-1-17-0-apigee-7.md)
 - [2026-05-11 - Google Distributed Cloud (software only): バージョン 1.34.400-gke.88 リリース](2026/2026-05-11-google-distributed-cloud-1-34-400.md)
 - [2026-05-11 - Google Cloud VMware Engine: Privileged Access Manager (PAM) によるクラスタ削除機能](2026/2026-05-11-vmware-engine-pam-cluster-deletion.md)
 - [2026-05-11 - Security Command Center: Compliance Manager プロジェクトレベル有効化と Standard ティア拡張](2026/2026-05-11-security-command-center-compliance-manager-standard-tier.md)
