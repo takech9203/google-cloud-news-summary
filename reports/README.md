@@ -5,9 +5,16 @@
 
 ## 2026 年
 
+- [2026-05-15 - Backup and DR Service: Cloud SQL Enhanced Backups における CMEK サポート](2026/2026-05-15-backup-and-dr-cmek-cloud-sql-enhanced-backups.md)
+- [2026-05-14 - Google Kubernetes Engine: Container-Optimized OS (COS) マイルストーン 129 以降で kubectl バイナリが削除](2026/2026-05-14-gke-cos-129-kubectl-removal.md)
+- [2026-05-14 - BigQuery: AI.KEY_DRIVERS 関数のプレビューが一時的に無効化](2026/2026-05-14-bigquery-ai-key-drivers-disabled.md)
+- [2026-05-14 - Google Kubernetes Engine: Managed OpenTelemetry マルチモーダルプロンプト・レスポンス収集 (Preview)](2026/2026-05-14-gke-managed-otel-multimodal-prompts.md)
+- [2026-05-14 - Cloud Load Balancing: カスタムヘッダー変数の追加 (asn, cloud_trace_id, hostname)](2026/2026-05-14-cloud-load-balancing-custom-header-variables.md)
+- [2026-05-14 - Google Kubernetes Engine: ノードプール同時アップグレード (Concurrent Node Pool Upgrades)](2026/2026-05-14-gke-concurrent-node-pool-upgrades.md)
 - [2026-05-14 - Cloud Spanner: Change Streams デフォルト保持期間の 7 日間への拡大](2026/2026-05-14-spanner-change-streams-retention-period.md)
 - [2026-05-14 - Cloud Key Management Service (Cloud KMS): Encryption metrics ダッシュボードおよびプロジェクトレベルの鍵追跡が GA](2026/2026-05-14-cloud-kms-encryption-metrics-dashboard-ga.md)
 - [2026-05-14 - Cloud Composer: google-api-core パッケージによるパフォーマンス低下問題](2026/2026-05-14-cloud-composer-google-api-core-performance-issue.md)
+- [2026-05-14 - Spanner: PostgreSQL ダイアレクト用サンプルデータセット](2026/2026-05-14-spanner-postgresql-sample-datasets.md)
 - [2026-05-13 - Cloud Service Mesh: セキュリティプロキシバージョン更新 (csm_mesh_proxy.20260423_RC03)](2026/2026-05-13-cloud-service-mesh-security-proxy-update.md)
 - [2026-05-13 - Vertex AI Search: Weight searchable fields (Preview)](2026/2026-05-13-vertex-ai-search-weight-searchable-fields.md)
 - [2026-05-13 - Google Kubernetes Engine (GKE): クラスタバージョンアップデート 2026-R19](2026/2026-05-13-gke-version-updates-2026-r19.md)
