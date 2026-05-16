@@ -5,11 +5,21 @@
 
 ## 2026 年
 
+- [2026-05-16 - Google SecOps SOAR: Release 6.3.84 全リージョン展開完了](2026/2026-05-16-google-secops-soar-release-6-3-84.md)
 - [2026-05-15 - Backup and DR Service: Cloud SQL Enhanced Backups における CMEK サポート](2026/2026-05-15-backup-and-dr-cmek-cloud-sql-enhanced-backups.md)
+- [2026-05-15 - Knowledge Catalog (Data Lineage): Dataproc カラムレベルリネージュ GA および Data Lineage API アップデート](2026/2026-05-15-knowledge-catalog-column-level-lineage-ga.md)
+- [2026-05-15 - Gemini Enterprise Agent Platform: エージェントリビジョン管理とトラフィック分割](2026/2026-05-15-gemini-enterprise-agent-platform-revisions-traffic-splitting.md)
+- [2026-05-15 - BigQuery: AI.DETECT_ANOMALIES 関数の単一入力テーブルサポートが GA](2026/2026-05-15-bigquery-ai-detect-anomalies-ga.md)
+- [2026-05-15 - Security Command Center: Vulnerability Assessment for Google Cloud が Image streaming 有効の GKE クラスタスキャンに対応](2026/2026-05-15-security-command-center-vulnerability-assessment-image-streaming.md)
+- [2026-05-15 - Cloud Logging / Cloud Monitoring (Ops Agent): Telemetry API によるログ・メトリクスのエクスポート](2026/2026-05-15-ops-agent-telemetry-api.md)
+- [2026-05-15 - Cloud Build: ビルド構成ファイルにおける results フィールドのサポート](2026/2026-05-15-cloud-build-results-field-attestation.md)
+- [2026-05-15 - Google Cloud VMware Engine: ve1 ハードウェア End-of-Life (EoL) 移行ガイド公開](2026/2026-05-15-vmware-engine-ve1-eol-migration.md)
+- [2026-05-15 - Vertex AI Search: Agent Search for healthcare の廃止](2026/2026-05-15-vertex-ai-search-healthcare-deprecated.md)
 - [2026-05-14 - Google Kubernetes Engine: Container-Optimized OS (COS) マイルストーン 129 以降で kubectl バイナリが削除](2026/2026-05-14-gke-cos-129-kubectl-removal.md)
 - [2026-05-14 - BigQuery: AI.KEY_DRIVERS 関数のプレビューが一時的に無効化](2026/2026-05-14-bigquery-ai-key-drivers-disabled.md)
 - [2026-05-14 - Google Kubernetes Engine: Managed OpenTelemetry マルチモーダルプロンプト・レスポンス収集 (Preview)](2026/2026-05-14-gke-managed-otel-multimodal-prompts.md)
 - [2026-05-14 - Cloud Load Balancing: カスタムヘッダー変数の追加 (asn, cloud_trace_id, hostname)](2026/2026-05-14-cloud-load-balancing-custom-header-variables.md)
+- [2026-05-14 - Gemini Enterprise Agent Platform: Priority PayGo が一般提供 (GA) に](2026/2026-05-14-gemini-enterprise-agent-platform-priority-paygo-ga.md)
 - [2026-05-14 - Google Kubernetes Engine: ノードプール同時アップグレード (Concurrent Node Pool Upgrades)](2026/2026-05-14-gke-concurrent-node-pool-upgrades.md)
 - [2026-05-14 - Cloud Spanner: Change Streams デフォルト保持期間の 7 日間への拡大](2026/2026-05-14-spanner-change-streams-retention-period.md)
 - [2026-05-14 - Cloud Key Management Service (Cloud KMS): Encryption metrics ダッシュボードおよびプロジェクトレベルの鍵追跡が GA](2026/2026-05-14-cloud-kms-encryption-metrics-dashboard-ga.md)
