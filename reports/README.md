@@ -5,6 +5,7 @@
 
 ## 2026 年
 
+- [2026-05-17 - Google SecOps SOAR: Release 6.3.85](2026/2026-05-17-google-secops-soar-release-6-3-85.md)
 - [2026-05-16 - Google SecOps SOAR: Release 6.3.84 全リージョン展開完了](2026/2026-05-16-google-secops-soar-release-6-3-84.md)
 - [2026-05-15 - Backup and DR Service: Cloud SQL Enhanced Backups における CMEK サポート](2026/2026-05-15-backup-and-dr-cmek-cloud-sql-enhanced-backups.md)
 - [2026-05-15 - Knowledge Catalog (Data Lineage): Dataproc カラムレベルリネージュ GA および Data Lineage API アップデート](2026/2026-05-15-knowledge-catalog-column-level-lineage-ga.md)
