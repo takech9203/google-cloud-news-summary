@@ -5,7 +5,12 @@
 
 ## 2026 年
 
+- [2026-05-18 - BigQuery: カスタム組織ポリシーによるワークロード管理リソースの制御](2026/2026-05-18-bigquery-custom-org-policy-workload-management.md)
+- [2026-05-18 - NetApp Volumes: Flex Unified リージョン拡大・レプリケーション GA・ONTAP-mode 機能強化](2026/2026-05-18-netapp-volumes-flex-unified-expansion.md)
+- [2026-05-18 - Cloud Bigtable: Row-Affinity ルーティングの Google Cloud コンソール対応](2026/2026-05-18-bigtable-row-affinity-routing-console.md)
+- [2026-05-18 - BigQuery: Studio Git Repositories によるフォルダベースのバージョン管理](2026/2026-05-18-bigquery-studio-git-repositories.md)
 - [2026-05-17 - Google SecOps SOAR: Release 6.3.85](2026/2026-05-17-google-secops-soar-release-6-3-85.md)
+- [2026-05-17 - Gemini Enterprise: Agent Designer のデフォルトモデルが Gemini 3.1 Pro に変更](2026/2026-05-17-gemini-enterprise-agent-designer-gemini-3-1-pro.md)
 - [2026-05-16 - Google SecOps SOAR: Release 6.3.84 全リージョン展開完了](2026/2026-05-16-google-secops-soar-release-6-3-84.md)
 - [2026-05-15 - Backup and DR Service: Cloud SQL Enhanced Backups における CMEK サポート](2026/2026-05-15-backup-and-dr-cmek-cloud-sql-enhanced-backups.md)
 - [2026-05-15 - Knowledge Catalog (Data Lineage): Dataproc カラムレベルリネージュ GA および Data Lineage API アップデート](2026/2026-05-15-knowledge-catalog-column-level-lineage-ga.md)
