@@ -5,8 +5,12 @@
 
 ## 2026 年
 
+- [2026-05-19 - Oracle Database@Google Cloud: ローカルピアデータベース向け Autonomous Data Guard](2026/2026-05-19-oracle-database-google-cloud-autonomous-data-guard.md)
+- [2026-05-18 - BigQuery: Reservation Groups によるアイドルスロットの優先共有](2026/2026-05-18-bigquery-reservation-groups.md)
 - [2026-05-18 - BigQuery: カスタム組織ポリシーによるワークロード管理リソースの制御](2026/2026-05-18-bigquery-custom-org-policy-workload-management.md)
 - [2026-05-18 - NetApp Volumes: Flex Unified リージョン拡大・レプリケーション GA・ONTAP-mode 機能強化](2026/2026-05-18-netapp-volumes-flex-unified-expansion.md)
+- [2026-05-18 - Google SecOps: Enhanced Data Export API GA](2026/2026-05-18-google-secops-enhanced-data-export-api.md)
+- [2026-05-18 - Google Distributed Cloud (software only): バージョン 1.33.800-gke.75 リリース](2026/2026-05-18-google-distributed-cloud-1-33-800.md)
 - [2026-05-18 - Cloud Bigtable: Row-Affinity ルーティングの Google Cloud コンソール対応](2026/2026-05-18-bigtable-row-affinity-routing-console.md)
 - [2026-05-18 - BigQuery: Studio Git Repositories によるフォルダベースのバージョン管理](2026/2026-05-18-bigquery-studio-git-repositories.md)
 - [2026-05-17 - Google SecOps SOAR: Release 6.3.85](2026/2026-05-17-google-secops-soar-release-6-3-85.md)
