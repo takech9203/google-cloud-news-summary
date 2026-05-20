@@ -5,6 +5,21 @@
 
 ## 2026 年
 
+- [2026-05-20 - Guest Environment: ゲストエージェント再起動によるコアプラグイン障害の修正](2026/2026-05-20-guest-environment-agent-restart-fix.md)
+- [2026-05-20 - Google SecOps Marketplace: コネクタ・インテグレーション一括アップデート (2026年5月)](2026/2026-05-20-google-secops-marketplace-connector-updates-may.md)
+- [2026-05-20 - Cloud Service Mesh: Istio API ステータスコードレポート機能](2026/2026-05-20-cloud-service-mesh-istio-api-status-codes.md)
+- [2026-05-20 - Apigee X: SetIntegrationRequest ポリシーにおける SSRF 脆弱性 (CVE-2026-2264)](2026/2026-05-20-apigee-x-security-cve-2026-2264.md)
+- [2026-05-20 - Oracle Database@Google Cloud: OCI GoldenGate サポート](2026/2026-05-20-oracle-database-google-cloud-goldengate.md)
+- [2026-05-19 - Gemini Enterprise Agent Platform: Managed Agents API / Gemini 3.5 Flash GA / Skill Registry / AI Content Detection API](2026/2026-05-19-gemini-enterprise-agent-platform-managed-agents-api.md)
+- [2026-05-19 - Gemini Enterprise: Crossbeam データストア対応 & Gemini 3.5 Flash GA](2026/2026-05-19-gemini-enterprise-crossbeam-gemini-3-5-flash.md)
+- [2026-05-19 - Apigee hybrid: v1.16.3 パッチリリース](2026/2026-05-19-apigee-hybrid-v1-16-3.md)
+- [2026-05-19 - Security Command Center: Vulnerability Assessment for Google Cloud が XFS および NTFS ディスクパーティションのスキャンに対応](2026/2026-05-19-security-command-center-xfs-ntfs-scanning.md)
+- [2026-05-19 - Cloud Load Balancing: Google tag gateway for advertisers](2026/2026-05-19-cloud-load-balancing-google-tag-gateway.md)
+- [2026-05-19 - Virtual Private Cloud: VPC Network Peering 削除リクエストのキャンセル機能](2026/2026-05-19-vpc-network-peering-cancel-deletion.md)
+- [2026-05-19 - Certificate Manager: 第 2 世代 (2nd gen) が Preview で利用可能に](2026/2026-05-19-certificate-manager-2nd-gen.md)
+- [2026-05-19 - Google Cloud Contact Center as a Service (CCaaS): バージョン 4.30 リリース](2026/2026-05-19-ccaas-4-30.md)
+- [2026-05-19 - Config Connector: バージョン 1.151.0 リリース](2026/2026-05-19-config-connector-v1-151-0.md)
+- [2026-05-19 - BigQuery: AI.PARSE_DOCUMENT 関数によるドキュメントパース](2026/2026-05-19-bigquery-ai-parse-document.md)
 - [2026-05-19 - Oracle Database@Google Cloud: ローカルピアデータベース向け Autonomous Data Guard](2026/2026-05-19-oracle-database-google-cloud-autonomous-data-guard.md)
 - [2026-05-18 - BigQuery: Reservation Groups によるアイドルスロットの優先共有](2026/2026-05-18-bigquery-reservation-groups.md)
 - [2026-05-18 - BigQuery: カスタム組織ポリシーによるワークロード管理リソースの制御](2026/2026-05-18-bigquery-custom-org-policy-workload-management.md)
