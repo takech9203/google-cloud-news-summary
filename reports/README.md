@@ -5,7 +5,18 @@
 
 ## 2026 年
 
+- [2026-05-21 - Security Command Center: Risk Engine が Cloud Build リソースに関連する Toxic Combination を検出](2026/2026-05-21-security-command-center-risk-engine-cloud-build.md)
+- [2026-05-21 - SAP on Google Cloud: Agent for SAP バージョン 3.14 GA - CMEK によるディスクスナップショットリカバリ暗号化サポート](2026/2026-05-21-sap-agent-v3-14-cmek.md)
+- [2026-05-21 - App Engine standard environment: Migration Hub で Cloud Run への移行とコスト最適化を実現](2026/2026-05-21-app-engine-migration-hub-cloud-run.md)
+- [2026-05-21 - Google Cloud CCaaS: 2026年5月バグ修正リリース](2026/2026-05-21-ccaas-bug-fixes-may-21.md)
+- [2026-05-21 - Secure Web Proxy: ネクストホップモードでの全ポートリスニング機能](2026/2026-05-21-secure-web-proxy-all-ports-next-hop.md)
+- [2026-05-21 - Apigee X: Model Armor レスポンスパース修正 (1-17-0-apigee-8)](2026/2026-05-21-apigee-x-model-armor-fix-1-17-0-apigee-8.md)
+- [2026-05-20 - reCAPTCHA: Mobile SDK v18.9.1 for iOS - シンボル衝突の修正](2026/2026-05-20-recaptcha-mobile-sdk-v18-9-1-ios.md)
+- [2026-05-20 - Cloud Service Mesh: EnvoyFilter API の限定サポート (Stable チャネル)](2026/2026-05-20-cloud-service-mesh-envoyfilter-api.md)
+- [2026-05-20 - Gemini Enterprise (NotebookLM Enterprise): Podcast API の非推奨化](2026/2026-05-20-gemini-enterprise-notebooklm-podcast-deprecated.md)
+- [2026-05-20 - Google Cloud VMware Engine: ve1 SKU の 1 年間 CUD が europe-west2 リージョンで販売終了](2026/2026-05-20-vmware-engine-ve1-cuds-end-of-sale-europe-west2.md)
 - [2026-05-20 - Guest Environment: ゲストエージェント再起動によるコアプラグイン障害の修正](2026/2026-05-20-guest-environment-agent-restart-fix.md)
+- [2026-05-20 - BigQuery: Python UDFs GA / AI.AGG 関数プレビュー / クエリ再実行機能](2026/2026-05-20-bigquery-python-udfs-ga-ai-agg.md)
 - [2026-05-20 - Google SecOps Marketplace: コネクタ・インテグレーション一括アップデート (2026年5月)](2026/2026-05-20-google-secops-marketplace-connector-updates-may.md)
 - [2026-05-20 - Cloud Service Mesh: Istio API ステータスコードレポート機能](2026/2026-05-20-cloud-service-mesh-istio-api-status-codes.md)
 - [2026-05-20 - Apigee X: SetIntegrationRequest ポリシーにおける SSRF 脆弱性 (CVE-2026-2264)](2026/2026-05-20-apigee-x-security-cve-2026-2264.md)
