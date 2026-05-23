@@ -5,8 +5,10 @@
 
 ## 2026 年
 
+- [2026-05-23 - Google SecOps SOAR: Release 6.3.85 全リージョン提供開始](2026/2026-05-23-google-secops-soar-release-6-3-85.md)
 - [2026-05-22 - Security Command Center: Compliance Manager フレームワーク更新 & Artifact Guard Preview](2026/2026-05-22-security-command-center-compliance-artifact-guard.md)
 - [2026-05-22 - Key Access Justifications: デフォルトポリシーの一般提供開始 (GA)](2026/2026-05-22-key-access-justifications-default-policies.md)
+- [2026-05-22 - Apigee X / Apigee hybrid: Apigee Emulator v2.0.0 独立リリース + Apigee hybrid v1.14.5 セキュリティパッチ](2026/2026-05-22-apigee-emulator-v2-hybrid-v1-14-5.md)
 - [2026-05-22 - Database Center: Generative Views (Gemini によるダッシュボードビュー生成)](2026/2026-05-22-database-center-generative-views-gemini.md)
 - [2026-05-22 - Cloud Load Balancing: Traffic Duration 設定と In-Flight バランシングモードが GA](2026/2026-05-22-cloud-load-balancing-traffic-duration-in-flight.md)
 - [2026-05-22 - Cloud Database Migration Service: Cloud SQL for SQL Server ソースの専用サポート](2026/2026-05-22-dms-cloud-sql-sql-server-source.md)
