@@ -5,6 +5,7 @@
 
 ## 2026 年
 
+- [2026-05-24 - Google SecOps SOAR: Release 6.3.86 第1段階リージョン展開開始](2026/2026-05-24-google-secops-soar-release-6-3-86.md)
 - [2026-05-23 - Google SecOps SOAR: Release 6.3.85 全リージョン提供開始](2026/2026-05-23-google-secops-soar-release-6-3-85.md)
 - [2026-05-22 - Security Command Center: Compliance Manager フレームワーク更新 & Artifact Guard Preview](2026/2026-05-22-security-command-center-compliance-artifact-guard.md)
 - [2026-05-22 - Key Access Justifications: デフォルトポリシーの一般提供開始 (GA)](2026/2026-05-22-key-access-justifications-default-policies.md)
