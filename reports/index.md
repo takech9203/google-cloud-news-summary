@@ -5,6 +5,7 @@
 
 ## 2026 年
 
+- [2026-05-25 - Knowledge Catalog (Dataplex): データプロダクト機能が GA (一般提供) に](2026/2026-05-25-knowledge-catalog-data-products-ga.md)
 - [2026-05-24 - Google SecOps SOAR: Release 6.3.86 第1段階リージョン展開開始](2026/2026-05-24-google-secops-soar-release-6-3-86.md)
 - [2026-05-23 - Google SecOps SOAR: Release 6.3.85 全リージョン提供開始](2026/2026-05-23-google-secops-soar-release-6-3-85.md)
 - [2026-05-22 - Security Command Center: Compliance Manager フレームワーク更新 & Artifact Guard Preview](2026/2026-05-22-security-command-center-compliance-artifact-guard.md)
