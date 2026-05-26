@@ -5,8 +5,17 @@
 
 ## 2026 年
 
+- [2026-05-26 - Cloud Trace: リモート MCP サーバーの tools/call オペレーションに対するトレーススパン自動生成](2026/2026-05-26-cloud-trace-mcp-server-spans.md)
+- [2026-05-26 - Gemini Enterprise Agent Platform: Gemini Deep Research Agent](2026/2026-05-26-gemini-deep-research-agent.md)
+- [2026-05-26 - Generative AI on Vertex AI: Vertex AI Extensions の廃止と Agent Platform への移行](2026/2026-05-26-vertex-ai-extensions-deprecation.md)
+- [2026-05-26 - Cloud Load Balancing: リージョナル/クロスリージョン ロードバランサにおける IPv6 フロントエンド構成サポート](2026/2026-05-26-cloud-load-balancing-ipv6-frontend.md)
+- [2026-05-26 - BigQuery / Colab Enterprise: Data Science Agent が GA (一般提供) に](2026/2026-05-26-bigquery-data-science-agent-ga.md)
+- [2026-05-26 - Google Cloud Contact Center as a Service (CCaaS): 2026年5月バグ修正リリース](2026/2026-05-26-ccaas-bug-fixes-may-26.md)
+- [2026-05-26 - Cloud CDN: URL マップレベルでのキャッシュポリシー設定が GA](2026/2026-05-26-cloud-cdn-cache-policies-url-maps.md)
 - [2026-05-25 - Knowledge Catalog (Dataplex): データプロダクト機能が GA (一般提供) に](2026/2026-05-25-knowledge-catalog-data-products-ga.md)
+- [2026-05-25 - Google Kubernetes Engine (GKE): トレーニング JobSet Goodput メトリクスの追加](2026/2026-05-25-gke-training-jobset-metrics.md)
 - [2026-05-24 - Google SecOps SOAR: Release 6.3.86 第1段階リージョン展開開始](2026/2026-05-24-google-secops-soar-release-6-3-86.md)
+- [2026-05-24 - Google SecOps SOAR: Calculated Fields (計算フィールド)](2026/2026-05-24-google-secops-calculated-fields.md)
 - [2026-05-23 - Google SecOps SOAR: Release 6.3.85 全リージョン提供開始](2026/2026-05-23-google-secops-soar-release-6-3-85.md)
 - [2026-05-22 - Security Command Center: Compliance Manager フレームワーク更新 & Artifact Guard Preview](2026/2026-05-22-security-command-center-compliance-artifact-guard.md)
 - [2026-05-22 - Key Access Justifications: デフォルトポリシーの一般提供開始 (GA)](2026/2026-05-22-key-access-justifications-default-policies.md)
