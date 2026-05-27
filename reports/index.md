@@ -5,11 +5,22 @@
 
 ## 2026 年
 
+- [2026-05-27 - Knowledge Catalog: データリネージリモート MCP サーバー (Preview)](2026/2026-05-27-knowledge-catalog-data-lineage-mcp-server.md)
+- [2026-05-27 - App Engine standard environment: レガシーバンドルサービスの選択的有効化](2026/2026-05-27-app-engine-bundled-services-selective-enable.md)
+- [2026-05-27 - Cloud SDK: Cloud SDK 570.0.0 リリース](2026/2026-05-27-cloud-sdk-570.md)
+- [2026-05-27 - Google SecOps Marketplace: Cloud Identity 連携の追加](2026/2026-05-27-secops-marketplace-cloud-identity.md)
+- [2026-05-27 - Google Cloud Marketplace Partners: レポート配信の高速化 (D+2 から D+1 へ)](2026/2026-05-27-marketplace-partners-report-acceleration.md)
+- [2026-05-27 - BigQuery: Simba ODBC ドライバーの更新版リリース](2026/2026-05-27-bigquery-simba-odbc-driver.md)
+- [2026-05-27 - Oracle Database@Google Cloud: メルボルンおよびミラノリージョンの新規追加](2026/2026-05-27-oracle-database-google-cloud-melbourne-milan.md)
+- [2026-05-26 - Google Kubernetes Engine (GKE): Cloud Storage FUSE CSI ドライバーが Google Cloud Dedicated クラスタに対応](2026/2026-05-26-gke-cloud-storage-fuse-dedicated.md)
+- [2026-05-26 - Gemini Enterprise Agent Platform: Agent Platform Sandboxes](2026/2026-05-26-gemini-agent-platform-sandboxes.md)
+- [2026-05-26 - Gemini Enterprise: Assist 廃止、PagerDuty データストア (Preview)、Gemini 3.5 Flash 管理者制御](2026/2026-05-26-gemini-enterprise-pagerduty-flash.md)
 - [2026-05-26 - Cloud Trace: リモート MCP サーバーの tools/call オペレーションに対するトレーススパン自動生成](2026/2026-05-26-cloud-trace-mcp-server-spans.md)
 - [2026-05-26 - Gemini Enterprise Agent Platform: Gemini Deep Research Agent](2026/2026-05-26-gemini-deep-research-agent.md)
 - [2026-05-26 - Generative AI on Vertex AI: Vertex AI Extensions の廃止と Agent Platform への移行](2026/2026-05-26-vertex-ai-extensions-deprecation.md)
 - [2026-05-26 - Cloud Load Balancing: リージョナル/クロスリージョン ロードバランサにおける IPv6 フロントエンド構成サポート](2026/2026-05-26-cloud-load-balancing-ipv6-frontend.md)
 - [2026-05-26 - BigQuery / Colab Enterprise: Data Science Agent が GA (一般提供) に](2026/2026-05-26-bigquery-data-science-agent-ga.md)
+- [2026-05-26 - Container Optimized OS: cos-129-19506-120-115 セキュリティおよびバグ修正アップデート](2026/2026-05-26-container-optimized-os-cos-129-security.md)
 - [2026-05-26 - Google Cloud Contact Center as a Service (CCaaS): 2026年5月バグ修正リリース](2026/2026-05-26-ccaas-bug-fixes-may-26.md)
 - [2026-05-26 - Cloud CDN: URL マップレベルでのキャッシュポリシー設定が GA](2026/2026-05-26-cloud-cdn-cache-policies-url-maps.md)
 - [2026-05-25 - Knowledge Catalog (Dataplex): データプロダクト機能が GA (一般提供) に](2026/2026-05-25-knowledge-catalog-data-products-ga.md)
