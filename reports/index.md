@@ -6,6 +6,7 @@
 ## 2026 年
 
 - [2026-05-29 - Apigee X: Apigee UI での Spaces 管理機能の追加](2026/2026-05-29-apigee-x-manage-spaces-ui.md)
+- [2026-05-29 - Google Kubernetes Engine: Gateway バックエンド認証 TLS サポートと Workload Identity 接続問題](2026/2026-05-29-gke-gateway-backend-tls-workload-identity.md)
 - [2026-05-28 - Gemini Enterprise: Core Assistant の一般提供開始と Trace/Metrics 機能のプレビューリリース](2026/2026-05-28-gemini-enterprise-core-assistant-ga.md)
 - [2026-05-28 - Google SecOps: Chronicle API v1 統合アップグレードとプレビュー機能管理](2026/2026-05-28-google-secops-chronicle-api-v1-preview-features.md)
 - [2026-05-28 - Secure Source Manager: Git-over-SSH レガシーアルゴリズムのサポート廃止](2026/2026-05-28-secure-source-manager-ssh-algorithms.md)
