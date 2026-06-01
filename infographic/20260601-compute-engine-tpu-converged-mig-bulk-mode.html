@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Compute Engine: TPU 統合管理と MIG バルクモード</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1 {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .card-teal {
+      border-left-color: var(--gc-teal);
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge-ga {
+      display: inline-block;
+      background: var(--gc-green);
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge-service {
+      display: inline-block;
+      background: var(--gc-blue-600);
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .before-box h4, .after-box h4 {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .before-box h4 { color: var(--gc-red); }
+    .after-box h4 { color: var(--gc-green); }
+
+    .before-box ul, .after-box ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 4px 0;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.green {
+      background: linear-gradient(135deg, var(--gc-green), #1E8E3E);
+    }
+
+    .stat-card.purple {
+      background: linear-gradient(135deg, var(--gc-purple), #7B1FA2);
+    }
+
+    .stat-card.teal {
+      background: linear-gradient(135deg, var(--gc-teal), #00838F);
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-900);
+      margin: 0 0 8px 0;
+    }
+
+    .usecase-card p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid) {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stat-grid { grid-template-columns: 1fr; }
+      .feature-grid { grid-template-columns: 1fr; }
+      .flow-diagram { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>Compute Engine: TPU 統合管理と MIG バルクモード</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge-service">Compute Engine</span>
+          <span class="badge-ga">GA</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-06-01</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>☁️ 概要</h2>
+      <p>Google Cloud は Compute Engine において 2 つの重要な機能を一般提供 (GA) として発表しました。</p>
+
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">1</div>
+          <div class="stat-label">統一 API で<br>GPU + TPU を管理</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-value">100%</div>
+          <div class="stat-label">バルクモードで<br>一括プロビジョニング</div>
+        </div>
+        <div class="stat-card purple">
+          <div class="stat-value">0</div>
+          <div class="stat-label">部分プロビジョニング<br>による無駄なコスト</div>
+        </div>
+      </div>
+
+      <div class="note-box">
+        <strong>💡 ポイント:</strong> TPU を Compute Engine API から直接管理する「コンバージド体験」と、MIG バルクモードによる一括プロビジョニングの組み合わせで、大規模 AI/ML ワークロードの管理が大幅に簡素化されます。
+      </div>
+    </div>
+
+    <!-- Before/After 比較 -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h4>❌ Before</h4>
+          <ul>
+            <li>TPU VM の管理には専用の Cloud TPU API が必要</li>
+            <li>GPU と TPU で別々の API、CLI、ワークフロー</li>
+            <li>MIG で VM がリソース利用可能順に個別作成</li>
+            <li>部分プロビジョニング状態でもコスト発生</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h4>✅ After</h4>
+          <ul>
+            <li>Compute Engine API から TPU VM を直接管理</li>
+            <li>GPU と同じワークフローで TPU を運用可能</li>
+            <li>バルクモードで全 VM を一括プロビジョニング</li>
+            <li>無駄なコストを完全に回避</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>Compute Engine API を通じて GPU と TPU を統合管理するアーキテクチャと、MIG バルクモードによる一括プロビジョニングの概念図です。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TB
+    subgraph User["ユーザー / オーケストレーション"]
+        CLI["gcloud CLI"]
+        Console["Cloud Console"]
+        API["REST API / SDK"]
+    end
+
+    subgraph CE["Compute Engine API - 統合管理レイヤー"]
+        InstanceAPI["Instance API"]
+        MIGAPI["MIG API"]
+    end
+
+    subgraph MIG_Config["MIG Target Size Policy"]
+        Individual["Individual モード"]
+        Bulk["Bulk モード"]
+    end
+
+    subgraph Accelerators["AI アクセラレータ"]
+        GPU["GPU VM"]
+        TPU["TPU VM"]
+        TPU_Slice["TPU スライス"]
+    end
+
+    subgraph Consumption["消費オプション"]
+        OnDemand["オンデマンド"]
+        Spot["Spot VM"]
+        Reserved["予約"]
+    end
+
+    CLI --> CE
+    Console --> CE
+    API --> CE
+
+    InstanceAPI --> GPU
+    InstanceAPI --> TPU
+    MIGAPI --> MIG_Config
+    MIG_Config --> GPU
+    MIG_Config --> TPU_Slice
+
+    Bulk --> |"全VM一括作成"| TPU_Slice
+
+    TPU --> Consumption
+    TPU_Slice --> Consumption
+        </pre>
+      </div>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+
+      <div class="feature-grid">
+        <div class="card">
+          <h3>🔗 TPU の Compute Engine 統合管理</h3>
+          <div class="check-item"><span style="color: var(--gc-green);">✓</span> <span>Instance API で TPU VM を作成・管理</span></div>
+          <div class="check-item"><span style="color: var(--gc-green);">✓</span> <span>MIG API で TPU グループ管理</span></div>
+          <div class="check-item"><span style="color: var(--gc-green);">✓</span> <span>カスタム OS、ブートディスクサイズ対応</span></div>
+          <div class="check-item"><span style="color: var(--gc-green);">✓</span> <span>全消費オプション (オンデマンド/Spot/予約)</span></div>
+        </div>
+        <div class="card card-purple">
+          <h3>🧩 TPU スライスの統合管理</h3>
+          <div class="check-item"><span style="color: var(--gc-green);">✓</span> <span>Compute Engine API からスライス作成</span></div>
+          <div class="check-item"><span style="color: var(--gc-green);">✓</span> <span>マルチホスト TPU スライスを MIG で管理</span></div>
+          <div class="check-item"><span style="color: var(--gc-green);">✓</span> <span>自動修復・自動更新機能の適用</span></div>
+        </div>
+        <div class="card card-green">
+          <h3>📦 MIG バルクモード</h3>
+          <div class="check-item"><span style="color: var(--gc-green);">✓</span> <span><code>--target-size-policy-mode=bulk</code> で有効化</span></div>
+          <div class="check-item"><span style="color: var(--gc-green);">✓</span> <span>全 VM を一括プロビジョニング</span></div>
+          <div class="check-item"><span style="color: var(--gc-green);">✓</span> <span>リソース不足時は全揃いまで待機</span></div>
+          <div class="check-item"><span style="color: var(--gc-green);">✓</span> <span>部分プロビジョニングを完全回避</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>📋 技術仕様</h2>
+
+      <h3>TPU 統合管理の対応範囲</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>API</td>
+            <td>Compute Engine Instance API, MIG API</td>
+          </tr>
+          <tr>
+            <td>TPU バージョン</td>
+            <td>TPU v5e, v5p, v6e (Trillium), Ironwood 以降</td>
+          </tr>
+          <tr>
+            <td>消費オプション</td>
+            <td>オンデマンド、Spot VM、予約</td>
+          </tr>
+          <tr>
+            <td>VM 構成</td>
+            <td>カスタム OS、ブートディスクサイズ設定対応</td>
+          </tr>
+          <tr>
+            <td>スケール</td>
+            <td>単一ホストから大規模スライスまで</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>MIG Target Size Policy モード比較</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>モード</th>
+            <th>動作</th>
+            <th>推奨ユースケース</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>individual</code> (デフォルト)</td>
+            <td>リソースが利用可能な VM から順次作成</td>
+            <td>一般的なサービスワークロード</td>
+          </tr>
+          <tr>
+            <td><code>bulk</code></td>
+            <td>全 VM を一括作成。不可の場合は待機</td>
+            <td>HPC、分散トレーニング、バッチ処理</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Target Distribution Shape との組み合わせ</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Distribution Shape</th>
+            <th>説明</th>
+            <th>バルクモードとの相性</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>ANY</code></td>
+            <td>リソース可用性優先、予約活用を最大化</td>
+            <td>バッチワークロードに推奨</td>
+          </tr>
+          <tr>
+            <td><code>ANY_SINGLE_ZONE</code></td>
+            <td>単一ゾーンに全 VM を配置、低レイテンシ</td>
+            <td>分散トレーニングに推奨</td>
+          </tr>
+          <tr>
+            <td><code>BALANCED</code></td>
+            <td>ゾーン分散とリソース取得のバランス</td>
+            <td>高可用性バッチに推奨</td>
+          </tr>
+          <tr>
+            <td><code>EVEN</code></td>
+            <td>ゾーン間で均等分散</td>
+            <td>サービングワークロード向け</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🔧 設定方法</h2>
+
+      <h3>前提条件</h3>
+      <div class="check-item"><span style="color: var(--gc-blue-600);">1.</span> <span>Compute Engine API が有効であること</span></div>
+      <div class="check-item"><span style="color: var(--gc-blue-600);">2.</span> <span>TPU 使用リージョン/ゾーンで適切なクォータが確保されていること</span></div>
+      <div class="check-item"><span style="color: var(--gc-blue-600);">3.</span> <span>必要な IAM 権限 (<code>compute.instances.create</code>, <code>compute.instanceGroupManagers.create</code>) を持つこと</span></div>
+
+      <h3>Step 1: TPU VM を Compute Engine API で作成</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># Compute Engine 経由で TPU VM を作成
+gcloud compute tpus tpu-vm create my-tpu-vm \
+    --zone=us-central1-a \
+    --accelerator-type=v5litepod-8 \
+    --version=v2-alpha-tpuv5-lite</code></pre>
+
+      <h3>Step 2: MIG をバルクモードで作成</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># バルクモードで MIG を作成
+gcloud compute instance-groups managed create my-training-mig \
+    --template=my-tpu-template \
+    --size=8 \
+    --zone=us-central1-a \
+    --target-size-policy-mode=bulk</code></pre>
+
+      <h3>Step 3: リージョナル MIG でバルクモード (分散トレーニング向け)</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># ANY_SINGLE_ZONE 分散形状とバルクモードの組み合わせ
+gcloud compute instance-groups managed create my-distributed-training \
+    --template=my-tpu-template \
+    --size=16 \
+    --region=us-central1 \
+    --zones=us-central1-a,us-central1-b,us-central1-f \
+    --target-distribution-shape=ANY_SINGLE_ZONE \
+    --target-size-policy-mode=bulk</code></pre>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div class="feature-grid">
+        <div class="card card-green">
+          <h3>💼 ビジネス面</h3>
+          <div class="check-item"><span style="color: var(--gc-green);">✓</span> <span><strong>運用コスト削減</strong>: GPU/TPU を同一ツールで運用</span></div>
+          <div class="check-item"><span style="color: var(--gc-green);">✓</span> <span><strong>無駄なコストの排除</strong>: 部分プロビジョニング課金防止</span></div>
+          <div class="check-item"><span style="color: var(--gc-green);">✓</span> <span><strong>市場投入の迅速化</strong>: インフラ構築時間短縮</span></div>
+          <div class="check-item"><span style="color: var(--gc-green);">✓</span> <span><strong>柔軟な消費モデル</strong>: オンデマンド/Spot/予約を活用</span></div>
+        </div>
+        <div class="card">
+          <h3>🔧 技術面</h3>
+          <div class="check-item"><span style="color: var(--gc-green);">✓</span> <span><strong>API の一貫性</strong>: 単一インターフェースで全アクセラレータ管理</span></div>
+          <div class="check-item"><span style="color: var(--gc-green);">✓</span> <span><strong>IaC との親和性</strong>: Terraform 等で TPU リソース管理可能</span></div>
+          <div class="check-item"><span style="color: var(--gc-green);">✓</span> <span><strong>原子的プロビジョニング</strong>: 分散ワークロード起動信頼性向上</span></div>
+          <div class="check-item"><span style="color: var(--gc-green);">✓</span> <span><strong>MIG 機能の活用</strong>: 自動修復、ローリングアップデート等</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <div class="warning-box">
+        <strong>制限事項</strong>
+        <ul style="margin: 8px 0; padding-left: 20px;">
+          <li>バルクモードでは全リソースが揃うまで一切の VM が作成されないため、待機時間が長くなる可能性あり</li>
+          <li>部分的な容量での早期開始が不可能 - 迅速なスケールアウトが必要なワークロードには不向き</li>
+          <li>TPU の利用可能ゾーンは限定的 (全リージョンで使用可能ではない)</li>
+          <li>ワークロードポリシーとの組み合わせ時、対応する distribution shape (<code>ANY</code> / <code>ANY_SINGLE_ZONE</code>) に制限</li>
+        </ul>
+      </div>
+      <div class="note-box">
+        <strong>💡 考慮すべき点</strong>
+        <ul style="margin: 8px 0; padding-left: 20px;">
+          <li>既存の Cloud TPU API ベースのワークフローからの移行計画が必要</li>
+          <li>バルクモード使用時のタイムアウトやリトライ戦略の設計が重要</li>
+          <li>TPU クォータの事前確保とバルクモードのリソース待機動作の関係を理解する</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>🧠 ユースケース 1: 大規模 LLM 分散トレーニング</h4>
+        <p><strong>シナリオ:</strong> 数百億パラメータの大規模言語モデルを TPU スライス上で分散トレーニング。全ノードが同時起動しないとトレーニングジョブを開始不可。</p>
+        <span class="code-label">Bash</span>
+        <pre><code class="language-bash"># 分散トレーニング用 MIG (バルクモード + 単一ゾーン配置)
+gcloud compute instance-groups managed create llm-training-cluster \
+    --template=tpu-v6e-training-template \
+    --size=32 \
+    --region=us-central1 \
+    --target-distribution-shape=ANY_SINGLE_ZONE \
+    --target-size-policy-mode=bulk</code></pre>
+        <p><strong>効果:</strong> 32 ノード全てが一括プロビジョニングされ、部分的な課金なしにトレーニングを即時開始可能。単一ゾーン配置により ICI 通信のレイテンシも最小化。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>🖥️ ユースケース 2: HPC バッチ処理</h4>
+        <p><strong>シナリオ:</strong> 科学計算シミュレーションで、全計算ノードが揃わないと MPI ジョブが開始不可。部分プロビジョニングで待機中にもコストが発生。</p>
+        <p><strong>効果:</strong> バルクモードにより全ノードが同時にプロビジョニングされ、不完全な状態での課金なし。リソースが揃い次第即座にジョブ開始可能。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>🔀 ユースケース 3: GPU/TPU ハイブリッド AI パイプライン</h4>
+        <p><strong>シナリオ:</strong> データ前処理を GPU VM で実行し、モデルトレーニングを TPU スライスで実行するパイプラインを構築。</p>
+        <p><strong>効果:</strong> Compute Engine の統一 API で GPU MIG と TPU MIG の両方を管理でき、同一の IaC テンプレートやオーケストレーションツールで運用可能。</p>
+      </div>
+    </div>
+
+    <!-- 料金情報 -->
+    <div class="section">
+      <h2>💰 料金情報</h2>
+      <p>MIG やバルクモード自体に追加料金は発生しません。TPU の料金はバージョン、消費オプション、リージョンによって異なります。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>消費オプション</th>
+            <th>特徴</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>オンデマンド</td>
+            <td>予約不要、利用可能時に即座にプロビジョニング</td>
+          </tr>
+          <tr>
+            <td>Spot VM</td>
+            <td>大幅なディスカウント価格、プリエンプション可能性あり</td>
+          </tr>
+          <tr>
+            <td>予約</td>
+            <td>容量保証付き、長期利用のコミットメント割引</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="note-box">
+        <strong>💡 コストポイント:</strong> グループ内で使用するリソース (TPU チップ、VM、ストレージ等) に基づいて課金。バルクモードにより部分プロビジョニングの無駄なコストを回避可能。
+      </div>
+    </div>
+
+    <!-- 関連サービス -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h3>Cloud TPU</h3>
+          <p style="font-size: 14px; margin: 4px 0;">Google 独自開発の AI アクセラレータ。Compute Engine API からも管理可能に。</p>
+        </div>
+        <div class="card card-teal">
+          <h3>GKE</h3>
+          <p style="font-size: 14px; margin: 4px 0;">TPU ノードプールによる Kubernetes ベースの TPU ワークロード管理。</p>
+        </div>
+        <div class="card card-purple">
+          <h3>AI Hypercomputer</h3>
+          <p style="font-size: 14px; margin: 4px 0;">TPU を中心とした Google Cloud の AI インフラストラクチャアーキテクチャ。</p>
+        </div>
+        <div class="card card-orange">
+          <h3>MIG Resize Requests</h3>
+          <p style="font-size: 14px; margin: 4px 0;">GPU VM を一括作成するための既存機能。バルクモードはより広範なワークロードに対応。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <p>今回のアップデートにより、Google Cloud は AI アクセラレータの管理体験を大幅に統合・簡素化しました。</p>
+      <div class="flow-diagram">
+        <div class="flow-step">🔗 TPU 統合管理<br><small>GPU と同じ API で TPU を管理</small></div>
+        <span class="flow-arrow">+</span>
+        <div class="flow-step">📦 MIG バルクモード<br><small>全 VM を一括プロビジョニング</small></div>
+        <span class="flow-arrow">=</span>
+        <div class="flow-step" style="border-color: var(--gc-green); background: var(--gc-green-tint);">🚀 効率的な AI/ML 運用<br><small>コスト最適 + 運用簡素化</small></div>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="list-style: none; padding: 0; margin: 4px 0;">
+        <li><a href="https://docs.cloud.google.com/release-notes#June_01_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート</a></li>
+        <li><a href="https://docs.cloud.google.com/compute/docs/tpus/tpu-resources-in-compute-engine" target="_blank" rel="noopener noreferrer" class="gc-link">TPU resources in Compute Engine ドキュメント</a></li>
+        <li><a href="https://docs.cloud.google.com/compute/docs/instance-groups/about-bulk-mode" target="_blank" rel="noopener noreferrer" class="gc-link">MIG バルクモード ドキュメント</a></li>
+        <li><a href="https://cloud.google.com/tpu/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud TPU Pricing</a></li>
+        <li><a href="https://cloud.google.com/compute/all-pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Compute Engine Pricing</a></li>
+      </ul>
+      <p style="margin-top: 12px; font-size: 11px; color: var(--gc-outline);">#ComputeEngine #TPU #ManagedInstanceGroup #MIG #BulkMode #AIAccelerator #MachineLearning #HPC #DistributedTraining #GA</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

@@ -5,8 +5,18 @@
 
 ## 2026 年
 
+- [2026-06-01 - Cloud Monitoring / Cloud Trace: トレースコール階層の DAG (有向非巡回グラフ) 可視化](2026/2026-06-01-cloud-monitoring-trace-dag-visualization.md)
+- [2026-06-01 - Filestore: リモート MCP サーバーの一般提供 (GA)](2026/2026-06-01-filestore-mcp-server-ga.md)
+- [2026-06-01 - Compute Engine: TPU 統合管理と MIG バルクモード](2026/2026-06-01-compute-engine-tpu-converged-mig-bulk-mode.md)
+- [2026-06-01 - Virtual Private Cloud (VPC): Private Service Connect の Composite Health (自動クロスリージョン フェイルオーバー)](2026/2026-06-01-vpc-private-service-connect-composite-health.md)
+- [2026-06-01 - BigQuery Data Transfer Service: Facebook Ads コネクタの対応レポート拡張](2026/2026-06-01-bigquery-facebook-ads-connector-reports.md)
+- [2026-06-01 - SAP on Google Cloud: RHEL 10.0 for SAP の新規認定](2026/2026-06-01-sap-on-google-cloud-rhel-10-certification.md)
+- [2026-06-01 - Cloud Load Balancing: コンポーネント中心の新しいコンソールインターフェース](2026/2026-06-01-cloud-load-balancing-component-centric-ui.md)
 - [2026-05-31 - Google SecOps SOAR: Release 6.3.86 全リージョン展開完了 / Release 6.3.87 第1段階展開開始](2026/2026-05-31-google-secops-soar-release-6-3-86-87.md)
+- [2026-05-31 - Google SecOps (SIEM): デフォルトパーサーの一括アップデート](2026/2026-05-31-google-secops-parser-updates.md)
+- [2026-05-30 - Apigee hybrid: v1.15.4 セキュリティパッチリリース](2026/2026-05-30-apigee-hybrid-v1-15-4-security.md)
 - [2026-05-29 - Apigee X: Apigee UI での Spaces 管理機能の追加](2026/2026-05-29-apigee-x-manage-spaces-ui.md)
+- [2026-05-29 - Knowledge Catalog (旧 Dataplex): Data Lineage API searchLineageStreaming メソッド](2026/2026-05-29-knowledge-catalog-lineage-streaming-api.md)
 - [2026-05-29 - Google Kubernetes Engine: Gateway バックエンド認証 TLS サポートと Workload Identity 接続問題](2026/2026-05-29-gke-gateway-backend-tls-workload-identity.md)
 - [2026-05-28 - Gemini Enterprise: Core Assistant の一般提供開始と Trace/Metrics 機能のプレビューリリース](2026/2026-05-28-gemini-enterprise-core-assistant-ga.md)
 - [2026-05-28 - Google SecOps: Chronicle API v1 統合アップグレードとプレビュー機能管理](2026/2026-05-28-google-secops-chronicle-api-v1-preview-features.md)
