@@ -5,12 +5,23 @@
 
 ## 2026 年
 
+- [2026-06-02 - Cloud Trace: Observability バケット作成フローにおける組織ポリシーの適用](2026/2026-06-02-cloud-trace-observability-bucket-org-policies.md)
+- [2026-06-02 - AlloyDB for PostgreSQL: リードプールインスタンスのオートスケーリングにクールダウン期間設定機能を追加](2026/2026-06-02-alloydb-autoscaling-cooldown-period.md)
+- [2026-06-02 - Cloud Monitoring: カスタムダッシュボードの Histogram ウィジェットが一般提供開始](2026/2026-06-02-cloud-monitoring-histogram-widgets-ga.md)
+- [2026-06-02 - Google Cloud NetApp Volumes: Flex Unified サービスレベルが us-east5 (Columbus) で利用可能に](2026/2026-06-02-netapp-volumes-flex-unified-us-east5.md)
+- [2026-06-02 - Cloud Composer: Managed Airflow (Gen 3) から内部 Ingress 制限付き Cloud Run エンドポイントへのアクセスが可能に](2026/2026-06-02-cloud-composer-gen3-cloud-run-internal-access.md)
+- [2026-06-02 - Filestore: Private Service Connect 接続が一般提供開始 (GA)](2026/2026-06-02-filestore-private-service-connect-ga.md)
+- [2026-06-02 - Datastream: Google Cloud ソースからの CDC データ処理に無料枠を導入](2026/2026-06-02-datastream-free-tier-cdc.md)
+- [2026-06-02 - Cloud Load Balancing: ポスト量子鍵交換 (Post-Quantum Key Exchange) サポート](2026/2026-06-02-cloud-load-balancing-post-quantum-tls.md)
 - [2026-06-01 - Cloud Monitoring / Cloud Trace: トレースコール階層の DAG (有向非巡回グラフ) 可視化](2026/2026-06-01-cloud-monitoring-trace-dag-visualization.md)
+- [2026-06-01 - Cloud Billing: CUD Analysis が一般提供 (GA) を開始](2026/2026-06-01-cloud-billing-cud-analysis-ga.md)
 - [2026-06-01 - Filestore: リモート MCP サーバーの一般提供 (GA)](2026/2026-06-01-filestore-mcp-server-ga.md)
+- [2026-06-01 - Gemini Enterprise: Canvas によるドキュメント・スライド作成機能と Agent Designer の Gemini 3.5 Flash 移行](2026/2026-06-01-gemini-enterprise-canvas-agent-designer.md)
 - [2026-06-01 - Compute Engine: TPU 統合管理と MIG バルクモード](2026/2026-06-01-compute-engine-tpu-converged-mig-bulk-mode.md)
 - [2026-06-01 - Virtual Private Cloud (VPC): Private Service Connect の Composite Health (自動クロスリージョン フェイルオーバー)](2026/2026-06-01-vpc-private-service-connect-composite-health.md)
 - [2026-06-01 - BigQuery Data Transfer Service: Facebook Ads コネクタの対応レポート拡張](2026/2026-06-01-bigquery-facebook-ads-connector-reports.md)
 - [2026-06-01 - SAP on Google Cloud: RHEL 10.0 for SAP の新規認定](2026/2026-06-01-sap-on-google-cloud-rhel-10-certification.md)
+- [2026-06-01 - Google Cloud VMware Engine: ve2 ノード 3年間 CUD の早期終了日設定](2026/2026-06-01-vmware-engine-ve2-cud-termination.md)
 - [2026-06-01 - Cloud Load Balancing: コンポーネント中心の新しいコンソールインターフェース](2026/2026-06-01-cloud-load-balancing-component-centric-ui.md)
 - [2026-05-31 - Google SecOps SOAR: Release 6.3.86 全リージョン展開完了 / Release 6.3.87 第1段階展開開始](2026/2026-05-31-google-secops-soar-release-6-3-86-87.md)
 - [2026-05-31 - Google SecOps (SIEM): デフォルトパーサーの一括アップデート](2026/2026-05-31-google-secops-parser-updates.md)
