@@ -5,11 +5,18 @@
 
 ## 2026 年
 
+- [2026-06-04 - Looker: Looker 26.10 リリース](2026/2026-06-04-looker-26-10-release.md)
 - [2026-06-03 - Google SecOps Marketplace: 複数インテグレーション アップデート (2026年6月3日)](2026/2026-06-03-google-secops-marketplace-integration-updates.md)
+- [2026-06-03 - Gemini Enterprise: NotebookLM Enterprise の EU における DRZ/MLP コンプライアンス対応](2026/2026-06-03-gemini-enterprise-notebooklm-drz-mlp-eu.md)
+- [2026-06-03 - VPC Service Controls: Workload Identity API サポート (Preview)](2026/2026-06-03-vpc-service-controls-workload-identity-api.md)
 - [2026-06-03 - Compute Engine: MIG での Flex-start VM の段階的作成が GA](2026/2026-06-03-compute-engine-flex-start-mig-ga.md)
+- [2026-06-03 - Cloud Service Mesh: Security Patches (June 2026)](2026/2026-06-03-cloud-service-mesh-security-patches-june-2026.md)
+- [2026-06-03 - BigQuery: Fluid Scaling が GA (一般提供)](2026/2026-06-03-bigquery-fluid-scaling-ga.md)
+- [2026-06-03 - Sensitive Data Protection: 会話コンテンツの検査・匿名化機能](2026/2026-06-03-sensitive-data-protection-conversational-content.md)
 - [2026-06-03 - Google Cloud Contact Center as a Service (CCaaS): 2026年6月バグ修正リリース](2026/2026-06-03-ccaas-bug-fixes-june.md)
 - [2026-06-03 - App Engine Standard Environment: Direct VPC Egress (Preview)](2026/2026-06-03-app-engine-direct-vpc-egress-preview.md)
 - [2026-06-02 - Cloud Trace: Observability バケット作成フローにおける組織ポリシーの適用](2026/2026-06-02-cloud-trace-observability-bucket-org-policies.md)
+- [2026-06-02 - Cloud Interconnect: Single-Region Critical Production SLA (99.99%) GA](2026/2026-06-02-cloud-interconnect-single-region-critical-sla-ga.md)
 - [2026-06-02 - AlloyDB for PostgreSQL: リードプールインスタンスのオートスケーリングにクールダウン期間設定機能を追加](2026/2026-06-02-alloydb-autoscaling-cooldown-period.md)
 - [2026-06-02 - Cloud Monitoring: カスタムダッシュボードの Histogram ウィジェットが一般提供開始](2026/2026-06-02-cloud-monitoring-histogram-widgets-ga.md)
 - [2026-06-02 - Google Cloud NetApp Volumes: Flex Unified サービスレベルが us-east5 (Columbus) で利用可能に](2026/2026-06-02-netapp-volumes-flex-unified-us-east5.md)
@@ -17,6 +24,7 @@
 - [2026-06-02 - Filestore: Private Service Connect 接続が一般提供開始 (GA)](2026/2026-06-02-filestore-private-service-connect-ga.md)
 - [2026-06-02 - BigQuery: Remote Functions カスタムパスサポート (GA)](2026/2026-06-02-bigquery-remote-functions-custom-path-ga.md)
 - [2026-06-02 - Google Kubernetes Engine: メンテナンス除外機能の拡張](2026/2026-06-02-gke-maintenance-exclusions-expansion.md)
+- [2026-06-02 - Apigee X: Cassandra セキュリティアップデート](2026/2026-06-02-apigee-x-cassandra-security-update.md)
 - [2026-06-02 - Datastream: Google Cloud ソースからの CDC データ処理に無料枠を導入](2026/2026-06-02-datastream-free-tier-cdc.md)
 - [2026-06-02 - Gemini Enterprise: 画像生成モデル (Nano Banana Pro / Nano Banana 2) が GA](2026/2026-06-02-gemini-enterprise-image-generation-ga.md)
 - [2026-06-02 - Cloud Load Balancing: ポスト量子鍵交換 (Post-Quantum Key Exchange) サポート](2026/2026-06-02-cloud-load-balancing-post-quantum-tls.md)
