@@ -5,6 +5,14 @@
 
 ## 2026 年
 
+- [2026-06-05 - Cloud Data Fusion: v6.11.1.3 GA リリース (パイプラインプレビュー修正、ログコンテキスト修正、デプロイ戦略パラメータ追加)](2026/2026-06-05-cloud-data-fusion-v6-11-1-3-ga.md)
+- [2026-06-05 - Cloud Monitoring / Cloud Trace: カスタムダッシュボードでのトレースデータ表示](2026/2026-06-05-cloud-monitoring-trace-data-dashboards.md)
+- [2026-06-05 - Security Command Center: AI Protection が EU データレジデンシーをサポート、検出カテゴリ名を変更](2026/2026-06-05-security-command-center-ai-protection-eu.md)
+- [2026-06-05 - Knowledge Catalog (Data Catalog): Data Catalog サービスの段階的シャットダウン開始](2026/2026-06-05-knowledge-catalog-data-catalog-shutdown.md)
+- [2026-06-04 - Knowledge Catalog: lookupContext メソッドによるエージェント向けデータアセットコンテキスト取得](2026/2026-06-04-knowledge-catalog-lookup-context-agentic.md)
+- [2026-06-04 - Document AI: Custom Extractor にドキュメントバリデーションと修正機能が追加](2026/2026-06-04-document-ai-custom-extractor-validation.md)
+- [2026-06-04 - Google Kubernetes Engine (GKE): Gateway フロントエンド mTLS (クライアント証明書検証) サポート](2026/2026-06-04-gke-gateway-frontend-mtls.md)
+- [2026-06-04 - Memorystore for Valkey: ノードレベルメトリクスの追加](2026/2026-06-04-memorystore-valkey-node-level-metrics.md)
 - [2026-06-04 - Looker: Looker 26.10 リリース](2026/2026-06-04-looker-26-10-release.md)
 - [2026-06-03 - Google SecOps Marketplace: 複数インテグレーション アップデート (2026年6月3日)](2026/2026-06-03-google-secops-marketplace-integration-updates.md)
 - [2026-06-03 - Gemini Enterprise: NotebookLM Enterprise の EU における DRZ/MLP コンプライアンス対応](2026/2026-06-03-gemini-enterprise-notebooklm-drz-mlp-eu.md)
