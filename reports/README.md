@@ -5,15 +5,23 @@
 
 ## 2026 年
 
+- [2026-06-06 - Cloud Location Finder: 一般提供開始 (GA)](2026/2026-06-06-cloud-location-finder-ga.md)
 - [2026-06-05 - Cloud Data Fusion: v6.11.1.3 GA リリース (パイプラインプレビュー修正、ログコンテキスト修正、デプロイ戦略パラメータ追加)](2026/2026-06-05-cloud-data-fusion-v6-11-1-3-ga.md)
+- [2026-06-05 - Gemini Enterprise: Asana データストア (Preview) & Gemini 3.5 Flash 管理者制御](2026/2026-06-05-gemini-enterprise-asana-data-store.md)
 - [2026-06-05 - Cloud Monitoring / Cloud Trace: カスタムダッシュボードでのトレースデータ表示](2026/2026-06-05-cloud-monitoring-trace-data-dashboards.md)
+- [2026-06-05 - Google Distributed Cloud (bare metal): バージョン 1.33.900-gke.90 リリース](2026/2026-06-05-google-distributed-cloud-bare-metal-1-33-900.md)
 - [2026-06-05 - Security Command Center: AI Protection が EU データレジデンシーをサポート、検出カテゴリ名を変更](2026/2026-06-05-security-command-center-ai-protection-eu.md)
+- [2026-06-05 - Google Cloud CCaaS: プレリリースノート (2026年6月)](2026/2026-06-05-ccaas-prerelease-june.md)
 - [2026-06-05 - Knowledge Catalog (Data Catalog): Data Catalog サービスの段階的シャットダウン開始](2026/2026-06-05-knowledge-catalog-data-catalog-shutdown.md)
+- [2026-06-04 - Cloud Trace: スパン詳細ビューにメタデータ & リンクタブ追加](2026/2026-06-04-cloud-trace-span-metadata-links.md)
 - [2026-06-04 - Knowledge Catalog: lookupContext メソッドによるエージェント向けデータアセットコンテキスト取得](2026/2026-06-04-knowledge-catalog-lookup-context-agentic.md)
+- [2026-06-04 - Google Kubernetes Engine: バージョンアップデート (2026-R22)](2026/2026-06-04-gke-version-updates-2026-r22.md)
 - [2026-06-04 - Document AI: Custom Extractor にドキュメントバリデーションと修正機能が追加](2026/2026-06-04-document-ai-custom-extractor-validation.md)
+- [2026-06-04 - Anthos Config Management: セキュリティアップデート (CVE 対応)](2026/2026-06-04-anthos-config-management-cve-june.md)
 - [2026-06-04 - Google Kubernetes Engine (GKE): Gateway フロントエンド mTLS (クライアント証明書検証) サポート](2026/2026-06-04-gke-gateway-frontend-mtls.md)
 - [2026-06-04 - Memorystore for Valkey: ノードレベルメトリクスの追加](2026/2026-06-04-memorystore-valkey-node-level-metrics.md)
 - [2026-06-04 - Looker: Looker 26.10 リリース](2026/2026-06-04-looker-26-10-release.md)
+- [2026-06-04 - Container-Optimized OS: セキュリティアップデート (2026年6月)](2026/2026-06-04-container-optimized-os-security-june.md)
 - [2026-06-03 - Google SecOps Marketplace: 複数インテグレーション アップデート (2026年6月3日)](2026/2026-06-03-google-secops-marketplace-integration-updates.md)
 - [2026-06-03 - Gemini Enterprise: NotebookLM Enterprise の EU における DRZ/MLP コンプライアンス対応](2026/2026-06-03-gemini-enterprise-notebooklm-drz-mlp-eu.md)
 - [2026-06-03 - VPC Service Controls: Workload Identity API サポート (Preview)](2026/2026-06-03-vpc-service-controls-workload-identity-api.md)
