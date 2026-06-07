@@ -5,9 +5,11 @@
 
 ## 2026 年
 
+- [2026-06-07 - Google SecOps SOAR: Release 6.3.87 / 6.3.88](2026/2026-06-07-google-secops-soar-release-6-3-87-88.md)
 - [2026-06-06 - Cloud Location Finder: 一般提供開始 (GA)](2026/2026-06-06-cloud-location-finder-ga.md)
 - [2026-06-05 - Cloud Data Fusion: v6.11.1.3 GA リリース (パイプラインプレビュー修正、ログコンテキスト修正、デプロイ戦略パラメータ追加)](2026/2026-06-05-cloud-data-fusion-v6-11-1-3-ga.md)
 - [2026-06-05 - Gemini Enterprise: Asana データストア (Preview) & Gemini 3.5 Flash 管理者制御](2026/2026-06-05-gemini-enterprise-asana-data-store.md)
+- [2026-06-05 - Gemini Enterprise: Gemini 3.5 Flash 管理者制御トグルの廃止](2026/2026-06-05-gemini-enterprise-gemini-3-5-flash-admin-control.md)
 - [2026-06-05 - Cloud Monitoring / Cloud Trace: カスタムダッシュボードでのトレースデータ表示](2026/2026-06-05-cloud-monitoring-trace-data-dashboards.md)
 - [2026-06-05 - Google Distributed Cloud (bare metal): バージョン 1.33.900-gke.90 リリース](2026/2026-06-05-google-distributed-cloud-bare-metal-1-33-900.md)
 - [2026-06-05 - Security Command Center: AI Protection が EU データレジデンシーをサポート、検出カテゴリ名を変更](2026/2026-06-05-security-command-center-ai-protection-eu.md)
