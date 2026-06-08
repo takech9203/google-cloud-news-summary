@@ -5,7 +5,17 @@
 
 ## 2026 年
 
+- [2026-06-08 - Cloud Billing: FOCUS 課金データエクスポート (Preview)](2026/2026-06-08-cloud-billing-focus-export-preview.md)
+- [2026-06-08 - Google Cloud CCaaS: バグ修正リリース (2026年6月8日)](2026/2026-06-08-ccaas-bug-fixes-june-8.md)
+- [2026-06-08 - Network Intelligence Center: Cloud Network Insights GA](2026/2026-06-08-network-intelligence-center-cloud-network-insights-ga.md)
+- [2026-06-08 - Gemini: Gemini 3.5 Flash - Code Assist GA](2026/2026-06-08-gemini-3-5-flash-code-assist-ga.md)
+- [2026-06-08 - BigQuery: Organization Policy カスタム制約によるデータ共有リソース制御](2026/2026-06-08-bigquery-custom-constraints-sharing.md)
+- [2026-06-08 - Sensitive Data Protection: PERSON/SIGNATURE infoType 検出器のリージョン拡大](2026/2026-06-08-sensitive-data-protection-person-signature-infotype.md)
+- [2026-06-08 - Cloud Composer: Managed Airflow (Gen 3) API 依存関係の段階的廃止](2026/2026-06-08-cloud-composer-api-dependencies-phase-out.md)
+- [2026-06-08 - BigQuery: 生成 AI 関数のトークンベースコスト管理 GA](2026/2026-06-08-bigquery-genai-token-cost-management.md)
+- [2026-06-08 - App Hub: Memorystore リソースサポート GA](2026/2026-06-08-app-hub-memorystore-support-ga.md)
 - [2026-06-07 - Google SecOps SOAR: Release 6.3.87 / 6.3.88](2026/2026-06-07-google-secops-soar-release-6-3-87-88.md)
+- [2026-06-06 - VPC Service Controls: Firebase Phone Number Verification サポート GA](2026/2026-06-06-vpc-service-controls-firebase-phone-verification.md)
 - [2026-06-06 - Cloud Location Finder: 一般提供開始 (GA)](2026/2026-06-06-cloud-location-finder-ga.md)
 - [2026-06-05 - Cloud Data Fusion: v6.11.1.3 GA リリース (パイプラインプレビュー修正、ログコンテキスト修正、デプロイ戦略パラメータ追加)](2026/2026-06-05-cloud-data-fusion-v6-11-1-3-ga.md)
 - [2026-06-05 - Gemini Enterprise: Asana データストア (Preview) & Gemini 3.5 Flash 管理者制御](2026/2026-06-05-gemini-enterprise-asana-data-store.md)
