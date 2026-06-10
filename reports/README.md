@@ -5,9 +5,14 @@
 
 ## 2026 年
 
+- [2026-06-10 - BigQuery: Continuous Queries で ARRAY_AGG / STRING_AGG 集約関数をサポート](2026/2026-06-10-bigquery-continuous-queries-aggregation-functions.md)
+- [2026-06-09 - Cloud SDK: バージョン 572.0.0 リリース](2026/2026-06-09-cloud-sdk-572-0-0.md)
+- [2026-06-09 - Cloud Domains: Organization Policy Service カスタム制約が GA](2026/2026-06-09-cloud-domains-custom-org-policies-ga.md)
+- [2026-06-09 - Cloud Service Mesh: バージョン 1.29.4-asm.0 リリース](2026/2026-06-09-cloud-service-mesh-1-29-4-asm-0.md)
 - [2026-06-09 - Google SecOps (SIEM): UDM フィールドにエンリッチメント状態ラベルを表示](2026/2026-06-09-google-secops-udm-enrichment-labels.md)
 - [2026-06-09 - Gemini Enterprise Agent Platform: Claude Fable 5 が Model Garden で利用可能に](2026/2026-06-09-gemini-enterprise-claude-fable-5.md)
 - [2026-06-09 - NetApp Volumes: ONTAP-mode バックアップ機能が一般提供 (GA) に](2026/2026-06-09-netapp-volumes-ontap-mode-backup-ga.md)
+- [2026-06-08 - Cloud Workstations: コンフィグレーション作成ページの最適化](2026/2026-06-08-cloud-workstations-configuration-presets.md)
 - [2026-06-08 - BigQuery: IAM deny policies が GA (一般提供開始)](2026/2026-06-08-bigquery-iam-deny-policies-ga.md)
 - [2026-06-08 - Cloud Billing: FOCUS 課金データエクスポート (Preview)](2026/2026-06-08-cloud-billing-focus-export-preview.md)
 - [2026-06-08 - App Hub: Memorystore リソースサポート GA](2026/2026-06-08-app-hub-memorystore-support-ga.md)
