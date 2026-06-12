@@ -5,9 +5,16 @@
 
 ## 2026 年
 
+- [2026-06-12 - Google SecOps: SIEM Search でのケース検索機能](2026/2026-06-12-google-secops-siem-search-cases.md)
+- [2026-06-12 - Media CDN: キャッシュ可能オブジェクトサイズ上限拡大 (最大 1 TiB) およびエッジキャッシュ国コード識別](2026/2026-06-12-media-cdn-cacheable-size-country-codes.md)
+- [2026-06-12 - Google SecOps SIEM: Asynchronous Search APIs](2026/2026-06-12-google-secops-async-search-apis.md)
+- [2026-06-12 - BigQuery: AI 関数が ObjectRef 値を直接入力として受け付け可能に](2026/2026-06-12-bigquery-ai-functions-objectref.md)
+- [2026-06-11 - Knowledge Catalog (Dataplex): 非構造化データに対するデータプロファイルスキャン](2026/2026-06-11-knowledge-catalog-unstructured-data-profiles.md)
+- [2026-06-11 - BigQuery: Gemini Cloud Assist によるパフォーマンス監視、キャパシティ分析、コスト最適化](2026/2026-06-11-bigquery-gemini-cloud-assist-monitoring.md)
 - [2026-06-11 - Google Cloud Contact Center as a Service (CCaaS): ダッシュボード機能強化](2026/2026-06-11-ccaas-dashboard-enhancements.md)
 - [2026-06-11 - Compute Engine: MIG Autoscaler Stabilization Period の構成機能](2026/2026-06-11-compute-engine-mig-stabilization-period.md)
 - [2026-06-11 - Google Cloud VMware Engine: ve2 ノードタイプが northamerica-south1 (メキシコシティ) リージョンで利用可能に](2026/2026-06-11-vmware-engine-ve2-northamerica-south1.md)
+- [2026-06-11 - BigQuery: AI.KEY_DRIVERS 関数のサポート復活](2026/2026-06-11-bigquery-ai-key-drivers.md)
 - [2026-06-10 - Cloud Billing: マルチプロジェクト コストビューへのアクセス](2026/2026-06-10-cloud-billing-multi-project-cost-views.md)
 - [2026-06-10 - BigQuery: Continuous Queries で ARRAY_AGG / STRING_AGG 集約関数をサポート](2026/2026-06-10-bigquery-continuous-queries-aggregation-functions.md)
 - [2026-06-10 - Google Kubernetes Engine: "No channel" 構成オプションの非推奨化](2026/2026-06-10-gke-no-channel-deprecated.md)
