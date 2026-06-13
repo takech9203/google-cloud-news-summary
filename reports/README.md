@@ -5,10 +5,14 @@
 
 ## 2026 年
 
+- [2026-06-13 - Google SecOps: Non-prioritized IoC Matching rules Category](2026/2026-06-13-google-secops-non-prioritized-ioc-matching-rules.md)
+- [2026-06-12 - Cloud SQL for PostgreSQL: Parameterized Secure Views](2026/2026-06-12-cloud-sql-postgresql-parameterized-secure-views.md)
 - [2026-06-12 - Google SecOps: SIEM Search でのケース検索機能](2026/2026-06-12-google-secops-siem-search-cases.md)
 - [2026-06-12 - Media CDN: キャッシュ可能オブジェクトサイズ上限拡大 (最大 1 TiB) およびエッジキャッシュ国コード識別](2026/2026-06-12-media-cdn-cacheable-size-country-codes.md)
 - [2026-06-12 - Google SecOps SIEM: Asynchronous Search APIs](2026/2026-06-12-google-secops-async-search-apis.md)
 - [2026-06-12 - BigQuery: AI 関数が ObjectRef 値を直接入力として受け付け可能に](2026/2026-06-12-bigquery-ai-functions-objectref.md)
+- [2026-06-12 - Google Kubernetes Engine: クラスターバージョンアップデート (2026-R23)](2026/2026-06-12-gke-cluster-version-updates-2026-r23.md)
+- [2026-06-12 - Cloud Service Mesh: サイドカーおよびセキュリティプロキシのバージョンロールアウト (GCP-2026-035)](2026/2026-06-12-cloud-service-mesh-security-patch-gcp-2026-035.md)
 - [2026-06-11 - Knowledge Catalog (Dataplex): 非構造化データに対するデータプロファイルスキャン](2026/2026-06-11-knowledge-catalog-unstructured-data-profiles.md)
 - [2026-06-11 - BigQuery: Gemini Cloud Assist によるパフォーマンス監視、キャパシティ分析、コスト最適化](2026/2026-06-11-bigquery-gemini-cloud-assist-monitoring.md)
 - [2026-06-11 - Google Cloud Contact Center as a Service (CCaaS): ダッシュボード機能強化](2026/2026-06-11-ccaas-dashboard-enhancements.md)
