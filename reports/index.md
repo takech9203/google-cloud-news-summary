@@ -6,8 +6,10 @@
 ## 2026 年
 
 - [2026-06-13 - Google SecOps: Non-prioritized IoC Matching rules Category](2026/2026-06-13-google-secops-non-prioritized-ioc-matching-rules.md)
+- [2026-06-12 - Sensitive Data Protection: バッチコンテンツの検査・匿名化サポート](2026/2026-06-12-sensitive-data-protection-batched-content.md)
 - [2026-06-12 - Cloud SQL for PostgreSQL: Parameterized Secure Views](2026/2026-06-12-cloud-sql-postgresql-parameterized-secure-views.md)
 - [2026-06-12 - Google SecOps: SIEM Search でのケース検索機能](2026/2026-06-12-google-secops-siem-search-cases.md)
+- [2026-06-12 - Cloud Monitoring: プロセスメトリクスのデータ保持期間が 24 か月に統一](2026/2026-06-12-cloud-monitoring-process-metrics-retention.md)
 - [2026-06-12 - Media CDN: キャッシュ可能オブジェクトサイズ上限拡大 (最大 1 TiB) およびエッジキャッシュ国コード識別](2026/2026-06-12-media-cdn-cacheable-size-country-codes.md)
 - [2026-06-12 - Google SecOps SIEM: Asynchronous Search APIs](2026/2026-06-12-google-secops-async-search-apis.md)
 - [2026-06-12 - BigQuery: AI 関数が ObjectRef 値を直接入力として受け付け可能に](2026/2026-06-12-bigquery-ai-functions-objectref.md)
