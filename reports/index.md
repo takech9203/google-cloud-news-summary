@@ -5,6 +5,9 @@
 
 ## 2026 年
 
+- [2026-06-15 - Blockchain Node Engine: サービス限定サポート移行のお知らせ](2026/2026-06-15-blockchain-node-engine-limited-support.md)
+- [2026-06-15 - AlloyDB for PostgreSQL: Database Insights リモート MCP サーバーに高度なクエリインサイトツールが追加](2026/2026-06-15-alloydb-database-insights-mcp-advanced-tools.md)
+- [2026-06-14 - Google SecOps SOAR: Release 6.3.88 GA / Release 6.3.89 ロールアウト開始](2026/2026-06-14-google-secops-soar-release-6-3-88-89.md)
 - [2026-06-13 - Google SecOps: Non-prioritized IoC Matching rules Category](2026/2026-06-13-google-secops-non-prioritized-ioc-matching-rules.md)
 - [2026-06-12 - Sensitive Data Protection: バッチコンテンツの検査・匿名化サポート](2026/2026-06-12-sensitive-data-protection-batched-content.md)
 - [2026-06-12 - Cloud SQL for PostgreSQL: Parameterized Secure Views](2026/2026-06-12-cloud-sql-postgresql-parameterized-secure-views.md)
