@@ -5,8 +5,20 @@
 
 ## 2026 年
 
+- [2026-06-16 - Cloud SDK: バージョン 573.0.0 リリース (破壊的変更を含む)](2026/2026-06-16-cloud-sdk-573.md)
+- [2026-06-16 - Google SecOps SIEM: Feed Management に Gemini Cloud Assist を統合](2026/2026-06-16-google-secops-siem-gemini-cloud-assist-feed-management.md)
+- [2026-06-16 - Confidential VM: g4-standard-48 マシンタイプのサポート (GPU 付き Confidential Computing)](2026/2026-06-16-confidential-vm-g4-standard-48-gpu.md)
+- [2026-06-16 - Gemini Enterprise: ServiceNow データストアのフェデレーションおよびアシスタントアクションが GA](2026/2026-06-16-gemini-enterprise-servicenow-data-store-ga.md)
+- [2026-06-15 - Cloud Billing: Billing Reports に Products / Originating services フィルタと Group by オプションを追加](2026/2026-06-15-cloud-billing-products-originating-services-filters.md)
+- [2026-06-15 - Compute Engine: Spot VM の可用性・プリエンプション率・料金情報の事前確認機能](2026/2026-06-15-compute-engine-spot-vm-availability-preview.md)
+- [2026-06-15 - BigQuery: Gemini Cloud Assist によるクエリ最適化とジョブパフォーマンストラブルシューティング](2026/2026-06-15-bigquery-gemini-cloud-assist-query-optimization.md)
+- [2026-06-15 - Gemini Enterprise: 新規データストア追加とエージェント個別オブザーバビリティ](2026/2026-06-15-gemini-enterprise-data-stores-agent-observability.md)
 - [2026-06-15 - Blockchain Node Engine: サービス限定サポート移行のお知らせ](2026/2026-06-15-blockchain-node-engine-limited-support.md)
+- [2026-06-15 - Identity and Access Management (IAM): 権限エラーメッセージにおけるエラー ID の提供](2026/2026-06-15-iam-error-id-permission-messages.md)
+- [2026-06-15 - Google Cloud CCaaS: Advanced Reporting Dashboards バージョン 4.36 リリース](2026/2026-06-15-ccaas-advanced-reporting-4-36.md)
 - [2026-06-15 - AlloyDB for PostgreSQL: Database Insights リモート MCP サーバーに高度なクエリインサイトツールが追加](2026/2026-06-15-alloydb-database-insights-mcp-advanced-tools.md)
+- [2026-06-15 - Cloud Service Mesh: Envoy Compressor Filter が GA (Rapid チャネル)](2026/2026-06-15-cloud-service-mesh-envoy-compressor-filter-ga.md)
+- [2026-06-15 - Dataflow: ストリーミングパイプライン更新機能の拡張](2026/2026-06-15-dataflow-streaming-pipeline-update-features.md)
 - [2026-06-14 - Google SecOps SOAR: Release 6.3.88 GA / Release 6.3.89 ロールアウト開始](2026/2026-06-14-google-secops-soar-release-6-3-88-89.md)
 - [2026-06-13 - Google SecOps: Non-prioritized IoC Matching rules Category](2026/2026-06-13-google-secops-non-prioritized-ioc-matching-rules.md)
 - [2026-06-12 - Sensitive Data Protection: バッチコンテンツの検査・匿名化サポート](2026/2026-06-12-sensitive-data-protection-batched-content.md)
