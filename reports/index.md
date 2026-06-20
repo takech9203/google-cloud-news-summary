@@ -5,6 +5,7 @@
 
 ## 2026 年
 
+- [2026-06-20 - Google SecOps SOAR: Release 6.3.89 全リージョン展開完了 (GA)](2026/2026-06-20-google-secops-soar-release-6-3-89-ga.md)
 - [2026-06-19 - Bigtable: Studio Explorer にリソース検索機能を追加](2026/2026-06-19-bigtable-studio-explorer-search.md)
 - [2026-06-18 - Apigee X: メンテナンスアップデート (1-17-0-apigee-9)](2026/2026-06-18-apigee-x-maintenance-update-1-17-0-9.md)
 - [2026-06-18 - API Gateway: ランタイムアーキテクチャの更新](2026/2026-06-18-api-gateway-runtime-architecture-update.md)
@@ -12,6 +13,7 @@
 - [2026-06-18 - Cloud Logging: "ca" (Canada) リージョナルエンドポイントの追加](2026/2026-06-18-cloud-logging-ca-regional-endpoint.md)
 - [2026-06-18 - Backup and DR: Cloud SQL CMEK インスタンスの Backup Vault サポートが GA](2026/2026-06-18-backup-dr-cloud-sql-cmek-backup-vault-ga.md)
 - [2026-06-18 - Cloud SQL for PostgreSQL: Google AI Studio 統合が GA (一般提供)](2026/2026-06-18-cloud-sql-postgresql-ai-studio-integration-ga.md)
+- [2026-06-18 - Cloud SQL for PostgreSQL: マイナーバージョンおよびエクステンションアップグレード完了](2026/2026-06-18-cloud-sql-postgresql-minor-version-upgrades.md)
 - [2026-06-18 - Gemini Enterprise: Workflow Agents (GA with allowlist)](2026/2026-06-18-gemini-enterprise-workflow-agents-ga.md)
 - [2026-06-18 - Oracle Database@Google Cloud: asia-northeast2 (大阪) リージョン追加 - Exascale / Base Database Service](2026/2026-06-18-oracle-database-google-cloud-asia-northeast2.md)
 - [2026-06-18 - Gemini Enterprise Agent Platform: Agent Observability が GA (一般提供)](2026/2026-06-18-gemini-agent-platform-observability-ga.md)
