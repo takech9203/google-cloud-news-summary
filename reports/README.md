@@ -5,6 +5,7 @@
 
 ## 2026 年
 
+- [2026-06-21 - Google SecOps SOAR: Release 6.3.90 段階的ロールアウト開始](2026/2026-06-21-google-secops-soar-release-6-3-90.md)
 - [2026-06-20 - Google SecOps SOAR: Release 6.3.89 全リージョン展開完了 (GA)](2026/2026-06-20-google-secops-soar-release-6-3-89-ga.md)
 - [2026-06-19 - Bigtable: Studio Explorer にリソース検索機能を追加](2026/2026-06-19-bigtable-studio-explorer-search.md)
 - [2026-06-18 - Apigee X: メンテナンスアップデート (1-17-0-apigee-9)](2026/2026-06-18-apigee-x-maintenance-update-1-17-0-9.md)
