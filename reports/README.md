@@ -5,6 +5,8 @@
 
 ## 2026 年
 
+- [2026-06-22 - Google Cloud Contact Center as a Service (CCaaS): Bug Fixes - June 22, 2026](2026/2026-06-22-ccaas-bug-fixes-june-22.md)
+- [2026-06-22 - Compute Engine: リージョナル MIG リサイズリクエスト - 一般提供開始](2026/2026-06-22-compute-engine-mig-resize-requests-ga.md)
 - [2026-06-21 - Google SecOps SOAR: Release 6.3.90 段階的ロールアウト開始](2026/2026-06-21-google-secops-soar-release-6-3-90.md)
 - [2026-06-20 - Google SecOps SOAR: Release 6.3.89 全リージョン展開完了 (GA)](2026/2026-06-20-google-secops-soar-release-6-3-89-ga.md)
 - [2026-06-19 - Bigtable: Studio Explorer にリソース検索機能を追加](2026/2026-06-19-bigtable-studio-explorer-search.md)
