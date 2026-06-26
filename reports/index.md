@@ -5,9 +5,20 @@
 
 ## 2026 年
 
+- [2026-06-26 - Gemini Enterprise Agent Platform: Provisioned Throughput 注文管理機能の GA](2026/2026-06-26-gemini-agent-platform-provisioned-throughput-ga.md)
+- [2026-06-26 - Compute Engine: Future Reservation キャンセル機能 & MIG オートヒーリング無効化](2026/2026-06-26-compute-engine-future-reservation-cancel-mig-autohealing.md)
+- [2026-06-25 - Google Cloud Contact Center as a Service (CCaaS): Web SDK v2 シャットダウン](2026/2026-06-25-ccaas-web-sdk-v2-shutdown.md)
 - [2026-06-25 - BigQuery: Simba ODBC ドライバーの更新版リリース](2026/2026-06-25-bigquery-simba-odbc-driver-update.md)
+- [2026-06-25 - Gemini Enterprise: エージェント・MCP サーバーのガバナンスと新コネクタ](2026/2026-06-25-gemini-enterprise-governance-agents-mcp.md)
+- [2026-06-25 - Application Integration: セキュリティ速報ページの新設](2026/2026-06-25-application-integration-security-bulletins.md)
 - [2026-06-25 - Oracle Database@Google Cloud: GoldenGate コンソール管理機能が GA](2026/2026-06-25-oracle-database-google-cloud-goldengate-console-ga.md)
 - [2026-06-25 - Cloud SQL for MySQL: メジャーバージョンアップグレード事前チェック (Precheck) 機能](2026/2026-06-25-cloud-sql-mysql-upgrade-readiness-precheck.md)
+- [2026-06-25 - Cloud Monitoring: Tags によるロールベースアクセス制御 (RBAC) が GA](2026/2026-06-25-cloud-monitoring-rbac-tags-ga.md)
+- [2026-06-25 - Cloud CDN: Private Bucket Access が GA (一般提供)](2026/2026-06-25-cloud-cdn-private-bucket-access-ga.md)
+- [2026-06-25 - BigQuery: VECTOR_SEARCH ハイブリッド検索 (Preview)](2026/2026-06-25-bigquery-vector-search-hybrid-search-preview.md)
+- [2026-06-25 - Google SecOps Marketplace: 11 インテグレーション一括アップデート (2026年6月25日)](2026/2026-06-25-google-secops-marketplace-palo-alto-xdr-v30.md)
+- [2026-06-25 - Gemini Enterprise Agent Platform: Gemini Online Inference API SLA の管理上の修正](2026/2026-06-25-gemini-agent-platform-sla-correction.md)
+- [2026-06-25 - Cortex Framework: Release 7.0.0-preview.2.1 tableSettings パス解決の修正](2026/2026-06-25-cortex-framework-7-0-0-preview-2-1.md)
 - [2026-06-24 - Bigtable: Bigtable Studio でのホットバックアップ作成・バックアップ管理機能](2026/2026-06-24-bigtable-hot-backups-studio.md)
 - [2026-06-24 - Identity-Aware Proxy: Agent Gateway 向け Agent-to-Anywhere Egress セキュリティが GA](2026/2026-06-24-iap-agent-gateway-egress-ga.md)
 - [2026-06-24 - Google Cloud VMware Engine: HCX Manager Appliance 4.11.4 アップグレード](2026/2026-06-24-vmware-engine-hcx-4-11-4.md)
