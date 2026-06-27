@@ -5,13 +5,19 @@
 
 ## 2026 年
 
+- [2026-06-27 - Google SecOps SOAR: Release 6.3.90](2026/2026-06-27-google-secops-soar-release-6-3-90.md)
 - [2026-06-26 - Gemini Enterprise Agent Platform: Provisioned Throughput 注文管理機能の GA](2026/2026-06-26-gemini-agent-platform-provisioned-throughput-ga.md)
+- [2026-06-26 - Google Kubernetes Engine (GKE): バージョンアップデート 2026-R25 (Kubernetes 1.36.0 対応)](2026/2026-06-26-gke-version-updates-2026-r25.md)
+- [2026-06-26 - Gemini Enterprise: Confluence Data Center フェデレーテッドデータストア GA](2026/2026-06-26-gemini-enterprise-confluence-data-center-ga.md)
 - [2026-06-26 - Compute Engine: Future Reservation キャンセル機能 & MIG オートヒーリング無効化](2026/2026-06-26-compute-engine-future-reservation-cancel-mig-autohealing.md)
 - [2026-06-25 - Google Cloud Contact Center as a Service (CCaaS): Web SDK v2 シャットダウン](2026/2026-06-25-ccaas-web-sdk-v2-shutdown.md)
 - [2026-06-25 - BigQuery: Simba ODBC ドライバーの更新版リリース](2026/2026-06-25-bigquery-simba-odbc-driver-update.md)
 - [2026-06-25 - Gemini Enterprise: エージェント・MCP サーバーのガバナンスと新コネクタ](2026/2026-06-25-gemini-enterprise-governance-agents-mcp.md)
 - [2026-06-25 - Application Integration: セキュリティ速報ページの新設](2026/2026-06-25-application-integration-security-bulletins.md)
+- [2026-06-25 - Gemini Enterprise: エージェント ID 表示機能 GA](2026/2026-06-25-gemini-enterprise-agent-identity-ga.md)
+- [2026-06-25 - Google SecOps Marketplace: インテグレーションアップデート (2026年6月25日)](2026/2026-06-25-google-secops-marketplace-updates-june-25.md)
 - [2026-06-25 - Oracle Database@Google Cloud: GoldenGate コンソール管理機能が GA](2026/2026-06-25-oracle-database-google-cloud-goldengate-console-ga.md)
+- [2026-06-25 - Gemini Enterprise: Lovable データストア & 新規アクション対応 (Public Preview)](2026/2026-06-25-gemini-enterprise-lovable-data-store-preview.md)
 - [2026-06-25 - Cloud SQL for MySQL: メジャーバージョンアップグレード事前チェック (Precheck) 機能](2026/2026-06-25-cloud-sql-mysql-upgrade-readiness-precheck.md)
 - [2026-06-25 - Cloud Monitoring: Tags によるロールベースアクセス制御 (RBAC) が GA](2026/2026-06-25-cloud-monitoring-rbac-tags-ga.md)
 - [2026-06-25 - Cloud CDN: Private Bucket Access が GA (一般提供)](2026/2026-06-25-cloud-cdn-private-bucket-access-ga.md)
