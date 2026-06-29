@@ -5,6 +5,10 @@
 
 ## 2026 年
 
+- [2026-06-29 - Dataform: ワークフローの拡張アクセス (Extended Access for Workflows)](2026/2026-06-29-dataform-extended-access-workflows.md)
+- [2026-06-29 - VPC Service Controls: Agent Identity および SPIFFE 形式サードパーティ ID の Ingress/Egress ルール対応 (GA)](2026/2026-06-29-vpc-service-controls-agent-spiffe-identities-ga.md)
+- [2026-06-29 - BigQuery: Data Preparations / Pipelines の拡張アクセス (Extended Access)](2026/2026-06-29-bigquery-extended-access-data-preparations.md)
+- [2026-06-29 - Cloud Monitoring: PromQL アラートポリシーで 25 時間超のデータクエリが可能に](2026/2026-06-29-cloud-monitoring-promql-alerting-extended.md)
 - [2026-06-27 - Google SecOps SOAR: Release 6.3.90](2026/2026-06-27-google-secops-soar-release-6-3-90.md)
 - [2026-06-26 - Gemini Enterprise Agent Platform: Provisioned Throughput 注文管理機能の GA](2026/2026-06-26-gemini-agent-platform-provisioned-throughput-ga.md)
 - [2026-06-26 - Google Kubernetes Engine (GKE): バージョンアップデート 2026-R25 (Kubernetes 1.36.0 対応)](2026/2026-06-26-gke-version-updates-2026-r25.md)
