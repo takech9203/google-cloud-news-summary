@@ -5,10 +5,21 @@
 
 ## 2026 年
 
+- [2026-07-01 - BigQuery: TimesFM モデルが Connected Sheets から利用可能に (GA)](2026/2026-07-01-bigquery-timesfm-connected-sheets-ga.md)
+- [2026-07-01 - Looker (Google Cloud core): リリースチャネル機能 (Preview)](2026/2026-07-01-looker-release-channels-preview.md)
+- [2026-07-01 - Gemini Enterprise Agent Platform: Provisioned Throughput 複数保留中オーダーが GA](2026/2026-07-01-gemini-agent-platform-provisioned-throughput-multiple-orders.md)
+- [2026-07-01 - Google SecOps: Advanced BigQuery Export のセキュリティ・コンプライアンス強化](2026/2026-07-01-google-secops-enhanced-security-compliance.md)
+- [2026-07-01 - Google SecOps Marketplace: Proofpoint Email Protection Version 8.0](2026/2026-07-01-google-secops-marketplace-proofpoint-v8.md)
 - [2026-06-30 - Virtual Private Cloud: Falcon VPC ネットワークで複数の Private Service Connect インターフェースをサポート](2026/2026-06-30-vpc-rdma-psc-multiple-interfaces-ga.md)
+- [2026-06-30 - Google Cloud CCaaS: Agent Desktop の Knowledge Assist パネルが Agent Assist Hub パネルに置き換え](2026/2026-06-30-ccaas-agent-assist-hub-panel.md)
 - [2026-06-30 - Cloud SDK: バージョン 575.0.0 リリース](2026/2026-06-30-cloud-sdk-575-0-0.md)
+- [2026-06-30 - Cloud NAT: Private NAT で IPv6 to IPv4 (NAT64) アドレス変換をサポート](2026/2026-06-30-cloud-nat-private-nat-ipv6-to-ipv4.md)
 - [2026-06-30 - Gemini Enterprise Agent Platform: Claude Sonnet 5 が Model Garden で利用可能に](2026/2026-06-30-gemini-agent-platform-claude-sonnet-5.md)
 - [2026-06-30 - Google SecOps: Unified Rules Interface (Public Preview)](2026/2026-06-30-google-secops-unified-rules-interface.md)
+- [2026-06-30 - BigQuery: Reservation Assignment の Principal プロパティによるユーザーベースルーティング](2026/2026-06-30-bigquery-reservation-principal-property.md)
+- [2026-06-30 - Gemini Enterprise: SharePoint フィルター GA 化およびインド・シンガポールリージョン対応](2026/2026-06-30-gemini-enterprise-sharepoint-filters.md)
+- [2026-06-30 - Agent Platform Workbench: Python 3.12 ベースコンテナのサポート](2026/2026-06-30-agent-platform-workbench-python-3-12.md)
+- [2026-06-29 - Cloud SQL for MySQL: MySQL 8.0.45 がデフォルトマイナーバージョンに変更](2026/2026-06-29-cloud-sql-mysql-8-0-45-default.md)
 - [2026-06-29 - Cloud Service Mesh: セキュリティパッチ GCP-2026-045 (QPACK デコード DoS 脆弱性修正)](2026/2026-06-29-cloud-service-mesh-security-gcp-2026-045.md)
 - [2026-06-29 - Dataform: ワークフローの拡張アクセス (Extended Access for Workflows)](2026/2026-06-29-dataform-extended-access-workflows.md)
 - [2026-06-29 - BigQuery: Migration Service に Cloud Billing アカウントが必須化](2026/2026-06-29-bigquery-migration-service-billing.md)
