@@ -5,8 +5,11 @@
 
 ## 2026 年
 
+- [2026-07-02 - NetApp Volumes: Flex Unified サービスレベルにおけるボリューム削除保護とシッククローン機能](2026/2026-07-02-netapp-volumes-flex-unified-block-deletion-protection.md)
+- [2026-07-02 - Oracle Database@Google Cloud: Exascale Storage Vaults が GA (一般提供)](2026/2026-07-02-oracle-database-google-cloud-exascale-storage-vaults.md)
 - [2026-07-01 - BigQuery: TimesFM モデルが Connected Sheets から利用可能に (GA)](2026/2026-07-01-bigquery-timesfm-connected-sheets-ga.md)
 - [2026-07-01 - Looker (Google Cloud core): リリースチャネル機能 (Preview)](2026/2026-07-01-looker-release-channels-preview.md)
+- [2026-07-01 - Google Cloud CCaaS: バージョン 4.45 リリース - Do Not Call 機能と切断後キュー復帰](2026/2026-07-01-ccaas-4-45-do-not-call-return-to-queue.md)
 - [2026-07-01 - Gemini Enterprise Agent Platform: Provisioned Throughput 複数保留中オーダーが GA](2026/2026-07-01-gemini-agent-platform-provisioned-throughput-multiple-orders.md)
 - [2026-07-01 - Google SecOps: Advanced BigQuery Export のセキュリティ・コンプライアンス強化](2026/2026-07-01-google-secops-enhanced-security-compliance.md)
 - [2026-07-01 - Google SecOps Marketplace: Proofpoint Email Protection Version 8.0](2026/2026-07-01-google-secops-marketplace-proofpoint-v8.md)
