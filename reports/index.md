@@ -5,6 +5,8 @@
 
 ## 2026 年
 
+- [2026-07-03 - Apigee hybrid: v1.15.5 パッチリリース](2026/2026-07-03-apigee-hybrid-v1-15-5.md)
+- [2026-07-03 - Cloud CDN: Private Bucket Access for Cloud Storage (GA)](2026/2026-07-03-cloud-cdn-private-bucket-access.md)
 - [2026-07-02 - NetApp Volumes: Flex Unified サービスレベルにおけるボリューム削除保護とシッククローン機能](2026/2026-07-02-netapp-volumes-flex-unified-block-deletion-protection.md)
 - [2026-07-02 - Oracle Database@Google Cloud: Exascale Storage Vaults が GA (一般提供)](2026/2026-07-02-oracle-database-google-cloud-exascale-storage-vaults.md)
 - [2026-07-01 - BigQuery: TimesFM モデルが Connected Sheets から利用可能に (GA)](2026/2026-07-01-bigquery-timesfm-connected-sheets-ga.md)
