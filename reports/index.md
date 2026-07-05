@@ -5,6 +5,7 @@
 
 ## 2026 年
 
+- [2026-07-05 - Google SecOps SOAR: Release 6.3.91 / 6.3.92 バグ修正リリース](2026/2026-07-05-google-secops-soar-release-6-3-91-92.md)
 - [2026-07-03 - Apigee hybrid: v1.15.5 パッチリリース](2026/2026-07-03-apigee-hybrid-v1-15-5.md)
 - [2026-07-03 - Cloud CDN: Private Bucket Access for Cloud Storage (GA)](2026/2026-07-03-cloud-cdn-private-bucket-access.md)
 - [2026-07-02 - NetApp Volumes: Flex Unified サービスレベルにおけるボリューム削除保護とシッククローン機能](2026/2026-07-02-netapp-volumes-flex-unified-block-deletion-protection.md)
