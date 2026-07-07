@@ -5,8 +5,17 @@
 
 ## 2026 年
 
+- [2026-07-07 - Bigtable: タグバインディング、エージェントスキル、カスタム組織ポリシーが GA](2026/2026-07-07-bigtable-tags-agent-skill-ga.md)
+- [2026-07-07 - App Engine standard environment: Images サービスから Cloud Run への移行パス](2026/2026-07-07-app-engine-images-service-cloud-run-migration.md)
+- [2026-07-07 - Gemini Enterprise: データコネクタ向けマネージド組織ポリシー制約](2026/2026-07-07-gemini-enterprise-data-connectors-org-policy.md)
 - [2026-07-06 - Bigtable: ダイレクト接続 (Direct Connectivity)](2026/2026-07-06-bigtable-direct-connectivity.md)
 - [2026-07-06 - BigQuery: Facebook Ads AdInsightsMMM レポート一時停止](2026/2026-07-06-bigquery-facebook-ads-adinsightsmmm-disabled.md)
+- [2026-07-06 - Apigee X: ParsePayload ポリシーによる MCP ツールアクセス管理](2026/2026-07-06-apigee-parsepayload-policy.md)
+- [2026-07-06 - Cloud Service Mesh: Envoy Compressor Filter GA / Lua Filter Preview](2026/2026-07-06-cloud-service-mesh-envoy-filters.md)
+- [2026-07-06 - Google SecOps: 1P ケース・アラートに対する Data RBAC (Public Preview)](2026/2026-07-06-google-secops-data-rbac-1p-cases.md)
+- [2026-07-06 - Spanner: Gemini による SQL クエリエラーの自動修正機能](2026/2026-07-06-spanner-gemini-sql-fix.md)
+- [2026-07-06 - Gemini Enterprise Agent Platform: AlphaGenome の提供開始](2026/2026-07-06-gemini-enterprise-agent-platform-alphagenome.md)
+- [2026-07-06 - Gemini Enterprise: 日本・英国リージョンのサポート開始](2026/2026-07-06-gemini-enterprise-japan-uk-regions.md)
 - [2026-07-05 - Google SecOps SOAR: Release 6.3.91 / 6.3.92 バグ修正リリース](2026/2026-07-05-google-secops-soar-release-6-3-91-92.md)
 - [2026-07-03 - Apigee hybrid: v1.15.5 パッチリリース](2026/2026-07-03-apigee-hybrid-v1-15-5.md)
 - [2026-07-03 - Cloud CDN: Private Bucket Access for Cloud Storage (GA)](2026/2026-07-03-cloud-cdn-private-bucket-access.md)
