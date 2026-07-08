@@ -5,9 +5,19 @@
 
 ## 2026 年
 
+- [2026-07-08 - Gemini Enterprise Agent Platform: Memory Bank IngestEvents GA / Gemini Embedding 2 対応 / Grok 4.1 非推奨化](2026/2026-07-08-gemini-agent-platform-memory-bank-ga.md)
+- [2026-07-08 - Cloud Run: Sandboxes によるコード実行環境](2026/2026-07-08-cloud-run-sandboxes.md)
+- [2026-07-07 - Cloud SDK: バージョン 575.0.1 セキュリティ修正 (CVE-2026-34182 対応)](2026/2026-07-07-cloud-sdk-575-0-1.md)
+- [2026-07-07 - Cloud Key Management Service: Asymmetric PQC Insights チャートが GA](2026/2026-07-07-cloud-kms-pqc-insights-ga.md)
 - [2026-07-07 - Bigtable: タグバインディング、エージェントスキル、カスタム組織ポリシーが GA](2026/2026-07-07-bigtable-tags-agent-skill-ga.md)
+- [2026-07-07 - Google Cloud CCaaS: チャット向け Direct Access Points (DAP)](2026/2026-07-07-ccaas-direct-access-points.md)
 - [2026-07-07 - App Engine standard environment: Images サービスから Cloud Run への移行パス](2026/2026-07-07-app-engine-images-service-cloud-run-migration.md)
+- [2026-07-07 - Google Cloud VMware Engine: カスタム組織ポリシー制約が GA (一般提供)](2026/2026-07-07-vmware-engine-custom-org-policies-ga.md)
 - [2026-07-07 - Gemini Enterprise: データコネクタ向けマネージド組織ポリシー制約](2026/2026-07-07-gemini-enterprise-data-connectors-org-policy.md)
+- [2026-07-07 - Looker: インスタンス削除時のゴミ箱機能と復元サポート](2026/2026-07-07-looker-instance-trash-restore.md)
+- [2026-07-07 - Google Cloud Managed Service for Apache Kafka: トピック圧縮 zstd サポート](2026/2026-07-07-managed-kafka-zstd-compression.md)
+- [2026-07-07 - Google Kubernetes Engine (GKE): PSI メトリクス、Confidential GPU ノード、VPA ログ、Gateway バックエンド mTLS、サージアップグレード上限引き上げ](2026/2026-07-07-gke-psi-metrics-confidential-gpu-gateway-mtls.md)
+- [2026-07-06 - Container-Optimized OS: 2026年7月セキュリティアップデート (複数マイルストーン一斉パッチ)](2026/2026-07-06-container-optimized-os-security-july.md)
 - [2026-07-06 - Bigtable: ダイレクト接続 (Direct Connectivity)](2026/2026-07-06-bigtable-direct-connectivity.md)
 - [2026-07-06 - BigQuery: Facebook Ads AdInsightsMMM レポート一時停止](2026/2026-07-06-bigquery-facebook-ads-adinsightsmmm-disabled.md)
 - [2026-07-06 - Apigee X: ParsePayload ポリシーによる MCP ツールアクセス管理](2026/2026-07-06-apigee-parsepayload-policy.md)
