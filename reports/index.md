@@ -5,8 +5,20 @@
 
 ## 2026 年
 
+- [2026-07-09 - Compute Engine: Advanced Compute Images](2026/2026-07-09-compute-engine-advanced-compute-images.md)
+- [2026-07-09 - Gemini Enterprise: AlphaEvolve アルゴリズム最適化エージェント (GA)](2026/2026-07-09-gemini-enterprise-alphaevolve-ga.md)
+- [2026-07-09 - Bigtable: Go クライアントライブラリで Data Boost が利用可能に](2026/2026-07-09-bigtable-go-data-boost.md)
+- [2026-07-08 - Google Cloud Armor: 事前構成 WAF ルールの ModSecurity Core Rule Set (CRS) 4.22 サポートが GA](2026/2026-07-08-cloud-armor-modsecurity-crs-4-22.md)
+- [2026-07-08 - Google SecOps Marketplace: インテグレーション アップデート (2026年7月)](2026/2026-07-08-secops-marketplace-updates-july-2026.md)
+- [2026-07-08 - Gemini Enterprise Agent Platform: Grok 4.1 モデルファミリーの非推奨化](2026/2026-07-08-gemini-agent-platform-grok-4-1-deprecation.md)
+- [2026-07-08 - Compute Engine / Google Kubernetes Engine: ネットワーク最適化 C4N マシンシリーズが一般提供開始](2026/2026-07-08-compute-engine-c4n-machine-series-ga.md)
+- [2026-07-08 - Apigee X: BigQuery DAO 入力バリデーション脆弱性 (CVE-2026-12879)](2026/2026-07-08-apigee-x-security-cve-2026-12879.md)
+- [2026-07-08 - BigQuery: マルチレベル集計 (Multi-level Aggregation) と Simba ODBC ドライバー更新](2026/2026-07-08-bigquery-multi-level-aggregation.md)
+- [2026-07-08 - Network Intelligence Center: Connectivity Tests が Proxy Network Load Balancer の SNI ルーティング分析に対応](2026/2026-07-08-network-intelligence-center-sni-routing.md)
 - [2026-07-08 - Gemini Enterprise Agent Platform: Memory Bank IngestEvents GA / Gemini Embedding 2 対応 / Grok 4.1 非推奨化](2026/2026-07-08-gemini-agent-platform-memory-bank-ga.md)
 - [2026-07-08 - Cloud Run: Sandboxes によるコード実行環境](2026/2026-07-08-cloud-run-sandboxes.md)
+- [2026-07-08 - AlloyDB for PostgreSQL: Apache Solr 外部検索統合](2026/2026-07-08-alloydb-external-search-solr.md)
+- [2026-07-08 - Google Cloud VMware Engine: JetStream DR (Preview) & CMEK セルフサービス管理 (GA)](2026/2026-07-08-vmware-engine-jetstream-dr-cmek.md)
 - [2026-07-07 - Cloud SDK: バージョン 575.0.1 セキュリティ修正 (CVE-2026-34182 対応)](2026/2026-07-07-cloud-sdk-575-0-1.md)
 - [2026-07-07 - Cloud Key Management Service: Asymmetric PQC Insights チャートが GA](2026/2026-07-07-cloud-kms-pqc-insights-ga.md)
 - [2026-07-07 - Bigtable: タグバインディング、エージェントスキル、カスタム組織ポリシーが GA](2026/2026-07-07-bigtable-tags-agent-skill-ga.md)
