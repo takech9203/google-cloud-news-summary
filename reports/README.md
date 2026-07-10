@@ -5,14 +5,23 @@
 
 ## 2026 年
 
+- [2026-07-10 - Cloud Deploy: Google 固有の Skaffold フォーク (cd-skaffold) への移行](2026/2026-07-10-cloud-deploy-skaffold-fork.md)
+- [2026-07-10 - Google Distributed Cloud (software only): バージョン 1.33.1000-gke.59 リリース](2026/2026-07-10-google-distributed-cloud-1-33-1000.md)
 - [2026-07-09 - Compute Engine: Advanced Compute Images](2026/2026-07-09-compute-engine-advanced-compute-images.md)
 - [2026-07-09 - Gemini Enterprise: AlphaEvolve アルゴリズム最適化エージェント (GA)](2026/2026-07-09-gemini-enterprise-alphaevolve-ga.md)
+- [2026-07-09 - Container-Optimized OS: 複数マイルストーンのセキュリティ・バグ修正アップデート](2026/2026-07-09-container-optimized-os-security-july-9.md)
+- [2026-07-09 - Gemini Enterprise Agent Platform: Preview モデルエンドポイントの廃止](2026/2026-07-09-gemini-agent-platform-preview-model-retirement.md)
 - [2026-07-09 - Bigtable: Go クライアントライブラリで Data Boost が利用可能に](2026/2026-07-09-bigtable-go-data-boost.md)
+- [2026-07-09 - Security Command Center: データレジデンシーおよびデータ暗号化設定のアクティベーション後変更が可能に](2026/2026-07-09-security-command-center-data-residency-modification.md)
+- [2026-07-09 - Looker: 26.12 リリース (KPI Visualization デフォルト有効化 / Increased Row Limit GA)](2026/2026-07-09-looker-26-12-release.md)
+- [2026-07-09 - BigQuery: Data Transfer Service メタデータ転送 / Data Agent Kit / ハイブリッド検索一時無効化](2026/2026-07-09-bigquery-data-transfer-metadata-agent-kit.md)
+- [2026-07-09 - Knowledge Catalog: SQL Server / PostgreSQL データベースコネクタ (Preview)](2026/2026-07-09-knowledge-catalog-database-connectors.md)
 - [2026-07-08 - Google Cloud Armor: 事前構成 WAF ルールの ModSecurity Core Rule Set (CRS) 4.22 サポートが GA](2026/2026-07-08-cloud-armor-modsecurity-crs-4-22.md)
 - [2026-07-08 - Google SecOps Marketplace: インテグレーション アップデート (2026年7月)](2026/2026-07-08-secops-marketplace-updates-july-2026.md)
 - [2026-07-08 - Gemini Enterprise Agent Platform: Grok 4.1 モデルファミリーの非推奨化](2026/2026-07-08-gemini-agent-platform-grok-4-1-deprecation.md)
 - [2026-07-08 - Compute Engine / Google Kubernetes Engine: ネットワーク最適化 C4N マシンシリーズが一般提供開始](2026/2026-07-08-compute-engine-c4n-machine-series-ga.md)
 - [2026-07-08 - Apigee X: BigQuery DAO 入力バリデーション脆弱性 (CVE-2026-12879)](2026/2026-07-08-apigee-x-security-cve-2026-12879.md)
+- [2026-07-08 - Cloud Workstations: CASFS カーネルモジュール追加と Data Agent Toolkit Extension のデフォルトインストール](2026/2026-07-08-cloud-workstations-casfs-data-agent-toolkit.md)
 - [2026-07-08 - BigQuery: マルチレベル集計 (Multi-level Aggregation) と Simba ODBC ドライバー更新](2026/2026-07-08-bigquery-multi-level-aggregation.md)
 - [2026-07-08 - Network Intelligence Center: Connectivity Tests が Proxy Network Load Balancer の SNI ルーティング分析に対応](2026/2026-07-08-network-intelligence-center-sni-routing.md)
 - [2026-07-08 - Gemini Enterprise Agent Platform: Memory Bank IngestEvents GA / Gemini Embedding 2 対応 / Grok 4.1 非推奨化](2026/2026-07-08-gemini-agent-platform-memory-bank-ga.md)
