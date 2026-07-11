@@ -5,8 +5,13 @@
 
 ## 2026 年
 
+- [2026-07-11 - Google SecOps SOAR: Release 6.3.92 全リージョン展開完了](2026/2026-07-11-google-secops-soar-release-6-3-92.md)
+- [2026-07-10 - Apigee hybrid: v1.16.7 パッチリリース](2026/2026-07-10-apigee-hybrid-v1-16-7.md)
+- [2026-07-10 - Google Kubernetes Engine (GKE): バージョンアップデートとセキュリティ修正 (2026-R29)](2026/2026-07-10-gke-version-security-updates-r29.md)
 - [2026-07-10 - Cloud Deploy: Google 固有の Skaffold フォーク (cd-skaffold) への移行](2026/2026-07-10-cloud-deploy-skaffold-fork.md)
+- [2026-07-10 - Apigee Advanced API Security: GenAI Incident Summary (generative AI Insights) の廃止](2026/2026-07-10-apigee-genai-incident-summary-deprecated.md)
 - [2026-07-10 - Google Distributed Cloud (software only): バージョン 1.33.1000-gke.59 リリース](2026/2026-07-10-google-distributed-cloud-1-33-1000.md)
+- [2026-07-10 - Cloud Billing: Payment status ページによる請求書払いアカウント向けドキュメント管理の刷新](2026/2026-07-10-cloud-billing-payment-status-page.md)
 - [2026-07-09 - Compute Engine: Advanced Compute Images](2026/2026-07-09-compute-engine-advanced-compute-images.md)
 - [2026-07-09 - Gemini Enterprise: AlphaEvolve アルゴリズム最適化エージェント (GA)](2026/2026-07-09-gemini-enterprise-alphaevolve-ga.md)
 - [2026-07-09 - Container-Optimized OS: 複数マイルストーンのセキュリティ・バグ修正アップデート](2026/2026-07-09-container-optimized-os-security-july-9.md)
@@ -14,6 +19,8 @@
 - [2026-07-09 - Bigtable: Go クライアントライブラリで Data Boost が利用可能に](2026/2026-07-09-bigtable-go-data-boost.md)
 - [2026-07-09 - Security Command Center: データレジデンシーおよびデータ暗号化設定のアクティベーション後変更が可能に](2026/2026-07-09-security-command-center-data-residency-modification.md)
 - [2026-07-09 - Looker: 26.12 リリース (KPI Visualization デフォルト有効化 / Increased Row Limit GA)](2026/2026-07-09-looker-26-12-release.md)
+- [2026-07-09 - BigQuery: ハイブリッド検索機能の一時的な無効化](2026/2026-07-09-bigquery-hybrid-search-disabled.md)
+- [2026-07-09 - Gemini Enterprise: スキル機能管理トグルに関する訂正](2026/2026-07-09-gemini-enterprise-enable-skills-correction.md)
 - [2026-07-09 - BigQuery: Data Transfer Service メタデータ転送 / Data Agent Kit / ハイブリッド検索一時無効化](2026/2026-07-09-bigquery-data-transfer-metadata-agent-kit.md)
 - [2026-07-09 - Knowledge Catalog: SQL Server / PostgreSQL データベースコネクタ (Preview)](2026/2026-07-09-knowledge-catalog-database-connectors.md)
 - [2026-07-08 - Google Cloud Armor: 事前構成 WAF ルールの ModSecurity Core Rule Set (CRS) 4.22 サポートが GA](2026/2026-07-08-cloud-armor-modsecurity-crs-4-22.md)
