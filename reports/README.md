@@ -5,6 +5,8 @@
 
 ## 2026 年
 
+- [2026-07-12 - Google SecOps (Chronicle): Publisher Agent Version 2.7.0](2026/2026-07-12-google-secops-publisher-agent-2-7-0.md)
+- [2026-07-12 - Google SecOps SOAR: Release 6.3.93](2026/2026-07-12-google-secops-soar-release-6-3-93.md)
 - [2026-07-11 - Google SecOps SOAR: Release 6.3.92 全リージョン展開完了](2026/2026-07-11-google-secops-soar-release-6-3-92.md)
 - [2026-07-10 - Apigee hybrid: v1.16.7 パッチリリース](2026/2026-07-10-apigee-hybrid-v1-16-7.md)
 - [2026-07-10 - Google Kubernetes Engine (GKE): バージョンアップデートとセキュリティ修正 (2026-R29)](2026/2026-07-10-gke-version-security-updates-r29.md)
