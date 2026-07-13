@@ -5,6 +5,13 @@
 
 ## 2026 年
 
+- [2026-07-13 - BigQuery: Project Caps (Scheduling Policies)](2026/2026-07-13-bigquery-project-caps.md)
+- [2026-07-13 - BigQuery Data Transfer Service: Salesforce インクリメンタルデータ転送の一般提供開始](2026/2026-07-13-bigquery-data-transfer-salesforce-incremental.md)
+- [2026-07-13 - BigQuery: Migration Service MCP Server による SQL 翻訳タスク](2026/2026-07-13-bigquery-migration-service-mcp-server.md)
+- [2026-07-13 - Cloud Composer (Managed Airflow): Web Server Memory Requirement Issue in Gen 3](2026/2026-07-13-managed-airflow-web-server-memory.md)
+- [2026-07-13 - BigQuery / Dataform / Colab Enterprise: セキュリティ脆弱性 GCP-2026-047 - Missing Authorization によるクロステナント リポジトリ乗っ取り](2026/2026-07-13-bigquery-dataform-colab-security-gcp-2026-047.md)
+- [2026-07-13 - Sensitive Data Protection (Cloud DLP): MEDICAL_ID infoType の動作変更 - MEDICAL_RECORD_NUMBER の統合](2026/2026-07-13-sensitive-data-protection-medical-id.md)
+- [2026-07-13 - Developer Connect: Secret Manager の呼び出し元プリンシパルに対する権限チェックの追加](2026/2026-07-13-developer-connect-secret-manager-permissions.md)
 - [2026-07-12 - Google SecOps (Chronicle): Publisher Agent Version 2.7.0](2026/2026-07-12-google-secops-publisher-agent-2-7-0.md)
 - [2026-07-12 - Google SecOps SOAR: Release 6.3.93](2026/2026-07-12-google-secops-soar-release-6-3-93.md)
 - [2026-07-11 - Google SecOps SOAR: Release 6.3.92 全リージョン展開完了](2026/2026-07-11-google-secops-soar-release-6-3-92.md)
