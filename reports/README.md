@@ -5,11 +5,20 @@
 
 ## 2026 年
 
+- [2026-07-17 - Batch: Instance Flexibility (Preview)](2026/2026-07-17-batch-instance-flexibility-preview.md)
+- [2026-07-16 - Gemini Enterprise: BYOID モバイルアプリ GA + NotebookLM Enterprise から Gemini Notebook Enterprise へのリブランド](2026/2026-07-16-gemini-enterprise-byoid-mobile-notebook-rebrand.md)
+- [2026-07-16 - Google Kubernetes Engine (GKE): Filestore API デフォルト有効化、予約アフィニティ any-reservation-then-fail、N4D マシンシリーズ対応、VPA CPU スタートアップブースト](2026/2026-07-16-gke-filestore-reservation-n4d-vpa-boost.md)
 - [2026-07-16 - Oracle Database@Google Cloud: Autonomous AI Database のクローニングが GA](2026/2026-07-16-oracle-database-autonomous-ai-db-cloning-ga.md)
 - [2026-07-16 - Cloud KMS: ポスト量子コンピューティング (PQC) 署名アルゴリズムが GA](2026/2026-07-16-cloud-kms-pqc-signing-algorithms-ga.md)
+- [2026-07-16 - Compute Engine: ブートディスク操作で iam.serviceAccounts.actAs 権限が不要に](2026/2026-07-16-compute-engine-boot-disk-iam-permission-change.md)
 - [2026-07-16 - Apigee X: メンテナンスアップデート (1-17-0-apigee-10)](2026/2026-07-16-apigee-x-maintenance-update-1-17-0-apigee-10.md)
+- [2026-07-15 - Google SecOps (SIEM): ダッシュボードの高度なフィルタリング機能 (Preview)](2026/2026-07-15-google-secops-advanced-filtering-dashboards.md)
 - [2026-07-15 - Cloud Data Fusion: v6.11.1.4 GA リリース (レースコンディション修正とセキュリティ強化)](2026/2026-07-15-cloud-data-fusion-v6-11-1-4.md)
 - [2026-07-15 - BigQuery: データガバナンスタグによるカラムレベルセキュリティ (Preview)](2026/2026-07-15-bigquery-data-governance-tags-preview.md)
+- [2026-07-15 - Datastream: アプリケーションソースレプリケーション (ServiceNow, Salesforce Marketing Cloud, Microsoft Dataverse) - Preview](2026/2026-07-15-datastream-application-sources-preview.md)
+- [2026-07-15 - Gemini Enterprise: 新規データストア、新規アクション、Jira Data Center アクションフィルタリング (Preview)](2026/2026-07-15-gemini-enterprise-data-stores-actions-jira.md)
+- [2026-07-15 - Google SecOps Marketplace: コネクタ・インテグレーション複数アップデート (2026年7月)](2026/2026-07-15-google-secops-marketplace-connector-updates-july.md)
+- [2026-07-15 - Gemini Enterprise Agent Platform: Memory Bank Memory Profiles GA](2026/2026-07-15-gemini-enterprise-agent-platform-memory-profiles-ga.md)
 - [2026-07-15 - Cloud Service Mesh: 1.29.5-asm.12 緊急セキュリティパッチ (複数の Critical CVE 修正)](2026/2026-07-15-cloud-service-mesh-1-29-5-asm-12-cve.md)
 - [2026-07-15 - Apigee X: バージョン 1-18-0-apigee-1 セキュリティ・バグ修正アップデート](2026/2026-07-15-apigee-x-1-18-0-apigee-1-security-update.md)
 - [2026-07-15 - Apigee hybrid: v1.15.6 セキュリティパッチリリース](2026/2026-07-15-apigee-hybrid-v1-15-6.md)
