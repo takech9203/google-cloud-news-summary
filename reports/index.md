@@ -5,10 +5,15 @@
 
 ## 2026 年
 
+- [2026-07-18 - Google SecOps SOAR: Release 6.3.93 が全リージョンで利用可能に](2026/2026-07-18-google-secops-soar-release-6-3-93.md)
+- [2026-07-17 - Knowledge Catalog (Dataplex): データリネージ制御が組織・フォルダ・プロジェクトレベルで GA](2026/2026-07-17-knowledge-catalog-data-lineage-control-ga.md)
+- [2026-07-17 - Document AI: Custom Extractor に Gemini 3.5 Flash LLM 搭載モデルが Preview で登場](2026/2026-07-17-document-ai-custom-extractor-gemini-flash.md)
+- [2026-07-17 - Looker: OpenJDK 21 サポート (Looker 26.8)](2026/2026-07-17-looker-openjdk-21-support.md)
 - [2026-07-17 - Batch: Instance Flexibility (Preview)](2026/2026-07-17-batch-instance-flexibility-preview.md)
 - [2026-07-16 - Gemini Enterprise: BYOID モバイルアプリ GA + NotebookLM Enterprise から Gemini Notebook Enterprise へのリブランド](2026/2026-07-16-gemini-enterprise-byoid-mobile-notebook-rebrand.md)
 - [2026-07-16 - Google Kubernetes Engine (GKE): Filestore API デフォルト有効化、予約アフィニティ any-reservation-then-fail、N4D マシンシリーズ対応、VPA CPU スタートアップブースト](2026/2026-07-16-gke-filestore-reservation-n4d-vpa-boost.md)
 - [2026-07-16 - Oracle Database@Google Cloud: Autonomous AI Database のクローニングが GA](2026/2026-07-16-oracle-database-autonomous-ai-db-cloning-ga.md)
+- [2026-07-16 - Google Kubernetes Engine (GKE): バージョンアップデート 2026-R30](2026/2026-07-16-gke-version-updates-2026-r30.md)
 - [2026-07-16 - Cloud KMS: ポスト量子コンピューティング (PQC) 署名アルゴリズムが GA](2026/2026-07-16-cloud-kms-pqc-signing-algorithms-ga.md)
 - [2026-07-16 - Compute Engine: ブートディスク操作で iam.serviceAccounts.actAs 権限が不要に](2026/2026-07-16-compute-engine-boot-disk-iam-permission-change.md)
 - [2026-07-16 - Apigee X: メンテナンスアップデート (1-17-0-apigee-10)](2026/2026-07-16-apigee-x-maintenance-update-1-17-0-apigee-10.md)
