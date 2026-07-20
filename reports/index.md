@@ -5,6 +5,12 @@
 
 ## 2026 年
 
+- [2026-07-20 - Google Kubernetes Engine (GKE): Ubuntu ノードイメージからの vulkan-tools パッケージ削除](2026/2026-07-20-gke-vulkan-tools-removal.md)
+- [2026-07-20 - Cloud NGFW: WildFire マルウェア防御サービス](2026/2026-07-20-cloud-ngfw-wildfire-malware-protection.md)
+- [2026-07-20 - Cloud Load Balancing / VPC: BYOIP IPv6 アドレスの事前予約とプロモーション](2026/2026-07-20-cloud-load-balancing-byoip-ipv6-reservation.md)
+- [2026-07-20 - Google SecOps (Google Security Operations): レガシー SIEM API の廃止](2026/2026-07-20-google-secops-legacy-siem-api-deprecation.md)
+- [2026-07-20 - Batch: allowedLocations フィールドによるジョブロケーション外リソース配置の廃止](2026/2026-07-20-batch-allowed-locations-breaking-change.md)
+- [2026-07-19 - Google SecOps SOAR: Release 6.3.94](2026/2026-07-19-google-secops-soar-release-6-3-94.md)
 - [2026-07-18 - Google SecOps SOAR: Release 6.3.93 が全リージョンで利用可能に](2026/2026-07-18-google-secops-soar-release-6-3-93.md)
 - [2026-07-17 - Knowledge Catalog (Dataplex): データリネージ制御が組織・フォルダ・プロジェクトレベルで GA](2026/2026-07-17-knowledge-catalog-data-lineage-control-ga.md)
 - [2026-07-17 - Document AI: Custom Extractor に Gemini 3.5 Flash LLM 搭載モデルが Preview で登場](2026/2026-07-17-document-ai-custom-extractor-gemini-flash.md)
