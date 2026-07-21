@@ -5,11 +5,20 @@
 
 ## 2026 年
 
+- [2026-07-21 - Gemini Enterprise Agent Platform: オープンモデルエンドポイントの廃止予定](2026/2026-07-21-gemini-agent-platform-open-model-deprecations.md)
+- [2026-07-21 - Compute Engine: リージョナル MIG の代替ゾーン VM 修復 (GA)](2026/2026-07-21-compute-engine-mig-alternate-zone-repair.md)
+- [2026-07-21 - Binary Authorization: ポスト量子暗号 (PQC) 鍵のサポート](2026/2026-07-21-binary-authorization-pqc-keys.md)
+- [2026-07-20 - Google Distributed Cloud for Bare Metal: v1.35.300-gke.87 リリース](2026/2026-07-20-google-distributed-cloud-bare-metal-1-35-300.md)
+- [2026-07-20 - BigQuery: Lakehouse for Apache Iceberg と SAP Business Data Cloud の連携 (Preview)](2026/2026-07-20-bigquery-lakehouse-sap-bdc-integration.md)
+- [2026-07-20 - Gemini Agent Studio: SSRF 脆弱性のセキュリティ修正](2026/2026-07-20-gemini-agent-studio-ssrf-security-fix.md)
 - [2026-07-20 - Google Kubernetes Engine (GKE): Ubuntu ノードイメージからの vulkan-tools パッケージ削除](2026/2026-07-20-gke-vulkan-tools-removal.md)
 - [2026-07-20 - Cloud NGFW: WildFire マルウェア防御サービス](2026/2026-07-20-cloud-ngfw-wildfire-malware-protection.md)
 - [2026-07-20 - Cloud Load Balancing / VPC: BYOIP IPv6 アドレスの事前予約とプロモーション](2026/2026-07-20-cloud-load-balancing-byoip-ipv6-reservation.md)
 - [2026-07-20 - Google SecOps (Google Security Operations): レガシー SIEM API の廃止](2026/2026-07-20-google-secops-legacy-siem-api-deprecation.md)
+- [2026-07-20 - Cloud SQL: Data API での Secret Manager 認証サポート](2026/2026-07-20-cloud-sql-secret-manager-data-api-auth.md)
 - [2026-07-20 - Batch: allowedLocations フィールドによるジョブロケーション外リソース配置の廃止](2026/2026-07-20-batch-allowed-locations-breaking-change.md)
+- [2026-07-20 - Cloud Storage: オブジェクトライフサイクル管理のサイズ条件](2026/2026-07-20-cloud-storage-lifecycle-size-conditions.md)
+- [2026-07-20 - Compute Engine: 顧客指定の暗号鍵 (CSEK) の廃止予定](2026/2026-07-20-compute-engine-csek-deprecation.md)
 - [2026-07-19 - Google SecOps SOAR: Release 6.3.94](2026/2026-07-19-google-secops-soar-release-6-3-94.md)
 - [2026-07-18 - Google SecOps SOAR: Release 6.3.93 が全リージョンで利用可能に](2026/2026-07-18-google-secops-soar-release-6-3-93.md)
 - [2026-07-17 - Knowledge Catalog (Dataplex): データリネージ制御が組織・フォルダ・プロジェクトレベルで GA](2026/2026-07-17-knowledge-catalog-data-lineage-control-ga.md)
