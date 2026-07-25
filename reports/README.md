@@ -5,13 +5,23 @@
 
 ## 2026 年
 
+- [2026-07-25 - Google SecOps SOAR: Release 6.3.94 全リージョン提供開始](2026/2026-07-25-google-secops-soar-release-6-3-94.md)
+- [2026-07-24 - Apigee hybrid: v1.16.8 パッチリリース](2026/2026-07-24-apigee-hybrid-v1-16-8.md)
 - [2026-07-24 - Gemini Enterprise: Create and Edit Documents and Slides in Canvas (GA)](2026/2026-07-24-gemini-enterprise-canvas-ga.md)
+- [2026-07-24 - Apigee API hub: Model Context Protocol (MCP) サーバー GA および ConfigureAndDeployServer RPC](2026/2026-07-24-apigee-api-hub-mcp-ga.md)
 - [2026-07-24 - Managed Service for Apache Airflow: Version Support Policy Changes (Airflow 2.10.5 Deprecation)](2026/2026-07-24-managed-airflow-version-support-policy-changes.md)
+- [2026-07-24 - Knowledge Catalog (Dataplex): Governance Workflows (Preview)](2026/2026-07-24-knowledge-catalog-governance-workflows.md)
+- [2026-07-24 - reCAPTCHA (Google Cloud Fraud Defense): Policy Engine, Universal keys, Challenge Policies (Preview)](2026/2026-07-24-recaptcha-policy-engine-preview.md)
+- [2026-07-24 - Cloud Billing: AI ワークロード向けアーリーシグナル（早期異常検知）](2026/2026-07-24-cloud-billing-early-signals-ai-workloads.md)
+- [2026-07-24 - Cloud API Registry / Service Usage: MCP サーバーサポート廃止](2026/2026-07-24-cloud-api-registry-service-usage-mcp-deprecated.md)
 - [2026-07-24 - Cloud SQL for PostgreSQL: Logical Replication Failover Slot](2026/2026-07-24-cloud-sql-postgresql-logical-replication-failover-slot.md)
+- [2026-07-24 - Artifact Registry: Connector Repositories](2026/2026-07-24-artifact-registry-connector-repositories.md)
 - [2026-07-24 - SAP on Google Cloud: SLES 16 for SAP Certification](2026/2026-07-24-sap-on-google-cloud-sles-16-certification.md)
 - [2026-07-24 - Gemini Enterprise Agent Platform: Anthropic Claude Opus 5 が Model Garden で利用可能に](2026/2026-07-24-gemini-enterprise-agent-platform-claude-opus-5.md)
 - [2026-07-24 - Cloud Service Mesh: Envoy Compressor Filter GA](2026/2026-07-24-cloud-service-mesh-envoy-compressor-filter-ga.md)
 - [2026-07-24 - Compute Engine: MIG Instance Distribution Monitoring Dashboard](2026/2026-07-24-compute-engine-mig-instance-distribution-monitoring.md)
+- [2026-07-24 - Google Cloud Contact Center as a Service (CCaaS): バージョン 5.0 リリース](2026/2026-07-24-google-cloud-ccaas-5-0.md)
+- [2026-07-24 - Google Cloud Marketplace: Cloud Commerce Producer API for Private Offers](2026/2026-07-24-google-cloud-marketplace-private-offers-api.md)
 - [2026-07-23 - BigQuery: Simba ODBC ドライバーの更新版リリース](2026/2026-07-23-bigquery-simba-odbc-driver.md)
 - [2026-07-23 - AlloyDB for PostgreSQL: Transparent Query Forwarding (Preview)](2026/2026-07-23-alloydb-transparent-query-forwarding-preview.md)
 - [2026-07-23 - Cloud Location Finder: Model Context Protocol (MCP) Integration (Preview)](2026/2026-07-23-cloud-location-finder-mcp-integration-preview.md)
