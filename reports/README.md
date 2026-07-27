@@ -5,6 +5,16 @@
 
 ## 2026 年
 
+- [2026-07-27 - AlloyDB for PostgreSQL: 外部検索 (External Search) が OpenSearch をサポート (Preview)](2026/2026-07-27-alloydb-opensearch-external-search.md)
+- [2026-07-27 - App Engine flexible environment: Node.js 26 ランタイムのサポート (Preview)](2026/2026-07-27-app-engine-flexible-nodejs-26-runtime.md)
+- [2026-07-27 - AlloyDB for PostgreSQL: クロスリージョンフェイルオーバー (Preview)](2026/2026-07-27-alloydb-cross-region-failover.md)
+- [2026-07-27 - Dataform: Dataform デプロイメント (Preview)](2026/2026-07-27-dataform-deployments-preview.md)
+- [2026-07-27 - Google Kubernetes Engine: 混合プロトコル LoadBalancer Service が GA (トラフィックルーティング修正を含む)](2026/2026-07-27-gke-mixed-protocol-loadbalancer-ga.md)
+- [2026-07-27 - BigQuery: Marketplace フィルタによる商用 BigQuery sharing リスティングの検索 (GA)](2026/2026-07-27-bigquery-sharing-marketplace-filter.md)
+- [2026-07-27 - Cloud Run: Node.js 26 ランタイムのサポート (Preview)](2026/2026-07-27-cloud-run-nodejs-26-runtime.md)
+- [2026-07-27 - Cloud NGFW: WildFire 機能の一時的な提供停止 (Breaking Change)](2026/2026-07-27-cloud-ngfw-wildfire-temporary-removal.md)
+- [2026-07-27 - BigQuery: APPENDS / CHANGES 変更履歴関数が GA](2026/2026-07-27-bigquery-change-history-functions-ga.md)
+- [2026-07-27 - Gemini Enterprise: Transparent thinking (透過的な思考プロセス表示) が GA](2026/2026-07-27-gemini-enterprise-transparent-thinking-ga.md)
 - [2026-07-26 - Google SecOps: [Spotlight Feature] 新しい調査・ケース管理エクスペリエンス (Public Preview)](2026/2026-07-26-google-secops-investigation-case-management.md)
 - [2026-07-26 - Google SecOps: マルチイベントルールのカスタマイズ可能なスケジュール (Public Preview)](2026/2026-07-26-google-secops-multi-event-rule-schedules.md)
 - [2026-07-26 - Google SecOps SOAR: Release 6.3.95 第一段階リージョンへのロールアウト開始](2026/2026-07-26-google-secops-soar-release-6-3-95.md)
