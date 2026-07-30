@@ -5,10 +5,16 @@
 
 ## 2026 年
 
+- [2026-07-30 - Managed Service for Apache Spark (on GKE): 新サブマイナーイメージ 3.5-dataproc-28 で Conda チャネルの事前構成を廃止 (Breaking Change)](2026/2026-07-30-managed-spark-gke-conda-channels-change.md)
+- [2026-07-30 - Virtual Private Cloud (VPC): Resolve subnet mask 設定 (インスタンスネットマスクの拡大) が GA](2026/2026-07-30-vpc-resolve-subnet-mask-ga.md)
+- [2026-07-30 - Google SecOps Marketplace: Google Chronicle 統合 Version 91.0 - Wiz Defend アラート命名形式の更新](2026/2026-07-30-google-secops-marketplace-chronicle-91.md)
+- [2026-07-29 - Google SecOps Marketplace: インテグレーション更新 (2026 年 7 月 29 日)](2026/2026-07-29-google-secops-marketplace-updates-july-29.md)
 - [2026-07-29 - App Engine standard environment: レガシーバンドルサービスの選択的有効化が GA](2026/2026-07-29-app-engine-bundled-services-selective-enable-ga.md)
 - [2026-07-29 - Google SecOps / Google SecOps SIEM: プレビルトパーサーの Preview バージョン内容の参照 (View prebuilt parser version content)](2026/2026-07-29-google-secops-view-prebuilt-parser-version-content.md)
+- [2026-07-29 - Datastream: Spanner コンソールからの自動ストリーム作成フロー](2026/2026-07-29-datastream-spanner-automated-stream-creation.md)
 - [2026-07-29 - reCAPTCHA (Google Cloud Fraud Defense): Agent overview ダッシュボードによるエージェントトラフィック監視](2026/2026-07-29-recaptcha-agent-overview-dashboard.md)
 - [2026-07-29 - BigQuery Data Transfer Service: Klaviyo 転送での増分データ転送サポート](2026/2026-07-29-bigquery-dts-klaviyo-incremental-transfers.md)
+- [2026-07-29 - Cloud Service Mesh: TRAFFIC_DIRECTOR 実装で DNS Proxy の IP 自動割り当てをサポート](2026/2026-07-29-cloud-service-mesh-dns-proxy-ip-auto-allocation.md)
 - [2026-07-29 - Cloud KMS: Autokey with same-project key storage が GA (用語リネームを含む)](2026/2026-07-29-cloud-kms-autokey-same-project-key-storage-ga.md)
 - [2026-07-29 - Bigtable: Google Cloud コンソールから行キースキーマ (Row Key Schema) を管理可能に](2026/2026-07-29-bigtable-row-key-schema-console-management.md)
 - [2026-07-29 - Cloud Scheduler: 3 リージョンを追加 (Milan / Paris / Dallas)](2026/2026-07-29-cloud-scheduler-new-regions.md)
