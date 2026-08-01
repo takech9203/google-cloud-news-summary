@@ -5,8 +5,19 @@
 
 ## 2026 年
 
+- [2026-08-01 - Google SecOps SOAR: Release 6.3.95 が全リージョンで利用可能に](2026/2026-08-01-google-secops-soar-release-6-3-95-all-regions.md)
+- [2026-07-31 - Cloud SQL: Private Service Connect の接続再調整 (Connection Reconciliation) がデフォルトで有効化](2026/2026-07-31-cloud-sql-psc-connection-reconciliation.md)
+- [2026-07-31 - Dataflow: バッチジョブの一時停止 (pause_on_failure サービスオプション)](2026/2026-07-31-dataflow-batch-job-pause-on-failure.md)
+- [2026-07-31 - Cloud Load Balancing: グローバル外部パススルー Network Load Balancer (Preview)](2026/2026-07-31-cloud-load-balancing-global-external-passthrough-nlb.md)
+- [2026-07-31 - Security Command Center: データレジデンシー設定の変更対応 (Preview プログラム) と Agent Platform Vulnerability Assessment のシークレットスキャン](2026/2026-07-31-security-command-center-data-residency-agent-platform-vuln.md)
+- [2026-07-31 - Contact Center AI Insights (Customer Experience Insights): Quality AI データトレーシング](2026/2026-07-31-contact-center-ai-insights-quality-ai-data-tracing.md)
+- [2026-07-31 - Apigee hybrid: v1.15.7 リリース (ランタイムロールアウト戦略の設定機能 + セキュリティ修正)](2026/2026-07-31-apigee-hybrid-v1-15-7.md)
+- [2026-07-31 - Cloud SQL for MySQL: QueryData がパラメータ化セキュアビュー (PSV) をサポート](2026/2026-07-31-cloud-sql-mysql-querydata-parameterized-secure-views.md)
+- [2026-07-31 - Google Cloud Managed Service for Apache Kafka: Dataflow による合成データ生成](2026/2026-07-31-managed-kafka-synthetic-data-generation.md)
 - [2026-07-31 - Datastream: Workday ソースからの変更データレプリケーション (Preview)](2026/2026-07-31-datastream-workday-source.md)
+- [2026-07-31 - Memorystore for Valkey: カスタム組織ポリシーが一般提供 (GA) に](2026/2026-07-31-memorystore-valkey-custom-org-policies.md)
 - [2026-07-30 - Managed Service for Apache Spark (on GKE): 新サブマイナーイメージ 3.5-dataproc-28 で Conda チャネルの事前構成を廃止 (Breaking Change)](2026/2026-07-30-managed-spark-gke-conda-channels-change.md)
+- [2026-07-30 - Config Connector: バージョン 1.154.1 リリース - 約 70 の新規 Alpha リソースと Direct Reconciler の大幅拡充](2026/2026-07-30-config-connector-v1-154-1.md)
 - [2026-07-30 - Data Studio: Conversational Analytics の GA とデータエージェント共有時のメール通知](2026/2026-07-30-data-studio-conversational-analytics-ga.md)
 - [2026-07-30 - Looker: Looker 26.12 自動有効化機能群 (MFA 必須化、Custom Calendar GA、Verified Queries Preview ほか)](2026/2026-07-30-looker-26-12-auto-enabled-features.md)
 - [2026-07-30 - Virtual Private Cloud (VPC): Resolve subnet mask 設定 (インスタンスネットマスクの拡大) が GA](2026/2026-07-30-vpc-resolve-subnet-mask-ga.md)
