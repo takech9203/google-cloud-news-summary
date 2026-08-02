@@ -5,6 +5,7 @@
 
 ## 2026 年
 
+- [2026-08-02 - Google SecOps SOAR: Release 6.3.96 の第一段階ロールアウト開始とデータベース・インフラ定期メンテナンス](2026/2026-08-02-google-secops-soar-release-6-3-96.md)
 - [2026-08-01 - Google SecOps SOAR: Release 6.3.95 が全リージョンで利用可能に](2026/2026-08-01-google-secops-soar-release-6-3-95-all-regions.md)
 - [2026-07-31 - Cloud SQL: Private Service Connect の接続再調整 (Connection Reconciliation) がデフォルトで有効化](2026/2026-07-31-cloud-sql-psc-connection-reconciliation.md)
 - [2026-07-31 - Dataflow: バッチジョブの一時停止 (pause_on_failure サービスオプション)](2026/2026-07-31-dataflow-batch-job-pause-on-failure.md)
