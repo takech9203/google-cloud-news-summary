@@ -5,7 +5,13 @@
 
 ## 2026 年
 
+- [2026-08-08 - Google SecOps SOAR: Release 6.3.96 が全リージョンで利用可能に](2026/2026-08-08-google-secops-soar-release-6-3-96.md)
+- [2026-08-07 - Cloud Billing: Billing Reports に「Originating products」フィルタとグループ化オプションが追加](2026/2026-08-07-cloud-billing-originating-products-filter.md)
+- [2026-08-07 - AlloyDB for PostgreSQL: BigQuery 統合 (テーブル同期・Lakehouse Federation)](2026/2026-08-07-alloydb-bigquery-sync-integration.md)
+- [2026-08-07 - Google Cloud Contact Center as a Service (CCaaS): 次期バージョンのプレリリースノート — カスタムパネル URL パラメータとコールバック制限](2026/2026-08-07-ccaas-prerelease-custom-panels-callback-restrictions.md)
 - [2026-08-07 - Cortex Framework: Release 7.0.1 (Windows 環境のビルドエラー修正と Dataform クォータ管理の改善)](2026/2026-08-07-cortex-framework-release-7-0-1.md)
+- [2026-08-07 - Gemini Enterprise: Custom MCP server data stores が一般提供 (GA)](2026/2026-08-07-gemini-enterprise-custom-mcp-server-datastores-ga.md)
+- [2026-08-07 - Confidential VM: アクセラレータ最適化マシンタイプ g4-standard-48 が一般提供 (GA)](2026/2026-08-07-confidential-vm-g4-standard-48-ga.md)
 - [2026-08-06 - Google Cloud NetApp Volumes: Flex Unified Default-mode でシッククローン (シンクローン分割) が GA](2026/2026-08-06-netapp-volumes-thick-clone-flex-ga.md)
 - [2026-08-06 - Gemini Enterprise: Custom MCP server データストアから Description フィールドが削除](2026/2026-08-06-gemini-enterprise-custom-mcp-datastore-description-removed.md)
 - [2026-08-06 - Policy Intelligence: Policy Troubleshooter MCP サーバーが GA (一般提供)](2026/2026-08-06-policy-intelligence-policy-troubleshooter-mcp-server-ga.md)
