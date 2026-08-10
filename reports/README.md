@@ -5,7 +5,12 @@
 
 ## 2026 年
 
+- [2026-08-10 - Security Command Center: Application Design Center 統合によるアプリケーションライフサイクルセキュリティ評価が GA](2026/2026-08-10-scc-application-design-center-integration-ga.md)
+- [2026-08-10 - Security Command Center: Vulnerability Assessment for Google Cloud の一般提供 (GA) 開始](2026/2026-08-10-scc-vulnerability-assessment-google-cloud-ga.md)
+- [2026-08-10 - Cloud Hub: App Topology API の従量課金モデルへの移行](2026/2026-08-10-cloud-hub-app-topology-api-billing.md)
+- [2026-08-10 - Cloud Run functions: アップグレードツールが GA (一般提供) に](2026/2026-08-10-cloud-run-functions-upgrade-tool-ga.md)
 - [2026-08-09 - Google SecOps SOAR: Release 6.3.97 が第 1 フェーズのリージョンへロールアウト開始](2026/2026-08-09-google-secops-soar-release-6-3-97.md)
+- [2026-08-09 - Google SecOps: Cloud Logging によるフィードアクティビティ分析 (Public Preview)](2026/2026-08-09-google-secops-feed-activity-cloud-logging.md)
 - [2026-08-09 - Google SecOps (SIEM): Bindplane Enterprise ライセンスのセルフサービスダウンロード](2026/2026-08-09-google-secops-bindplane-license-self-service.md)
 - [2026-08-08 - Google SecOps SOAR: Release 6.3.96 が全リージョンで利用可能に](2026/2026-08-08-google-secops-soar-release-6-3-96.md)
 - [2026-08-07 - Cloud Billing: Billing Reports に「Originating products」フィルタとグループ化オプションが追加](2026/2026-08-07-cloud-billing-originating-products-filter.md)
