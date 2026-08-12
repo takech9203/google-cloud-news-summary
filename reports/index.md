@@ -5,10 +5,20 @@
 
 ## 2026 年
 
+- [2026-08-12 - Apigee API hub: gcloud CLI による MCP サーバーの構成とデプロイ](2026/2026-08-12-apigee-api-hub-mcp-server-gcloud-deploy.md)
+- [2026-08-12 - Cloud Trace: リモート MCP サーバーのトレーススパン対応拡大と SQL チャート向けトレースエグザンプラー自動生成](2026/2026-08-12-cloud-trace-mcp-spans-trace-exemplars.md)
+- [2026-08-12 - Bigtable: CLUSTER_ATTRIBUTE() フィルタによる継続的マテリアライズドビューのクラスタ分離 (GA)](2026/2026-08-12-bigtable-cluster-attribute-materialized-views.md)
+- [2026-08-11 - Compute Engine: セキュリティ脆弱性 GCP-2026-054 - TPM 2.0 リファレンス実装の脆弱性 (CVE-2026-6726)](2026/2026-08-11-compute-engine-tpm-cve-2026-6726.md)
+- [2026-08-11 - Confidential VM: Intel TDX ファームウェア脆弱性への対応 (GCP-2026-053)](2026/2026-08-11-confidential-vm-intel-tdx-gcp-2026-053.md)
+- [2026-08-11 - Apigee hybrid: v1.16.9 パッチリリース (Model Armor ポリシー修正・apigee-logger スケジューリング修正・セキュリティ修正)](2026/2026-08-11-apigee-hybrid-v1-16-9.md)
 - [2026-08-11 - BigQuery: データクリーンルーム向けクエリテンプレートと TVF テーブルパラメータが GA](2026/2026-08-11-bigquery-query-templates-tvf-table-parameters.md)
 - [2026-08-11 - Cloud SDK: gcloud CLI 580.0.0 リリース (Snap パッケージ非推奨化の Breaking Change)](2026/2026-08-11-cloud-sdk-580-snap-deprecation.md)
+- [2026-08-11 - Firestore / Firestore in Datastore mode: asia-southeast3 バンコクリージョンのサポート](2026/2026-08-11-firestore-datastore-asia-southeast3-bangkok.md)
+- [2026-08-11 - Cloud Run: NVIDIA L4 GPU ドライバ バージョン 580.x.x が利用可能に](2026/2026-08-11-cloud-run-nvidia-l4-gpu-driver-580.md)
 - [2026-08-11 - Cortex Framework: Release 7.0.2 (依存関係更新によるセキュリティ脆弱性の解消)](2026/2026-08-11-cortex-framework-release-7-0-2.md)
+- [2026-08-11 - Gemini Enterprise: オーバーエイジ・支出上限・コスト管理機能 (請求書払いアカウント向け)](2026/2026-08-11-gemini-enterprise-overages-spend-limits.md)
 - [2026-08-11 - Google Distributed Cloud (software only) for bare metal: 1.35.400-gke.81 リリース](2026/2026-08-11-gdc-bare-metal-1-35-400.md)
+- [2026-08-11 - Compute Engine: Compute flexible CUD が G2 / G4 GPU マシンシリーズで一般提供 (GA)](2026/2026-08-11-compute-engine-flexible-cuds-g2-g4.md)
 - [2026-08-11 - Google Distributed Cloud (software only) for VMware: 1.35.400-gke.81 リリース (脆弱性修正と Advanced Cluster 移行期の安定性改善)](2026/2026-08-11-gdc-vmware-1-35-400.md)
 - [2026-08-10 - Eventarc: Cloud Run 宛先トリガーで再試行なしの単一配信 (Single Delivery Attempt) 設定が可能に](2026/2026-08-10-eventarc-cloud-run-single-delivery-attempt.md)
 - [2026-08-10 - Bigtable: Go クライアントライブラリ v1.52.0 リリース (AFE ピッカーとセッションバックエンド基盤の追加)](2026/2026-08-10-bigtable-go-client-1-52-0.md)
