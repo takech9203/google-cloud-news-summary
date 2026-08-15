@@ -5,9 +5,14 @@
 
 ## 2026 年
 
+- [2026-08-15 - Google SecOps SOAR: Release 6.3.97 が全リージョンで利用可能に](2026/2026-08-15-google-secops-soar-release-6-3-97.md)
+- [2026-08-15 - Gemini Enterprise Agent Platform: セマンティックガバナンスポリシーの組み込みメトリクス (Preview)](2026/2026-08-15-gemini-enterprise-agent-platform-semantic-governance-metrics.md)
+- [2026-08-14 - Google SecOps: Health Hub によるデータレイテンシのモニタリング](2026/2026-08-14-google-secops-health-hub-data-latency.md)
 - [2026-08-14 - Carbon Footprint: Granular Certificates 反映に伴う 2026 年 7 月方法論リフレッシュの延期](2026/2026-08-14-carbon-footprint-granular-certificates-methodology.md)
+- [2026-08-14 - Gemini Enterprise: Gemini 3.7 Flash がモバイルアプリで利用可能に (GA)](2026/2026-08-14-gemini-enterprise-gemini-3-7-flash-mobile-app.md)
 - [2026-08-14 - App Engine: 最小 TLS バージョン 1.2 への自動オプトイン開始 (オプトアウトは 2026 年 8 月末まで)](2026/2026-08-14-app-engine-minimum-tls-1-2.md)
 - [2026-08-14 - Cortex Framework: Release 7.0.3 (SAP BDC データプロダクトの table_settings 強制問題を修正)](2026/2026-08-14-cortex-framework-7-0-3.md)
+- [2026-08-14 - Google Kubernetes Engine (GKE): バージョンアップデート 2026-R34](2026/2026-08-14-gke-version-updates-2026-r34.md)
 - [2026-08-14 - Identity and Access Management: Agent Identity リソースに対する Organization Policy カスタム制約が GA](2026/2026-08-14-iam-agent-identity-custom-org-policies.md)
 - [2026-08-13 - Apigee X: メンテナンスウィンドウ設定インスタンスの 1-18-0-apigee-2 への定期メンテナンス更新開始](2026/2026-08-13-apigee-x-maintenance-1-18-0-apigee-2.md)
 - [2026-08-13 - VPC Service Controls: サービス境界を最適化する VPC Service Controls recommender (Preview)](2026/2026-08-13-vpc-service-controls-perimeter-recommender-preview.md)
@@ -17,6 +22,7 @@
 - [2026-08-13 - Vertex AI Search: Agent Search が Gemini 3.5 Flash による回答生成をサポート](2026/2026-08-13-vertex-ai-search-agent-search-gemini-3-5-flash.md)
 - [2026-08-13 - Sensitive Data Protection: AI サービス API キー検出用 infoType (ANTHROPIC_API_KEY / GEMINI_API_KEY / OPENAI_API_KEY) が全リージョンで利用可能に](2026/2026-08-13-sensitive-data-protection-ai-api-key-infotypes.md)
 - [2026-08-13 - Cloud SQL for MySQL: MySQL 9.7 が GA (一般提供) に](2026/2026-08-13-cloud-sql-mysql-9-7-ga.md)
+- [2026-08-13 - Apigee X: 新バージョン 1-18-0-apigee-3 リリース (LLM ポリシー修正・セキュリティ修正)](2026/2026-08-13-apigee-x-release-1-18-0-apigee-3.md)
 - [2026-08-13 - Memorystore for Valkey: セルフマネージド Redis/Valkey からのワークロード移行が GA](2026/2026-08-13-memorystore-valkey-self-managed-migration-ga.md)
 - [2026-08-13 - Gemini Enterprise: カスタムスキルの作成・アップロード・共有機能が GA に](2026/2026-08-13-gemini-enterprise-custom-skills-ga.md)
 - [2026-08-13 - Looker Studio (Data Studio): 可視化・編集機能の強化 (フルスクリーンチャートほか 6 機能)](2026/2026-08-13-data-studio-visualization-enhancements.md)
