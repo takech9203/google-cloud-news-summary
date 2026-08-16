@@ -5,6 +5,7 @@
 
 ## 2026 年
 
+- [2026-08-16 - Google SecOps SOAR: Release 6.3.98 の first-phase リージョンへのロールアウト開始](2026/2026-08-16-google-secops-soar-release-6-3-98.md)
 - [2026-08-15 - Google SecOps SOAR: Release 6.3.97 が全リージョンで利用可能に](2026/2026-08-15-google-secops-soar-release-6-3-97.md)
 - [2026-08-15 - Gemini Enterprise Agent Platform: セマンティックガバナンスポリシーの組み込みメトリクス (Preview)](2026/2026-08-15-gemini-enterprise-agent-platform-semantic-governance-metrics.md)
 - [2026-08-14 - Google SecOps: Health Hub によるデータレイテンシのモニタリング](2026/2026-08-14-google-secops-health-hub-data-latency.md)
