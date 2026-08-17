@@ -5,6 +5,11 @@
 
 ## 2026 年
 
+- [2026-08-17 - Cloud Trace: Cloud Trace API の上限引き上げ (OTLP 準拠の Telemetry API と整合)](2026/2026-08-17-cloud-trace-api-limits-increase.md)
+- [2026-08-17 - Dataform: リモート Model Context Protocol (MCP) サーバーが一般提供 (GA)](2026/2026-08-17-dataform-remote-mcp-server-ga.md)
+- [2026-08-17 - Cloud Database Migration Service: MySQL 同種移行での MySQL 9.7 サポート](2026/2026-08-17-database-migration-service-mysql-9-7.md)
+- [2026-08-17 - Gemini Enterprise: A2UI / A2A エージェント登録が一般提供 (GA) に](2026/2026-08-17-gemini-enterprise-a2ui-a2a-agents-ga.md)
+- [2026-08-17 - Cloud NGFW: Advanced malware sandbox (WildFire) サービスのサポート復活 (Preview)](2026/2026-08-17-cloud-ngfw-advanced-malware-sandbox-wildfire.md)
 - [2026-08-16 - Google SecOps SOAR: Release 6.3.98 の first-phase リージョンへのロールアウト開始](2026/2026-08-16-google-secops-soar-release-6-3-98.md)
 - [2026-08-15 - Google SecOps SOAR: Release 6.3.97 が全リージョンで利用可能に](2026/2026-08-15-google-secops-soar-release-6-3-97.md)
 - [2026-08-15 - Gemini Enterprise Agent Platform: セマンティックガバナンスポリシーの組み込みメトリクス (Preview)](2026/2026-08-15-gemini-enterprise-agent-platform-semantic-governance-metrics.md)
