@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cloud Storage: プロジェクト削除時のソフト削除バケット保持とプロジェクト復元対応</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+:root {
+  --gc-blue: #4285F4;
+  --gc-red: #EA4335;
+  --gc-yellow: #FBBC04;
+  --gc-green: #34A853;
+  --gc-blue-900: #174EA6;
+  --gc-blue-800: #185ABC;
+  --gc-blue-700: #1967D2;
+  --gc-blue-600: #1A73E8;
+  --gc-blue-500: #4285F4;
+  --gc-blue-300: #669DF6;
+  --gc-blue-200: #8AB4F8;
+  --gc-blue-100: #AECBFA;
+  --gc-blue-50: #E8F0FE;
+  --gc-on-surface: #202124;
+  --gc-on-surface-variant: #5F6368;
+  --gc-outline: #80868B;
+  --gc-surface: #FFFFFF;
+  --gc-surface-container-lowest: #F8F9FA;
+  --gc-surface-container-low: #F1F3F4;
+  --gc-surface-container: #E8EAED;
+  --gc-outline-variant: #DADCE0;
+  --gc-blue-tint: #E8F0FE;
+  --gc-green-tint: #E6F4EA;
+  --gc-red-tint: #FCE8E6;
+  --gc-yellow-tint: #FEF7E0;
+  --gc-purple-tint: #F3E8FD;
+  --gc-teal-tint: #E0F7FA;
+  --gc-purple: #A142F4;
+  --gc-teal: #00BCD4;
+  --gc-orange: #FF6D00;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background-color: var(--gc-surface);
+  font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+  color: var(--gc-on-surface-variant);
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 20px;
+  margin: 0;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 16px;
+  border-bottom: 3px solid var(--gc-blue-600);
+}
+
+h1, .title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--gc-on-surface);
+  margin: 0;
+  line-height: 1.4;
+}
+
+h2, .section-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 20px 0 8px 0;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: var(--gc-outline);
+}
+
+.badge-row { margin: 12px 0 28px 0; }
+
+.badge,
+.badge-ga,
+.badge-preview,
+.badge-deprecated {
+  display: inline-block;
+  color: #FFFFFF;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+  margin: 4px 8px 4px 0;
+}
+
+.badge { background: var(--gc-blue-600); }
+.badge-ga { background: var(--gc-green); color: #FFFFFF; }
+.badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+.badge-deprecated { background: var(--gc-red); color: #FFFFFF; }
+
+.section {
+  background: var(--gc-surface-container-low);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid var(--gc-outline-variant);
+}
+
+.highlight {
+  background-color: var(--gc-blue-50);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--gc-blue-800);
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+.card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border-left: 4px solid var(--gc-blue-600);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+}
+
+.card h4 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  color: var(--gc-on-surface);
+}
+
+.card p { margin: 0; font-size: 14.5px; }
+
+.icon-text {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+  color: var(--gc-on-surface-variant);
+}
+
+.arrow { color: var(--gc-blue-600); font-size: 20px; }
+
+.gc-link { color: var(--gc-blue-600); text-decoration: none; }
+.gc-link:hover { color: var(--gc-blue-800); text-decoration: underline; }
+
+/* Before / After 比較 */
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.before-col, .after-col {
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.before-col {
+  background: var(--gc-red-tint);
+  border: 1px solid rgba(234, 67, 53, 0.35);
+}
+
+.after-col {
+  background: var(--gc-green-tint);
+  border: 1px solid rgba(52, 168, 83, 0.35);
+}
+
+.before-col h3, .after-col h3 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+}
+
+.before-col h3 { color: #C5221F; }
+.after-col h3 { color: #188038; }
+
+.before-col ul, .after-col ul {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 14.5px;
+}
+
+.before-col li, .after-col li { margin-bottom: 8px; }
+
+@media (max-width: 700px) {
+  .before-after { grid-template-columns: 1fr; }
+  h1 { font-size: 26px; }
+}
+
+/* チェックリスト */
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+}
+.check-icon { color: var(--gc-green); font-size: 18px; flex-shrink: 0; }
+.cross-icon { color: var(--gc-red); font-size: 18px; flex-shrink: 0; }
+
+/* コードブロック */
+.code-block,
+pre:not(.mermaid) {
+  background: #1E1E1E;
+  border-radius: 8px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: #E8E8E8;
+  margin: 16px 0;
+}
+
+.code-block { overflow: hidden; }
+.code-block pre { margin: 0; padding: 0; overflow-x: auto; }
+
+.code-header {
+  background: #2D2D2D;
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+.code-lang { color: #9CDCFE; font-weight: bold; }
+.code-title { color: #AAAAAA; }
+
+.code-block code {
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 16px !important;
+  display: block;
+}
+
+pre code { background: none; border: none; font-size: inherit; }
+
+code:not(pre code) {
+  background: var(--gc-surface-container-low);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 0.9em;
+  color: var(--gc-blue-900);
+}
+
+.section code:not(pre code) { background: var(--gc-surface); }
+
+/* テーブル */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--gc-outline-variant);
+  background: var(--gc-surface);
+}
+
+th {
+  background: var(--gc-blue-50);
+  color: var(--gc-blue-900);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 2px solid var(--gc-blue-200);
+}
+
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--gc-outline-variant);
+  font-size: 14px;
+}
+
+tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+tr:hover { background: var(--gc-blue-50); }
+
+/* ボックス */
+.note-box {
+  background: var(--gc-blue-tint);
+  border-left: 4px solid var(--gc-blue-600);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.warning-box {
+  background: var(--gc-yellow-tint);
+  border-left: 4px solid var(--gc-yellow);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.error-box {
+  background: var(--gc-red-tint);
+  border-left: 4px solid var(--gc-red);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.success-box {
+  background: var(--gc-green-tint);
+  border-left: 4px solid var(--gc-green);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+/* 統計カード */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.stat-card {
+  background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+  color: var(--gc-surface);
+  border-radius: 12px;
+  padding: 24px 16px;
+  text-align: center;
+}
+
+.stat-value { font-size: 32px; font-weight: 700; margin-bottom: 4px; }
+.stat-label { font-size: 13px; opacity: 0.92; }
+
+/* Mermaid */
+.mermaid-container {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 20px 0;
+  border: 2px solid rgba(66, 133, 244, 0.3);
+  overflow-x: auto;
+}
+.mermaid { display: flex; justify-content: center; }
+
+/* ユースケース */
+.usecase {
+  background: var(--gc-blue-tint);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 16px 0;
+  border: 1px solid var(--gc-blue-100);
+}
+
+.usecase h3 {
+  margin: 0 0 8px 0;
+  color: var(--gc-blue-900);
+  font-size: 17px;
+}
+
+.usecase p { margin: 8px 0; font-size: 14.5px; }
+
+footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gc-outline-variant);
+  font-size: 12px;
+  color: var(--gc-outline);
+}
+
+footer a { word-break: break-all; }
+footer ul { margin: 8px 0; padding-left: 20px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <h1>🪣 Cloud Storage<br>プロジェクト削除時のソフト削除バケット保持・復元対応</h1>
+    <div class="subtitle">リリース日: 2026-08-17</div>
+  </div>
+
+  <div class="badge-row">
+    <span class="badge">Cloud Storage</span>
+    <span class="badge badge-ga">GA (Feature)</span>
+    <span class="badge">Soft Delete</span>
+    <span class="badge">データ保護</span>
+    <span class="badge">Resource Manager</span>
+  </div>
+
+  <!-- 概要 -->
+  <div class="section">
+    <h2>📌 概要</h2>
+    <p>Google Cloud プロジェクトを削除した場合でも、<span class="highlight">ソフト削除 (Soft Delete) が有効なバケットが一定期間保持</span>されるようになりました。保持期間内に削除済みプロジェクトを復元すると、バケットは<span class="highlight">プロジェクト削除時点の状態に復元</span>されます。</p>
+    <p>これまでソフト削除は誤削除・悪意ある削除からの保護機能でしたが、プロジェクト自体が削除された場合には復元できませんでした。今回のアップデートで、<strong>プロジェクト削除という最も影響範囲の大きいオペレーションミス</strong>に対しても Cloud Storage のデータ保護が拡張されます。</p>
+
+    <div class="before-after">
+      <div class="before-col">
+        <h3>❌ Before: アップデート前の課題</h3>
+        <ul>
+          <li>プロジェクトを削除すると、ソフト削除が有効でもバケット・オブジェクトの復元は<strong>不可</strong></li>
+          <li>30 日間の復元期間内にプロジェクトを復元しても、Cloud Storage などのリソースは早期に削除され、完全には復元できない可能性</li>
+          <li>プロジェクト削除ミスに対する Cloud Storage データの保護手段が実質的に存在しなかった</li>
+        </ul>
+      </div>
+      <div class="after-col">
+        <h3>✅ After: アップデート後の改善</h3>
+        <ul>
+          <li>ソフト削除有効バケットは「ソフト削除の保持期間」と「プロジェクトの復元期間」の<strong>短い方の期間だけ保持</strong></li>
+          <li>保持期間内にプロジェクトを復元すると、削除時点でライブだったバケットは<strong>ライブ状態で復元</strong></li>
+          <li>削除時点でソフト削除状態だったバケットも、各保持期間終了までソフト削除状態を維持 (個別に復元可能)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- アーキテクチャ図 -->
+  <div class="section">
+    <h2>🏗️ アーキテクチャ図</h2>
+    <div class="mermaid-container">
+      <pre class="mermaid">
+flowchart TD
+    subgraph Before["Before: 従来の動作"]
+        A1([👤 管理者]) -->|プロジェクト削除| B1["🗂️ プロジェクト<br/>DELETE_REQUESTED"]
+        B1 --> C1["🪣 バケット<br/>ソフト削除有効でも復元不可"]
+        B1 -->|30 日以内に復元| D1["🗂️ プロジェクト復元"]
+        D1 -.->|❌ バケットは戻らない可能性| C1
+    end
+
+    subgraph After["After: 今回のアップデート"]
+        A2([👤 管理者]) -->|プロジェクト削除| B2["🗂️ プロジェクト<br/>DELETE_REQUESTED"]
+        B2 --> C2["🪣 バケットを保持<br/>min(ソフト削除保持期間, 復元期間)"]
+        C2 -->|期間内にプロジェクト復元| D2["✅ 削除時点の状態で<br/>バケットを復元"]
+        C2 -->|期間経過| E2["🗑️ 完全削除"]
+    end
+      </pre>
+    </div>
+    <p>プロジェクト削除後もソフト削除有効バケットが一定期間保持され、期間内のプロジェクト復元でバケットが削除時点の状態に戻る流れを Before/After で示しています。</p>
+  </div>
+
+  <!-- 数字で見るポイント -->
+  <div class="section">
+    <h2>📊 数字で見るポイント</h2>
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-value">30 日</div>
+        <div class="stat-label">プロジェクトの復元期間<br>(DELETE_REQUESTED 状態)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">7 日</div>
+        <div class="stat-label">ソフト削除のデフォルト保持期間</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">7〜90 日</div>
+        <div class="stat-label">ソフト削除保持期間の設定範囲<br>(0 で無効化)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">min()</div>
+        <div class="stat-label">バケット保持期間 = ソフト削除保持期間と復元期間の短い方</div>
+      </div>
+    </div>
+    <div class="warning-box">
+      <strong>⚠️ 注意:</strong> デフォルトの保持期間 7 日はプロジェクト復元期間 (30 日) より短いため、確実な復元を重視する場合は<strong>ソフト削除保持期間を 30 日以上</strong>に設定してプロジェクト復元期間全体をカバーすることを推奨します。
+    </div>
+  </div>
+
+  <!-- 主要機能 -->
+  <div class="section">
+    <h2>⚙️ 主要機能</h2>
+    <div class="card">
+      <h4>1️⃣ プロジェクト削除時のバケット保持</h4>
+      <p>ソフト削除が有効なバケットは、プロジェクト削除後も「ソフト削除の保持期間」または「Google Cloud プロジェクトの復元期間」のいずれか短い期間だけ保持されます。この期間が経過すると、バケットは完全に削除されます。</p>
+    </div>
+    <div class="card">
+      <h4>2️⃣ プロジェクト復元時のバケット復元</h4>
+      <p>保持期間内に削除済みプロジェクトを復元すると、プロジェクト削除時点でライブだったバケットはライブバケットとして復元されます。削除時点でソフト削除状態だったバケットは、それぞれの保持期間が終了するまでソフト削除状態のまま維持されます。</p>
+    </div>
+    <div class="card">
+      <h4>3️⃣ ソフト削除無効バケットとの動作差異</h4>
+      <p>ソフト削除が有効になっていないバケットは、プロジェクト削除時に即座に削除される可能性があり、復元できない場合があります。プロジェクト削除に対する保護を得るには、バケットのソフト削除ポリシーを有効に保つ必要があります。</p>
+    </div>
+  </div>
+
+  <!-- 技術仕様 -->
+  <div class="section">
+    <h2>🔧 技術仕様</h2>
+    <h3>保持期間と復元の関係</h3>
+    <table>
+      <tr><th>項目</th><th>詳細</th></tr>
+      <tr><td>バケットの保持期間</td><td>ソフト削除の保持期間とプロジェクト復元期間のいずれか短い方</td></tr>
+      <tr><td>プロジェクトの復元期間</td><td>30 日間 (<code>DELETE_REQUESTED</code> 状態)</td></tr>
+      <tr><td>ソフト削除の保持期間</td><td>デフォルト 7 日間、7〜90 日間で設定可能 (0 で無効化)</td></tr>
+      <tr><td>ソフト削除のデフォルト</td><td>対応するすべての新規バケットで自動的に有効</td></tr>
+      <tr><td>復元後のバケット状態</td><td>プロジェクト削除時点の状態 (ライブ → ライブ、ソフト削除 → ソフト削除)</td></tr>
+      <tr><td>ソフト削除無効バケット</td><td>プロジェクト削除時に即時削除される可能性があり、復元不可の場合がある</td></tr>
+    </table>
+
+    <h3>留意すべき既存のソフト削除仕様</h3>
+    <table>
+      <tr><th>項目</th><th>詳細</th></tr>
+      <tr><td>ソフト削除中のリソース</td><td>読み取り・変更・上書き不可。一覧表示と復元のみ可能</td></tr>
+      <tr><td>バケット名の競合</td><td>同名のライブバケットが存在する場合、削除されるまで復元不可</td></tr>
+      <tr><td>非対応バケット</td><td>Rapid Bucket を使用するゾーンバケットはソフト削除非対応</td></tr>
+      <tr><td>復元後のストレージクラス</td><td>ソフト削除オブジェクトの復元後は Standard クラスに書き込まれる</td></tr>
+    </table>
+  </div>
+
+  <!-- 設定方法 -->
+  <div class="section">
+    <h2>🛠️ 設定方法</h2>
+    <div class="note-box">
+      <strong>💡 ポイント:</strong> この保護は、バケットのソフト削除ポリシーが有効であれば<strong>自動的に適用</strong>されます。追加の設定は不要です。
+    </div>
+
+    <h3>ステップ 1: バケットのソフト削除ポリシーを確認</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Bash</span>
+        <span class="code-title">現在のソフト削除保持期間を確認</span>
+      </div>
+      <pre><code class="language-bash">gcloud storage buckets describe gs://BUCKET_NAME \
+    --format="default(soft_delete_policy)"</code></pre>
+    </div>
+
+    <h3>ステップ 2: 保持期間の変更 (必要に応じて)</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Bash</span>
+        <span class="code-title">保持期間の更新</span>
+      </div>
+      <pre><code class="language-bash"># 保持期間を 30 日に設定 (7〜90 日で指定可能)
+gcloud storage buckets update gs://BUCKET_NAME --soft-delete-duration=30d</code></pre>
+    </div>
+    <p>保持期間の変更は、<strong>変更後に削除されたリソースにのみ適用</strong>されます。</p>
+  </div>
+
+  <!-- メリット -->
+  <div class="section">
+    <h2>💡 メリット</h2>
+    <h3>💼 ビジネス面</h3>
+    <div class="check-item"><span class="check-icon">✅</span><span><strong>データ損失リスクの低減</strong>: プロジェクト削除という影響範囲の大きい操作ミスからも Cloud Storage データを保護でき、事業継続性が向上する</span></div>
+    <div class="check-item"><span class="check-icon">✅</span><span><strong>復旧オペレーションの簡素化</strong>: プロジェクトを復元するだけでバケットが削除時点の状態に戻るため、バックアップからの再構築作業が不要になる</span></div>
+    <h3>🔧 技術面</h3>
+    <div class="check-item"><span class="check-icon">✅</span><span><strong>追加設定不要</strong>: ソフト削除はデフォルトで有効なため、多くのバケットで自動的にこの保護が適用される</span></div>
+    <div class="check-item"><span class="check-icon">✅</span><span><strong>一貫した復元動作</strong>: ライブバケットはライブ状態、ソフト削除中のバケットはソフト削除状態と、削除時点の状態が正確に維持される</span></div>
+  </div>
+
+  <!-- デメリット・制約事項 -->
+  <div class="section">
+    <h2>⚠️ デメリット・制約事項</h2>
+    <h3>制限事項</h3>
+    <div class="check-item"><span class="cross-icon">❌</span><span>保持期間は「ソフト削除の保持期間」と「プロジェクトの復元期間 (30 日)」の短い方であるため、デフォルトの 7 日間設定ではプロジェクト復元期間 (30 日) より早くバケットが完全削除される</span></div>
+    <div class="check-item"><span class="cross-icon">❌</span><span>ソフト削除が無効なバケットは、プロジェクト削除時に即時削除される可能性があり、復元できない場合がある</span></div>
+    <div class="check-item"><span class="cross-icon">❌</span><span>Rapid Bucket を使用するゾーンバケットはソフト削除に対応していない</span></div>
+    <h3>考慮すべき点</h3>
+    <div class="warning-box">
+      <strong>📋 運用上の考慮点</strong>
+      <div class="icon-text"><span class="arrow">→</span><span>プロジェクト削除からの確実な復元を重視する場合、ソフト削除の保持期間を <strong>30 日以上</strong>に設定することで、プロジェクト復元期間全体をカバーできる</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>ソフト削除されたデータには保持期間中も<strong>ストレージ料金が発生</strong>するため、保持期間の延長はコストとのトレードオフになる</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>プロジェクト復元時、関連付けられていた <strong>Cloud Billing アカウントは自動的には再接続されない</strong>ため、復元後に請求設定の確認が必要</span></div>
+    </div>
+  </div>
+
+  <!-- ユースケース -->
+  <div class="section">
+    <h2>🎯 ユースケース</h2>
+
+    <div class="usecase">
+      <h3>1️⃣ プロジェクトの誤削除からのデータ復旧</h3>
+      <p><strong>シナリオ</strong>: 運用整理の一環で不要プロジェクトを削除したところ、本番データを含むバケットを持つプロジェクトを誤って削除してしまった。</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">プロジェクトの復元手順</span>
+        </div>
+        <pre><code class="language-bash"># 削除済みプロジェクトの状態を確認
+gcloud projects describe PROJECT_ID
+# lifecycleState: DELETE_REQUESTED であることを確認
+
+# プロジェクトを復元
+gcloud projects undelete PROJECT_ID</code></pre>
+      </div>
+      <p><strong>効果</strong>: 保持期間内であれば、プロジェクト復元によりソフト削除有効バケットが削除時点の状態で復元され、バックアップからの再構築なしにデータを回復できる。</p>
+    </div>
+
+    <div class="usecase">
+      <h3>2️⃣ プロジェクトライフサイクル管理におけるデータ保護基準の策定</h3>
+      <p><strong>シナリオ</strong>: 組織内で多数のプロジェクトを管理しており、プロジェクト削除時のデータ保護基準を定めたい。</p>
+      <p><strong>効果</strong>: 重要データを保持するバケットのソフト削除保持期間を 30 日以上に設定する運用ルールを定めることで、プロジェクト復元期間 (30 日) 全体にわたってバケットの復元可能性を確保できる。タグを使用して新規バケットのデフォルト保持期間を組織全体で統制することも可能。</p>
+    </div>
+  </div>
+
+  <!-- 料金 -->
+  <div class="section">
+    <h2>💰 料金</h2>
+    <p>ソフト削除されたオブジェクトは、保持期間が終了して完全に削除されるまで<span class="highlight">ストレージ料金が発生し続けます</span>。プロジェクト削除後の保持期間中も同様にストレージが保持されます。</p>
+    <div class="icon-text"><span class="arrow">→</span><span>Standard 以外のストレージクラスで最小保存期間の終了前にソフト削除されたオブジェクトには、<strong>早期削除料金</strong>が発生する</span></div>
+    <div class="icon-text"><span class="arrow">→</span><span>一時オブジェクトを大量に扱うバケットではソフト削除によるコスト増が大きくなる可能性があるため、ソフト削除を無効化したバケットの利用が推奨される</span></div>
+    <div class="icon-text"><span class="arrow">→</span><span>ソフト削除の有効化・無効化の判断には、コストと使用状況に基づく <strong>Soft Delete Recommender</strong> の活用が可能</span></div>
+    <p>詳細は <a href="https://cloud.google.com/storage/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud Storage の料金ページ</a> を参照してください。</p>
+  </div>
+
+  <!-- 関連サービス・機能 -->
+  <div class="section">
+    <h2>🔗 関連サービス・機能</h2>
+    <div class="card">
+      <h4>🗂️ Resource Manager (プロジェクトの削除と復元)</h4>
+      <p>プロジェクト削除後 30 日間の <code>DELETE_REQUESTED</code> 状態と <code>gcloud projects undelete</code> による復元機能が、今回のバケット復元の前提となる。</p>
+    </div>
+    <div class="card">
+      <h4>📚 オブジェクトのバージョニング</h4>
+      <p>非現行バージョンのオブジェクトも削除時にソフト削除され、多層的なデータ保護を構成できる。</p>
+    </div>
+    <div class="card">
+      <h4>🔒 Bucket Lock / Object Retention Lock</h4>
+      <p>保持ポリシーによる削除防止に加え、ソフト削除が追加の保護レイヤーとして機能する。</p>
+    </div>
+    <div class="card">
+      <h4>📈 Soft Delete Recommender</h4>
+      <p>コストと使用状況に基づき、バケットごとのソフト削除の有効化・無効化を推奨する。</p>
+    </div>
+    <div class="card">
+      <h4>🏷️ タグ (Tags)</h4>
+      <p>新規バケットのデフォルトのソフト削除保持期間 (7〜90 日または無効) を組織的に制御できる。</p>
+    </div>
+  </div>
+
+  <!-- まとめ -->
+  <div class="section">
+    <h2>📝 まとめ</h2>
+    <div class="success-box">
+      <div class="check-item"><span class="check-icon">✅</span><span>プロジェクト削除という<strong>リカバリーが最も困難だった操作ミス</strong>に対して、Cloud Storage のソフト削除による保護が拡張された重要なアップデート</span></div>
+      <div class="check-item"><span class="check-icon">✅</span><span>ソフト削除は<strong>デフォルトで有効</strong>なため、多くの環境で自動的に恩恵を受けられる</span></div>
+      <div class="check-item"><span class="check-icon">✅</span><span>デフォルトの保持期間は <strong>7 日間</strong>であり、プロジェクト復元期間 (30 日) より短い点に注意</span></div>
+      <div class="check-item"><span class="check-icon">✅</span><span>重要データを保持するバケットは、コストとのバランスを考慮しつつ<strong>保持期間の延長</strong>を検討することを推奨</span></div>
+    </div>
+  </div>
+
+  <footer>
+    <p>📎 出典:</p>
+    <ul>
+      <li><a href="https://docs.cloud.google.com/release-notes#August_17_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026-08-17)</a></li>
+      <li><a href="https://docs.cloud.google.com/storage/docs/soft-delete" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: ソフト削除</a></li>
+      <li><a href="https://docs.cloud.google.com/resource-manager/docs/delete-restore-projects" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: プロジェクトのシャットダウン (削除) と復元</a></li>
+      <li><a href="https://cloud.google.com/storage/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud Storage 料金ページ</a></li>
+    </ul>
+    <p>このインフォグラフィックは Google Cloud News レポート (2026-08-17) を基に作成されました。</p>
+  </footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+    mermaid.initialize({
+        startOnLoad: true,
+        theme: 'base',
+        themeVariables: {
+            primaryColor: '#4285F4',
+            primaryTextColor: '#202124',
+            primaryBorderColor: '#4285F4',
+            lineColor: '#4285F4',
+            secondaryColor: '#F1F3F4',
+            tertiaryColor: '#FAFAFA',
+            background: '#FFFFFF',
+            mainBkg: '#E8F0FE',
+            nodeBorder: '#4285F4',
+            clusterBkg: '#E8F0FE',
+            clusterBorder: '#4285F4',
+            edgeLabelBackground: '#FFFFFF',
+            textColor: '#202124'
+        }
+    });
+</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

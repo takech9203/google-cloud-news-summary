@@ -5,8 +5,15 @@
 
 ## 2026 年
 
+- [2026-08-18 - App Engine standard environment (Java / Python): Images service から Cloud Run への移行が GA に](2026/2026-08-18-app-engine-images-service-cloud-run-migration.md)
+- [2026-08-17 - Cloud CDN: ターゲット型 CDN-Cache-Control HTTP レスポンスヘッダー (RFC 9213) のサポート](2026/2026-08-17-cloud-cdn-cdn-cache-control-header.md)
+- [2026-08-17 - Backup and DR Service: 強制保持バックアップを含むプロジェクトへのプロジェクトリーエン自動適用と PAM による保護](2026/2026-08-17-backup-and-dr-project-lien-pam.md)
 - [2026-08-17 - Cloud Trace: Cloud Trace API の上限引き上げ (OTLP 準拠の Telemetry API と整合)](2026/2026-08-17-cloud-trace-api-limits-increase.md)
+- [2026-08-17 - Looker: レガシー スタンドアロン Spectacles サービスの提供終了を発表 (2026 年 11 月 30 日から)](2026/2026-08-17-looker-spectacles-discontinuation.md)
+- [2026-08-17 - AlloyDB for PostgreSQL: MCP Toolbox for Databases による可観測性機能と高度なクエリインサイトへの IDE アクセス](2026/2026-08-17-alloydb-mcp-toolbox-observability.md)
+- [2026-08-17 - Container-Optimized OS (COS): 全アクティブマイルストーンへのセキュリティアップデート](2026/2026-08-17-container-optimized-os-security-updates.md)
 - [2026-08-17 - Dataform: リモート Model Context Protocol (MCP) サーバーが一般提供 (GA)](2026/2026-08-17-dataform-remote-mcp-server-ga.md)
+- [2026-08-17 - Cloud Storage: プロジェクト削除時のソフト削除バケット保持とプロジェクト復元対応](2026/2026-08-17-cloud-storage-soft-delete-project-restore.md)
 - [2026-08-17 - Cloud Database Migration Service: MySQL 同種移行での MySQL 9.7 サポート](2026/2026-08-17-database-migration-service-mysql-9-7.md)
 - [2026-08-17 - Gemini Enterprise: A2UI / A2A エージェント登録が一般提供 (GA) に](2026/2026-08-17-gemini-enterprise-a2ui-a2a-agents-ga.md)
 - [2026-08-17 - Cloud NGFW: Advanced malware sandbox (WildFire) サービスのサポート復活 (Preview)](2026/2026-08-17-cloud-ngfw-advanced-malware-sandbox-wildfire.md)
