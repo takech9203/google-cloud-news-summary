@@ -5,6 +5,22 @@
 
 ## 2026 年
 
+- [2026-08-20 - BigQuery: run_bq_command ツールによる Cloud CLI リモート MCP サーバー経由の bq コマンド実行 (Preview)](2026/2026-08-20-bigquery-run-bq-command-mcp.md)
+- [2026-08-20 - BigQuery: BigQuery Graph のコアグラフ処理が Enterprise / Enterprise Plus エディション限定に (Standard エディションとオンデマンド課金のサポートを非推奨化)](2026/2026-08-20-bigquery-graph-editions-deprecation.md)
+- [2026-08-20 - Bigtable: allow_incomplete_view クエリヒントによる初期データ投入中の読み取りが GA](2026/2026-08-20-bigtable-allow-incomplete-view-ga.md)
+- [2026-08-20 - Google SecOps: Cases の Alerts & Detections タブに Side-by-side ビューが登場 (Public Preview)](2026/2026-08-20-google-secops-alerts-side-by-side-view.md)
+- [2026-08-19 - Batch: Debian 11 OS イメージファミリーの開発終了 (2026 年 8 月 31 日サポート終了)](2026/2026-08-19-batch-debian-11-image-deprecation.md)
+- [2026-08-19 - Google SecOps Marketplace: 統合 (インテグレーション) アップデート (Wiz、Splunk、Exchange ほか 8 件)](2026/2026-08-19-google-secops-marketplace-integration-updates.md)
+- [2026-08-19 - Cloud Load Balancing / Cloud CDN / Google Cloud Armor: Global Front End (Preview)](2026/2026-08-19-global-front-end-preview.md)
+- [2026-08-19 - Google Cloud Contact Center as a Service (CCaaS): バージョン 6.3 リリース](2026/2026-08-19-ccaas-6-3-release.md)
+- [2026-08-19 - Virtual Private Cloud (VPC): Private Service Connect によるマルチリージョンサービスエンドポイントへのアクセスが GA](2026/2026-08-19-vpc-psc-multi-regional-endpoints-ga.md)
+- [2026-08-19 - Google Cloud サーバーレス: Go 1.27 ランタイムが Preview で利用可能に](2026/2026-08-19-go-1-27-runtime-preview-serverless.md)
+- [2026-08-19 - App Engine スタンダード環境: バンドルサービス SDK 更新による Push キューの Cloud Tasks 移行 (Preview)](2026/2026-08-19-app-engine-push-queues-cloud-tasks-migration.md)
+- [2026-08-19 - Gemini Enterprise: サブスクリプションのシート数上限の導入](2026/2026-08-19-gemini-enterprise-subscription-seat-limits.md)
+- [2026-08-19 - Container-Optimized OS: LTS イメージのセキュリティアップデート (cos-125 / cos-129)](2026/2026-08-19-container-optimized-os-security-updates.md)
+- [2026-08-19 - Oracle Database@Google Cloud: Exascale ストレージへの VM ファイルシステム・VM バックアップ配置 (GA)](2026/2026-08-19-oracle-database-exascale-vm-storage-ga.md)
+- [2026-08-19 - Google Distributed Cloud (software only): 1.34.800-gke.90 リリース (VMware / ベアメタル)](2026/2026-08-19-gdc-software-only-1-34-800-gke-90.md)
+- [2026-08-18 - BigQuery: ユーザー固有の予約割り当て (Reservation Assignments) のデフォルト上限が 10 から 100 に引き上げ](2026/2026-08-18-bigquery-reservation-assignments-limit-increase.md)
 - [2026-08-18 - App Engine standard environment (Java / Python): Images service から Cloud Run への移行が GA に](2026/2026-08-18-app-engine-images-service-cloud-run-migration.md)
 - [2026-08-17 - Cloud CDN: ターゲット型 CDN-Cache-Control HTTP レスポンスヘッダー (RFC 9213) のサポート](2026/2026-08-17-cloud-cdn-cdn-cache-control-header.md)
 - [2026-08-17 - Backup and DR Service: 強制保持バックアップを含むプロジェクトへのプロジェクトリーエン自動適用と PAM による保護](2026/2026-08-17-backup-and-dr-project-lien-pam.md)
