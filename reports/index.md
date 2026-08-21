@@ -5,10 +5,22 @@
 
 ## 2026 年
 
+- [2026-08-21 - Application Integration: QueryEngineTask における認可欠如の脆弱性 (CVE-2026-12710) への対応](2026/2026-08-21-application-integration-cve-2026-12710.md)
+- [2026-08-21 - Gemini Enterprise Agent Platform: xAI Grok 4.6 が Model Garden で Preview 提供開始](2026/2026-08-21-gemini-enterprise-agent-platform-grok-4-6.md)
+- [2026-08-20 - Gemini Enterprise: アイデンティティ/共有機能の強化 (Okta SCIM オートコンプリートと Google Identity 対応)](2026/2026-08-20-gemini-enterprise-identity-sharing-enhancements.md)
 - [2026-08-20 - BigQuery: run_bq_command ツールによる Cloud CLI リモート MCP サーバー経由の bq コマンド実行 (Preview)](2026/2026-08-20-bigquery-run-bq-command-mcp.md)
+- [2026-08-20 - Compute Engine: Image Builder (allowlist-only Preview)](2026/2026-08-20-compute-engine-image-builder-preview.md)
 - [2026-08-20 - BigQuery: BigQuery Graph のコアグラフ処理が Enterprise / Enterprise Plus エディション限定に (Standard エディションとオンデマンド課金のサポートを非推奨化)](2026/2026-08-20-bigquery-graph-editions-deprecation.md)
+- [2026-08-20 - App Engine flexible environment: Cloud SQL Auth Proxy v2 が組み込みサイドカーコンテナに](2026/2026-08-20-app-engine-flexible-cloud-sql-auth-proxy-v2.md)
 - [2026-08-20 - Bigtable: allow_incomplete_view クエリヒントによる初期データ投入中の読み取りが GA](2026/2026-08-20-bigtable-allow-incomplete-view-ga.md)
+- [2026-08-20 - BigQuery: 時系列分析用テーブル値関数 (ML.TREND / ML.SEASONALITY / ML.DETECT_CHANGE_POINTS)](2026/2026-08-20-bigquery-time-series-analysis-functions.md)
+- [2026-08-20 - Cloud Service Mesh: Managed Cloud Service Mesh における Distroless プロキシイメージのガイダンス更新](2026/2026-08-20-cloud-service-mesh-distroless-proxy-images.md)
+- [2026-08-20 - Gemini Enterprise: Antigravity for IDEs が AI developer tools で利用可能に](2026/2026-08-20-gemini-enterprise-antigravity-for-ides.md)
+- [2026-08-20 - Sensitive Data Protection: 画像スキャンのリージョン拡大 (europe-north1、us-central1)](2026/2026-08-20-sensitive-data-protection-image-scanning-regions.md)
 - [2026-08-20 - Google SecOps: Cases の Alerts & Detections タブに Side-by-side ビューが登場 (Public Preview)](2026/2026-08-20-google-secops-alerts-side-by-side-view.md)
+- [2026-08-20 - Container-Optimized OS: cos-125-19216-532-123 イメージリリース](2026/2026-08-20-container-optimized-os-image-updates.md)
+- [2026-08-20 - Gemini Code Assist: 初月ライセンスクレジットの提供終了](2026/2026-08-20-gemini-code-assist-first-month-credits-discontinued.md)
+- [2026-08-20 - Google Kubernetes Engine (GKE): バージョンアップデート 2026-R35](2026/2026-08-20-gke-version-updates-2026-r35.md)
 - [2026-08-19 - Batch: Debian 11 OS イメージファミリーの開発終了 (2026 年 8 月 31 日サポート終了)](2026/2026-08-19-batch-debian-11-image-deprecation.md)
 - [2026-08-19 - Google SecOps Marketplace: 統合 (インテグレーション) アップデート (Wiz、Splunk、Exchange ほか 8 件)](2026/2026-08-19-google-secops-marketplace-integration-updates.md)
 - [2026-08-19 - Cloud Load Balancing / Cloud CDN / Google Cloud Armor: Global Front End (Preview)](2026/2026-08-19-global-front-end-preview.md)
