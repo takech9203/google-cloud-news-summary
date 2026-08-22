@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AlloyDB for PostgreSQL: ScaNN 4 レベルツリーインデックスのメモリ推定改善と OOM 防止</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      margin-bottom: 32px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 12px 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 10px 0;
+    }
+
+    .subtitle {
+      font-size: 15px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* バッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+    }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 700px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .before-panel {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-panel {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-panel h3 {
+      color: #C5221F;
+      margin-top: 0;
+    }
+
+    .after-panel h3 {
+      color: #188038;
+      margin-top: 0;
+    }
+
+    .before-panel ul, .after-panel ul {
+      margin: 0;
+      padding-left: 4px;
+      list-style: none;
+    }
+
+    .before-panel li, .after-panel li {
+      margin: 10px 0;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* コードブロック (Mermaid の pre は除外) */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block {
+      overflow: hidden;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .ai-box {
+      background: var(--gc-purple-tint);
+      border-left: 4px solid var(--gc-purple);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+      border: 1px solid var(--gc-blue-100);
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+    }
+
+    /* 統計カード */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* 2 カラムグリッド */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 700px) {
+      .two-col {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    ul.plain-list {
+      padding-left: 20px;
+      margin: 8px 0;
+    }
+
+    ul.plain-list li {
+      margin: 8px 0;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 13px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      word-break: break-all;
+    }
+
+    footer ul {
+      padding-left: 20px;
+      margin: 8px 0;
+    }
+
+    footer li {
+      margin: 6px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- タイトルエリア -->
+    <div class="header">
+      <h1>🐘 AlloyDB for PostgreSQL<br>ScaNN 4 レベルツリーインデックスのメモリ推定改善と OOM 防止</h1>
+      <div>
+        <span class="badge">AlloyDB for PostgreSQL</span>
+        <span class="badge-preview badge">Preview</span>
+        <span class="badge">🧠 ベクトル検索 / AlloyDB AI</span>
+      </div>
+      <div class="subtitle">📅 リリース日: 2026-08-21 | 機能: ScaNN 4 レベルツリーインデックス構築時のメモリ使用量推定改善・OOM エラー防止</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📌 概要</h2>
+      <p>
+        AlloyDB for PostgreSQL で、ScaNN の <span class="highlight">4 レベルツリーインデックス</span> (four-level tree index) を構築する際の
+        <span class="highlight">メモリ使用量推定がより正確</span>になり、<span class="highlight">Out-of-Memory (OOM) エラーを防止</span>する改善が
+        Preview として提供されました。メモリ制限の適用 (enforcing memory limits) と、メモリが制約された状況下でのメモリ推定の改善により、
+        インデックス構築の安定性が向上します。
+      </p>
+      <div class="ai-box">
+        <strong>🤖 ScaNN インデックスとは:</strong> Google 製のツリーベース量子化インデックスで、近似最近傍探索 (ANN) に使用されます。
+        HNSW と比較してインデックス構築時間が短く、メモリフットプリントが小さく、ワークロードによってはより高い QPS を実現します。
+        4 レベルツリーインデックス (<code>max_num_levels = 3</code>) は Preview 機能であり、大規模なベクトルデータセット向けの構成です。
+      </div>
+      <p>
+        大規模データセットに対する多階層インデックスの構築はメモリ集約的な処理であり、並列ワーカーも自動的に起動されるため、
+        メモリの見積もりが不正確だと構築途中で OOM エラーが発生するリスクがありました。今回の改善は、ベクトル検索を大規模に運用する
+        データベース管理者や、AlloyDB AI で RAG・セマンティック検索基盤を構築するエンジニアにとって、インデックス構築の信頼性を高めるアップデートです。
+      </p>
+
+      <div class="before-after">
+        <div class="before-panel">
+          <h3>🔴 Before: アップデート前の課題</h3>
+          <ul>
+            <li><span class="cross-icon">❌</span><span>4 レベルツリーのような大規模なインデックス構築では、メモリ使用量の推定精度が十分でなく、メモリ制約下で構築中に OOM エラーが発生する可能性があった</span></li>
+            <li><span class="cross-icon">❌</span><span>OOM を避けるため、ユーザー側で <code>maintenance_work_mem</code> や <code>shared_buffers</code> の調整といった慎重なメモリ管理が必要だった</span></li>
+            <li><span class="cross-icon">❌</span><span>構築が途中で失敗すると、時間のかかる構築処理をやり直す必要があった</span></li>
+          </ul>
+        </div>
+        <div class="after-panel">
+          <h3>🟢 After: アップデート後の改善</h3>
+          <ul>
+            <li><span class="check-icon">✅</span><span>構築前・構築中のメモリ使用量推定がより正確になり、必要メモリの見積もり精度が向上</span></li>
+            <li><span class="check-icon">✅</span><span>メモリ制限が適用 (enforce) され、4 レベルツリーインデックス構築時の OOM エラーを防止</span></li>
+            <li><span class="check-icon">✅</span><span>メモリ制約下でも構築が安定し、大規模データセットへのインデックス構築を安心して実行可能に</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図: Before / After</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Before["🔴 Before: 従来のインデックス構築"]
+        A1([👤 ユーザー]) -->|CREATE INDEX<br>max_num_levels=3| B1[🌲 4 レベルツリー<br>インデックス構築]
+        B1 --> C1[📏 粗いメモリ推定]
+        C1 --> D1{メモリ不足?}
+        D1 -->|Yes| E1[💥 OOM エラー<br>構築失敗・やり直し]
+        D1 -->|No| F1[✅ 構築完了]
+    end
+
+    subgraph After["🟢 After: メモリ推定改善後 (Preview)"]
+        A2([👤 ユーザー]) -->|CREATE INDEX<br>max_num_levels=3| B2[🌲 4 レベルツリー<br>インデックス構築]
+        B2 --> C2[📐 高精度なメモリ推定<br>+ メモリ制限の適用]
+        C2 --> F2[✅ OOM を防止して<br>安定した構築]
+    end
+        </pre>
+      </div>
+      <p>
+        従来はメモリ制約下での推定が不正確なために構築中に OOM エラーが発生し得ましたが、今回の改善により、
+        <span class="highlight">高精度なメモリ推定とメモリ制限の適用</span>によって 4 レベルツリーインデックスの構築が安定して完了するようになります。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚙️ 主要機能</h2>
+      <div class="card">
+        <h3>📐 1. メモリ使用量推定の高精度化</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span>ScaNN 4 レベルツリーインデックス構築時のメモリ使用量をより正確に推定</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>特にメモリが制約された条件下 (constrained conditions) での推定精度が改善</span></div>
+      </div>
+      <div class="card">
+        <h3>🛡️ 2. メモリ制限の適用による OOM 防止</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span>インデックス構築時にメモリ制限を適用 (enforce) し、OOM エラーの発生を防止</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>構築処理の安定性が向上し、構築失敗によるやり直しリスクを低減</span></div>
+      </div>
+      <div class="card">
+        <h3>🌲 3. 4 レベルツリーインデックス (Preview) の実用性向上</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span><code>max_num_levels = 3</code> で作成する 4 レベルの K-means クラスタリングツリーによる大規模データセット向けインデックスが、より安定して構築可能に</span></div>
+      </div>
+    </div>
+
+    <!-- 統計情報 -->
+    <div class="section">
+      <h2>📊 数字で見る ScaNN インデックス</h2>
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">100 億</div>
+          <div class="stat-label">ScaNN インデックスがスケールする最大ベクトル規模</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">4 レベル</div>
+          <div class="stat-label">max_num_levels = 3 で構築するツリー階層 (Preview)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">3,000 万</div>
+          <div class="stat-label">num_leaves で設定可能なパーティション数の上限</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔬 技術仕様</h2>
+
+      <h3>🌲 ScaNN インデックスのツリーレベル</h3>
+      <table>
+        <thead>
+          <tr>
+            <th><code>max_num_levels</code> の値</th>
+            <th>インデックス構成</th>
+            <th>提供ステータス</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td>2 レベルインデックス</td>
+            <td><span class="badge badge-ga">GA</span></td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td>3 レベルインデックス</td>
+            <td><span class="badge badge-ga">GA</span></td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td>4 レベルインデックス</td>
+            <td><span class="badge badge-preview">Preview</span> (今回の改善対象)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>📏 ツリーレベル選択の目安 (公式ドキュメントより)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>ベクトル行数</th>
+            <th>推奨インデックス</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1,000 万行未満</td>
+            <td>2 レベルインデックス</td>
+          </tr>
+          <tr>
+            <td>1,000 万〜1 億行</td>
+            <td>構築時間優先なら 3 レベル、検索リコール優先なら 2 レベル</td>
+          </tr>
+          <tr>
+            <td>1 億行超</td>
+            <td>3 レベルインデックス</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>ScaNN インデックスは最大 100 億ベクトル規模までスケールし、4 レベルツリー (Preview) はさらに大規模なデータセット向けの構成として提供されています。</p>
+
+      <h3>💾 メモリ関連の考慮事項</h3>
+      <div class="note-box">
+        <ul class="plain-list" style="margin: 0;">
+          <li>インデックス生成時の問題を避けるため、<code>maintenance_work_mem</code> と <code>shared_buffers</code> はマシンの合計メモリより小さい値に設定する必要があります</li>
+          <li>3 レベル・4 レベルの ScaNN インデックス作成時や、データが 1 億行を超える場合、AlloyDB は並列ワーカーを自動的に起動することがあります。並列処理は <code>max_parallel_maintenance_workers</code>、<code>max_parallel_workers</code>、<code>min_parallel_table_scan_size</code> で調整できます</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>📋 前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><code>vector</code> および <code>alloydb_scann</code> 拡張機能がインストールされていること</span></div>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">拡張機能のインストール</span>
+        </div>
+        <pre><code class="language-sql">CREATE EXTENSION IF NOT EXISTS alloydb_scann CASCADE;</code></pre>
+      </div>
+      <div class="check-item"><span class="check-icon">✓</span><span>埋め込みベクトルがテーブルに格納されていること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>4 レベルツリーインデックスは Preview 機能のため、事前に有効化が必要</span></div>
+
+      <h3>1️⃣ ステップ 1: Preview 機能の有効化</h3>
+      <p>以下のいずれかの方法で 4 レベルツリーインデックスを有効化します。</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">方法 1: セッションレベルで設定</span>
+        </div>
+        <pre><code class="language-sql">SET scann.max_allowed_num_levels = 3;</code></pre>
+      </div>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">方法 2: インスタンスレベルでデータベースフラグを設定</span>
+        </div>
+        <pre><code class="language-bash">gcloud alloydb instances update INSTANCE_ID \
+  --cluster=CLUSTER_ID \
+  --region=REGION \
+  --database-flags=scann.enable_preview_features=on</code></pre>
+      </div>
+
+      <h3>2️⃣ ステップ 2: 4 レベルツリーインデックスの作成</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">4 レベルツリーインデックスの作成</span>
+        </div>
+        <pre><code class="language-sql">CREATE INDEX my_scann_index ON my_table
+  USING scann (embedding_column cosine)
+  WITH (mode='MANUAL',
+        num_leaves=NUM_LEAVES_VALUE,
+        quantizer='SQ8',
+        max_num_levels = 3);</code></pre>
+      </div>
+      <ul class="plain-list">
+        <li><code>num_leaves</code>: パーティション数 (1〜3,000 万の範囲で設定)</li>
+        <li><code>quantizer</code>: <code>SQ8</code> (デフォルト、性能とリコールのバランス)、<code>FLAT</code> (リコール 99% 以上が必要な場合)</li>
+      </ul>
+
+      <h3>3️⃣ ステップ 3: 構築の進捗確認</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">インデックス構築の進捗確認</span>
+        </div>
+        <pre><code class="language-sql">SELECT * FROM pg_stat_progress_create_index;</code></pre>
+      </div>
+    </div>
+
+    <!-- メリット / デメリット -->
+    <div class="section">
+      <h2>⚖️ メリットと制約事項</h2>
+      <div class="two-col">
+        <div>
+          <div class="success-box">
+            <strong>💼 ビジネス面のメリット</strong>
+            <ul class="plain-list">
+              <li><strong>運用の信頼性向上</strong>: 大規模ベクトルデータセットのインデックス構築が OOM で失敗するリスクが低減し、RAG・セマンティック検索基盤の構築・運用が安定</li>
+              <li><strong>やり直しコストの削減</strong>: 時間のかかる構築処理が途中で失敗しにくくなり、再実行にかかる時間とコンピュートコストを削減</li>
+            </ul>
+          </div>
+          <div class="success-box">
+            <strong>🔧 技術面のメリット</strong>
+            <ul class="plain-list">
+              <li><strong>メモリ制約環境での安定性</strong>: メモリに余裕がないインスタンスでも、正確なメモリ推定と制限適用により構築が安定</li>
+              <li><strong>大規模データセットへの対応強化</strong>: 4 レベルツリーインデックスの実用性が高まり、超大規模なベクトルワークロードに対応しやすく</li>
+            </ul>
+          </div>
+        </div>
+        <div>
+          <div class="warning-box">
+            <strong>⚠️ 制限事項</strong>
+            <ul class="plain-list">
+              <li>4 レベルツリーインデックスは Preview 機能であり、Pre-GA Offerings Terms が適用される (サポートが限定される可能性)</li>
+              <li>Preview 機能の有効化 (<code>scann.enable_preview_features</code> フラグまたは <code>scann.max_allowed_num_levels = 3</code>) が必要</li>
+            </ul>
+          </div>
+          <div class="warning-box">
+            <strong>💡 考慮すべき点</strong>
+            <ul class="plain-list">
+              <li>空のテーブルや <code>num_leaves</code> より行数が少ないテーブルには通常インデックスを構築できない (遅延インデックス作成などの回避策あり)</li>
+              <li><code>maintenance_work_mem</code> と <code>shared_buffers</code> の設定値がマシンの合計メモリを超えないよう、引き続き基本的なメモリ設定の確認は必要</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>📚 ユースケース 1: 大規模 RAG 基盤でのベクトルインデックス構築</h3>
+        <p><strong>シナリオ</strong>: 数億件規模のドキュメント埋め込みを AlloyDB に格納し、RAG (検索拡張生成) 用のベクトル検索基盤を構築する。インデックス構築に長時間かかるため、途中の OOM 失敗は避けたい。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">実装例</span>
+          </div>
+          <pre><code class="language-sql">SET scann.max_allowed_num_levels = 3;
+CREATE INDEX docs_embedding_idx ON documents
+  USING scann (embedding cosine)
+  WITH (mode='MANUAL', num_leaves=1000000, max_num_levels = 3);</code></pre>
+        </div>
+        <p><strong>✅ 効果</strong>: メモリ推定の改善とメモリ制限の適用により、長時間のインデックス構築が OOM で中断されるリスクが低減し、構築の再実行コストを回避できる。</p>
+      </div>
+
+      <div class="usecase">
+        <h3>🔄 ユースケース 2: メモリに余裕のないインスタンスでのインデックス再構築</h3>
+        <p><strong>シナリオ</strong>: 本番ワークロードが動作しており空きメモリが限られたインスタンス上で、ScaNN インデックスを再構築する必要がある。</p>
+        <p><strong>✅ 効果</strong>: メモリが制約された条件下での推定精度が改善されているため、既存ワークロードと共存しながらインデックス構築を安定して完了できる。</p>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>
+        この機能自体に<span class="highlight">追加料金はありません</span> (Preview 機能の有効化はデータベースフラグの設定のみ)。
+        AlloyDB の料金は vCPU・メモリ、ストレージ、ネットワークの使用量に基づく従量課金です。
+      </p>
+      <p>→ <a href="https://cloud.google.com/alloydb/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">AlloyDB for PostgreSQL の料金</a></p>
+    </div>
+
+    <!-- 関連サービス -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <h3>🤖 AlloyDB AI</h3>
+        <p>埋め込み生成 (<code>embedding()</code> 関数)、ベクトル検索、ScaNN インデックスを含む AI 機能群。今回の改善はこのベクトル検索基盤の一部。</p>
+      </div>
+      <div class="card">
+        <h3>🧭 pgvector (vector 拡張)</h3>
+        <p>ベクトル型と HNSW インデックスを提供。ScaNN は HNSW と比較して構築時間・メモリ・QPS で優位なケースが多い。</p>
+      </div>
+      <div class="card">
+        <h3>⚡ AlloyDB カラムナエンジン</h3>
+        <p>ScaNN インデックスによるベクトル検索やフィルタ付き KNN 検索を高速化。</p>
+      </div>
+      <div class="card">
+        <h3>🧠 Vertex AI</h3>
+        <p>埋め込みモデル (text-embedding など) の提供元として AlloyDB AI と連携。</p>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="success-box">
+        <p style="margin: 0;">
+          AlloyDB の ScaNN 4 レベルツリーインデックス構築における<strong>メモリ推定の高精度化</strong>と<strong>メモリ制限の適用</strong>により、
+          大規模ベクトルデータセットのインデックス構築が OOM エラーで失敗するリスクが大幅に低減されました。
+          数億件超のベクトルを扱う RAG・セマンティック検索基盤を AlloyDB で運用しているチームは、
+          <strong>Preview 機能を有効化して 4 レベルツリーインデックスの構築を検証すること</strong>を推奨します。
+        </p>
+      </div>
+      <p>
+        <span class="badge">AlloyDB</span>
+        <span class="badge">PostgreSQL</span>
+        <span class="badge">ScaNN</span>
+        <span class="badge">ベクトル検索</span>
+        <span class="badge">AI</span>
+        <span class="badge">インデックス</span>
+        <span class="badge">OOM</span>
+        <span class="badge badge-preview">Preview</span>
+      </p>
+    </div>
+
+    <!-- フッター (出典) -->
+    <footer>
+      <p><strong>📎 出典・参考リンク</strong></p>
+      <ul>
+        <li>公式リリースノート: <a href="https://docs.cloud.google.com/release-notes#August_21_2026" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/release-notes#August_21_2026</a></li>
+        <li>ScaNN インデックスの作成 (公式ドキュメント): <a href="https://docs.cloud.google.com/alloydb/docs/ai/create-scann-index" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/alloydb/docs/ai/create-scann-index</a></li>
+        <li>ScaNN インデックスのチューニングパラメータリファレンス: <a href="https://docs.cloud.google.com/alloydb/docs/reference/ai/scann-index-reference" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/alloydb/docs/reference/ai/scann-index-reference</a></li>
+        <li>ScaNN インデックスによるベクトルクエリ性能の概要: <a href="https://docs.cloud.google.com/alloydb/docs/ai/scann-vector-query-perf-overview" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/alloydb/docs/ai/scann-vector-query-perf-overview</a></li>
+        <li>ScaNN インデックスエラーのトラブルシューティング: <a href="https://docs.cloud.google.com/alloydb/docs/troubleshoot/troubleshoot-scann-indexes" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/alloydb/docs/troubleshoot/troubleshoot-scann-indexes</a></li>
+        <li>料金ページ: <a href="https://cloud.google.com/alloydb/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">https://cloud.google.com/alloydb/pricing</a></li>
+      </ul>
+      <p>ベースレポート: reports/2026/2026-08-21-alloydb-scann-index-memory-estimation.md | 生成日: 2026-08-22</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

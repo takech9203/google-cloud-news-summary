@@ -5,7 +5,15 @@
 
 ## 2026 年
 
+- [2026-08-22 - Apigee UI: ServiceCallout ポリシー作成とデベロッパーカスタム属性保存の不具合修正](2026/2026-08-22-apigee-ui-servicecallout-developer-attributes-fixes.md)
+- [2026-08-21 - AlloyDB for PostgreSQL: ScaNN 4 レベルツリーインデックス構築時のメモリ使用量推定の改善と OOM 防止](2026/2026-08-21-alloydb-scann-index-memory-estimation.md)
+- [2026-08-21 - Google SecOps: 相対時間フィルタリングの刷新 (Past / Previous / Current オペレーター)](2026/2026-08-21-google-secops-relative-time-filtering.md)
+- [2026-08-21 - Compute Engine: ネットワーク・メモリ最適化 M4N マシンシリーズが GA](2026/2026-08-21-compute-engine-m4n-machine-series-ga.md)
+- [2026-08-21 - Gemini Enterprise: AI developer tools が Standard Emerging Market エディションで利用可能に](2026/2026-08-21-gemini-enterprise-ai-dev-tools-emerging-market.md)
+- [2026-08-21 - Google Cloud Contact Center as a Service (CCaaS): バージョン 6.4 リリース](2026/2026-08-21-ccaas-6-4-release.md)
 - [2026-08-21 - Application Integration: QueryEngineTask における認可欠如の脆弱性 (CVE-2026-12710) への対応](2026/2026-08-21-application-integration-cve-2026-12710.md)
+- [2026-08-21 - Google Kubernetes Engine: リリースチャネル未登録クラスタの新規作成が既存顧客のみに制限](2026/2026-08-21-gke-release-channel-enrollment-required.md)
+- [2026-08-21 - Google Kubernetes Engine: Windows Server 2019 (LTSC) ノードイメージが 2025 年 12 月版に固定](2026/2026-08-21-gke-windows-server-2019-node-image-pinned.md)
 - [2026-08-21 - Gemini Enterprise Agent Platform: xAI Grok 4.6 が Model Garden で Preview 提供開始](2026/2026-08-21-gemini-enterprise-agent-platform-grok-4-6.md)
 - [2026-08-20 - Gemini Enterprise: アイデンティティ/共有機能の強化 (Okta SCIM オートコンプリートと Google Identity 対応)](2026/2026-08-20-gemini-enterprise-identity-sharing-enhancements.md)
 - [2026-08-20 - BigQuery: run_bq_command ツールによる Cloud CLI リモート MCP サーバー経由の bq コマンド実行 (Preview)](2026/2026-08-20-bigquery-run-bq-command-mcp.md)
@@ -17,6 +25,7 @@
 - [2026-08-20 - Cloud Service Mesh: Managed Cloud Service Mesh における Distroless プロキシイメージのガイダンス更新](2026/2026-08-20-cloud-service-mesh-distroless-proxy-images.md)
 - [2026-08-20 - Gemini Enterprise: Antigravity for IDEs が AI developer tools で利用可能に](2026/2026-08-20-gemini-enterprise-antigravity-for-ides.md)
 - [2026-08-20 - Sensitive Data Protection: 画像スキャンのリージョン拡大 (europe-north1、us-central1)](2026/2026-08-20-sensitive-data-protection-image-scanning-regions.md)
+- [2026-08-20 - Config Connector: バージョン 1.155.1 リリース (新 Beta リソース・新フィールド・Direct Reconciler 拡充)](2026/2026-08-20-config-connector-v1-155-1.md)
 - [2026-08-20 - Google SecOps: Cases の Alerts & Detections タブに Side-by-side ビューが登場 (Public Preview)](2026/2026-08-20-google-secops-alerts-side-by-side-view.md)
 - [2026-08-20 - Container-Optimized OS: cos-125-19216-532-123 イメージリリース](2026/2026-08-20-container-optimized-os-image-updates.md)
 - [2026-08-20 - Gemini Code Assist: 初月ライセンスクレジットの提供終了](2026/2026-08-20-gemini-code-assist-first-month-credits-discontinued.md)
