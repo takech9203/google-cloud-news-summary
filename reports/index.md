@@ -5,6 +5,7 @@
 
 ## 2026 年
 
+- [2026-08-22 - Identity and Access Management (IAM): Agent Identity Auth Manager と Agent Identity APIs が GA](2026/2026-08-22-iam-agent-identity-ga.md)
 - [2026-08-22 - Apigee UI: ServiceCallout ポリシー作成とデベロッパーカスタム属性保存の不具合修正](2026/2026-08-22-apigee-ui-servicecallout-developer-attributes-fixes.md)
 - [2026-08-21 - AlloyDB for PostgreSQL: ScaNN 4 レベルツリーインデックス構築時のメモリ使用量推定の改善と OOM 防止](2026/2026-08-21-alloydb-scann-index-memory-estimation.md)
 - [2026-08-21 - Google SecOps: 相対時間フィルタリングの刷新 (Past / Previous / Current オペレーター)](2026/2026-08-21-google-secops-relative-time-filtering.md)
