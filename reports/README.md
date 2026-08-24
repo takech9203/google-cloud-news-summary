@@ -5,6 +5,9 @@
 
 ## 2026 年
 
+- [2026-08-24 - Cloud Trace: リモート MCP サーバー (Policy Troubleshooter / Managed Service for Apache Airflow) が tools/call のトレーススパンを自動生成](2026/2026-08-24-cloud-trace-remote-mcp-server-spans.md)
+- [2026-08-24 - Cloud Trace: Observability Bucket の手動作成と更新 (表示名・説明・Cloud KMS キー) に対応](2026/2026-08-24-cloud-trace-observability-buckets-management.md)
+- [2026-08-24 - Google SecOps: Emerging Threats Center の Operations サポート](2026/2026-08-24-google-secops-emerging-threats-center-operations.md)
 - [2026-08-22 - Identity and Access Management (IAM): Agent Identity Auth Manager と Agent Identity APIs が GA](2026/2026-08-22-iam-agent-identity-ga.md)
 - [2026-08-22 - Apigee UI: ServiceCallout ポリシー作成とデベロッパーカスタム属性保存の不具合修正](2026/2026-08-22-apigee-ui-servicecallout-developer-attributes-fixes.md)
 - [2026-08-21 - AlloyDB for PostgreSQL: ScaNN 4 レベルツリーインデックス構築時のメモリ使用量推定の改善と OOM 防止](2026/2026-08-21-alloydb-scann-index-memory-estimation.md)
