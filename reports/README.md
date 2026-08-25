@@ -5,9 +5,21 @@
 
 ## 2026 年
 
+- [2026-08-25 - Cloud SQL for PostgreSQL: Database Center のアセスメント機能 (Preview)](2026/2026-08-25-cloud-sql-postgresql-database-center-assessments.md)
+- [2026-08-25 - reCAPTCHA: Fraud Defense Mobile SDK v18.10.0-beta01 (iOS) リリース](2026/2026-08-25-recaptcha-fraud-defense-mobile-sdk-v18-10-0.md)
+- [2026-08-25 - Cloud SDK (gcloud CLI): 582.0.0 リリース - Cloud SQL Proxy V1 削除などの破壊的変更](2026/2026-08-25-cloud-sdk-582-breaking-changes.md)
+- [2026-08-24 - Gemini Enterprise Agent Platform: Z.ai GLM 5.2 が Model Garden のマネージドモデル (MaaS) として Preview 提供開始](2026/2026-08-24-gemini-enterprise-agent-platform-glm-5-2.md)
+- [2026-08-24 - Container-Optimized OS: 4 つの新イメージリリース (セキュリティ修正)](2026/2026-08-24-container-optimized-os-image-updates.md)
+- [2026-08-24 - Backup and DR: Filestore インスタンスの CMEK 対応バックアップ ボールトが GA](2026/2026-08-24-backup-and-dr-filestore-cmek-backup-vault-ga.md)
 - [2026-08-24 - Cloud Trace: リモート MCP サーバー (Policy Troubleshooter / Managed Service for Apache Airflow) が tools/call のトレーススパンを自動生成](2026/2026-08-24-cloud-trace-remote-mcp-server-spans.md)
+- [2026-08-24 - BigQuery: Google Cloud Observability によるデータエージェントのモニタリング (Preview)](2026/2026-08-24-bigquery-data-agent-monitoring.md)
 - [2026-08-24 - Cloud Trace: Observability Bucket の手動作成と更新 (表示名・説明・Cloud KMS キー) に対応](2026/2026-08-24-cloud-trace-observability-buckets-management.md)
 - [2026-08-24 - Google SecOps: Emerging Threats Center の Operations サポート](2026/2026-08-24-google-secops-emerging-threats-center-operations.md)
+- [2026-08-24 - Google SecOps: データ処理パイプライン向け Unroll プロセッサ (イベントブレーキング)](2026/2026-08-24-google-secops-unroll-processor.md)
+- [2026-08-24 - Google Cloud VMware Engine: vCenter Server / ESXi 8.0 Update 3k セキュリティアップデート](2026/2026-08-24-vmware-engine-vcenter-esxi-8-0-u3k-security-update.md)
+- [2026-08-24 - Gemini Enterprise: D&B Commercial Graph データストア (Public Preview) とデータコネクタの Cloud Monitoring 可観測性強化](2026/2026-08-24-gemini-enterprise-dnb-commercial-graph-connector-monitoring.md)
+- [2026-08-24 - Anthos Config Management (Config Sync): RootSync/RepoSync 単位でのモニタリング無効化と CVE 対応](2026/2026-08-24-anthos-config-management-config-sync-disable-monitoring.md)
+- [2026-08-23 - Agent Platform Workbench: スケジュール実行ノートブックの認証情報失効時のステータス報告修正](2026/2026-08-23-agent-platform-workbench-scheduled-notebook-execution-fix.md)
 - [2026-08-22 - Identity and Access Management (IAM): Agent Identity Auth Manager と Agent Identity APIs が GA](2026/2026-08-22-iam-agent-identity-ga.md)
 - [2026-08-22 - Apigee UI: ServiceCallout ポリシー作成とデベロッパーカスタム属性保存の不具合修正](2026/2026-08-22-apigee-ui-servicecallout-developer-attributes-fixes.md)
 - [2026-08-21 - AlloyDB for PostgreSQL: ScaNN 4 レベルツリーインデックス構築時のメモリ使用量推定の改善と OOM 防止](2026/2026-08-21-alloydb-scann-index-memory-estimation.md)
