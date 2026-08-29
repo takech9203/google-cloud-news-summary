@@ -5,6 +5,7 @@
 
 ## 2026 年
 
+- [2026-08-29 - Google SecOps SOAR: Release 6.3.98 全リージョン提供開始](2026/2026-08-29-google-secops-soar-6-3-98.md)
 - [2026-08-28 - Gemini Enterprise: 新規データストア 5 種の追加と 3 コネクタの新アクション対応 (Preview)](2026/2026-08-28-gemini-enterprise-new-data-stores-actions.md)
 - [2026-08-28 - Cloud Build: Connection details ページからのアクセストークン更新 (Bitbucket / GitLab 2nd gen 接続)](2026/2026-08-28-cloud-build-connection-token-rotation.md)
 - [2026-08-28 - Looker: Looker 26.14 アップデートまとめ (in-database 分析モデル、MongoSQL 対応、Unused Content Cleanup GA)](2026/2026-08-28-looker-26-14-updates.md)
