@@ -5,6 +5,19 @@
 
 ## 2026 年
 
+- [2026-08-31 - Google Kubernetes Engine: GKE Gateway における GCPTrafficDistributionPolicy を使用したセッションアフィニティが GA](2026/2026-08-31-gke-gateway-session-affinity-ga.md)
+- [2026-08-31 - Virtual Private Cloud: 同一 VPC ネットワーク内での複数 vNIC 構成が GA](2026/2026-08-31-vpc-multiple-vnics-same-network-ga.md)
+- [2026-08-31 - Memorystore for Redis Cluster: アクセス制御リスト (ACL) ポリシーが GA に](2026/2026-08-31-memorystore-redis-cluster-acl-ga.md)
+- [2026-08-31 - Datastream: Cloud SQL インスタンス概要ページからの自動フローによるストリーム作成](2026/2026-08-31-datastream-cloud-sql-automated-flow.md)
+- [2026-08-31 - BigQuery: パイプラインの Git フォルダ対応 (Preview) とフォルダ管理の GA](2026/2026-08-31-bigquery-pipelines-git-folders.md)
+- [2026-08-31 - BigQuery: Identity 列 (自動採番列) の作成が可能に (Preview)](2026/2026-08-31-bigquery-identity-columns.md)
+- [2026-08-31 - Network Connectivity Center: ハイブリッドスポークのスポークフィルタが IPv6 動的ルートをサポート (Preview)](2026/2026-08-31-network-connectivity-center-ipv6-spoke-filters.md)
+- [2026-08-31 - Cloud SQL for PostgreSQL: pgAudit 拡張機能による監査ログの機密情報マスキング](2026/2026-08-31-cloud-sql-postgresql-pgaudit-sensitive-data-redaction.md)
+- [2026-08-31 - Cloud Service Mesh: in-cluster 版 1.30.4-asm.1 リリースと 1.27 のサポート終了](2026/2026-08-31-cloud-service-mesh-1-30-4-asm-1.md)
+- [2026-08-31 - Gemini Enterprise: Assured Workloads (FedRAMP High) でのフェデレーテッドデータストア対応](2026/2026-08-31-gemini-enterprise-assured-workloads-fedramp-high.md)
+- [2026-08-31 - Gemini Enterprise: Gemini 3.5 Flash がカナダ (ca) リージョンで利用可能に (DRZ / MLP 対応)](2026/2026-08-31-gemini-enterprise-gemini-3-5-flash-canada.md)
+- [2026-08-31 - Memorystore for Valkey: アクセス制御リスト (ACL) ポリシーが GA に](2026/2026-08-31-memorystore-valkey-acl-ga.md)
+- [2026-08-31 - Google SecOps: マルチイベントルールのカスタマイズ可能なスケジュールが GA](2026/2026-08-31-google-secops-multi-event-rule-custom-schedules-ga.md)
 - [2026-08-30 - Google SecOps SOAR: Release 6.3.99 第 1 フェーズリージョンへロールアウト開始](2026/2026-08-30-google-secops-soar-6-3-99.md)
 - [2026-08-29 - Google SecOps SOAR: Release 6.3.98 全リージョン提供開始](2026/2026-08-29-google-secops-soar-6-3-98.md)
 - [2026-08-28 - Gemini Enterprise: 新規データストア 5 種の追加と 3 コネクタの新アクション対応 (Preview)](2026/2026-08-28-gemini-enterprise-new-data-stores-actions.md)
