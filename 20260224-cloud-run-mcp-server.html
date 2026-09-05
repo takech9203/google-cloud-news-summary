@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Run: リモート MCP サーバーと高可用性デプロイメント</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; min-width: 280px; }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+      text-align: right;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green { border-left-color: var(--gc-green); }
+    .card-purple { border-left-color: var(--gc-purple); }
+    .card-orange { border-left-color: var(--gc-orange); }
+    .card-teal { border-left-color: var(--gc-teal); }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h3 { color: var(--gc-red); margin-top: 0; }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box h3 { color: var(--gc-green); margin-top: 0; }
+
+    .before-box ul, .after-box ul {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    .before-box li, .after-box li {
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.green { background: linear-gradient(135deg, var(--gc-green), #1B8A3A); }
+    .stat-card.purple { background: linear-gradient(135deg, var(--gc-purple), #7B1FA2); }
+    .stat-card.teal { background: linear-gradient(135deg, var(--gc-teal), #00838F); }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h3 {
+      color: var(--gc-blue-900);
+      margin-top: 0;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .ai-box {
+      background: var(--gc-purple-tint);
+      border-left: 4px solid var(--gc-purple);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .region-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    .region-tag {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-800);
+      border: 1px solid var(--gc-blue-200);
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .region-tag.tier2 {
+      background: var(--gc-surface-container-lowest);
+      color: var(--gc-on-surface-variant);
+      border-color: var(--gc-outline-variant);
+    }
+
+    .merit-demerit {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .link-list {
+      list-style: none;
+      padding: 0;
+      margin: 8px 0;
+    }
+
+    .link-list li {
+      margin: 8px 0;
+      padding: 8px 12px;
+      background: var(--gc-surface);
+      border-radius: 8px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .link-list li a {
+      word-break: break-all;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a { word-break: break-all; }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .before-after { grid-template-columns: 1fr; }
+      .merit-demerit { grid-template-columns: 1fr; }
+      .stat-grid { grid-template-columns: 1fr; }
+      .header { flex-direction: column; }
+      .subtitle { text-align: left; margin-top: 8px; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>Cloud Run: リモート MCP サーバーと高可用性デプロイメント</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Cloud Run</span>
+          <span class="badge-preview">Preview</span>
+          <span class="badge" style="background: var(--gc-purple);">MCP</span>
+          <span class="badge" style="background: var(--gc-teal);">高可用性</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-02-24</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>Cloud Run に 2 つの重要な新機能が <span class="highlight">Preview</span> として追加された。</p>
+      <div class="ai-box">
+        <strong>🤖 MCP サーバーホスティング:</strong> AI エージェントやアプリケーションが Cloud Run 上でリモート MCP (Model Context Protocol) サーバーをホストし、デプロイメントを行える機能。MCP はオープンプロトコルであり、AI エージェントが環境とどのようにインタラクションするかを標準化する。Streamable HTTP トランスポートを使用し、コンテナイメージまたはソースコードからのデプロイに対応。
+      </div>
+      <div class="note-box">
+        <strong>🌐 高可用性デプロイメント:</strong> Cloud Run service health として提供され、マルチリージョン構成での自動フェイルオーバーとフェイルバックが可能。リージョン障害時にトラフィックを自動的に健全なリージョンへ切り替えることで、サービスの中断を最小限に抑える。グローバル外部 Application Load Balancer またはクロスリージョン内部 Application Load Balancer と組み合わせて使用。
+      </div>
+    </div>
+
+    <!-- Statistics -->
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-value">40+</div>
+        <div class="stat-label">利用可能リージョン</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-value">8</div>
+        <div class="stat-label">対応 MCP SDK 言語</div>
+      </div>
+      <div class="stat-card purple">
+        <div class="stat-value">5</div>
+        <div class="stat-label">認証方式</div>
+      </div>
+      <div class="stat-card teal">
+        <div class="stat-value">自動</div>
+        <div class="stat-label">フェイルオーバー / フェイルバック</div>
+      </div>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before</h3>
+          <ul>
+            <li>MCP サーバーを本番環境でホストするにはインフラの手動管理やスケーリング設定が必要</li>
+            <li>AI エージェントと MCP サーバー間の認証やネットワーク構成を個別に設計する必要があった</li>
+            <li>クロスリージョンフェイルオーバーは手動構成が必要でリージョン障害時の自動復旧が困難</li>
+            <li>マルチリージョンデプロイメントにおけるヘルスチェックと自動トラフィック切り替えの統合的な仕組みがなかった</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After</h3>
+          <ul>
+            <li>Cloud Run 上で MCP サーバーをコンテナイメージまたはソースコードから直接デプロイ可能</li>
+            <li>IAM、Cloud Run proxy、サイドカー、Cloud Service Mesh など複数の認証方式が統合サポート</li>
+            <li>Readiness Probe に基づくリージョンヘルスの自動集約とロードバランサーへの健全性レポートが自動化</li>
+            <li>リージョン障害時の自動フェイルオーバーとフェイルバックが可能になり手動介入不要</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>Cloud Run 上の MCP サーバーを高可用性構成でデプロイした場合のアーキテクチャ。AI エージェントからのリクエストはグローバルロードバランサーを経由し、Cloud Run service health が各リージョンの健全性を監視して自動フェイルオーバーを実現する。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Agent["AI エージェント"]
+        MC["MCP クライアント"]
+    end
+
+    subgraph GCP["Google Cloud"]
+        subgraph LB["Global External ALB"]
+            FW["フォワーディングルール"]
+            BS["バックエンドサービス"]
+        end
+
+        subgraph RegionA["リージョン A"]
+            NEG_A["Serverless NEG"]
+            CR_A["Cloud Run サービス\n+ MCP サーバー"]
+            HP_A["Readiness Probe"]
+        end
+
+        subgraph RegionB["リージョン B"]
+            NEG_B["Serverless NEG"]
+            CR_B["Cloud Run サービス\n+ MCP サーバー"]
+            HP_B["Readiness Probe"]
+        end
+
+        SH["Cloud Run\nService Health"]
+    end
+
+    subgraph Tools["外部ツール・リソース"]
+        T1["Cloud Storage"]
+        T2["Database"]
+        T3["外部 API"]
+    end
+
+    MC -->|"Streamable HTTP / SSE"| FW
+    FW --> BS
+    BS --> NEG_A
+    BS --> NEG_B
+    NEG_A --> CR_A
+    NEG_B --> CR_B
+    HP_A -->|"ヘルス報告"| SH
+    HP_B -->|"ヘルス報告"| SH
+    SH -->|"健全性ステータス"| BS
+    CR_A --> Tools
+    CR_B --> Tools
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="feature-grid">
+
+        <div class="card card-purple">
+          <h3>🤖 1. リモート MCP サーバーホスティング</h3>
+          <div class="icon-text"><span class="arrow">→</span><span>Cloud Run 上で Streamable HTTP トランスポートを使用した MCP サーバーをホスト可能</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>コンテナイメージまたはソースコード (Node.js, Python) からのデプロイに対応</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>MCP クライアントとの通信に SSE (Server-Sent Events) または Streamable HTTP をサポート</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>stdio トランスポートはサポート外 (ローカル実行向けのため)</span></div>
+        </div>
+
+        <div class="card">
+          <h3>🔐 2. MCP クライアント認証</h3>
+          <div class="icon-text"><span class="arrow">→</span><span><strong>IAM invoker 権限</strong>: <code>roles/run.invoker</code> による Cloud Run proxy を使用したセキュアな認証</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span><strong>OIDC ID トークン</strong>: カスタムオーディエンスに対応した ID トークンベースの認証</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span><strong>サイドカーデプロイメント</strong>: MCP サーバーを MCP クライアントと同一インスタンスに配置し localhost 経由で通信</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span><strong>Service-to-Service 認証</strong>: 個別の Cloud Run サービス間での認証</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span><strong>Cloud Service Mesh</strong>: メッシュによる自動認証とトラフィック管理</span></div>
+        </div>
+
+        <div class="card card-teal">
+          <h3>🌐 3. 高可用性デプロイメント (Cloud Run service health)</h3>
+          <div class="icon-text"><span class="arrow">→</span><span>マルチリージョンデプロイメントでの自動クロスリージョンフェイルオーバーとフェイルバック</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>Readiness Probe に基づくリージョンヘルスの集約と自動報告</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>グローバル外部 ALB およびクロスリージョン内部 ALB との統合</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>Serverless NEG を使用したリージョン間トラフィック制御</span></div>
+        </div>
+
+        <div class="card card-green">
+          <h3>🚀 4. マルチリージョンサービスデプロイメント</h3>
+          <div class="icon-text"><span class="arrow">→</span><span>単一の gcloud CLI コマンドまたは YAML / Terraform でマルチリージョンデプロイが可能</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span><code>gcloud run deploy --regions=REGION_A,REGION_B</code> で複数リージョンへの同時デプロイ</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>リージョンの追加・削除は <code>gcloud run multi-region-services update</code> で管理</span></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>📐 技術仕様</h2>
+
+      <h3>MCP サーバーデプロイメント</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>サポートトランスポート</td><td>Streamable HTTP, SSE</td></tr>
+          <tr><td>非サポートトランスポート</td><td>stdio</td></tr>
+          <tr><td>デプロイ方式</td><td>コンテナイメージ、ソースコード</td></tr>
+          <tr><td>推奨 MCP SDK</td><td>FastMCP、公式言語 SDK (TypeScript, Python, Go, Kotlin, Java, C#, Ruby, Rust)</td></tr>
+          <tr><td>認証方式</td><td>IAM invoker、OIDC ID トークン、サイドカー、Service-to-Service、Cloud Service Mesh</td></tr>
+        </tbody>
+      </table>
+
+      <h3>高可用性デプロイメント制限事項</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>最小インスタンス要件</td><td>リージョンごとにサービスレベルまたはリビジョンレベルで 1 以上の最小インスタンスが必須</td></tr>
+          <tr><td>フェイルオーバー要件</td><td>少なくとも 2 つの異なるリージョンのサービスが必要</td></tr>
+          <tr><td>NEG バックエンド上限</td><td>クロスリージョン内部 ALB では最大 5 つの Serverless NEG バックエンド</td></tr>
+          <tr><td>URL マスク / タグ</td><td>Serverless NEG では設定不可</td></tr>
+          <tr><td>IAP</td><td>ロードバランサーからの IAP 有効化は不可 (Cloud Run から直接有効化が必要)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup Guide -->
+    <div class="section">
+      <h2>🔧 設定方法</h2>
+
+      <div class="note-box">
+        <strong>📝 前提条件:</strong>
+        <ul style="margin: 8px 0; padding-left: 20px;">
+          <li>Google Cloud プロジェクトで Cloud Run 開発環境をセットアップ済み</li>
+          <li>Cloud Run Admin (<code>roles/run.admin</code>) および Service Account User (<code>roles/iam.serviceAccountUser</code>) ロールを付与済み</li>
+          <li>Artifact Registry、Cloud Build、Cloud Run Admin API、Compute Engine、Network Services API を有効化済み</li>
+        </ul>
+      </div>
+
+      <h3>ステップ 1: MCP サーバーのデプロイ (コンテナイメージ)</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">Artifact Registry + Cloud Run デプロイ</span>
+        </div>
+        <pre><code class="language-bash"># Artifact Registry リポジトリを作成
+gcloud artifacts repositories create remote-mcp-servers \
+  --repository-format=docker \
+  --location=us-central1 \
+  --description="Repository for remote MCP servers" \
+  --project=PROJECT_ID
+
+# コンテナイメージをビルドしてプッシュ
+gcloud builds submit --region=us-central1 \
+  --tag us-central1-docker.pkg.dev/PROJECT_ID/remote-mcp-servers/mcp-server:latest
+
+# Cloud Run にデプロイ
+gcloud run deploy mcp-server \
+  --image us-central1-docker.pkg.dev/PROJECT_ID/remote-mcp-servers/mcp-server:latest \
+  --region=us-central1 \
+  --no-allow-unauthenticated</code></pre>
+      </div>
+      <p style="font-size: 14px; color: var(--gc-outline);"><code>--no-allow-unauthenticated</code> フラグにより認証済みリクエストのみを許可する。</p>
+
+      <h3>ステップ 2: MCP クライアントの認証設定</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">Cloud Run proxy でローカルからアクセス</span>
+        </div>
+        <pre><code class="language-bash"># Cloud Run proxy を使用してローカルからアクセス
+gcloud run services proxy mcp-server --region=us-central1 --port=3000</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">JSON</span>
+          <span class="code-title">MCP クライアント設定例</span>
+        </div>
+        <pre><code class="language-json">{
+  "mcpServers": {
+    "cloud-run": {
+      "url": "http://localhost:3000/sse"
+    }
+  }
+}</code></pre>
+      </div>
+      <p style="font-size: 14px; color: var(--gc-outline);">Cloud Run proxy がローカルのポート 3000 でリクエストを待ち受け、IAM 認証を自動的に注入してリモート MCP サーバーにフォワードする。</p>
+
+      <h3>ステップ 3: マルチリージョン高可用性デプロイメント</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">マルチリージョンデプロイ + リージョン追加</span>
+        </div>
+        <pre><code class="language-bash"># マルチリージョンサービスのデプロイ (最小インスタンスを設定)
+gcloud beta run deploy SERVICE_NAME \
+  --regions=us-central1,europe-west1 \
+  --min=1
+
+# リージョンの追加
+gcloud run multi-region-services update SERVICE_NAME \
+  --add-regions=asia-northeast1</code></pre>
+      </div>
+      <p style="font-size: 14px; color: var(--gc-outline);">複数リージョンにサービスをデプロイし、最小インスタンスを 1 以上に設定することで Cloud Run service health が有効になる。</p>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h3>🎯 ユースケース 1: AI エージェントのツール基盤</h3>
+        <p><strong>シナリオ:</strong> 企業内の複数の AI エージェントが共通のツール (データベースアクセス、外部 API 呼び出し、ファイル操作) を MCP サーバー経由で利用する。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Python</span>
+            <span class="code-title">FastMCP サーバー実装例</span>
+          </div>
+          <pre><code class="language-python">from fastmcp import FastMCP
+import os
+
+mcp = FastMCP("Enterprise Tools Server")
+
+@mcp.tool()
+def query_database(sql: str) -> str:
+    """データベースに対してクエリを実行する"""
+    # データベース接続とクエリ実行のロジック
+    return result
+
+@mcp.tool()
+def call_external_api(endpoint: str, payload: dict) -> dict:
+    """外部 API を呼び出す"""
+    # API 呼び出しのロジック
+    return response
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(
+        mcp.run_async(
+            transport="streamable-http",
+            host="0.0.0.0",
+            port=os.getenv("PORT", 8080),
+        )
+    )</code></pre>
+        </div>
+        <p><strong>効果:</strong> MCP プロトコルにより、ADK、LangGraph、Dify など異なるエージェントフレームワークから統一的にツールにアクセスでき、ツールの再利用性が大幅に向上する。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>🎯 ユースケース 2: グローバル展開の AI サービスの高可用性確保</h3>
+        <p><strong>シナリオ:</strong> グローバルに展開する AI チャットボットサービスを Cloud Run で運用し、リージョン障害時にも継続稼働を保証する必要がある。</p>
+        <p><strong>効果:</strong> Cloud Run service health と Global External ALB の組み合わせにより、リージョン障害を自動検知し、健全なリージョンにトラフィックを自動フェイルオーバーする。フェイルバックも自動化されるため、運用チームの手動介入が不要になる。</p>
+      </div>
+    </div>
+
+    <!-- Merits and Demerits -->
+    <div class="section">
+      <h2>⚖️ メリット・デメリット</h2>
+      <div class="merit-demerit">
+        <div>
+          <h3 style="color: var(--gc-green);">✅ メリット</h3>
+
+          <h4 style="margin: 12px 0 6px;">ビジネス面</h4>
+          <div class="card card-green">
+            <div class="icon-text"><span class="arrow" style="color: var(--gc-green);">→</span><span><strong>AI エージェント開発の加速</strong>: MCP サーバーを Cloud Run 上で簡単にホストでき、AI エージェントのツール連携基盤を迅速に構築可能</span></div>
+            <div class="icon-text"><span class="arrow" style="color: var(--gc-green);">→</span><span><strong>サービス可用性の向上</strong>: 自動フェイルオーバーにより、リージョン障害時もサービスを継続。SLA 向上とユーザー影響の最小化</span></div>
+            <div class="icon-text"><span class="arrow" style="color: var(--gc-green);">→</span><span><strong>運用コストの削減</strong>: サーバーレス特性により、MCP サーバーもスケールトゥゼロが可能で使用分のみ課金</span></div>
+          </div>
+
+          <h4 style="margin: 12px 0 6px;">技術面</h4>
+          <div class="card card-green">
+            <div class="icon-text"><span class="arrow" style="color: var(--gc-green);">→</span><span><strong>標準化されたプロトコル</strong>: MCP オープンプロトコルによりエージェントフレームワーク非依存のツール連携を実現</span></div>
+            <div class="icon-text"><span class="arrow" style="color: var(--gc-green);">→</span><span><strong>柔軟な認証方式</strong>: IAM、OIDC、サイドカー、Service Mesh など用途に応じた認証方式を選択可能</span></div>
+            <div class="icon-text"><span class="arrow" style="color: var(--gc-green);">→</span><span><strong>インフラ管理不要</strong>: マネージドインフラにより、スケーリング、TLS 終端、ヘルスチェックが自動化</span></div>
+            <div class="icon-text"><span class="arrow" style="color: var(--gc-green);">→</span><span><strong>IaC 対応</strong>: gcloud CLI、YAML、Terraform すべてでマルチリージョン構成を定義・管理可能</span></div>
+          </div>
+        </div>
+
+        <div>
+          <h3 style="color: var(--gc-red);">⚠️ デメリット・制約事項</h3>
+
+          <h4 style="margin: 12px 0 6px;">制限事項</h4>
+          <div class="card" style="border-left-color: var(--gc-red);">
+            <div class="icon-text"><span class="arrow" style="color: var(--gc-red);">→</span><span>Preview 機能のため SLA 対象外。本番利用には注意が必要</span></div>
+            <div class="icon-text"><span class="arrow" style="color: var(--gc-red);">→</span><span>stdio トランスポート非サポート (Streamable HTTP / SSE のみ)</span></div>
+            <div class="icon-text"><span class="arrow" style="color: var(--gc-red);">→</span><span>高可用性機能には最小インスタンス設定が必須 (常時起動コスト発生)</span></div>
+            <div class="icon-text"><span class="arrow" style="color: var(--gc-red);">→</span><span>クロスリージョン内部 ALB で 5 つを超える Serverless NEG バックエンド非サポート</span></div>
+          </div>
+
+          <h4 style="margin: 12px 0 6px;">考慮すべき点</h4>
+          <div class="card" style="border-left-color: var(--gc-yellow);">
+            <div class="icon-text"><span class="arrow" style="color: var(--gc-yellow);">→</span><span>Readiness Probe の適切な設計が必要 (プローブなしは「unknown」扱いでロードバランサーは健全と見なす)</span></div>
+            <div class="icon-text"><span class="arrow" style="color: var(--gc-yellow);">→</span><span>サービスが削除された場合、異常ステータスはロードバランサーに報告されない</span></div>
+            <div class="icon-text"><span class="arrow" style="color: var(--gc-yellow);">→</span><span>新規インスタンス起動時の最初の Readiness Probe はカウントされないため、一時的にリクエストがルーティングされる可能性あり</span></div>
+            <div class="icon-text"><span class="arrow" style="color: var(--gc-yellow);">→</span><span>マルチリージョン構成では SSL 証明書プロビジョニングに最大 30 分かかる場合あり</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>Cloud Run の料金体系は従来通り適用される。2 つの課金モデルが利用可能。</p>
+
+      <div class="before-after" style="margin: 16px 0;">
+        <div class="card">
+          <h3>📊 リクエストベース課金 (デフォルト)</h3>
+          <p>リクエスト処理中のみ CPU/メモリが課金される。リクエストごとの料金も発生する。</p>
+        </div>
+        <div class="card card-green">
+          <h3>📊 インスタンスベース課金</h3>
+          <p>インスタンスの全ライフサイクルにわたって課金される。リクエストごとの料金は発生しない。</p>
+          <div class="warning-box" style="margin: 8px 0 0 0;">
+            <strong>💡 推奨:</strong> 高可用性デプロイメントでは最小インスタンスの設定 (1 以上) が必須であるため、インスタンスベース課金が推奨される。
+          </div>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>無料枠</td><td>月 200 万リクエスト、360,000 GiB 秒メモリ、180,000 vCPU 秒</td></tr>
+          <tr><td>Flexible CUD (1 年)</td><td>インスタンスベース: 28% 割引 / リクエストベース: 17% 割引</td></tr>
+          <tr><td>Flexible CUD (3 年)</td><td>インスタンスベース: 46% 割引 / リクエストベース: 17% 割引</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Available Regions -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <p>Cloud Run は Tier 1 および Tier 2 の合計 <span class="highlight">40 以上のリージョン</span>で利用可能。マルチリージョンデプロイメントでは任意のリージョンの組み合わせが選択できる。</p>
+
+      <h3>主な Tier 1 リージョン</h3>
+      <div class="region-tags">
+        <span class="region-tag">us-central1 (アイオワ)</span>
+        <span class="region-tag">us-east1 (サウスカロライナ)</span>
+        <span class="region-tag">us-west1 (オレゴン)</span>
+        <span class="region-tag">europe-west1 (ベルギー)</span>
+        <span class="region-tag">europe-west4 (オランダ)</span>
+        <span class="region-tag">europe-north1 (フィンランド)</span>
+        <span class="region-tag">asia-east1 (台湾)</span>
+        <span class="region-tag">asia-northeast1 (東京)</span>
+        <span class="region-tag">asia-northeast2 (大阪)</span>
+      </div>
+
+      <h3>主な Tier 2 リージョン</h3>
+      <div class="region-tags">
+        <span class="region-tag tier2">asia-northeast3 (ソウル)</span>
+        <span class="region-tag tier2">asia-southeast1 (シンガポール)</span>
+        <span class="region-tag tier2">australia-southeast1 (シドニー)</span>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="feature-grid">
+        <div class="card card-purple">
+          <div class="icon-text"><span class="arrow">→</span><span><strong>Agent Development Kit (ADK)</strong>: Cloud Run 上で ADK エージェントをデプロイし、MCP サーバーと連携する統合的なエージェント開発フレームワーク</span></div>
+        </div>
+        <div class="card card-teal">
+          <div class="icon-text"><span class="arrow">→</span><span><strong>Cloud Service Mesh</strong>: MCP クライアントとサーバー間の認証・トラフィック管理を自動化するサービスメッシュ</span></div>
+        </div>
+        <div class="card">
+          <div class="icon-text"><span class="arrow">→</span><span><strong>Global External Application Load Balancer</strong>: マルチリージョン Cloud Run サービスへのグローバルトラフィックルーティングとフェイルオーバーを提供</span></div>
+        </div>
+        <div class="card card-purple">
+          <div class="icon-text"><span class="arrow">→</span><span><strong>Vertex AI</strong>: Gemini API やカスタムモデルのホスティングなど、AI エージェントの推論レイヤーを提供</span></div>
+        </div>
+        <div class="card card-orange">
+          <div class="icon-text"><span class="arrow">→</span><span><strong>Artifact Registry</strong>: MCP サーバーのコンテナイメージを保存・管理するレジストリサービス</span></div>
+        </div>
+        <div class="card card-orange">
+          <div class="icon-text"><span class="arrow">→</span><span><strong>Cloud Build</strong>: MCP サーバーのコンテナイメージのビルドと CI/CD パイプラインの構築</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="ai-box">
+        <p>今回の Cloud Run アップデートは、<strong>AI エージェント開発のインフラストラクチャ基盤</strong>として Cloud Run をさらに強化するもの。リモート MCP サーバーホスティングにより、AI エージェントがツールやリソースにアクセスするための標準化されたインフラを Cloud Run 上で容易に構築できるようになった。</p>
+        <p>Cloud Run service health による<strong>高可用性デプロイメント</strong>は、ミッションクリティカルな AI サービスのリージョン障害耐性を自動化する。</p>
+        <p style="margin-bottom: 0;"><strong>推奨:</strong> AI エージェント基盤を Cloud Run で構築しているチームは、MCP サーバーの統合と高可用性構成の導入を検討することを推奨する。</p>
+      </div>
+    </div>
+
+    <!-- References -->
+    <div class="section">
+      <h2>📚 参考リンク</h2>
+      <ul class="link-list">
+        <li>📄 <a href="https://cloud.google.com/release-notes#February_24_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート</a></li>
+        <li>📖 <a href="https://cloud.google.com/run/docs/host-mcp-servers" target="_blank" rel="noopener noreferrer" class="gc-link">MCP サーバーのホスティングガイド</a></li>
+        <li>📘 <a href="https://cloud.google.com/run/docs/tutorials/deploy-remote-mcp-server" target="_blank" rel="noopener noreferrer" class="gc-link">リモート MCP サーバーデプロイチュートリアル</a></li>
+        <li>🌐 <a href="https://cloud.google.com/run/docs/multiple-regions" target="_blank" rel="noopener noreferrer" class="gc-link">マルチリージョンデプロイメント</a></li>
+        <li>🏥 <a href="https://cloud.google.com/run/docs/tutorials/configure-service-health" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud Run service health チュートリアル</a></li>
+        <li>🤖 <a href="https://cloud.google.com/run/docs/ai-agents" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud Run 上の AI エージェント</a></li>
+        <li>💰 <a href="https://cloud.google.com/run/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">料金ページ</a></li>
+      </ul>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="list-style: none; padding: 0; margin: 4px 0;">
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/release-notes#February_24_2026" target="_blank" rel="noopener noreferrer" class="gc-link">https://cloud.google.com/release-notes#February_24_2026</a></li>
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/run/docs/host-mcp-servers" target="_blank" rel="noopener noreferrer" class="gc-link">https://cloud.google.com/run/docs/host-mcp-servers</a></li>
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/run/docs/multiple-regions" target="_blank" rel="noopener noreferrer" class="gc-link">https://cloud.google.com/run/docs/multiple-regions</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline);">Generated: 2026-02-24 | #CloudRun #MCP #ModelContextProtocol #AIエージェント #高可用性 #マルチリージョン #サーバーレス #Preview</p>
+    </footer>
+
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

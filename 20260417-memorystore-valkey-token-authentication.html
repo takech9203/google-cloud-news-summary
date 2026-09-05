@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Memorystore for Valkey: Basic Token-Based Authentication</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; min-width: 280px; }
+
+    h1 {
+      font-size: 34px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .header-badges {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-preview {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-orange);
+    }
+
+    /* Sections */
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    /* Cards */
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 8px;
+    }
+
+    .card p {
+      margin: 6px 0;
+    }
+
+    /* Before/After */
+    .before-after-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h3 {
+      color: var(--gc-red);
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box h3 {
+      color: var(--gc-green);
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+
+    .before-box ul, .after-box ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .before-box li, .after-box li {
+      padding: 4px 0;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .before-box li::before { content: "  "; }
+    .after-box li::before { content: "  "; }
+
+    /* Feature cards grid */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .feature-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .feature-card h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .feature-card p {
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Mermaid */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* Code blocks */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      border-radius: 0 0 8px 8px;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Usecase */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-blue-900);
+      margin-bottom: 8px;
+    }
+
+    .usecase-card p {
+      font-size: 14px;
+      line-height: 1.6;
+      margin: 6px 0;
+    }
+
+    /* Note / Warning boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Check items */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon { color: var(--gc-green); font-size: 18px; }
+    .cross-icon { color: var(--gc-red); font-size: 18px; }
+
+    /* Flow diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Demerit list */
+    .demerit-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .demerit-list li {
+      padding: 8px 0;
+      font-size: 14px;
+      line-height: 1.6;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .demerit-list li:last-child {
+      border-bottom: none;
+    }
+
+    /* Region */
+    .region-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .region-card {
+      background: var(--gc-surface);
+      border-radius: 8px;
+      padding: 16px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .region-card h4 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      margin-bottom: 8px;
+    }
+
+    .region-card p {
+      font-size: 13px;
+      color: var(--gc-on-surface-variant);
+      line-height: 1.5;
+    }
+
+    /* Related services */
+    .related-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .related-card {
+      background: var(--gc-surface);
+      border-radius: 8px;
+      padding: 16px;
+      border: 1px solid var(--gc-outline-variant);
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .related-card .related-icon {
+      font-size: 28px;
+      flex-shrink: 0;
+    }
+
+    .related-card h4 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 4px;
+    }
+
+    .related-card p {
+      font-size: 13px;
+      color: var(--gc-on-surface-variant);
+      line-height: 1.5;
+    }
+
+    /* Links */
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* Footer */
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    footer ul {
+      list-style: none;
+      padding: 0;
+      margin: 8px 0;
+    }
+
+    footer li {
+      margin: 4px 0;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      h1 { font-size: 26px; }
+      .before-after-grid,
+      .feature-grid,
+      .stats-grid,
+      .region-grid,
+      .related-grid {
+        grid-template-columns: 1fr;
+      }
+      .flow-diagram { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>&#x1F511; Memorystore for Valkey: Basic Token-Based Authentication</h1>
+        <div class="subtitle">2026-04-17 | Memorystore for Valkey</div>
+        <div class="header-badges">
+          <span class="badge">Memorystore</span>
+          <span class="badge">Valkey</span>
+          <span class="badge">Security</span>
+          <span class="badge-preview">Preview</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>&#x1F4CB; &#x6982;&#x8981;</h2>
+      <p>Memorystore for Valkey &#x306B;<span class="highlight">&#x57FA;&#x672C;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x30D9;&#x30FC;&#x30B9;&#x8A8D;&#x8A3C; (Basic Token-Based Authentication)</span> &#x304C; Preview &#x3068;&#x3057;&#x3066;&#x8FFD;&#x52A0;&#x3055;&#x308C;&#x307E;&#x3057;&#x305F;&#x3002;&#x65E2;&#x5B58;&#x306E; IAM &#x8A8D;&#x8A3C;&#x306B;&#x52A0;&#x3048;&#x3066;&#x3001;&#x8EFD;&#x91CF;&#x306A;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x30D9;&#x30FC;&#x30B9;&#x306E;&#x8A8D;&#x8A3C;&#x65B9;&#x5F0F;&#x3092;&#x4F7F;&#x7528;&#x3057;&#x3066;&#x30A4;&#x30F3;&#x30B9;&#x30BF;&#x30F3;&#x30B9;&#x3078;&#x306E;&#x30A2;&#x30AF;&#x30BB;&#x30B9;&#x3092;&#x4FDD;&#x8B77;&#x3067;&#x304D;&#x307E;&#x3059;&#x3002;&#x7279;&#x306B; Memorystore for Redis &#x3084;&#x30AA;&#x30F3;&#x30D7;&#x30EC;&#x30DF;&#x30B9;&#x74B0;&#x5883;&#x304B;&#x3089;&#x306E;&#x79FB;&#x884C;&#x3092;&#x30B9;&#x30E0;&#x30FC;&#x30BA;&#x306B;&#x884C;&#x3046;&#x3053;&#x3068;&#x304C;&#x3067;&#x304D;&#x307E;&#x3059;&#x3002;</p>
+
+      <!-- Before/After -->
+      <div class="before-after-grid" style="margin-top: 20px;">
+        <div class="before-box">
+          <h3>&#x274C; Before</h3>
+          <ul>
+            <li>IAM &#x8A8D;&#x8A3C;&#x306E;&#x307F;&#x304C;&#x5229;&#x7528;&#x53EF;&#x80FD;</li>
+            <li>&#x30A2;&#x30AF;&#x30BB;&#x30B9;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x306E;&#x6709;&#x52B9;&#x671F;&#x9650;&#x304C;&#x77ED;&#x304F; (1 &#x6642;&#x9593;)&#x3001;&#x81EA;&#x52D5;&#x66F4;&#x65B0;&#x30ED;&#x30B8;&#x30C3;&#x30AF;&#x304C;&#x5FC5;&#x8981;</li>
+            <li>Redis &#x304B;&#x3089;&#x306E;&#x79FB;&#x884C;&#x6642;&#x306B; AUTH &#x30D9;&#x30FC;&#x30B9;&#x306E;&#x8A8D;&#x8A3C;&#x3092;&#x5F15;&#x304D;&#x7D99;&#x3052;&#x306A;&#x3044;</li>
+            <li>&#x30AA;&#x30F3;&#x30D7;&#x30EC;&#x30DF;&#x30B9;&#x306E;&#x30B7;&#x30F3;&#x30D7;&#x30EB;&#x306A;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x8A8D;&#x8A3C;&#x3092;&#x518D;&#x73FE;&#x3067;&#x304D;&#x306A;&#x3044;</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>&#x2705; After</h3>
+          <ul>
+            <li>&#x8EFD;&#x91CF;&#x306A;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x30D9;&#x30FC;&#x30B9;&#x8A8D;&#x8A3C;&#x304C;&#x9078;&#x629E;&#x53EF;&#x80FD;&#x306B;</li>
+            <li>Redis / &#x30AA;&#x30F3;&#x30D7;&#x30EC;&#x30DF;&#x30B9;&#x304B;&#x3089;&#x306E;&#x5F8C;&#x65B9;&#x4E92;&#x63DB;&#x6027;&#x3092;&#x78BA;&#x4FDD;</li>
+            <li>&#x30BC;&#x30ED;&#x30C0;&#x30A6;&#x30F3;&#x30BF;&#x30A4;&#x30E0;&#x306E;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x30ED;&#x30FC;&#x30C6;&#x30FC;&#x30B7;&#x30E7;&#x30F3;</li>
+            <li>&#x6700;&#x5927; 1,000 &#x30ED;&#x30FC;&#x30AB;&#x30EB;&#x30E6;&#x30FC;&#x30B6;&#x30FC;&#x3067;&#x304D;&#x3081;&#x7D30;&#x304B;&#x306A;&#x30A2;&#x30AF;&#x30BB;&#x30B9;&#x5236;&#x5FA1;</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value">2</div>
+        <div class="stat-label">&#x8A8D;&#x8A3C;&#x30E2;&#x30FC;&#x30C9;</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">1,000</div>
+        <div class="stat-label">&#x6700;&#x5927;&#x30ED;&#x30FC;&#x30AB;&#x30EB;&#x30E6;&#x30FC;&#x30B6;&#x30FC;&#x6570;</div>
+      </div>
+      <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-green), #1B5E20);">
+        <div class="stat-value">0</div>
+        <div class="stat-label">&#x30C0;&#x30A6;&#x30F3;&#x30BF;&#x30A4;&#x30E0; (&#x30ED;&#x30FC;&#x30C6;&#x30FC;&#x30B7;&#x30E7;&#x30F3;&#x6642;)</div>
+      </div>
+      <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-green), #1B5E20);">
+        <div class="stat-value">&#x00A5;0</div>
+        <div class="stat-label">&#x8FFD;&#x52A0;&#x6599;&#x91D1;&#x4E0D;&#x8981;</div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>&#x1F3D7;&#xFE0F; &#x30A2;&#x30FC;&#x30AD;&#x30C6;&#x30AF;&#x30C1;&#x30E3;&#x56F3;</h2>
+      <p>&#x30AF;&#x30E9;&#x30A4;&#x30A2;&#x30F3;&#x30C8;&#x30A2;&#x30D7;&#x30EA;&#x30B1;&#x30FC;&#x30B7;&#x30E7;&#x30F3;&#x306F; Secret Manager &#x304B;&#x3089;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x3092;&#x53D6;&#x5F97;&#x3057;&#x3001;&#x30B7;&#x30F3;&#x30D7;&#x30EB;&#x8A8D;&#x8A3C;&#x307E;&#x305F;&#x306F;&#x30DE;&#x30EB;&#x30C1;&#x30E6;&#x30FC;&#x30B6;&#x30FC;&#x8A8D;&#x8A3C;&#x306E;&#x3044;&#x305A;&#x308C;&#x304B;&#x306E;&#x65B9;&#x5F0F;&#x3067; Memorystore for Valkey &#x30A4;&#x30F3;&#x30B9;&#x30BF;&#x30F3;&#x30B9;&#x306B;&#x63A5;&#x7D9A;&#x3057;&#x307E;&#x3059;&#x3002;</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Client["クライアントアプリケーション"]
+        App["アプリケーション"]
+        SM["Secret Manager\n(トークン保管)"]
+    end
+
+    subgraph Auth["認証モード"]
+        Simple["シンプル認証\n(デフォルトユーザー + トークン)"]
+        Multi["マルチユーザー認証\n(ユーザー名 + トークン)"]
+    end
+
+    subgraph Memorystore["Memorystore for Valkey"]
+        Instance[("Valkey インスタンス\n--authorization-mode=token-auth")]
+        Default["デフォルトユーザー\n(自動作成)"]
+        Users["ローカルユーザー\n(最大 1,000)"]
+    end
+
+    App -->|"トークン取得"| SM
+    App -->|"AUTH トークン"| Simple
+    App -->|"AUTH ユーザー名 + トークン"| Multi
+    Simple --> Instance
+    Multi --> Instance
+    Instance --> Default
+    Instance --> Users
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>&#x26A1; &#x4E3B;&#x8981;&#x6A5F;&#x80FD;</h2>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <h3>&#x1F511; &#x30B7;&#x30F3;&#x30D7;&#x30EB;&#x8A8D;&#x8A3C;</h3>
+          <p>&#x30C7;&#x30D5;&#x30A9;&#x30EB;&#x30C8;&#x30E6;&#x30FC;&#x30B6;&#x30FC;&#x3068;&#x3057;&#x3066;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x306E;&#x307F;&#x3067;&#x8A8D;&#x8A3C;&#x3002;&#x30A4;&#x30F3;&#x30B9;&#x30BF;&#x30F3;&#x30B9;&#x4F5C;&#x6210;&#x6642;&#x307E;&#x305F;&#x306F;&#x6709;&#x52B9;&#x5316;&#x6642;&#x306B;&#x30C7;&#x30D5;&#x30A9;&#x30EB;&#x30C8;&#x30E6;&#x30FC;&#x30B6;&#x30FC;&#x3068;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x304C;&#x81EA;&#x52D5;&#x751F;&#x6210;&#x3055;&#x308C;&#x307E;&#x3059;&#x3002;&#x5358;&#x4E00;&#x30E6;&#x30FC;&#x30B6;&#x30FC;&#x306E;&#x30A2;&#x30AF;&#x30BB;&#x30B9;&#x5236;&#x5FA1;&#x306B;&#x6700;&#x9069;&#x3067;&#x3059;&#x3002;</p>
+        </div>
+        <div class="feature-card">
+          <h3>&#x1F465; &#x30DE;&#x30EB;&#x30C1;&#x30E6;&#x30FC;&#x30B6;&#x30FC;&#x8A8D;&#x8A3C;</h3>
+          <p>&#x30E6;&#x30FC;&#x30B6;&#x30FC;&#x540D;&#x3068;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x306E;&#x7D44;&#x307F;&#x5408;&#x308F;&#x305B;&#x3067;&#x8A8D;&#x8A3C;&#x3002;&#x8907;&#x6570;&#x306E;&#x30E6;&#x30FC;&#x30B6;&#x30FC;&#x3092;&#x4F5C;&#x6210;&#x3057;&#x3001;&#x305D;&#x308C;&#x305E;&#x308C;&#x306B;&#x500B;&#x5225;&#x306E;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x3092;&#x5272;&#x308A;&#x5F53;&#x3066;&#x3066;&#x3001;&#x304D;&#x3081;&#x7D30;&#x304B;&#x306A;&#x30A2;&#x30AF;&#x30BB;&#x30B9;&#x5236;&#x5FA1;&#x3092;&#x5B9F;&#x73FE;&#x3057;&#x307E;&#x3059;&#x3002;</p>
+        </div>
+        <div class="feature-card" style="border-left-color: var(--gc-green);">
+          <h3>&#x1F504; &#x30BC;&#x30ED;&#x30C0;&#x30A6;&#x30F3;&#x30BF;&#x30A4;&#x30E0;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x30ED;&#x30FC;&#x30C6;&#x30FC;&#x30B7;&#x30E7;&#x30F3;</h3>
+          <p>&#x5404;&#x30E6;&#x30FC;&#x30B6;&#x30FC;&#x306F;&#x6700;&#x5927; 2 &#x3064;&#x306E;&#x8A8D;&#x8A3C;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x3092;&#x4FDD;&#x6301;&#x53EF;&#x80FD;&#x3002;&#x65B0;&#x3057;&#x3044;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x3092;&#x4F5C;&#x6210;&#x2192;&#x30A2;&#x30D7;&#x30EA;&#x66F4;&#x65B0;&#x2192;&#x53E4;&#x3044;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x524A;&#x9664;&#x3067;&#x3001;&#x30C0;&#x30A6;&#x30F3;&#x30BF;&#x30A4;&#x30E0;&#x306A;&#x3057;&#x306E;&#x30ED;&#x30FC;&#x30C6;&#x30FC;&#x30B7;&#x30E7;&#x30F3;&#x304C;&#x53EF;&#x80FD;&#x3067;&#x3059;&#x3002;</p>
+        </div>
+        <div class="feature-card" style="border-left-color: var(--gc-purple);">
+          <h3>&#x1F4DD; &#x76E3;&#x67FB;&#x30ED;&#x30B0;&#x9023;&#x643A;</h3>
+          <p>&#x8A8D;&#x8A3C;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x3068;&#x30E6;&#x30FC;&#x30B6;&#x30FC;&#x306B;&#x95A2;&#x9023;&#x3059;&#x308B;&#x64CD;&#x4F5C;&#x306B;&#x3064;&#x3044;&#x3066; Admin Activity &#x304A;&#x3088;&#x3073; Data Access &#x76E3;&#x67FB;&#x30ED;&#x30B0;&#x304C;&#x751F;&#x6210;&#x3055;&#x308C;&#x3001;Cloud Audit Logs &#x3068;&#x306E;&#x7D71;&#x5408;&#x306B;&#x3088;&#x308A;&#x30A2;&#x30AF;&#x30BB;&#x30B9;&#x306E;&#x76E3;&#x8996;&#x3068;&#x76E3;&#x67FB;&#x304C;&#x53EF;&#x80FD;&#x3067;&#x3059;&#x3002;</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Token Rotation Flow -->
+    <div class="section">
+      <h2>&#x1F504; &#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x30ED;&#x30FC;&#x30C6;&#x30FC;&#x30B7;&#x30E7;&#x30F3;&#x30D5;&#x30ED;&#x30FC;</h2>
+      <p>&#x30BC;&#x30ED;&#x30C0;&#x30A6;&#x30F3;&#x30BF;&#x30A4;&#x30E0;&#x3067;&#x306E;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x66F4;&#x65B0;&#x624B;&#x9806;&#x3002;&#x5404;&#x30E6;&#x30FC;&#x30B6;&#x30FC;&#x304C;&#x6700;&#x5927; 2 &#x3064;&#x306E;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x3092;&#x540C;&#x6642;&#x4FDD;&#x6301;&#x3067;&#x304D;&#x308B;&#x3053;&#x3068;&#x3092;&#x5229;&#x7528;&#x3057;&#x307E;&#x3059;&#x3002;</p>
+      <div class="flow-diagram">
+        <div class="flow-step">&#x1F195; &#x65B0;&#x30C8;&#x30FC;&#x30AF;&#x30F3;<br/>&#x4F5C;&#x6210;</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">&#x2705; &#x4E21;&#x65B9;&#x306E;&#x30C8;&#x30FC;&#x30AF;&#x30F3;<br/>&#x304C;&#x6709;&#x52B9;</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">&#x1F504; &#x30A2;&#x30D7;&#x30EA;&#x3092;<br/>&#x65B0;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x306B;&#x66F4;&#x65B0;</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">&#x1F5D1;&#xFE0F; &#x53E4;&#x3044;&#x30C8;&#x30FC;&#x30AF;&#x30F3;<br/>&#x3092;&#x524A;&#x9664;</div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>&#x1F50D; &#x6280;&#x8853;&#x4ED5;&#x69D8;: &#x8A8D;&#x8A3C;&#x65B9;&#x5F0F;&#x306E;&#x6BD4;&#x8F03;</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>&#x9805;&#x76EE;</th>
+            <th>&#x57FA;&#x672C;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x30D9;&#x30FC;&#x30B9;&#x8A8D;&#x8A3C; (&#x4ECA;&#x56DE;&#x8FFD;&#x52A0;)</th>
+            <th>IAM &#x8A8D;&#x8A3C; (&#x65E2;&#x5B58;)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>&#x30B9;&#x30C6;&#x30FC;&#x30BF;&#x30B9;</strong></td>
+            <td><span class="badge-preview" style="margin: 0;">Preview</span></td>
+            <td><span style="display:inline-block;color:#FFFFFF;padding:4px 12px;border-radius:16px;font-size:13px;font-weight:500;background:var(--gc-green);">GA</span></td>
+          </tr>
+          <tr>
+            <td><strong>&#x8A8D;&#x8A3C;&#x65B9;&#x6CD5;</strong></td>
+            <td>&#x30E6;&#x30FC;&#x30B6;&#x30FC;&#x540D; + &#x30C8;&#x30FC;&#x30AF;&#x30F3;</td>
+            <td>IAM &#x30A2;&#x30AF;&#x30BB;&#x30B9;&#x30C8;&#x30FC;&#x30AF;&#x30F3;</td>
+          </tr>
+          <tr>
+            <td><strong>&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x6709;&#x52B9;&#x671F;&#x9593;</strong></td>
+            <td>&#x660E;&#x793A;&#x7684;&#x306B;&#x524A;&#x9664;&#x3059;&#x308B;&#x307E;&#x3067;&#x6709;&#x52B9;</td>
+            <td>1 &#x6642;&#x9593; (&#x81EA;&#x52D5;&#x66F4;&#x65B0;&#x304C;&#x5FC5;&#x8981;)</td>
+          </tr>
+          <tr>
+            <td><strong>&#x30E6;&#x30FC;&#x30B6;&#x30FC;&#x7BA1;&#x7406;</strong></td>
+            <td>&#x6700;&#x5927; 1,000 &#x30ED;&#x30FC;&#x30AB;&#x30EB;&#x30E6;&#x30FC;&#x30B6;&#x30FC;</td>
+            <td>IAM &#x30D7;&#x30EA;&#x30F3;&#x30B7;&#x30D1;&#x30EB;&#x3067;&#x7BA1;&#x7406;</td>
+          </tr>
+          <tr>
+            <td><strong>&#x63A5;&#x7D9A;&#x65B9;&#x5F0F;</strong></td>
+            <td>URI &#x6587;&#x5B57;&#x5217;&#x307E;&#x305F;&#x306F;&#x30D5;&#x30E9;&#x30B0;</td>
+            <td>IAM &#x30C8;&#x30FC;&#x30AF;&#x30F3; + valkey-cli</td>
+          </tr>
+          <tr>
+            <td><strong>&#x7121;&#x52B9;&#x5316;</strong></td>
+            <td>&#x6709;&#x52B9;&#x5316;&#x5F8C;&#x306F;&#x7121;&#x52B9;&#x5316;&#x4E0D;&#x53EF;</td>
+            <td>&#x30A4;&#x30F3;&#x30B9;&#x30BF;&#x30F3;&#x30B9;&#x3054;&#x3068;&#x306B;&#x8A2D;&#x5B9A;&#x53EF;&#x80FD;</td>
+          </tr>
+          <tr>
+            <td><strong>Redis &#x4E92;&#x63DB;&#x6027;</strong></td>
+            <td>&#x9AD8;&#x3044; (AUTH &#x30B3;&#x30DE;&#x30F3;&#x30C9;&#x4E92;&#x63DB;)</td>
+            <td>Redis &#x3068;&#x306F;&#x7570;&#x306A;&#x308B;&#x65B9;&#x5F0F;</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 style="font-size: 18px; font-weight: 600; color: var(--gc-on-surface); margin: 20px 0 12px;">&#x63A5;&#x7D9A;&#x65B9;&#x6CD5;</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">URI &#x6587;&#x5B57;&#x5217;&#x3092;&#x4F7F;&#x7528;&#x3057;&#x305F;&#x63A5;&#x7D9A;</span>
+        </div>
+        <pre><code class="language-bash">valkey-cli -u redis://USERNAME:TOKEN@IP_ADDRESS:PORT</code></pre>
+      </div>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">&#x30D5;&#x30E9;&#x30B0;&#x3092;&#x4F7F;&#x7528;&#x3057;&#x305F;&#x63A5;&#x7D9A;</span>
+        </div>
+        <pre><code class="language-bash">valkey-cli --user USERNAME -a TOKEN -h IP_ADDRESS -p PORT</code></pre>
+      </div>
+    </div>
+
+    <!-- Setup -->
+    <div class="section">
+      <h2>&#x1F6E0;&#xFE0F; &#x8A2D;&#x5B9A;&#x65B9;&#x6CD5;</h2>
+
+      <div class="note-box">
+        <strong>&#x2139;&#xFE0F; &#x524D;&#x63D0;&#x6761;&#x4EF6;:</strong> Google Cloud &#x30D7;&#x30ED;&#x30B8;&#x30A7;&#x30AF;&#x30C8;&#x3067; Memorystore for Valkey API &#x304C;&#x6709;&#x52B9;&#x5316;&#x3055;&#x308C;&#x3066;&#x3044;&#x308B;&#x3053;&#x3068;&#x3001;<code>gcloud</code> CLI &#x304C;&#x30A4;&#x30F3;&#x30B9;&#x30C8;&#x30FC;&#x30EB;&#x3055;&#x308C;&#x3066;&#x3044;&#x308B;&#x3053;&#x3068;&#x3001;&#x9069;&#x5207;&#x306A; IAM &#x6A29;&#x9650;&#x304C;&#x4ED8;&#x4E0E;&#x3055;&#x308C;&#x3066;&#x3044;&#x308B;&#x3053;&#x3068;&#x3002;
+      </div>
+
+      <h3 style="font-size: 18px; font-weight: 600; color: var(--gc-on-surface); margin: 16px 0 12px;">&#x30B9;&#x30C6;&#x30C3;&#x30D7; 1: &#x65B0;&#x898F;&#x30A4;&#x30F3;&#x30B9;&#x30BF;&#x30F3;&#x30B9;&#x3067;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x30D9;&#x30FC;&#x30B9;&#x8A8D;&#x8A3C;&#x3092;&#x6709;&#x52B9;&#x5316;</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">&#x65B0;&#x898F;&#x30A4;&#x30F3;&#x30B9;&#x30BF;&#x30F3;&#x30B9;&#x4F5C;&#x6210;</span>
+        </div>
+        <pre><code class="language-bash">gcloud beta memorystore instances create INSTANCE_ID \
+  --location=REGION \
+  --authorization-mode=token-auth</code></pre>
+      </div>
+
+      <h3 style="font-size: 18px; font-weight: 600; color: var(--gc-on-surface); margin: 16px 0 12px;">&#x30B9;&#x30C6;&#x30C3;&#x30D7; 2: &#x65E2;&#x5B58;&#x30A4;&#x30F3;&#x30B9;&#x30BF;&#x30F3;&#x30B9;&#x3067;&#x6709;&#x52B9;&#x5316;</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">&#x65E2;&#x5B58;&#x30A4;&#x30F3;&#x30B9;&#x30BF;&#x30F3;&#x30B9;&#x3078;&#x306E;&#x9069;&#x7528;</span>
+        </div>
+        <pre><code class="language-bash">gcloud beta memorystore instances update INSTANCE_ID \
+  --location=REGION \
+  --authorization-mode=token-auth</code></pre>
+      </div>
+
+      <h3 style="font-size: 18px; font-weight: 600; color: var(--gc-on-surface); margin: 16px 0 12px;">&#x30B9;&#x30C6;&#x30C3;&#x30D7; 3: &#x8FFD;&#x52A0;&#x30E6;&#x30FC;&#x30B6;&#x30FC;&#x306E;&#x4F5C;&#x6210;</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">&#x30E6;&#x30FC;&#x30B6;&#x30FC;&#x4F5C;&#x6210;</span>
+        </div>
+        <pre><code class="language-bash">gcloud beta memorystore instances create-token-auth-user INSTANCE_ID \
+  --location=REGION \
+  --token-auth-user=USERNAME</code></pre>
+      </div>
+
+      <h3 style="font-size: 18px; font-weight: 600; color: var(--gc-on-surface); margin: 16px 0 12px;">&#x30B9;&#x30C6;&#x30C3;&#x30D7; 4: &#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x30ED;&#x30FC;&#x30C6;&#x30FC;&#x30B7;&#x30E7;&#x30F3; (&#x30BC;&#x30ED;&#x30C0;&#x30A6;&#x30F3;&#x30BF;&#x30A4;&#x30E0;)</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">&#x30BC;&#x30ED;&#x30C0;&#x30A6;&#x30F3;&#x30BF;&#x30A4;&#x30E0;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x30ED;&#x30FC;&#x30C6;&#x30FC;&#x30B7;&#x30E7;&#x30F3;</span>
+        </div>
+        <pre><code class="language-bash"># 1. &#x65B0;&#x3057;&#x3044;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x3092;&#x4F5C;&#x6210; (&#x4E21;&#x65B9;&#x306E;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x304C;&#x6709;&#x52B9;)
+gcloud beta memorystore instances token-auth-users create-auth-token USERNAME \
+  --instance=INSTANCE_ID \
+  --location=REGION
+
+# 2. &#x30A2;&#x30D7;&#x30EA;&#x30B1;&#x30FC;&#x30B7;&#x30E7;&#x30F3;&#x3092;&#x65B0;&#x3057;&#x3044;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x306B;&#x66F4;&#x65B0;
+
+# 3. &#x53E4;&#x3044;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x3092;&#x524A;&#x9664;
+gcloud beta memorystore instances token-auth-users auth-tokens delete AUTH_TOKEN \
+  --instance=INSTANCE_ID \
+  --location=REGION \
+  --token-auth-user=USERNAME</code></pre>
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>&#x2728; &#x30E1;&#x30EA;&#x30C3;&#x30C8;</h2>
+      <div class="feature-grid">
+        <div style="background: var(--gc-green-tint); border-radius: 12px; padding: 20px;">
+          <h3 style="font-size: 18px; font-weight: 600; color: #1B5E20; margin-bottom: 12px;">&#x1F4BC; &#x30D3;&#x30B8;&#x30CD;&#x30B9;&#x9762;</h3>
+          <div class="check-item">
+            <span class="check-icon">&#x2713;</span>
+            <span><strong>&#x79FB;&#x884C;&#x30B3;&#x30B9;&#x30C8;&#x306E;&#x524A;&#x6E1B;</strong> - Redis / &#x30AA;&#x30F3;&#x30D7;&#x30EC;&#x30DF;&#x30B9;&#x304B;&#x3089;&#x306E;&#x79FB;&#x884C;&#x6642;&#x306B;&#x65E2;&#x5B58;&#x306E;&#x8A8D;&#x8A3C;&#x65B9;&#x5F0F;&#x3068;&#x306E;&#x5F8C;&#x65B9;&#x4E92;&#x63DB;&#x6027;&#x3067;&#x30A2;&#x30D7;&#x30EA;&#x5074;&#x306E;&#x5909;&#x66F4;&#x3092;&#x6700;&#x5C0F;&#x9650;&#x306B;</span>
+          </div>
+          <div class="check-item">
+            <span class="check-icon">&#x2713;</span>
+            <span><strong>&#x904B;&#x7528;&#x8CA0;&#x8377;&#x306E;&#x8EFD;&#x6E1B;</strong> - &#x30BC;&#x30ED;&#x30C0;&#x30A6;&#x30F3;&#x30BF;&#x30A4;&#x30E0;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x30ED;&#x30FC;&#x30C6;&#x30FC;&#x30B7;&#x30E7;&#x30F3;&#x3067;&#x8A08;&#x753B;&#x7684;&#x306A;&#x30E1;&#x30F3;&#x30C6;&#x30CA;&#x30F3;&#x30B9;&#x30A6;&#x30A3;&#x30F3;&#x30C9;&#x30A6;&#x304C;&#x4E0D;&#x8981;</span>
+          </div>
+        </div>
+        <div style="background: var(--gc-blue-tint); border-radius: 12px; padding: 20px;">
+          <h3 style="font-size: 18px; font-weight: 600; color: var(--gc-blue-900); margin-bottom: 12px;">&#x2699;&#xFE0F; &#x6280;&#x8853;&#x9762;</h3>
+          <div class="check-item">
+            <span class="check-icon">&#x2713;</span>
+            <span><strong>&#x8EFD;&#x91CF;&#x306A;&#x8A8D;&#x8A3C;</strong> - &#x30EA;&#x30BD;&#x30FC;&#x30B9;&#x8981;&#x4EF6;&#x304C;&#x6700;&#x5C0F;&#x9650;&#x3001;IAM &#x8A8D;&#x8A3C;&#x3088;&#x308A;&#x30AA;&#x30FC;&#x30D0;&#x30FC;&#x30D8;&#x30C3;&#x30C9;&#x304C;&#x4F4E;&#x3044;</span>
+          </div>
+          <div class="check-item">
+            <span class="check-icon">&#x2713;</span>
+            <span><strong>&#x67D4;&#x8EDF;&#x306A;&#x30E6;&#x30FC;&#x30B6;&#x30FC;&#x7BA1;&#x7406;</strong> - &#x6700;&#x5927; 1,000 &#x30E6;&#x30FC;&#x30B6;&#x30FC;&#x3067;&#x30DE;&#x30EB;&#x30C1;&#x30C6;&#x30CA;&#x30F3;&#x30C8;&#x74B0;&#x5883;&#x306B;&#x5BFE;&#x5FDC;</span>
+          </div>
+          <div class="check-item">
+            <span class="check-icon">&#x2713;</span>
+            <span><strong>&#x76E3;&#x67FB;&#x5BFE;&#x5FDC;</strong> - Cloud Audit Logs &#x3068;&#x306E;&#x7D71;&#x5408;&#x3067;&#x30B3;&#x30F3;&#x30D7;&#x30E9;&#x30A4;&#x30A2;&#x30F3;&#x30B9;&#x8981;&#x4EF6;&#x306B;&#x5BFE;&#x5FDC;</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>&#x26A0;&#xFE0F; &#x30C7;&#x30E1;&#x30EA;&#x30C3;&#x30C8;&#x30FB;&#x5236;&#x7D04;&#x4E8B;&#x9805;</h2>
+      <div class="warning-box">
+        <strong>&#x26A0;&#xFE0F; &#x5236;&#x9650;&#x4E8B;&#x9805;</strong>
+        <ul class="demerit-list">
+          <li><span class="cross-icon">&#x2717;</span> &#x73FE;&#x5728; Preview &#x30B9;&#x30C6;&#x30FC;&#x30BF;&#x30B9;&#x2014;&#x2014;&#x672C;&#x756A;&#x74B0;&#x5883;&#x3067;&#x306F; Pre-GA &#x5229;&#x7528;&#x898F;&#x7D04;&#x304C;&#x9069;&#x7528;</li>
+          <li><span class="cross-icon">&#x2717;</span> &#x6709;&#x52B9;&#x5316;&#x5F8C;&#x306F;&#x7121;&#x52B9;&#x5316;&#x3067;&#x304D;&#x306A;&#x3044;&#x2014;&#x2014;&#x8A2D;&#x5B9A;&#x5909;&#x66F4;&#x306F;&#x614E;&#x91CD;&#x306B;</li>
+          <li><span class="cross-icon">&#x2717;</span> &#x30C7;&#x30D5;&#x30A9;&#x30EB;&#x30C8;&#x30E6;&#x30FC;&#x30B6;&#x30FC;&#x306F;&#x524A;&#x9664;&#x4E0D;&#x53EF;</li>
+          <li><span class="cross-icon">&#x2717;</span> &#x5404;&#x30E6;&#x30FC;&#x30B6;&#x30FC;&#x306E;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x306F;&#x6700;&#x5927; 2 &#x3064;&#x307E;&#x3067;</li>
+          <li><span class="cross-icon">&#x2717;</span> <code>gcloud beta</code> &#x30B3;&#x30DE;&#x30F3;&#x30C9;&#x306E;&#x4F7F;&#x7528;&#x304C;&#x5FC5;&#x8981; (GA &#x7248;&#x672A;&#x5BFE;&#x5FDC;)</li>
+        </ul>
+      </div>
+      <div style="background: var(--gc-yellow-tint); border-left: 4px solid var(--gc-yellow); padding: 16px 20px; border-radius: 0 12px 12px 0; margin: 16px 0;">
+        <strong>&#x1F4A1; &#x8003;&#x616E;&#x3059;&#x3079;&#x304D;&#x70B9;</strong>
+        <ul class="demerit-list">
+          <li><span style="color: var(--gc-yellow); font-size: 18px;">&#x25CF;</span> &#x6709;&#x52B9;&#x5316;&#x5F8C;&#x306F;&#x65B0;&#x3057;&#x3044;&#x30AF;&#x30E9;&#x30A4;&#x30A2;&#x30F3;&#x30C8;&#x63A5;&#x7D9A;&#x306B;&#x8A8D;&#x8A3C;&#x304C;&#x5FC5;&#x9808;&#x3068;&#x306A;&#x308B;&#x305F;&#x3081;&#x3001;&#x65E2;&#x5B58;&#x30A2;&#x30D7;&#x30EA;&#x306E;&#x66F4;&#x65B0;&#x304C;&#x5FC5;&#x8981;</li>
+          <li><span style="color: var(--gc-yellow); font-size: 18px;">&#x25CF;</span> TLS (In-Transit Encryption) &#x3068;&#x7D44;&#x307F;&#x5408;&#x308F;&#x305B;&#x3066;&#x4F7F;&#x7528;&#x3059;&#x308B;&#x3053;&#x3068;&#x3092;&#x63A8;&#x5968; (&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x306E;&#x5E73;&#x6587;&#x9001;&#x4FE1;&#x9632;&#x6B62;)</li>
+          <li><span style="color: var(--gc-yellow); font-size: 18px;">&#x25CF;</span> &#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x306F;&#x30A2;&#x30D7;&#x30EA;&#x30B3;&#x30FC;&#x30C9;&#x306B;&#x30CF;&#x30FC;&#x30C9;&#x30B3;&#x30FC;&#x30C9;&#x305B;&#x305A;&#x3001;Secret Manager &#x306B;&#x4FDD;&#x7BA1;&#x3059;&#x308B;&#x3053;&#x3068;&#x3092;&#x63A8;&#x5968;</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>&#x1F4A1; &#x30E6;&#x30FC;&#x30B9;&#x30B1;&#x30FC;&#x30B9;</h2>
+
+      <div class="usecase-card">
+        <h3>&#x1F504; &#x30E6;&#x30FC;&#x30B9;&#x30B1;&#x30FC;&#x30B9; 1: Memorystore for Redis &#x304B;&#x3089;&#x306E;&#x79FB;&#x884C;</h3>
+        <p><strong>&#x30B7;&#x30CA;&#x30EA;&#x30AA;:</strong> &#x65E2;&#x5B58;&#x306E; Memorystore for Redis &#x30A4;&#x30F3;&#x30B9;&#x30BF;&#x30F3;&#x30B9;&#x3067; AUTH &#x30D1;&#x30B9;&#x30EF;&#x30FC;&#x30C9;&#x30D9;&#x30FC;&#x30B9;&#x306E;&#x8A8D;&#x8A3C;&#x3092;&#x4F7F;&#x7528;&#x3057;&#x3066;&#x304A;&#x308A;&#x3001;Memorystore for Valkey &#x3078;&#x79FB;&#x884C;&#x3057;&#x305F;&#x3044;&#x5834;&#x5408;&#x3002;</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">&#x5B9F;&#x88C5;&#x4F8B;</span>
+          </div>
+          <pre><code class="language-bash"># Valkey &#x30A4;&#x30F3;&#x30B9;&#x30BF;&#x30F3;&#x30B9;&#x3092;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x30D9;&#x30FC;&#x30B9;&#x8A8D;&#x8A3C;&#x3067;&#x4F5C;&#x6210;
+gcloud beta memorystore instances create my-valkey-instance \
+  --location=asia-northeast1 \
+  --authorization-mode=token-auth
+
+# &#x30A2;&#x30D7;&#x30EA;&#x30B1;&#x30FC;&#x30B7;&#x30E7;&#x30F3;&#x306E;&#x63A5;&#x7D9A;&#x8A2D;&#x5B9A;&#x3092;&#x66F4;&#x65B0;
+valkey-cli -u redis://default:TOKEN@INSTANCE_IP:6379</code></pre>
+        </div>
+        <p><strong>&#x52B9;&#x679C;:</strong> &#x65E2;&#x5B58;&#x306E; AUTH &#x30B3;&#x30DE;&#x30F3;&#x30C9;&#x4E92;&#x63DB;&#x306E;&#x8A8D;&#x8A3C;&#x65B9;&#x5F0F;&#x3092;&#x7DAD;&#x6301;&#x3057;&#x3064;&#x3064;&#x3001;Valkey &#x306E;&#x65B0;&#x6A5F;&#x80FD;&#x3092;&#x6D3B;&#x7528;&#x53EF;&#x80FD;&#x3002;&#x30A2;&#x30D7;&#x30EA;&#x5074;&#x306E;&#x8A8D;&#x8A3C;&#x30ED;&#x30B8;&#x30C3;&#x30AF;&#x306E;&#x5909;&#x66F4;&#x304C;&#x6700;&#x5C0F;&#x9650;&#x3067;&#x6E08;&#x307F;&#x307E;&#x3059;&#x3002;</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>&#x1F465; &#x30E6;&#x30FC;&#x30B9;&#x30B1;&#x30FC;&#x30B9; 2: &#x30DE;&#x30EB;&#x30C1;&#x30C6;&#x30CA;&#x30F3;&#x30C8;&#x74B0;&#x5883;&#x3067;&#x306E;&#x30A2;&#x30AF;&#x30BB;&#x30B9;&#x5236;&#x5FA1;</h3>
+        <p><strong>&#x30B7;&#x30CA;&#x30EA;&#x30AA;:</strong> &#x8907;&#x6570;&#x306E;&#x30DE;&#x30A4;&#x30AF;&#x30ED;&#x30B5;&#x30FC;&#x30D3;&#x30B9;&#x304C;&#x540C;&#x4E00;&#x306E; Memorystore for Valkey &#x30A4;&#x30F3;&#x30B9;&#x30BF;&#x30F3;&#x30B9;&#x306B;&#x30A2;&#x30AF;&#x30BB;&#x30B9;&#x3059;&#x308B;&#x74B0;&#x5883;&#x3067;&#x3001;&#x30B5;&#x30FC;&#x30D3;&#x30B9;&#x3054;&#x3068;&#x306B;&#x7570;&#x306A;&#x308B;&#x8A8D;&#x8A3C;&#x60C5;&#x5831;&#x3092;&#x5272;&#x308A;&#x5F53;&#x3066;&#x305F;&#x3044;&#x5834;&#x5408;&#x3002;</p>
+        <p><strong>&#x52B9;&#x679C;:</strong> &#x5404;&#x30B5;&#x30FC;&#x30D3;&#x30B9;&#x306B;&#x56FA;&#x6709;&#x306E;&#x30E6;&#x30FC;&#x30B6;&#x30FC;&#x3068;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x3092;&#x5272;&#x308A;&#x5F53;&#x3066;&#x308B;&#x3053;&#x3068;&#x3067;&#x3001;&#x30A2;&#x30AF;&#x30BB;&#x30B9;&#x306E;&#x8FFD;&#x8DE1;&#x3068;&#x5236;&#x5FA1;&#x304C;&#x5BB9;&#x6613;&#x306B;&#x3002;&#x4E0D;&#x6B63;&#x30A2;&#x30AF;&#x30BB;&#x30B9;&#x767A;&#x751F;&#x6642;&#x306B;&#x3082;&#x3001;&#x8A72;&#x5F53;&#x30E6;&#x30FC;&#x30B6;&#x30FC;&#x306E;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x306E;&#x307F;&#x3092;&#x7121;&#x52B9;&#x5316;&#x3057;&#x3066;&#x5F71;&#x97FF;&#x7BC4;&#x56F2;&#x3092;&#x9650;&#x5B9A;&#x3067;&#x304D;&#x307E;&#x3059;&#x3002;</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>&#x1F4B0; &#x6599;&#x91D1;</h2>
+      <div class="success-box">
+        <strong>&#x2705; &#x8FFD;&#x52A0;&#x6599;&#x91D1;&#x306A;&#x3057;</strong>
+        <p style="margin-top: 8px;">&#x57FA;&#x672C;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x30D9;&#x30FC;&#x30B9;&#x8A8D;&#x8A3C;&#x306E;&#x5229;&#x7528;&#x306B;&#x8FFD;&#x52A0;&#x6599;&#x91D1;&#x306F;&#x767A;&#x751F;&#x3057;&#x307E;&#x305B;&#x3093;&#x3002;Memorystore for Valkey &#x306E;&#x901A;&#x5E38;&#x306E;&#x30A4;&#x30F3;&#x30B9;&#x30BF;&#x30F3;&#x30B9;&#x6599;&#x91D1;&#x304C;&#x9069;&#x7528;&#x3055;&#x308C;&#x307E;&#x3059;&#x3002;</p>
+      </div>
+      <p style="margin-top: 12px;">&#x6599;&#x91D1;&#x306F;&#x30CE;&#x30FC;&#x30C9;&#x30BF;&#x30A4;&#x30D7;&#x3001;&#x30B7;&#x30E3;&#x30FC;&#x30C9;&#x6570;&#x3001;&#x30EC;&#x30D7;&#x30EA;&#x30AB;&#x6570;&#x306B;&#x57FA;&#x3065;&#x3044;&#x3066;&#x8A08;&#x7B97;&#x3055;&#x308C;&#x307E;&#x3059;&#x3002;Committed Use Discounts (CUD) &#x3067; 1 &#x5E74;&#x5951;&#x7D04; <strong>20%</strong>&#x3001;3 &#x5E74;&#x5951;&#x7D04; <strong>40%</strong> &#x306E;&#x5272;&#x5F15;&#x304C;&#x9069;&#x7528;&#x3055;&#x308C;&#x307E;&#x3059;&#x3002;</p>
+    </div>
+
+    <!-- Available Regions -->
+    <div class="section">
+      <h2>&#x1F30D; &#x5229;&#x7528;&#x53EF;&#x80FD;&#x30EA;&#x30FC;&#x30B8;&#x30E7;&#x30F3;</h2>
+      <p>&#x57FA;&#x672C;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x30D9;&#x30FC;&#x30B9;&#x8A8D;&#x8A3C;&#x306F;&#x3001;Memorystore for Valkey &#x304C;&#x5229;&#x7528;&#x53EF;&#x80FD;&#x306A;&#x3059;&#x3079;&#x3066;&#x306E;&#x30EA;&#x30FC;&#x30B8;&#x30E7;&#x30F3;&#x3067;&#x4F7F;&#x7528;&#x3067;&#x304D;&#x307E;&#x3059;&#x3002;</p>
+      <div class="region-grid">
+        <div class="region-card">
+          <h4>&#x1F1EF;&#x1F1F5; &#x30A2;&#x30B8;&#x30A2;&#x592A;&#x5E73;&#x6D0B;</h4>
+          <p>asia-northeast1 (&#x6771;&#x4EAC;)<br/>asia-northeast2 (&#x5927;&#x962A;)<br/>asia-northeast3 (&#x30BD;&#x30A6;&#x30EB;)<br/>asia-east1 (&#x53F0;&#x6E7E;)<br/>asia-south1 (&#x30E0;&#x30F3;&#x30D0;&#x30A4;)<br/>asia-southeast1 (&#x30B7;&#x30F3;&#x30AC;&#x30DD;&#x30FC;&#x30EB;)<br/>australia-southeast1 (&#x30B7;&#x30C9;&#x30CB;&#x30FC;)</p>
+        </div>
+        <div class="region-card">
+          <h4>&#x1F1FA;&#x1F1F8; &#x7C73;&#x56FD;</h4>
+          <p>us-central1 (&#x30A2;&#x30A4;&#x30AA;&#x30EF;)<br/>us-east1 (&#x30B5;&#x30A6;&#x30B9;&#x30AB;&#x30ED;&#x30E9;&#x30A4;&#x30CA;)<br/>us-west1 (&#x30AA;&#x30EC;&#x30B4;&#x30F3;)</p>
+        </div>
+        <div class="region-card">
+          <h4>&#x1F1EA;&#x1F1FA; &#x30E8;&#x30FC;&#x30ED;&#x30C3;&#x30D1;</h4>
+          <p>europe-west1 (&#x30D9;&#x30EB;&#x30AE;&#x30FC;)<br/>europe-west3 (&#x30D5;&#x30E9;&#x30F3;&#x30AF;&#x30D5;&#x30EB;&#x30C8;)<br/>europe-north1 (&#x30D5;&#x30A3;&#x30F3;&#x30E9;&#x30F3;&#x30C9;)</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#x1F517; &#x95A2;&#x9023;&#x30B5;&#x30FC;&#x30D3;&#x30B9;</h2>
+      <div class="related-grid">
+        <div class="related-card">
+          <span class="related-icon">&#x1F512;</span>
+          <div>
+            <h4>IAM &#x8A8D;&#x8A3C; (Memorystore for Valkey)</h4>
+            <p>&#x65E2;&#x5B58;&#x306E;&#x8A8D;&#x8A3C;&#x65B9;&#x5F0F;&#x3002;IAM &#x30DD;&#x30EA;&#x30B7;&#x30FC;&#x306B;&#x3088;&#x308B;&#x30A2;&#x30AF;&#x30BB;&#x30B9;&#x5236;&#x5FA1;&#x3092;&#x63D0;&#x4F9B;&#x3002;&#x7D44;&#x7E54;&#x30EC;&#x30D9;&#x30EB;&#x306E;&#x30A2;&#x30AF;&#x30BB;&#x30B9;&#x7BA1;&#x7406;&#x306B;&#x9069;&#x3057;&#x3066;&#x3044;&#x308B;</p>
+          </div>
+        </div>
+        <div class="related-card">
+          <span class="related-icon">&#x1F5DD;&#xFE0F;</span>
+          <div>
+            <h4>Secret Manager</h4>
+            <p>&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x306E;&#x5B89;&#x5168;&#x306A;&#x4FDD;&#x7BA1;&#x3068;&#x53D6;&#x5F97;&#x306B;&#x63A8;&#x5968;&#x3002;&#x30A2;&#x30D7;&#x30EA;&#x30B1;&#x30FC;&#x30B7;&#x30E7;&#x30F3;&#x30B3;&#x30FC;&#x30C9;&#x3078;&#x306E;&#x30CF;&#x30FC;&#x30C9;&#x30B3;&#x30FC;&#x30C9;&#x3092;&#x56DE;&#x907F;</p>
+          </div>
+        </div>
+        <div class="related-card">
+          <span class="related-icon">&#x1F510;</span>
+          <div>
+            <h4>In-Transit Encryption (TLS)</h4>
+            <p>&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x8A8D;&#x8A3C;&#x3068;&#x7D44;&#x307F;&#x5408;&#x308F;&#x305B;&#x3066;&#x4F7F;&#x7528;&#x3092;&#x63A8;&#x5968;&#x3002;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x306E;&#x5E73;&#x6587;&#x9001;&#x4FE1;&#x3092;&#x9632;&#x6B62;</p>
+          </div>
+        </div>
+        <div class="related-card">
+          <span class="related-icon">&#x1F4DD;</span>
+          <div>
+            <h4>Cloud Audit Logs</h4>
+            <p>&#x8A8D;&#x8A3C;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x3068;&#x30E6;&#x30FC;&#x30B6;&#x30FC;&#x64CD;&#x4F5C;&#x306E;&#x76E3;&#x67FB;&#x30ED;&#x30B0;&#x3092;&#x63D0;&#x4F9B;&#x3002;&#x30BB;&#x30AD;&#x30E5;&#x30EA;&#x30C6;&#x30A3;&#x76E3;&#x8996;&#x3068;&#x30B3;&#x30F3;&#x30D7;&#x30E9;&#x30A4;&#x30A2;&#x30F3;&#x30B9;&#x5BFE;&#x5FDC;</p>
+          </div>
+        </div>
+        <div class="related-card" style="grid-column: 1 / -1;">
+          <span class="related-icon">&#x1F534;</span>
+          <div>
+            <h4>Memorystore for Redis</h4>
+            <p>&#x79FB;&#x884C;&#x5143;&#x3068;&#x3057;&#x3066;&#x60F3;&#x5B9A;&#x3055;&#x308C;&#x308B;&#x30B5;&#x30FC;&#x30D3;&#x30B9;&#x3002;&#x57FA;&#x672C;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x30D9;&#x30FC;&#x30B9;&#x8A8D;&#x8A3C;&#x306B;&#x3088;&#x308A;&#x3001;Redis &#x306E; AUTH &#x65B9;&#x5F0F;&#x304B;&#x3089;&#x306E;&#x30B9;&#x30E0;&#x30FC;&#x30BA;&#x306A;&#x79FB;&#x884C;&#x304C;&#x53EF;&#x80FD;</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>&#x1F4DD; &#x307E;&#x3068;&#x3081;</h2>
+      <p>Memorystore for Valkey &#x306B;&#x57FA;&#x672C;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x30D9;&#x30FC;&#x30B9;&#x8A8D;&#x8A3C;&#x304C; Preview &#x3068;&#x3057;&#x3066;&#x8FFD;&#x52A0;&#x3055;&#x308C;&#x305F;&#x3053;&#x3068;&#x3067;&#x3001;IAM &#x8A8D;&#x8A3C;&#x306B;&#x52A0;&#x3048;&#x3066;&#x8EFD;&#x91CF;&#x3067;&#x5E83;&#x304F;&#x30B5;&#x30DD;&#x30FC;&#x30C8;&#x3055;&#x308C;&#x305F;&#x8A8D;&#x8A3C;&#x65B9;&#x5F0F;&#x304C;&#x5229;&#x7528;&#x53EF;&#x80FD;&#x306B;&#x306A;&#x308A;&#x307E;&#x3057;&#x305F;&#x3002;&#x7279;&#x306B; Memorystore for Redis &#x3084;&#x30AA;&#x30F3;&#x30D7;&#x30EC;&#x30DF;&#x30B9;&#x74B0;&#x5883;&#x304B;&#x3089;&#x306E;&#x79FB;&#x884C;&#x3092;&#x691C;&#x8A0E;&#x3057;&#x3066;&#x3044;&#x308B;&#x5834;&#x5408;&#x3001;&#x5F8C;&#x65B9;&#x4E92;&#x63DB;&#x6027;&#x306E;&#x3042;&#x308B;&#x8A8D;&#x8A3C;&#x65B9;&#x5F0F;&#x306B;&#x3088;&#x308A;&#x30B9;&#x30E0;&#x30FC;&#x30BA;&#x306A;&#x79FB;&#x884C;&#x304C;&#x5B9F;&#x73FE;&#x3067;&#x304D;&#x307E;&#x3059;&#x3002;</p>
+      <div class="note-box" style="margin-top: 16px;">
+        <strong>&#x1F4CC; &#x63A8;&#x5968;&#x30A2;&#x30AF;&#x30B7;&#x30E7;&#x30F3;:</strong> Preview &#x30B9;&#x30C6;&#x30FC;&#x30BF;&#x30B9;&#x3067;&#x3042;&#x308B;&#x305F;&#x3081;&#x672C;&#x756A;&#x74B0;&#x5883;&#x3078;&#x306E;&#x5C0E;&#x5165;&#x306F;&#x614E;&#x91CD;&#x306B;&#x691C;&#x8A0E;&#x3057;&#x3001;&#x958B;&#x767A;&#x30FB;&#x691C;&#x8A3C;&#x74B0;&#x5883;&#x3067;&#x306E;&#x8A55;&#x4FA1;&#x3092;&#x958B;&#x59CB;&#x3057;&#x3066; GA &#x6607;&#x683C;&#x306B;&#x5099;&#x3048;&#x308B;&#x3053;&#x3068;&#x3092;&#x63A8;&#x5968;&#x3057;&#x307E;&#x3059;&#x3002;
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>&#x1F4CE; &#x51FA;&#x5178;:</strong></p>
+      <ul>
+        <li>&#x1F4C4; <a href="https://cloud.google.com/release-notes#April_17_2026" target="_blank" rel="noopener noreferrer">&#x516C;&#x5F0F;&#x30EA;&#x30EA;&#x30FC;&#x30B9;&#x30CE;&#x30FC;&#x30C8; (April 17, 2026)</a></li>
+        <li>&#x1F4D6; <a href="https://cloud.google.com/memorystore/docs/valkey/manage-basic-auth" target="_blank" rel="noopener noreferrer">&#x57FA;&#x672C;&#x30C8;&#x30FC;&#x30AF;&#x30F3;&#x30D9;&#x30FC;&#x30B9;&#x8A8D;&#x8A3C;&#x306E;&#x7BA1;&#x7406; (&#x30C9;&#x30AD;&#x30E5;&#x30E1;&#x30F3;&#x30C8;)</a></li>
+        <li>&#x1F512; <a href="https://cloud.google.com/memorystore/docs/valkey/about-iam-auth" target="_blank" rel="noopener noreferrer">IAM &#x8A8D;&#x8A3C;&#x306B;&#x3064;&#x3044;&#x3066;</a></li>
+        <li>&#x1F510; <a href="https://cloud.google.com/memorystore/docs/valkey/about-in-transit-encryption" target="_blank" rel="noopener noreferrer">In-Transit Encryption &#x306B;&#x3064;&#x3044;&#x3066;</a></li>
+        <li>&#x1F4B0; <a href="https://cloud.google.com/memorystore/valkey/pricing" target="_blank" rel="noopener noreferrer">Memorystore for Valkey &#x6599;&#x91D1;</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: #999;">Generated: 2026-04-18 | Source: reports/2026/2026-04-17-memorystore-valkey-token-authentication.md</p>
+    </footer>
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+    hljs.highlightAll();
+  </script>
+</body>
+</html>

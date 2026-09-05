@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Build: OCI イメージの Artifact Registry へのアップロード対応</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card.orange-border {
+      border-left-color: var(--gc-orange);
+    }
+
+    .card.green-border {
+      border-left-color: var(--gc-green);
+    }
+
+    .card.teal-border {
+      border-left-color: var(--gc-teal);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-orange {
+      background: var(--gc-orange);
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge-feature {
+      background: var(--gc-green);
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Before/After comparison */
+    .comparison-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .before-card h3, .after-card h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-card ul, .after-card ul {
+      margin: 8px 0 0 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-card li, .after-card li {
+      margin-bottom: 6px;
+    }
+
+    /* Feature cards grid */
+    .features-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    /* Usecase cards */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h3 {
+      color: var(--gc-blue-900);
+      margin-top: 0;
+    }
+
+    /* Stats grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    /* Mermaid container */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Code blocks */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 0;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block pre:not(.mermaid) {
+      margin: 0;
+      padding: 0;
+      background: transparent;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 16px;
+      font-size: inherit;
+      color: inherit;
+      display: block;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      border-radius: 8px 8px 0 0;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-header + pre:not(.mermaid) {
+      border-radius: 0 0 8px 8px;
+      margin-top: 0;
+    }
+
+    /* Inline code */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Table styles */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* Note & warning boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Links list */
+    .links-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .links-list li {
+      padding: 8px 0;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    .links-list li:last-child {
+      border-bottom: none;
+    }
+
+    .links-list a {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .links-list a:hover {
+      text-decoration: underline;
+    }
+
+    /* Related services */
+    .related-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .related-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 16px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .related-card h4 {
+      margin: 0 0 6px 0;
+      font-size: 15px;
+      color: var(--gc-on-surface);
+    }
+
+    .related-card p {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    /* Pricing table container */
+    .pricing-section table {
+      font-size: 14px;
+    }
+
+    /* Constraint items */
+    .constraint-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--gc-outline-variant);
+    }
+
+    .constraint-item:last-child {
+      border-bottom: none;
+    }
+
+    .constraint-icon {
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .comparison-grid { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .related-grid { grid-template-columns: 1fr; }
+      .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>&#9881;&#65039; Cloud Build: OCI イメージの Artifact Registry へのアップロード対応</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Cloud Build</span>
+          <span class="badge-orange">Artifact Registry</span>
+          <span class="badge-feature">Feature</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-03-16</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>&#128203; 概要</h2>
+      <p>
+        Cloud Build が、ビルドプロセス中に <span class="highlight">OCI (Open Container Initiative) イメージ</span>を Artifact Registry にアップロードする機能をサポートしました。ビルド構成ファイル内で <code>oci</code> フィールドを使用して、OCI 準拠のイメージをビルド完了後に自動的に Artifact Registry へ保存できるようになりました。
+      </p>
+      <p>
+        OCI はコンテナイメージのフォーマットとランタイムに関するオープンな業界標準仕様であり、Docker イメージフォーマットに代わる標準として広く採用が進んでいます。今回のアップデートにより、<span class="highlight">マルチプラットフォーム対応</span>や<span class="highlight">サプライチェーンセキュリティの強化</span>を目指す開発チームにとって有用な機能拡張となります。
+      </p>
+    </div>
+
+    <!-- Before / After -->
+    <div class="section">
+      <h2>&#128260; Before / After 比較</h2>
+      <div class="comparison-grid">
+        <div class="before-card">
+          <h3>&#10060; アップデート前の課題</h3>
+          <ul>
+            <li>Cloud Build の構成ファイルで OCI イメージを直接指定してアップロードする標準的な手段がなかった</li>
+            <li>OCI イメージの保存には <code>docker push</code> や <code>crane</code>、<code>oras</code> などの外部ツールが必要だった</li>
+            <li>外部ツール使用時にビルド結果画面で OCI アーティファクト情報が表示されず、追跡が困難だった</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h3>&#9989; アップデート後の改善</h3>
+          <ul>
+            <li>ビルド構成ファイルの <code>oci</code> フィールドで宣言的に OCI イメージのアップロードを指定可能</li>
+            <li>ビルド完了後に自動で Artifact Registry に保存され、結果画面でアーティファクト情報を確認可能</li>
+            <li>Google Cloud コンソール上の 3 箇所 (ビルド履歴・実行詳細・ビルドアーティファクト) で可視化</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>&#127959;&#65039; アーキテクチャ図</h2>
+      <p>Cloud Build がビルド構成ファイルの <code>oci</code> フィールドに基づいて OCI イメージをビルドし、Artifact Registry の Docker リポジトリにアップロードする流れを示しています。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    subgraph BuildConfig["Cloud Build 構成ファイル"]
+        direction TB
+        Steps["steps:<br/>ビルドステップ"]
+        OCI["oci:<br/>OCI イメージ定義"]
+    end
+
+    subgraph CloudBuild["Cloud Build"]
+        direction TB
+        Build["ビルド実行"]
+        Upload["OCI イメージ<br/>アップロード"]
+        Build --> Upload
+    end
+
+    subgraph AR["Artifact Registry"]
+        direction TB
+        DockerRepo["Docker リポジトリ"]
+        OCIImage["OCI イメージ"]
+        DockerRepo --> OCIImage
+    end
+
+    subgraph Console["Google Cloud コンソール"]
+        direction TB
+        History["Build History<br/>(Artifacts 列)"]
+        ExecDetail["Execution Details<br/>タブ"]
+        ArtifactTab["Build Artifacts<br/>タブ"]
+    end
+
+    BuildConfig --> CloudBuild
+    Upload --> AR
+    AR --> Console
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>&#128273; 主要機能</h2>
+      <div class="features-grid">
+        <div class="card">
+          <h3>&#128196; ビルド構成ファイルでの <code>oci</code> フィールドサポート</h3>
+          <div class="icon-text"><span class="arrow">&#8594;</span><span>Cloud Build の構成ファイル (cloudbuild.yaml / cloudbuild.json) に新しい <code>oci</code> フィールドが追加</span></div>
+          <div class="icon-text"><span class="arrow">&#8594;</span><span>宣言的に OCI イメージのアップロード先リポジトリやイメージ名を指定可能</span></div>
+          <div class="icon-text"><span class="arrow">&#8594;</span><span>既存の <code>images</code> フィールドや <code>artifacts</code> フィールドと同様の使い勝手</span></div>
+        </div>
+        <div class="card orange-border">
+          <h3>&#128640; ビルド完了後の自動アップロード</h3>
+          <div class="icon-text"><span class="arrow">&#8594;</span><span>ビルドプロセス完了時に、指定した OCI イメージが自動的に Artifact Registry にアップロード</span></div>
+          <div class="icon-text"><span class="arrow">&#8594;</span><span>ビルドステップ内で手動の push コマンドを記述する必要がなくなった</span></div>
+          <div class="icon-text"><span class="arrow">&#8594;</span><span>アップロード結果がビルドの成果物として正式に記録される</span></div>
+        </div>
+        <div class="card green-border">
+          <h3>&#128187; Google Cloud コンソールでのアーティファクト表示</h3>
+          <div class="icon-text"><span class="arrow">&#8594;</span><span>ビルド履歴ページの「Artifacts」列に OCI アーティファクト情報を表示</span></div>
+          <div class="icon-text"><span class="arrow">&#8594;</span><span>ビルド詳細ページの「Execution details」タブで詳細確認</span></div>
+          <div class="icon-text"><span class="arrow">&#8594;</span><span>ビルド詳細ページの「Build artifacts」タブで一覧閲覧</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>&#128295; 技術仕様</h2>
+      <h3>OCI (Open Container Initiative) の概要</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>仕様</td>
+            <td>OCI Image Format Specification</td>
+          </tr>
+          <tr>
+            <td>ベース</td>
+            <td>Docker Image Manifest V2, Schema 2</td>
+          </tr>
+          <tr>
+            <td>対応リポジトリ</td>
+            <td>Artifact Registry の Docker リポジトリ</td>
+          </tr>
+          <tr>
+            <td>設定フィールド</td>
+            <td>ビルド構成ファイルの <code>oci</code> フィールド</td>
+          </tr>
+          <tr>
+            <td>表示箇所</td>
+            <td>Build History, Execution Details, Build Artifacts</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Cloud Build 構成ファイルでの OCI 設定</h3>
+      <p>既存の <code>images</code> フィールドとの関係を含め、Cloud Build 構成ファイルのアーティファクト関連フィールドは以下の通りです。</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">YAML</span>
+          <span class="code-title">cloudbuild.yaml の OCI 設定例</span>
+        </div>
+        <pre><code class="language-yaml">steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'LOCATION-docker.pkg.dev/PROJECT_ID/REPOSITORY/IMAGE', '.']
+
+# 従来の Docker イメージ保存
+images:
+  - 'LOCATION-docker.pkg.dev/PROJECT_ID/REPOSITORY/IMAGE'
+
+# 新機能: OCI イメージの保存
+oci:
+  # OCI イメージの設定 (詳細はドキュメント参照)</code></pre>
+      </div>
+    </div>
+
+    <!-- Setup Guide -->
+    <div class="section">
+      <h2>&#128221; 設定方法</h2>
+
+      <h3>前提条件</h3>
+      <div class="note-box">
+        <div class="icon-text"><span>&#9989;</span><span>Cloud Build API が有効化されていること</span></div>
+        <div class="icon-text"><span>&#9989;</span><span>Artifact Registry に Docker リポジトリが作成済みであること</span></div>
+        <div class="icon-text"><span>&#9989;</span><span>Cloud Build サービスアカウントに Artifact Registry Writer ロールが付与されていること (同一プロジェクト内であればデフォルトで付与済み)</span></div>
+      </div>
+
+      <h3>ステップ 1: Artifact Registry リポジトリの作成</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">リポジトリ作成コマンド</span>
+        </div>
+        <pre><code class="language-bash">gcloud artifacts repositories create REPOSITORY \
+  --repository-format=docker \
+  --location=LOCATION \
+  --description="OCI image repository"</code></pre>
+      </div>
+      <p style="font-size: 14px;"><code>LOCATION</code> にはリージョン (例: <code>us-central1</code>) またはマルチリージョン (例: <code>us</code>) を指定します。</p>
+
+      <h3>ステップ 2: ビルド構成ファイルの作成</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">YAML</span>
+          <span class="code-title">cloudbuild.yaml</span>
+        </div>
+        <pre><code class="language-yaml">steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'LOCATION-docker.pkg.dev/PROJECT_ID/REPOSITORY/IMAGE_NAME'
+      - '.'</code></pre>
+      </div>
+      <p style="font-size: 14px;">ビルド構成ファイルに OCI イメージのビルドステップと <code>oci</code> フィールドの設定を追加します。詳細なスキーマ定義については公式ドキュメントを参照してください。</p>
+
+      <h3>ステップ 3: ビルドの実行</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">ビルド実行コマンド</span>
+        </div>
+        <pre><code class="language-bash">gcloud builds submit --config=cloudbuild.yaml .</code></pre>
+      </div>
+      <p style="font-size: 14px;">ビルドを実行すると、OCI イメージが自動的に Artifact Registry にアップロードされます。</p>
+    </div>
+
+    <!-- Merits -->
+    <div class="section">
+      <h2>&#127775; メリット</h2>
+      <div class="comparison-grid">
+        <div>
+          <h3>&#128188; ビジネス面</h3>
+          <div class="card">
+            <strong>運用効率の向上</strong>
+            <p style="font-size: 14px; margin: 8px 0 0;">ビルドパイプライン内で OCI イメージの保存を宣言的に管理できるため、CI/CD パイプラインの構成がシンプルになり、メンテナンスコストが削減されます。</p>
+          </div>
+          <div class="card">
+            <strong>可視性の向上</strong>
+            <p style="font-size: 14px; margin: 8px 0 0;">Google Cloud コンソールの複数箇所で OCI アーティファクトを確認できるため、ビルド成果物の追跡と監査が容易になります。</p>
+          </div>
+        </div>
+        <div>
+          <h3>&#128736;&#65039; 技術面</h3>
+          <div class="card teal-border">
+            <strong>標準準拠</strong>
+            <p style="font-size: 14px; margin: 8px 0 0;">OCI 標準に準拠したイメージ管理により、ベンダーロックインのリスクを低減し、マルチクラウド環境での互換性を確保できます。</p>
+          </div>
+          <div class="card teal-border">
+            <strong>ビルドパイプラインの簡素化</strong>
+            <p style="font-size: 14px; margin: 8px 0 0;">外部ツール (<code>crane</code>、<code>oras</code> 等) を使用したカスタムビルドステップが不要になり、構成ファイルのみで完結します。</p>
+          </div>
+          <div class="card teal-border">
+            <strong>成果物の一元管理</strong>
+            <p style="font-size: 14px; margin: 8px 0 0;"><code>images</code> フィールドによる Docker イメージと同様に、OCI イメージもビルド結果に紐付けて管理できます。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>&#9888;&#65039; デメリット・制約事項</h2>
+      <div class="warning-box">
+        <h3 style="margin-top: 0;">制限事項</h3>
+        <div class="constraint-item">
+          <span class="constraint-icon">&#128679;</span>
+          <span>Artifact Registry の <strong>Docker リポジトリのみ</strong>が対象であり、他の形式のリポジトリには OCI イメージを保存できない</span>
+        </div>
+        <div class="constraint-item">
+          <span class="constraint-icon">&#128679;</span>
+          <span>Artifact Registry はチャンクアップロードをサポートしておらず、<strong>モノリシックアップロード</strong>を使用する必要がある。大容量イメージの場合はアップロード時間に影響する可能性がある</span>
+        </div>
+      </div>
+      <div class="note-box">
+        <h3 style="margin-top: 0;">考慮すべき点</h3>
+        <div class="constraint-item">
+          <span class="constraint-icon">&#128161;</span>
+          <span>既存のビルドパイプラインで <code>docker push</code> を使用して OCI イメージをアップロードしている場合は、<code>oci</code> フィールドへの移行を検討する必要がある</span>
+        </div>
+        <div class="constraint-item">
+          <span class="constraint-icon">&#128161;</span>
+          <span><code>oci</code> フィールドの詳細なスキーマ定義については公式ドキュメントで最新情報を確認すること</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>&#127919; ユースケース</h2>
+      <div class="usecase-card">
+        <h3>&#128230; ユースケース 1: マルチプラットフォームコンテナイメージの配布</h3>
+        <p><strong>シナリオ:</strong> 開発チームが AMD64 と ARM64 の両方のアーキテクチャ向けにコンテナイメージをビルドし、OCI Image Index として Artifact Registry に保存する。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">YAML</span>
+            <span class="code-title">マルチプラットフォームビルド例</span>
+          </div>
+          <pre><code class="language-yaml">steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'buildx'
+      - 'build'
+      - '--platform=linux/amd64,linux/arm64'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/my-project/my-repo/my-app:latest'
+      - '.'</code></pre>
+        </div>
+        <div class="success-box">
+          <strong>&#9889; 効果:</strong> OCI 標準のマルチプラットフォームイメージを Cloud Build のネイティブ機能で管理でき、GKE のマルチアーキテクチャクラスタへのデプロイが効率化される。
+        </div>
+      </div>
+      <div class="usecase-card">
+        <h3>&#128274; ユースケース 2: サプライチェーンセキュリティの強化</h3>
+        <p><strong>シナリオ:</strong> セキュリティ要件が厳格な組織が、ビルド成果物の来歴 (provenance) を追跡するために、OCI イメージとしてビルドアーティファクトを Artifact Registry に保存し、Artifact Analysis と連携させる。</p>
+        <div class="success-box">
+          <strong>&#9889; 効果:</strong> ビルド結果画面での OCI アーティファクトの可視化により、どのビルドからどのイメージが生成されたかを正確に追跡でき、Binary Authorization との統合も容易になる。
+        </div>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section pricing-section">
+      <h2>&#128176; 料金</h2>
+      <p>Cloud Build での OCI イメージアップロード機能自体には<span class="highlight">追加料金は発生しない</span>。ただし、以下の既存サービスの料金が適用されます。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>サービス</th>
+            <th>料金体系</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Cloud Build</td>
+            <td>ビルド時間に基づく従量課金 (120 ビルド分/日の無料枠あり)</td>
+          </tr>
+          <tr>
+            <td>Artifact Registry ストレージ</td>
+            <td>保存容量に基づく従量課金 (0.10 USD/GiB)</td>
+          </tr>
+          <tr>
+            <td>Artifact Registry ネットワーク</td>
+            <td>データ転送量に基づく従量課金</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#128279; 関連サービス・機能</h2>
+      <div class="related-grid">
+        <div class="related-card">
+          <h4>&#128230; Artifact Registry</h4>
+          <p>OCI イメージの保存先となるフルマネージドのアーティファクト管理サービス。Docker イメージ、OCI イメージ、言語パッケージなど複数のフォーマットをサポート。</p>
+        </div>
+        <div class="related-card">
+          <h4>&#128270; Artifact Analysis</h4>
+          <p>コンテナイメージの脆弱性スキャンやメタデータ管理を提供。OCI イメージに対する SBOM 生成や脆弱性情報の付与が可能。</p>
+        </div>
+        <div class="related-card">
+          <h4>&#128737;&#65039; Binary Authorization</h4>
+          <p>ビルド来歴の検証とデプロイポリシーの適用により、信頼されたイメージのみが本番環境にデプロイされることを保証。</p>
+        </div>
+        <div class="related-card">
+          <h4>&#9881;&#65039; Google Kubernetes Engine (GKE)</h4>
+          <p>Artifact Registry に保存された OCI イメージを直接プルしてコンテナワークロードを実行。イメージストリーミング機能により大容量イメージの起動時間を短縮可能。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reference Links -->
+    <div class="section">
+      <h2>&#128214; 参考リンク</h2>
+      <ul class="links-list">
+        <li>&#128203; <a href="https://cloud.google.com/release-notes#March_16_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li>&#128230; <a href="https://cloud.google.com/build/docs/building/store-artifacts-in-artifact-registry" target="_blank" rel="noopener noreferrer">Cloud Build でのアーティファクト保存</a></li>
+        <li>&#128196; <a href="https://cloud.google.com/build/docs/build-config-file-schema" target="_blank" rel="noopener noreferrer">Cloud Build 構成ファイルスキーマ</a></li>
+        <li>&#128451;&#65039; <a href="https://cloud.google.com/artifact-registry/docs/docker" target="_blank" rel="noopener noreferrer">Artifact Registry でのコンテナイメージ管理</a></li>
+        <li>&#128220; <a href="https://cloud.google.com/artifact-registry/docs/supported-formats" target="_blank" rel="noopener noreferrer">OCI 仕様 (Artifact Registry 対応フォーマット)</a></li>
+        <li>&#128176; <a href="https://cloud.google.com/build/pricing" target="_blank" rel="noopener noreferrer">Cloud Build の料金</a></li>
+        <li>&#128176; <a href="https://cloud.google.com/artifact-registry/pricing" target="_blank" rel="noopener noreferrer">Artifact Registry の料金</a></li>
+      </ul>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>&#128221; まとめ</h2>
+      <p>
+        Cloud Build に OCI イメージの Artifact Registry へのアップロード機能が追加されたことで、OCI 標準に準拠したコンテナイメージをビルドパイプライン内で<span class="highlight">宣言的に管理</span>できるようになりました。この機能は、マルチプラットフォーム対応やサプライチェーンセキュリティの強化を推進する組織にとって重要なアップデートです。
+      </p>
+      <p>
+        既存のビルドパイプラインで外部ツールを使用して OCI イメージを管理している場合は、新しい <code>oci</code> フィールドへの移行を検討することを推奨します。
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>&#128206; 出典: <a href="https://cloud.google.com/release-notes#March_16_2026" target="_blank" rel="noopener noreferrer">https://cloud.google.com/release-notes#March_16_2026</a></p>
+      <p>&#128278; 関連ドキュメント: <a href="https://cloud.google.com/build/docs/building/store-artifacts-in-artifact-registry" target="_blank" rel="noopener noreferrer">https://cloud.google.com/build/docs/building/store-artifacts-in-artifact-registry</a></p>
+      <p style="margin-top: 8px; font-size: 11px; color: #9AA0A6;">タグ: Cloud Build, Artifact Registry, OCI, コンテナイメージ, CI/CD, DevOps</p>
+    </footer>
+
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

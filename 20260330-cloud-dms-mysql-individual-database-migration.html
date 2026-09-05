@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud DMS: MySQL 同種移行で個別データベースの選択的移行が可能に</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; min-width: 280px; }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 12px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .badge,
+    .badge-ga {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green { border-left-color: var(--gc-green); }
+    .card-red { border-left-color: var(--gc-red); }
+    .card-yellow { border-left-color: var(--gc-yellow); }
+    .card-orange { border-left-color: var(--gc-orange); }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow { color: var(--gc-blue-600); font-size: 20px; }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* Before/After */
+    .before-after-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+    .before-card h3 { color: var(--gc-red); }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+    .after-card h3 { color: var(--gc-green); }
+
+    .before-card ul, .after-card ul {
+      list-style: none;
+      padding: 0;
+    }
+    .before-card li, .after-card li {
+      padding: 4px 0;
+      font-size: 14px;
+    }
+    .before-card li::before { content: "✕ "; color: var(--gc-red); font-weight: bold; }
+    .after-card li::before { content: "✓ "; color: var(--gc-green); font-weight: bold; }
+
+    /* Feature cards grid */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .feature-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid var(--gc-outline-variant);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+      text-align: center;
+    }
+
+    .feature-card .feature-icon {
+      font-size: 36px;
+      margin-bottom: 8px;
+    }
+
+    .feature-card .feature-title {
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 8px;
+      font-size: 15px;
+    }
+
+    .feature-card .feature-desc {
+      font-size: 13px;
+      color: var(--gc-on-surface-variant);
+    }
+
+    /* Stat cards */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.green { background: linear-gradient(135deg, var(--gc-green), #1B7A36); }
+    .stat-card.orange { background: linear-gradient(135deg, var(--gc-orange), #E65100); }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Usecase cards */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h3 {
+      color: var(--gc-blue-800);
+      margin-bottom: 8px;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* Code blocks */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid) {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    /* Note/Warning boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Mermaid container */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Merit/Demerit grid */
+    .merit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    /* Region tags */
+    .region-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .region-tag {
+      background: var(--gc-blue-50);
+      border: 1px solid var(--gc-blue-200);
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 13px;
+      color: var(--gc-blue-800);
+    }
+
+    /* Pricing table highlight */
+    .free-badge {
+      background: var(--gc-green-tint);
+      color: var(--gc-green);
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    /* IAM role list */
+    .iam-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .iam-role {
+      background: var(--gc-surface-container-lowest);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-family: 'Roboto Mono', monospace;
+      font-size: 13px;
+      color: var(--gc-blue-900);
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; }
+      .subtitle { text-align: left; margin-top: 8px; }
+      .before-after-grid,
+      .feature-grid,
+      .stat-grid,
+      .merit-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>&#x1f5c4;&#xfe0f; Cloud Database Migration Service:<br>MySQL 同種移行で個別データベースの選択的移行が可能に</h1>
+        <div style="margin-top: 12px;">
+          <span class="badge">Cloud Database Migration Service</span>
+          <span class="badge-ga">GA (一般提供)</span>
+          <span class="badge">MySQL Homogeneous Migration</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-03-30</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>&#x1f4cb; 概要</h2>
+      <p>
+        Database Migration Service (DMS) の <span class="highlight">MySQL 同種移行</span> において、ソースインスタンスから<span class="highlight">個別のデータベースを選択して移行</span>できる機能が追加されました。これまで全データベースが一括移行されていましたが、移行ジョブ作成時に対象を個別選択できるようになりました。
+      </p>
+      <p style="margin-top: 12px;">
+        PostgreSQL (Cloud SQL / AlloyDB) や SQL Server では既に提供されていた機能であり、今回の対応で <span class="highlight">MySQL でも同等の選択的移行</span>が実現しました。
+      </p>
+      <p style="margin-top: 12px; color: var(--gc-on-surface-variant);">
+        &#x1f3af; <strong>対象ユーザー:</strong> オンプレミスや他クラウド (AWS RDS, Amazon Aurora, Azure Database for MySQL) から Cloud SQL for MySQL への移行を計画しているデータベース管理者やクラウドアーキテクト
+      </p>
+    </div>
+
+    <!-- Before / After -->
+    <div class="section">
+      <h2>&#x1f504; Before / After 比較</h2>
+      <div class="before-after-grid">
+        <div class="before-card">
+          <h3>&#x274c; アップデート前</h3>
+          <ul>
+            <li>全データベースが一括移行、個別選択不可</li>
+            <li>不要なDBも含め移行時間・帯域を余分に消費</li>
+            <li>特定DBのみ移行するには手動ダンプ・リストアが必要</li>
+            <li>PostgreSQL/SQL Serverでは可能だがMySQLは非対応</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h3>&#x2705; アップデート後</h3>
+          <ul>
+            <li>移行対象データベースを個別に選択可能</li>
+            <li>必要なDBのみ移行し、時間・リソースを最適化</li>
+            <li>コンソールおよび gcloud CLI の両方から設定可能</li>
+            <li>MySQL でも PostgreSQL/SQL Server と同等の柔軟性</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>&#x1f3d7;&#xfe0f; アーキテクチャ図</h2>
+      <p style="margin-bottom: 16px;">移行ジョブ作成時にソースインスタンスのデータベース一覧から移行対象を選択し、選択されたデータベースのみがフルダンプおよび CDC を通じて Cloud SQL for MySQL にレプリケーションされます。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    subgraph Source["ソース MySQL インスタンス"]
+        DB_A["Database A\n(選択)"]
+        DB_B["Database B\n(選択)"]
+        DB_C["Database C\n(未選択)"]
+        DB_D["Database D\n(未選択)"]
+    end
+
+    subgraph DMS["Database Migration Service"]
+        MJ["移行ジョブ作成"]
+        Filter["データベース\nフィルタリング"]
+        Dump["Full Dump"]
+        CDC["CDC\n(継続的レプリケーション)"]
+    end
+
+    subgraph Dest["Cloud SQL for MySQL\n(移行先)"]
+        DB_A2["Database A"]
+        DB_B2["Database B"]
+    end
+
+    DB_A --> MJ
+    DB_B --> MJ
+    DB_C -.->|"移行対象外"| MJ
+    DB_D -.->|"移行対象外"| MJ
+    MJ --> Filter
+    Filter --> Dump
+    Dump --> CDC
+    CDC --> DB_A2
+    CDC --> DB_B2
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>&#x2b50; 主要機能</h2>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-icon">&#x2611;&#xfe0f;</div>
+          <div class="feature-title">個別データベース選択</div>
+          <div class="feature-desc">移行ジョブ作成ウィザードの「Configure migration objects」でチェックボックスにより個別選択。全DB一括移行も引き続きサポート。</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#x1f4bb;</div>
+          <div class="feature-title">gcloud CLI サポート</div>
+          <div class="feature-desc"><code>--databases-filter</code> フラグで移行対象DBを指定可能。<code>--all-databases</code> で従来の一括移行も対応。</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#x1f504;</div>
+          <div class="feature-title">継続移行との互換性</div>
+          <div class="feature-desc">選択したDBに対してフルダンプ後のCDCが適用。移行対象外DBの変更は無視され帯域を節約。</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Statistics -->
+    <div class="section">
+      <h2>&#x1f4ca; 数字で見るアップデート効果</h2>
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">&#x2193; 移行時間</div>
+          <div class="stat-label">必要なDBのみ移行で大幅短縮</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-value">&#x00a5;0</div>
+          <div class="stat-label">DMS 同種移行は追加料金なし</div>
+        </div>
+        <div class="stat-card orange">
+          <div class="stat-value">5 種類</div>
+          <div class="stat-label">対応ソースDB (Self-managed, RDS, Aurora, Azure, Cloud SQL)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specs -->
+    <div class="section">
+      <h2>&#x1f527; 技術仕様</h2>
+
+      <h3 style="margin-top: 16px;">対応ソースデータベース</h3>
+      <table>
+        <thead>
+          <tr><th>ソース</th><th>サポートバージョン</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Self-managed MySQL</td><td>5.5, 5.6, 5.7, 8.0, 8.4</td></tr>
+          <tr><td>Amazon RDS for MySQL</td><td>5.6, 5.7, 8.0, 8.4</td></tr>
+          <tr><td>Amazon Aurora MySQL</td><td>5.6, 5.7, 8.0, 8.4</td></tr>
+          <tr><td>Azure Database for MySQL</td><td>5.7, 8.0, 8.4</td></tr>
+          <tr><td>Cloud SQL for MySQL</td><td>5.6, 5.7, 8.0, 8.4</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top: 20px;">移行先データベース</h3>
+      <table>
+        <thead>
+          <tr><th>移行先</th><th>サポートバージョン</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Cloud SQL for MySQL</td><td>5.6, 5.7, 8.0, 8.4</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top: 20px;">&#x1f512; 必要な IAM ロール</h3>
+      <div class="iam-list">
+        <span class="iam-role">roles/datamigration.admin</span>
+        <span class="iam-role">roles/cloudsql.editor</span>
+        <span class="iam-role">roles/compute.networkUser</span>
+      </div>
+      <p style="margin-top: 8px; font-size: 13px; color: var(--gc-outline);">※ VPC ピアリング使用時は compute.networkUser が必要</p>
+    </div>
+
+    <!-- Setup -->
+    <div class="section">
+      <h2>&#x2699;&#xfe0f; 設定方法</h2>
+
+      <div class="note-box">
+        <strong>&#x1f4a1; 前提条件:</strong>
+        <ul style="margin-top: 8px; padding-left: 20px; font-size: 14px;">
+          <li>ソース MySQL インスタンスへの接続プロファイルが作成済み</li>
+          <li>Database Migration Service API が有効化済み</li>
+          <li>適切な IAM ロールが付与済み</li>
+        </ul>
+      </div>
+
+      <h3 style="margin-top: 20px;">&#x1f310; Google Cloud コンソールでの設定</h3>
+      <div class="card">
+        <ol style="padding-left: 20px; font-size: 14px;">
+          <li>Migration jobs ページに移動</li>
+          <li>「Create migration job」をクリック</li>
+          <li>ソースデータベースエンジンとして「MySQL」を選択</li>
+          <li>ソース接続プロファイルを指定</li>
+          <li><strong>「Configure migration objects」ステップで移行対象のデータベースを選択</strong></li>
+          <li>テストを実行し、移行ジョブを作成</li>
+        </ol>
+      </div>
+
+      <h3 style="margin-top: 20px;">&#x1f4bb; gcloud CLI での設定</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># 個別データベースを指定して移行ジョブを作成
+gcloud database-migration migration-jobs create my-mysql-migration \
+  --region=us-central1 \
+  --type=CONTINUOUS \
+  --source=mysql-source-profile \
+  --destination=mysql-dest-profile \
+  --databases-filter=app_db,user_db,analytics_db</code></pre>
+
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># 全データベースを移行する場合 (従来の動作)
+gcloud database-migration migration-jobs create my-mysql-migration \
+  --region=us-central1 \
+  --type=CONTINUOUS \
+  --source=mysql-source-profile \
+  --destination=mysql-dest-profile \
+  --all-databases</code></pre>
+    </div>
+
+    <!-- Merits / Demerits -->
+    <div class="section">
+      <h2>&#x2696;&#xfe0f; メリット・デメリット</h2>
+      <div class="merit-grid">
+        <div>
+          <h3 style="color: var(--gc-green);">&#x2705; メリット</h3>
+
+          <div class="card card-green">
+            <strong>ビジネス面</strong>
+            <div class="icon-text"><span class="arrow">&#x2192;</span><span><strong>移行コスト削減:</strong> 必要なDBのみ移行し時間・リソースを削減</span></div>
+            <div class="icon-text"><span class="arrow">&#x2192;</span><span><strong>段階的移行:</strong> アプリごとに段階移行しリスク分散</span></div>
+            <div class="icon-text"><span class="arrow">&#x2192;</span><span><strong>ダウンタイム最小化:</strong> データ量削減で切替時間を短縮</span></div>
+          </div>
+
+          <div class="card card-green">
+            <strong>技術面</strong>
+            <div class="icon-text"><span class="arrow">&#x2192;</span><span><strong>帯域効率化:</strong> 不要DBレプリケーションを排除</span></div>
+            <div class="icon-text"><span class="arrow">&#x2192;</span><span><strong>移行ジョブ簡素化:</strong> 1ジョブで選択的移行が可能</span></div>
+            <div class="icon-text"><span class="arrow">&#x2192;</span><span><strong>自動化対応:</strong> <code>--databases-filter</code> で CI/CD 統合容易</span></div>
+          </div>
+        </div>
+        <div>
+          <h3 style="color: var(--gc-red);">&#x26a0;&#xfe0f; 制限事項・注意点</h3>
+
+          <div class="card card-red">
+            <strong>制限事項</strong>
+            <div class="icon-text"><span style="color:var(--gc-red);">&#x2022;</span><span>MySQL 8.4 の移行先では物理バックアップによる移行が非サポート</span></div>
+            <div class="icon-text"><span style="color:var(--gc-red);">&#x2022;</span><span>リージョナルサービスのため、ソース・移行先・接続プロファイルは同一リージョン必須</span></div>
+            <div class="icon-text"><span style="color:var(--gc-red);">&#x2022;</span><span>system DB (mysql, information_schema, performance_schema, sys) は自動除外</span></div>
+          </div>
+
+          <div class="card card-yellow">
+            <strong>考慮すべき点</strong>
+            <div class="icon-text"><span style="color:var(--gc-yellow);">&#x2022;</span><span>DB間に外部キー等の依存がある場合、関連DBを全て含める必要あり</span></div>
+            <div class="icon-text"><span style="color:var(--gc-yellow);">&#x2022;</span><span>選択後にソースで新規DB作成しても自動追加されない</span></div>
+            <div class="icon-text"><span style="color:var(--gc-yellow);">&#x2022;</span><span>ストアドプロシージャのDB横断参照は事前に依存関係を確認</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>&#x1f4a1; ユースケース</h2>
+
+      <div class="usecase-card">
+        <h3>&#x1f3e2; ユースケース 1: マルチテナントアプリケーションの段階的移行</h3>
+        <p style="font-size: 14px;"><strong>シナリオ:</strong> 1つの MySQL インスタンスに複数テナントのDBが格納されている SaaS アプリケーションで、テナントごとに段階的に Cloud SQL へ移行したい場合。</p>
+        <span class="code-label">Bash</span>
+        <pre><code class="language-bash"># 第1バッチ: テナントA とテナントB のデータベースを移行
+gcloud database-migration migration-jobs create batch1-migration \
+  --region=asia-northeast1 \
+  --type=CONTINUOUS \
+  --source=saas-mysql-source \
+  --destination=csql-mysql-dest-1 \
+  --databases-filter=tenant_a_db,tenant_b_db</code></pre>
+        <p style="font-size: 14px; margin-top: 8px;">&#x2192; テナントごとにリスクを分散し、問題発生時の影響範囲を限定。アプリケーション切り替えも段階的に実施可能。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>&#x1f6e0;&#xfe0f; ユースケース 2: 開発環境の部分移行</h3>
+        <p style="font-size: 14px;"><strong>シナリオ:</strong> 本番環境のソースインスタンスには多数のDBが存在するが、開発・テスト用に特定のDBのみを Cloud SQL に移行したい場合。</p>
+        <p style="font-size: 14px; margin-top: 8px;">&#x2192; 開発環境に必要なDBのみを移行することで、コストとストレージ使用量を抑え、移行時間を大幅に短縮。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>&#x1f4b0; 料金情報</h2>
+      <table>
+        <thead>
+          <tr><th>リソース</th><th>料金</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Database Migration Service (同種移行)</td><td><span class="free-badge">無料</span></td></tr>
+          <tr><td>Cloud SQL for MySQL (移行先インスタンス)</td><td>Cloud SQL の通常料金が適用</td></tr>
+          <tr><td>Cloud Storage (物理バックアップ使用時)</td><td>Cloud Storage の通常料金が適用</td></tr>
+          <tr><td>ネットワーク (リージョン間通信)</td><td>ネットワーク egress 料金が適用</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Regions -->
+    <div class="section">
+      <h2>&#x1f30d; 利用可能リージョン</h2>
+      <p>Database Migration Service はリージョナルサービスです。Cloud SQL for MySQL がサポートされている全リージョンで利用可能です。</p>
+
+      <h3 style="margin-top: 16px;">&#x1f30f; アジア太平洋</h3>
+      <div class="region-tags">
+        <span class="region-tag">asia-northeast1 (東京)</span>
+        <span class="region-tag">asia-northeast2 (大阪)</span>
+        <span class="region-tag">asia-southeast1 (シンガポール)</span>
+        <span class="region-tag">asia-south1 (ムンバイ)</span>
+      </div>
+
+      <h3 style="margin-top: 16px;">&#x1f1fa;&#x1f1f8; 北米</h3>
+      <div class="region-tags">
+        <span class="region-tag">us-central1</span>
+        <span class="region-tag">us-east1</span>
+        <span class="region-tag">us-west1</span>
+        <span class="region-tag">northamerica-northeast1</span>
+      </div>
+
+      <h3 style="margin-top: 16px;">&#x1f1ea;&#x1f1fa; ヨーロッパ</h3>
+      <div class="region-tags">
+        <span class="region-tag">europe-west1</span>
+        <span class="region-tag">europe-west3</span>
+        <span class="region-tag">europe-north1</span>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#x1f517; 関連サービス・機能</h2>
+      <div class="card">
+        <div class="icon-text"><span>&#x2601;&#xfe0f;</span><span><strong>Cloud SQL for MySQL:</strong> MySQL 同種移行の移行先として使用される Google Cloud のマネージド MySQL サービス</span></div>
+      </div>
+      <div class="card">
+        <div class="icon-text"><span>&#x1f504;</span><span><strong>DMS 同種移行 (PostgreSQL / SQL Server):</strong> PostgreSQL (Cloud SQL / AlloyDB) および SQL Server でも同様の個別データベース選択移行が利用可能</span></div>
+      </div>
+      <div class="card">
+        <div class="icon-text"><span>&#x1fa63;</span><span><strong>Cloud Storage:</strong> 物理バックアップファイル (Percona XtraBackup) を使用した移行フローで利用</span></div>
+      </div>
+      <div class="card">
+        <div class="icon-text"><span>&#x1f310;</span><span><strong>VPC ネットワーク:</strong> プライベート IP 接続やリバース SSH トンネルによるセキュアな移行接続に使用</span></div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section" style="background: var(--gc-blue-tint); border: 2px solid var(--gc-blue-300);">
+      <h2>&#x1f4dd; まとめ</h2>
+      <p>
+        今回のアップデートにより、Database Migration Service の MySQL 同種移行で<span class="highlight">個別データベースの選択的移行</span>が可能になりました。PostgreSQL や SQL Server では既に提供されていた機能の MySQL への展開であり、<strong>段階的な移行戦略やコスト最適化</strong>を実現する上で重要な改善です。
+      </p>
+      <p style="margin-top: 12px;">
+        MySQL から Cloud SQL への移行を計画している場合は、移行ジョブ作成時にデータベース選択オプションを活用し、効率的な移行計画を策定することを推奨します。
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>&#x1f4ce; 出典・参考リンク:</strong></p>
+      <ul style="list-style: none; padding: 0; margin-top: 8px;">
+        <li>&#x2022; <a href="https://cloud.google.com/database-migration/docs/mysql/create-migration-job-intro" target="_blank" rel="noopener noreferrer">移行ジョブの作成 (MySQL 同種移行)</a></li>
+        <li>&#x2022; <a href="https://cloud.google.com/database-migration/docs/overview" target="_blank" rel="noopener noreferrer">Database Migration Service 概要</a></li>
+        <li>&#x2022; <a href="https://cloud.google.com/database-migration/docs/homogeneous-migrations" target="_blank" rel="noopener noreferrer">同種移行の概要</a></li>
+        <li>&#x2022; <a href="https://cloud.google.com/database-migration/docs/supported-databases" target="_blank" rel="noopener noreferrer">サポートされるソース・移行先データベース</a></li>
+      </ul>
+      <p style="margin-top: 12px; font-size: 11px; color: var(--gc-outline);">Generated on 2026-03-30 | Google Cloud News Infographic</p>
+    </footer>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

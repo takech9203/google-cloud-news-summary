@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AlloyDB for PostgreSQL: Elasticsearch 外部検索統合と AI 関数の拡充</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; min-width: 280px; }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 12px;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-preview {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      background: var(--gc-orange);
+    }
+
+    .badge-issue {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      background: var(--gc-red);
+    }
+
+    /* Sections */
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    /* Cards */
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 8px;
+    }
+
+    .card p, .card ul {
+      font-size: 14px;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .card ul {
+      padding-left: 20px;
+      margin-top: 6px;
+    }
+
+    .card ul li {
+      margin-bottom: 4px;
+    }
+
+    .card-green { border-left-color: var(--gc-green); }
+    .card-purple { border-left-color: var(--gc-purple); }
+    .card-orange { border-left-color: var(--gc-orange); }
+    .card-teal { border-left-color: var(--gc-teal); }
+    .card-red { border-left-color: var(--gc-red); }
+
+    /* Stat Cards */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 20px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.green { background: linear-gradient(135deg, var(--gc-green), #1B8A3A); }
+    .stat-card.purple { background: linear-gradient(135deg, var(--gc-purple), #7B2FBF); }
+    .stat-card.orange { background: linear-gradient(135deg, var(--gc-orange), #E06000); }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Before/After */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h4, .after-box h4 {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .before-box h4 { color: var(--gc-red); }
+    .after-box h4 { color: var(--gc-green); }
+
+    .before-box ul, .after-box ul {
+      font-size: 14px;
+      padding-left: 18px;
+    }
+
+    .before-box ul li, .after-box ul li {
+      margin-bottom: 6px;
+    }
+
+    /* Warning Box */
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .ai-box {
+      background: var(--gc-purple-tint);
+      border-left: 4px solid var(--gc-purple);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Use Case */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase h3 {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--gc-blue-900);
+      margin-bottom: 8px;
+    }
+
+    .usecase p {
+      font-size: 14px;
+      color: var(--gc-on-surface-variant);
+    }
+
+    /* Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* Code */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Mermaid */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Flow Diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Feature Grid */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    /* Check Items */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      font-size: 14px;
+    }
+
+    .check-icon { color: var(--gc-green); font-size: 18px; }
+    .cross-icon { color: var(--gc-red); font-size: 18px; }
+
+    /* Links */
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* Footer */
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    footer ul {
+      list-style: none;
+      padding: 0;
+      margin: 8px 0;
+    }
+
+    footer ul li {
+      margin-bottom: 4px;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .before-after { grid-template-columns: 1fr; }
+      .feature-grid { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .stat-value { font-size: 28px; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>&#x1f5c3;&#xfe0f; AlloyDB for PostgreSQL: Elasticsearch 外部検索統合と AI 関数の拡充</h1>
+        <div class="badges">
+          <span class="badge">AlloyDB for PostgreSQL</span>
+          <span class="badge-preview">Preview</span>
+          <span class="badge-issue">Issue</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-04-17</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>&#x1f4cb; 概要</h2>
+      <p>AlloyDB for PostgreSQL に <strong>3 つのカテゴリ</strong>にわたる大規模アップデートが発表されました。Elasticsearch との外部検索統合、AI 関数群の大幅な機能拡充、そして OFFSET 二重適用バグの報告です。</p>
+
+      <div class="flow-diagram">
+        <div class="flow-step">&#x1f50d; Elasticsearch<br/>外部検索統合</div>
+        <span class="flow-arrow">+</span>
+        <div class="flow-step">&#x1f9e0; AI 関数<br/>アクセラレーション</div>
+        <span class="flow-arrow">+</span>
+        <div class="flow-step">&#x1f4ac; 感情分析<br/>& 要約関数</div>
+      </div>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h4>&#x274c; Before (アップデート前)</h4>
+          <ul>
+            <li>AlloyDB と Elasticsearch を個別にクライアント管理し、アプリ層で統合</li>
+            <li>AI 関数は標準エグゼキュータ処理、行単位 LLM コールでレイテンシ大</li>
+            <li>感情分析・要約には外部 NLP サービスや ETL パイプラインが必要</li>
+            <li>LLM ベースの分類・フィルタリングは運用コストが高い</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h4>&#x2705; After (アップデート後)</h4>
+          <ul>
+            <li>AlloyDB 内から標準 SQL で Elasticsearch を直接クエリ</li>
+            <li>AI Function Apply ノードで <code>ai.if</code> / <code>ai.rank</code> を最適化</li>
+            <li><code>ai.analyze_sentiment</code>, <code>ai.summarize</code>, <code>ai.agg_summarize</code> でDB内直接処理</li>
+            <li>プロキシモデルで 100,000 行/秒、コスト 6,000 分の 1</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card green">
+        <div class="stat-value">100,000</div>
+        <div class="stat-label">行/秒のスループット<br/>(最適化 AI 関数)</div>
+      </div>
+      <div class="stat-card purple">
+        <div class="stat-value">23,000x</div>
+        <div class="stat-label">行単位比の高速化<br/>(プロキシモデル)</div>
+      </div>
+      <div class="stat-card orange">
+        <div class="stat-value">1/6,000</div>
+        <div class="stat-label">コスト削減率<br/>(LLM 呼び出し)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">6</div>
+        <div class="stat-label">新機能/変更<br/>(Preview + Issue)</div>
+      </div>
+    </div>
+
+    <!-- Architecture -->
+    <div class="section">
+      <h2>&#x1f3d7;&#xfe0f; アーキテクチャ図</h2>
+      <p>AlloyDB が Elasticsearch と Vertex AI の両方と連携するアーキテクチャ。外部検索は FDW 経由で Elasticsearch に直接クエリを実行し、AI 関数はローカルのプロキシモデルを優先使用しつつ、必要に応じて Vertex AI にフォールバックします。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph AlloyDB["AlloyDB for PostgreSQL"]
+        SQL["SQL クエリ実行"]
+        FDW["external_search_fdw\nエクステンション"]
+        AI_ENGINE["AI 関数エンジン\n(google_ml_integration)"]
+        PROXY["プロキシモデル\n(ローカル推論)"]
+
+        SQL --> FDW
+        SQL --> AI_ENGINE
+        AI_ENGINE --> PROXY
+    end
+
+    subgraph External["外部サービス"]
+        ES["Elasticsearch\nクラスタ"]
+        VERTEX["Vertex AI\n(Gemini LLM)"]
+        SM["Secret Manager"]
+    end
+
+    FDW -->|"REST API\n(クエリプッシュダウン)"| ES
+    FDW -->|"認証情報取得"| SM
+    AI_ENGINE -->|"フォールバック時のみ"| VERTEX
+    PROXY -.->|"精度チェック失敗時"| VERTEX
+
+    subgraph Functions["AI 関数群 (Preview)"]
+        IF["ai.if\n(フィルタリング)"]
+        RANK["ai.rank\n(ランキング)"]
+        SENTIMENT["ai.analyze_sentiment\n(感情分析)"]
+        SUMMARIZE["ai.summarize\n(要約)"]
+        AGG["ai.agg_summarize\n(集約要約)"]
+    end
+
+    AI_ENGINE --> Functions
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>&#x2b50; 主要機能</h2>
+
+      <div class="card">
+        <h3>&#x1f50d; 1. Elasticsearch 外部検索統合 (Preview)</h3>
+        <p><code>external_search_fdw</code> エクステンションにより、AlloyDB から Elasticsearch のデータに直接アクセス可能。</p>
+        <ul>
+          <li>標準 SQL で Elasticsearch インデックスを検索 (SELECT, WHERE, ORDER BY, LIMIT プッシュダウン対応)</li>
+          <li><code>ai.hybrid_search</code> で Reciprocal Rank Fusion (RRF) ベースのハイブリッド検索</li>
+          <li>Secret Manager を使用した認証情報管理 (API キーまたは Basic 認証)</li>
+          <li>ページネーション機能 (バッチサイズ・タイムアウト設定可能)</li>
+        </ul>
+      </div>
+
+      <div class="card card-purple">
+        <h3>&#x26a1; 2. AI 関数アクセラレーション (Preview)</h3>
+        <p>新しい AI Function Apply ノードがクエリプランに追加され、<code>ai.if</code> (WHERE 句) と <code>ai.rank</code> (ORDER BY 句) の実行を最適化。</p>
+        <ul>
+          <li>配列ベースの複雑なクエリを書かずに同等以上のパフォーマンスを実現</li>
+          <li>データベースフラグ <code>google_ml_integration.enable_ai_function_acceleration</code> で有効化</li>
+          <li>PostgreSQL 17 でのみ利用可能</li>
+        </ul>
+      </div>
+
+      <div class="card card-green">
+        <h3>&#x1f680; 3. 最適化 AI 関数 (Preview)</h3>
+        <p>ローカルで訓練されたプロキシモデルにより、LLM 呼び出しを大幅に削減。</p>
+        <ul>
+          <li><code>PREPARE</code> 文でプロキシモデルのバックグラウンド訓練を開始、<code>EXECUTE</code> でローカル推論を実行</li>
+          <li>精度チェックでしきい値を下回った場合は自動的に LLM にフォールバック</li>
+          <li>最大 100,000 行/秒の処理速度、コスト 6,000 分の 1 (1 セントの 10 分の 1 以下)</li>
+        </ul>
+      </div>
+
+      <div class="feature-grid">
+        <div class="card card-teal">
+          <h3>&#x1f4ca; 4. 感情分析 <code>ai.analyze_sentiment</code></h3>
+          <p>テキストの感情をポジティブ / ネガティブ / ニュートラルに分類。スコアリング (-1.0 ~ 1.0) による定量的評価。行単位+カーソルベースのバッチ処理対応。</p>
+        </div>
+        <div class="card card-orange">
+          <h3>&#x1f4dd; 5. 要約関数 <code>ai.summarize</code> / <code>ai.agg_summarize</code></h3>
+          <p><code>ai.summarize</code>: 個別行のテキスト要約。<code>ai.agg_summarize</code>: 集約関数として複数行をまとめて 1 つの要約を生成 (GROUP BY 対応)。</p>
+        </div>
+      </div>
+
+      <div class="warning-box">
+        <strong>&#x26a0;&#xfe0f; 6. OFFSET 二重適用バグ (Issue)</strong>
+        <p style="margin-top: 8px; font-size: 14px;">Elasticsearch データに対する SQL クエリで <code>OFFSET</code> を指定すると、プッシュダウン時と結果返却時の 2 回適用される。例: <code>OFFSET 5</code> を指定すると、Elasticsearch 側で 5 行スキップ + AlloyDB 側でさらに 5 行スキップ。ページネーションクエリで <code>OFFSET</code> を使用する際は注意が必要。</p>
+      </div>
+    </div>
+
+    <!-- Technical Specs -->
+    <div class="section">
+      <h2>&#x1f527; 技術仕様</h2>
+
+      <h3 style="font-size: 17px; font-weight: 600; color: var(--gc-on-surface); margin: 16px 0 12px 0;">Elasticsearch 統合の要件</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>PostgreSQL バージョン</td><td>17 以上</td></tr>
+          <tr><td>エクステンション</td><td><code>external_search_fdw</code></td></tr>
+          <tr><td>認証方式</td><td>API キー (<code>ApiKey</code>) または Basic 認証 (<code>Basic</code>)</td></tr>
+          <tr><td>認証情報保管</td><td>Secret Manager</td></tr>
+          <tr><td>データアクセス</td><td>読み取り専用 (書き込み不可)</td></tr>
+          <tr><td>最大応答待機時間 (デフォルト)</td><td>10,000 ms</td></tr>
+          <tr><td>ページネーションバッチサイズ</td><td>32 (デフォルト)</td></tr>
+          <tr><td>ページネーションタイムアウト</td><td>30,000 ms (デフォルト)</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="font-size: 17px; font-weight: 600; color: var(--gc-on-surface); margin: 16px 0 12px 0;">AI 関数の要件</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>PostgreSQL バージョン</td><td>17 以上</td></tr>
+          <tr><td>エクステンション</td><td><code>google_ml_integration</code> (v1.5.7+、最適化関数は v1.5.8+)</td></tr>
+          <tr><td>対応モデル</td><td>Gemini (デフォルト)、カスタムモデル設定可能</td></tr>
+          <tr><td>最適化関数の対象</td><td><code>ai.if()</code> のみ (Preview 時点)</td></tr>
+          <tr><td>アクセラレーション対象</td><td><code>ai.if()</code> (WHERE 句)、<code>ai.rank()</code> (ORDER BY 句)</td></tr>
+          <tr><td>データカラム型</td><td>TEXT / VARCHAR (ソースデータ)、REAL[] / VECTOR (埋め込み)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup Examples -->
+    <div class="section">
+      <h2>&#x2699;&#xfe0f; 設定方法とコードサンプル</h2>
+
+      <h3 style="font-size: 17px; font-weight: 600; color: var(--gc-on-surface); margin: 0 0 12px 0;">前提条件</h3>
+      <div style="margin-bottom: 16px;">
+        <div class="check-item"><span class="check-icon">&#x2713;</span> AlloyDB クラスタが作成済み</div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span> PostgreSQL 17 インスタンス</div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span> Elasticsearch クラスタがデプロイ済み (外部検索の場合)</div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span> AlloyDB インスタンスでアウトバウンド接続が有効化</div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span> Vertex AI との連携が設定済み (AI 関数の場合)</div>
+      </div>
+
+      <h3 style="font-size: 17px; font-weight: 600; color: var(--gc-on-surface); margin: 16px 0 8px 0;">Step 1: Elasticsearch 外部検索のセットアップ</h3>
+      <span class="code-label">SQL</span>
+      <pre><code class="language-sql">-- エクステンションの有効化
+CREATE EXTENSION external_search_fdw;
+
+-- Elasticsearch サーバーの設定
+CREATE SERVER my_es_server
+  FOREIGN DATA WRAPPER external_search_fdw
+  OPTIONS (
+    server 'https://my-elasticsearch.example.com:9200',
+    search_provider 'elastic',
+    auth_mode 'secret_manager',
+    auth_method 'ApiKey',
+    secret_path 'projects/123456789012/secrets/es-apikey/versions/1',
+    max_deadline_ms '10000',
+    pagination_num_results '32'
+  );
+
+-- ユーザーマッピング
+CREATE USER MAPPING FOR CURRENT_USER SERVER my_es_server;
+
+-- 外部テーブルの定義
+CREATE FOREIGN TABLE es_products(
+  metadata external_search_fdw_schema.OpaqueMetadata,
+  product_id TEXT,
+  product_name TEXT,
+  description TEXT
+) SERVER my_es_server OPTIONS(remote_table_name 'products_index');</code></pre>
+
+      <h3 style="font-size: 17px; font-weight: 600; color: var(--gc-on-surface); margin: 16px 0 8px 0;">Step 2: AI 関数の有効化</h3>
+      <span class="code-label">SQL</span>
+      <pre><code class="language-sql">-- Preview AI 関数の有効化
+CALL google_ml.upgrade_to_preview_version();
+SET google_ml_integration.enable_preview_ai_functions = 'on';
+
+-- AI 関数アクセラレーションの有効化 (セッションレベル)
+SET google_ml_integration.enable_ai_function_acceleration = on;
+
+-- アクセラレーションの確認 (EXPLAIN で AI Function Apply ノードを確認)
+EXPLAIN (COSTS OFF)
+SELECT r.name FROM restaurant_reviews r
+WHERE ai.if('Is the following a positive review? Review: ' || r.review)
+  AND r.city = 'Los Angeles'
+GROUP BY r.name HAVING count(*) > 20;</code></pre>
+
+      <h3 style="font-size: 17px; font-weight: 600; color: var(--gc-on-surface); margin: 16px 0 8px 0;">Step 3: 感情分析と要約の利用例</h3>
+      <span class="code-label">SQL</span>
+      <pre><code class="language-sql">-- 感情分析
+SELECT id, review_content,
+       ai.analyze_sentiment('Analyze the sentiment:', review_content)
+FROM reviews;
+
+-- テキスト要約
+SELECT ai.summarize(document_text) FROM documents;
+
+-- 集約要約 (販売者ごとのレビュー要約)
+SELECT seller_id, ai.agg_summarize(review)
+FROM product_reviews
+GROUP BY seller_id;</code></pre>
+    </div>
+
+    <!-- Merits & Demerits -->
+    <div class="section">
+      <h2>&#x2696;&#xfe0f; メリットとデメリット</h2>
+
+      <h3 style="font-size: 17px; font-weight: 600; color: var(--gc-green); margin: 0 0 12px 0;">&#x2705; メリット</h3>
+
+      <div class="feature-grid">
+        <div class="card card-green">
+          <h3>ビジネス面</h3>
+          <ul>
+            <li><strong>データサイロの解消</strong>: AlloyDB から Elasticsearch に直接アクセス</li>
+            <li><strong>AI 運用コスト大幅削減</strong>: LLM コストを最大 6,000 分の 1 に</li>
+            <li><strong>リアルタイムインサイト</strong>: DB 内で感情分析・要約を直接実行</li>
+            <li><strong>開発生産性の向上</strong>: SQL ベースで ML 専門知識不要</li>
+          </ul>
+        </div>
+        <div class="card card-teal">
+          <h3>技術面</h3>
+          <ul>
+            <li><strong>クエリプッシュダウン</strong>: 不要なデータ転送を削減</li>
+            <li><strong>ハイブリッド検索</strong>: RRF による高品質ランキング</li>
+            <li><strong>スケーラブルな AI</strong>: 100,000 行/秒のローカル推論</li>
+            <li><strong>自動フォールバック</strong>: 精度保証付きの LLM 切替</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3 style="font-size: 17px; font-weight: 600; color: var(--gc-red); margin: 24px 0 12px 0;">&#x26a0;&#xfe0f; デメリット・制約事項</h3>
+
+      <div class="card card-red">
+        <h3>制限事項</h3>
+        <ul>
+          <li>全機能が <strong>Preview ステータス</strong> - 本番環境での利用は推奨されない (Pre-GA 提供条件適用)</li>
+          <li>Elasticsearch 統合は<strong>読み取り専用</strong>、AlloyDB からの書き込み不可</li>
+          <li>AlloyDB と Elasticsearch 間のデータ同期はユーザー責任</li>
+          <li>Elasticsearch の <code>geo_point</code> などの特殊データ型は非サポート</li>
+          <li>AI 関数アクセラレーションは <strong>PostgreSQL 17 のみ</strong></li>
+          <li>最適化 AI 関数は Preview 時点で <code>ai.if()</code> のみサポート</li>
+          <li>AI 関数アクセラレーションは 1 スキャンあたり 1 つの AI 関数のみ対応</li>
+        </ul>
+      </div>
+
+      <div class="card card-orange">
+        <h3>考慮すべき点</h3>
+        <ul>
+          <li><code>OFFSET</code> 二重適用バグ: ページネーションクエリでの使用に注意</li>
+          <li>プロキシモデルは基盤データ変更時に再訓練が必要</li>
+          <li>プロンプト変更時には <code>PREPARE</code> 文の再実行が必要</li>
+          <li>AI 関数は Vertex AI 生成 AI モデルが利用可能なリージョンでのみ使用可能</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>&#x1f4a1; ユースケース</h2>
+
+      <div class="usecase">
+        <h3>&#x1f6d2; ユースケース 1: EC サイトの商品検索と感情分析</h3>
+        <p><strong>シナリオ</strong>: AlloyDB にトランザクションデータ、Elasticsearch で商品カタログの全文検索。顧客レビューの感情分析を組み合わせてレコメンデーション品質を向上。</p>
+        <span class="code-label">SQL</span>
+        <pre><code class="language-sql">-- Elasticsearch の商品データとレビューの感情分析を組み合わせ
+SELECT
+  es.product_name,
+  es.description,
+  ai.analyze_sentiment(
+    'Analyze the sentiment of this product review:',
+    r.review_text
+  ) AS sentiment
+FROM es_products es
+JOIN product_reviews r ON es.product_id = r.product_id::text
+WHERE es.metadata <@> 'description:"wireless headphones"'
+ORDER BY sentiment DESC
+LIMIT 10;</code></pre>
+        <p style="margin-top: 8px;"><strong>効果</strong>: Elasticsearch の全文検索と AlloyDB の AI 感情分析を統合し、単一の SQL クエリで高品質な商品レコメンデーションを実現。</p>
+      </div>
+
+      <div class="usecase">
+        <h3>&#x1f6e1;&#xfe0f; ユースケース 2: コストを抑えたリアルタイムコンテンツモデレーション</h3>
+        <p><strong>シナリオ</strong>: 大量のユーザー投稿コンテンツに対して LLM ベースのリアルタイムフィルタリングを実施しているが、API コストが高額。</p>
+        <span class="code-label">SQL</span>
+        <pre><code class="language-sql">-- 最適化 AI 関数でプロキシモデルを訓練
+PREPARE flagged_content AS
+SELECT c.id, c.content
+FROM user_content c
+WHERE ai.if(
+  'Is the following content inappropriate or harmful? Content: ' || c.content,
+  c.content_embedding
+);
+
+-- プロキシモデルによる高速・低コストフィルタリング
+EXECUTE flagged_content;</code></pre>
+        <p style="margin-top: 8px;"><strong>効果</strong>: プロキシモデルによるローカル推論で LLM コストを 6,000 分の 1 に削減しつつ、100,000 行/秒の処理速度でリアルタイムモデレーションを実現。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>&#x1f4b0; 料金情報</h2>
+      <p>AlloyDB for PostgreSQL は<strong>消費ベースの料金モデル</strong>を採用。インスタンスリソース (vCPU、メモリ)、ストレージ、ネットワーク転送量に基づいて課金されます。</p>
+
+      <div class="feature-grid" style="margin-top: 16px;">
+        <div class="card">
+          <h3>&#x1f4b3; 課金要素</h3>
+          <ul>
+            <li>AI 関数利用 = Vertex AI API 呼び出し料金 (最適化関数で大幅削減可能)</li>
+            <li>Elasticsearch 統合自体に追加料金なし (ES クラスタ運用コストは別途)</li>
+          </ul>
+        </div>
+        <div class="card card-green">
+          <h3>&#x1f3f7;&#xfe0f; CUD 割引</h3>
+          <ul>
+            <li><strong>1 年契約</strong>: 25% 割引</li>
+            <li><strong>3 年契約</strong>: 52% 割引</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Region -->
+    <div class="section">
+      <h2>&#x1f30d; 利用可能リージョン</h2>
+      <p>AlloyDB for PostgreSQL が利用可能な<strong>すべてのリージョン</strong>で Elasticsearch 統合を利用可能。ただし、AI 関数は <strong>Vertex AI 生成 AI モデルがサポートされているリージョン</strong>でのみ利用可能です。</p>
+      <div class="note-box">
+        <strong>&#x1f4cc; 参考</strong>: 対応リージョンの詳細は <a href="https://cloud.google.com/vertex-ai/generative-ai/docs/learn/locations#available-regions" target="_blank" class="gc-link">Generative AI locations</a> を参照してください。
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#x1f517; 関連サービス</h2>
+      <div class="feature-grid">
+        <div class="card card-purple">
+          <h3>&#x1f9e0; Vertex AI</h3>
+          <p>AlloyDB AI 関数のバックエンドとして LLM 推論を提供。Gemini モデルがデフォルトで使用される。</p>
+        </div>
+        <div class="card">
+          <h3>&#x1f510; Secret Manager</h3>
+          <p>Elasticsearch 接続の認証情報を安全に管理。</p>
+        </div>
+        <div class="card card-teal">
+          <h3>&#x1f50d; Elasticsearch</h3>
+          <p>外部検索プロバイダとして FDW 経由で統合。全文検索・スコアリング・ハイブリッド検索をサポート。</p>
+        </div>
+        <div class="card card-orange">
+          <h3>&#x2601;&#xfe0f; Cloud SQL for SQL Server</h3>
+          <p>同日に Vertex AI 統合 (Preview) が発表。Google Cloud データベース全体での AI 統合が拡充。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>&#x1f4ce; 出典・参考リンク:</strong></p>
+      <ul>
+        <li><a href="https://cloud.google.com/release-notes#April_17_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li><a href="https://cloud.google.com/alloydb/docs/release-notes" target="_blank" rel="noopener noreferrer">AlloyDB リリースノート</a></li>
+        <li><a href="https://cloud.google.com/alloydb/docs/elastic-search" target="_blank" rel="noopener noreferrer">Elasticsearch データへのアクセス</a></li>
+        <li><a href="https://cloud.google.com/alloydb/docs/ai/accelerate-ai-queries" target="_blank" rel="noopener noreferrer">AI 関数アクセラレーション</a></li>
+        <li><a href="https://cloud.google.com/alloydb/docs/ai/accelerate-queries-optimized-functions" target="_blank" rel="noopener noreferrer">最適化 AI 関数</a></li>
+        <li><a href="https://cloud.google.com/alloydb/docs/ai/evaluate-sentiment" target="_blank" rel="noopener noreferrer">感情分析</a></li>
+        <li><a href="https://cloud.google.com/alloydb/docs/ai/summarize-content" target="_blank" rel="noopener noreferrer">コンテンツ要約</a></li>
+        <li><a href="https://cloud.google.com/alloydb/docs/ai/ai-query-engine-landing" target="_blank" rel="noopener noreferrer">AI 関数概要</a></li>
+        <li><a href="https://cloud.google.com/alloydb/pricing" target="_blank" rel="noopener noreferrer">料金ページ</a></li>
+      </ul>
+      <p style="margin-top: 12px; font-size: 11px; color: var(--gc-outline);">Generated on 2026-04-18 | AlloyDB for PostgreSQL Elasticsearch &amp; AI Functions Update Infographic</p>
+    </footer>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

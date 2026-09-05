@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud SQL for PostgreSQL: Parameterized Secure Views</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1 {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-red {
+      border-left-color: var(--gc-red);
+    }
+
+    .card-yellow {
+      border-left-color: var(--gc-yellow);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-preview {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-orange);
+    }
+
+    .badge-service {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: #F4B400;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid) {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-card h3, .after-card h3 {
+      margin-top: 0;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h3 {
+      color: var(--gc-blue-800);
+      margin-top: 0;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stat-cards { grid-template-columns: 1fr; }
+      .feature-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>🔒 Cloud SQL for PostgreSQL:<br>Parameterized Secure Views</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge-service">Cloud SQL for PostgreSQL</span>
+          <span class="badge-preview">Preview</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-06-12</div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>Cloud SQL for PostgreSQL に <span class="highlight">Parameterized Secure Views</span>（パラメータ化セキュアビュー）機能が Preview として追加されました。ビュー定義内に名前付きパラメータ（ユーザー ID やリージョンなど）を使用し、クエリ実行時にアプリケーションがパラメータ値を提供することで、<strong>ユーザーごとに異なるデータセットを返すきめ細かなアクセス制御</strong>を実現します。</p>
+
+      <div class="note-box">
+        <strong>💡 主なユースケース:</strong> Natural Language to SQL（NL2SQL）アプリケーションにおけるセキュリティ強化。プロンプトインジェクション攻撃や意図しないデータアクセスのリスクをデータベースレベルで防御します。
+      </div>
+
+      <h3>対象ユーザー</h3>
+      <div class="icon-text">→ マルチテナントアプリケーションの開発者</div>
+      <div class="icon-text">→ AI/ML を活用した自然言語クエリインターフェースを構築するチーム</div>
+      <div class="icon-text">→ データベースレベルでの最小権限原則を徹底したいセキュリティ担当者</div>
+    </div>
+
+    <!-- Before/After Section -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-card">
+          <h3>❌ Before（課題）</h3>
+          <div class="check-item"><span class="cross-icon">✗</span><span>GRANT 文ではビューが返すデータを動的に制限できない</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>NL2SQL アプリで生成 SQL の範囲を制限する仕組みがない</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>RLS は DB ユーザー単位の制御でアプリユーザー単位は困難</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>プロンプトインジェクション攻撃への DB レベル防御が不足</span></div>
+        </div>
+        <div class="after-card">
+          <h3>✅ After（改善）</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><code>$@parameter_name</code> 構文でアプリユーザー単位のアクセス制御</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><code>security_barrier</code> で悪意ある関数によるデータ漏洩を防止</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>標準インターフェースでパラメータ値を安全に渡せる</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>自動的なクエリ制限（読み取り専用、再帰禁止、EXPLAIN 禁止）</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>Parameterized Secure Views は、アプリケーションとデータベースの間にセキュリティ境界を設け、パラメータ化されたクエリのみがベーステーブルのデータにアクセスできるようにします。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    A[("fa:fa-user エンドユーザー")] -->|自然言語クエリ| B["fa:fa-brain NL2SQL アプリケーション"]
+    B -->|SQL + パラメータ値| C["fa:fa-shield-alt execute_parameterized_query"]
+    C -->|パラメータバインド| D["fa:fa-eye Parameterized Secure View\n(security_barrier)"]
+    D -->|フィルタリング済み結果| E[("fa:fa-database Cloud SQL for PostgreSQL\nベーステーブル")]
+
+    subgraph セキュリティ境界
+        C
+        D
+    end
+
+    F["fa:fa-lock 制限事項の自動適用"] -.->|読み取り専用\n再帰禁止\nEXPLAIN禁止| C
+
+    style A fill:#4285F4,color:#fff
+    style B fill:#EA4335,color:#fff
+    style C fill:#34A853,color:#fff
+    style D fill:#FBBC04,color:#000
+    style E fill:#4285F4,color:#fff
+    style F fill:#9E9E9E,color:#fff
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h3>🏷️ 名前付きビューパラメータ</h3>
+          <p><code>$@parameter_name</code> 構文で WHERE 句内にパラメータを定義。大文字・小文字を区別し、英字/アンダースコアで始まる名前を使用。</p>
+        </div>
+        <div class="card card-green">
+          <h3>🛡️ Security Barrier</h3>
+          <p><code>WITH (security_barrier)</code> オプションで、悪意のある関数やオペレータがフィルタリング前の行データにアクセスすることを防止。</p>
+        </div>
+        <div class="card card-purple">
+          <h3>🔌 複数のクエリ実行 API</h3>
+          <p><strong>JSON API</strong>: ワンショット実行<br><strong>CURSOR API</strong>: 大規模クエリ向けバッチフェッチ<br><strong>Prepared Statements</strong>: 再利用可能なクエリプラン</p>
+        </div>
+        <div class="card card-yellow">
+          <h3>🚫 クエリ制限の自動適用</h3>
+          <p>読み取り専用（SELECT のみ）/ 再帰呼び出し禁止 / dblink 等のエクステンション制限 / EXPLAIN 文禁止</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>📐 技術仕様</h2>
+      <table>
+        <tr><th>項目</th><th>詳細</th></tr>
+        <tr><td>パラメータ構文</td><td><code>$@parameter_name</code></td></tr>
+        <tr><td>パラメータ名の制約</td><td>先頭: 英字 (a-z) またはアンダースコア / 後続: 英字・アンダースコア・数字</td></tr>
+        <tr><td>大文字小文字</td><td>区別あり</td></tr>
+        <tr><td>ビューオプション</td><td><code>WITH (security_barrier)</code> 必須</td></tr>
+        <tr><td>必要なエクステンション</td><td><code>parameterized_views</code></td></tr>
+        <tr><td>必要なデータベースフラグ</td><td><code>cloudsql.enable_parameterized_views = on</code></td></tr>
+      </table>
+
+      <h3>JSON API の制限パラメータ</h3>
+      <table>
+        <tr><th>パラメータ</th><th>説明</th></tr>
+        <tr><td><code>parameterized_views.json_results_max_size</code></td><td>結果セットの最大サイズ（KB）</td></tr>
+        <tr><td><code>parameterized_views.json_results_max_rows</code></td><td>結果セットの最大行数</td></tr>
+      </table>
+    </div>
+
+    <!-- Setup Guide -->
+    <div class="section">
+      <h2>🔧 設定方法</h2>
+
+      <h3>ステップ 1: データベースフラグの有効化</h3>
+      <p>インスタンスで <code>cloudsql.enable_parameterized_views</code> フラグを有効にします（再起動が必要）。</p>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud sql instances patch INSTANCE_NAME \
+  --database-flags cloudsql.enable_parameterized_views=on</code></pre>
+
+      <h3>ステップ 2: エクステンションの作成</h3>
+      <span class="code-label">SQL</span>
+      <pre><code class="language-sql">-- 管理者ユーザーで接続して実行
+CREATE EXTENSION parameterized_views;</code></pre>
+
+      <h3>ステップ 3: パラメータ化セキュアビューの作成</h3>
+      <span class="code-label">SQL</span>
+      <pre><code class="language-sql">CREATE VIEW app_schema.user_items_view WITH (security_barrier) AS
+SELECT item_id, item_name, description
+FROM app_schema.items
+WHERE owner_id = $@current_user_id;</code></pre>
+
+      <h3>ステップ 4: アプリケーション用ロールの作成と権限付与</h3>
+      <span class="code-label">SQL</span>
+      <pre><code class="language-sql">-- アプリケーション用のデータベースロールを作成
+CREATE ROLE psv_user WITH LOGIN PASSWORD 'PASSWORD';
+
+-- ビューとスキーマへのアクセス権を付与
+GRANT USAGE ON SCHEMA app_schema TO psv_user;
+GRANT SELECT ON app_schema.user_items_view TO psv_user;
+
+-- ベーステーブルへの直接アクセスを拒否
+REVOKE ALL PRIVILEGES ON app_schema.items FROM psv_user;</code></pre>
+
+      <h3>ステップ 5: パラメータ化ビューのクエリ実行</h3>
+      <span class="code-label">SQL</span>
+      <pre><code class="language-sql">-- JSON API を使用したクエリ実行
+SELECT * FROM parameterized_views.execute_parameterized_query(
+    query => 'SELECT * FROM app_schema.user_items_view',
+    param_names => ARRAY ['current_user_id'],
+    param_values => ARRAY ['123']
+);
+
+-- Prepared Statement を使用したクエリ実行
+PREPARE get_items (TEXT) AS RESTRICTED
+SELECT item_id, item_name FROM app_schema.user_items_view
+WHERE item_name LIKE $1;
+
+EXECUTE get_items ('%Laptop%')
+WITH VIEW PARAMETERS (current_user_id := '123');
+
+DEALLOCATE get_items;</code></pre>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div class="feature-grid">
+        <div>
+          <h3>💼 ビジネス面</h3>
+          <div class="card card-green">
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>コンプライアンス強化</strong>: 最小権限原則を DB レベルで実現し、監査要件への対応を簡素化</span></div>
+          </div>
+          <div class="card card-green">
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>AI アプリの安全な展開</strong>: NL2SQL アプリのデータ漏洩リスクを大幅に低減</span></div>
+          </div>
+          <div class="card card-green">
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>マルチテナント対応の簡素化</strong>: ビューレベルでのデータ分離で実装を削減</span></div>
+          </div>
+        </div>
+        <div>
+          <h3>🔧 技術面</h3>
+          <div class="card">
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>プロンプトインジェクション対策</strong>: DB レベルのセキュリティ境界</span></div>
+          </div>
+          <div class="card">
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>PostgreSQL 互換</strong>: 標準ビュー構文の拡張で既存知識を活用可能</span></div>
+          </div>
+          <div class="card">
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>自動的なクエリ制限</strong>: 追加のセキュリティ実装が不要</span></div>
+          </div>
+          <div class="card">
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>複数の API</strong>: ユースケースに応じた使い分けが可能</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <div class="warning-box">
+        <strong>⚠️ Preview ステータス</strong>: SLA 対象外であり本番環境での利用は推奨されません（Pre-GA Offerings Terms が適用）。
+      </div>
+      <div class="card card-red">
+        <h3>制限事項</h3>
+        <div class="check-item"><span class="cross-icon">✗</span><span>フラグ有効化にはデータベースの<strong>再起動が必要</strong></span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span><code>parameterized_views</code> エクステンションを各 DB に個別にインストールする必要あり</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>ユーザー定義関数内からのパラメータ化ビュー参照はエラー（直接参照のみ対応）</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span><code>dblink</code> や <code>pg_cron</code> などバックグラウンドセッション開始エクステンションは使用不可</span></div>
+      </div>
+      <div class="card card-yellow">
+        <h3>考慮すべき点</h3>
+        <div class="icon-text">→ フラグ有効化に伴うダウンタイムの計画が必要</div>
+        <div class="icon-text">→ 既存アプリコードをパラメータ化クエリインターフェースに対応させる改修が必要</div>
+        <div class="icon-text">→ JSON API の結果セットサイズ制限があるため、大量データには CURSOR API を検討</div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+      <div class="usecase-card">
+        <h3>📊 ユースケース 1: NL2SQL アプリケーションのデータセキュリティ</h3>
+        <p><strong>シナリオ</strong>: 社内 DB に対して自然言語でクエリを発行するアプリ。エンドユーザーが「自分の注文を表示して」と入力すると、そのユーザーの注文のみが返却される。</p>
+        <span class="code-label">SQL</span>
+        <pre><code class="language-sql">-- 注文ビューの作成
+CREATE VIEW orders_view WITH (security_barrier) AS
+SELECT order_id, product_name, quantity, order_date
+FROM orders
+WHERE customer_id = $@authenticated_user_id;
+
+-- アプリケーションからのクエリ実行
+SELECT * FROM parameterized_views.execute_parameterized_query(
+    query => 'SELECT * FROM orders_view WHERE order_date > ''2026-01-01''',
+    param_names => ARRAY ['authenticated_user_id'],
+    param_values => ARRAY ['user_12345']
+);</code></pre>
+        <div class="success-box">
+          <strong>効果:</strong> プロンプトインジェクション攻撃が行われても、認証されたユーザーのデータのみが返却され、他のユーザーのデータ露出リスクを排除。
+        </div>
+      </div>
+
+      <div class="usecase-card">
+        <h3>🏢 ユースケース 2: マルチテナント SaaS アプリケーション</h3>
+        <p><strong>シナリオ</strong>: 複数企業が共有 DB を使用する SaaS で、各テナントが自社のデータのみにアクセスできるようにする。</p>
+        <span class="code-label">SQL</span>
+        <pre><code class="language-sql">-- テナント別ビューの作成
+CREATE VIEW tenant_data_view WITH (security_barrier) AS
+SELECT record_id, data_field, created_at
+FROM shared_table
+WHERE tenant_id = $@current_tenant_id AND region = $@user_region;</code></pre>
+        <div class="success-box">
+          <strong>効果:</strong> データベースレベルでのテナント分離により、アプリケーションロジックの不具合によるクロステナントデータアクセスを防止。
+        </div>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <div class="note-box">
+        <strong>💡</strong> Parameterized Secure Views 機能自体に<strong>追加料金は発生しません</strong>。Cloud SQL for PostgreSQL の標準料金が適用されます。
+      </div>
+      <table>
+        <tr><th>エディション</th><th>vCPU 単価</th><th>メモリ単価</th></tr>
+        <tr><td>Cloud SQL Enterprise</td><td>$0.0413/vCPU/時間〜</td><td>$0.007/GB/時間〜</td></tr>
+        <tr><td>Cloud SQL Enterprise Plus</td><td>$0.05369/vCPU/時間〜</td><td>$0.0091/GB/時間〜</td></tr>
+      </table>
+    </div>
+
+    <!-- Region Availability -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <p>Cloud SQL for PostgreSQL が利用可能な<strong>すべてのリージョン</strong>で利用できます。</p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <strong>Cloud SQL RLS</strong>
+          <p style="margin: 4px 0 0 0; font-size: 14px;">DB ユーザー単位の行レベルセキュリティ。PSV はアプリユーザー単位で RLS を補完。</p>
+        </div>
+        <div class="card">
+          <strong>カラムレベルセキュリティ</strong>
+          <p style="margin: 4px 0 0 0; font-size: 14px;">特定カラムへのアクセス制御。PSV と組み合わせて多層的データ保護を実現。</p>
+        </div>
+        <div class="card">
+          <strong>Cloud SQL IAM 認証</strong>
+          <p style="margin: 4px 0 0 0; font-size: 14px;">インスタンスレベルのアクセス制御。PSV はデータレベルでより細かい制御を追加。</p>
+        </div>
+        <div class="card card-purple">
+          <strong>Vertex AI / Gemini</strong>
+          <p style="margin: 4px 0 0 0; font-size: 14px;">NL2SQL アプリ構築において、PSV がデータセキュリティレイヤーとして機能。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <p>Cloud SQL for PostgreSQL の Parameterized Secure Views は、特に <strong>AI/NL2SQL アプリケーションにおけるデータセキュリティの課題</strong>を解決する重要な機能です。データベースレベルで最小権限原則を実現し、プロンプトインジェクション攻撃への防御を提供します。</p>
+      <div class="success-box">
+        <strong>推奨:</strong> 現在 Preview 段階ですが、マルチテナントアプリケーションや自然言語クエリインターフェースの構築を検討しているチームは、<strong>開発・テスト環境での評価を開始すること</strong>を推奨します。
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>タグ:</strong> #CloudSQL #PostgreSQL #Security #ParameterizedSecureViews #RowLevelSecurity #NL2SQL #DataPrivacy #Preview #Database</p>
+      <p>📎 出典:</p>
+      <ul style="margin: 4px 0; padding-left: 20px;">
+        <li><a href="https://cloud.google.com/release-notes#June_12_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li><a href="https://docs.cloud.google.com/sql/docs/postgres/parameterized-secure-views" target="_blank" rel="noopener noreferrer">Parameterized Secure Views 概要</a></li>
+        <li><a href="https://docs.cloud.google.com/sql/docs/postgres/use-parameterized-secure-views" target="_blank" rel="noopener noreferrer">使用方法ドキュメント</a></li>
+        <li><a href="https://docs.cloud.google.com/sql/docs/postgres/secure-app-data-parameterized-secure-views" target="_blank" rel="noopener noreferrer">チュートリアル</a></li>
+        <li><a href="https://cloud.google.com/sql/pricing" target="_blank" rel="noopener noreferrer">Cloud SQL 料金ページ</a></li>
+      </ul>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

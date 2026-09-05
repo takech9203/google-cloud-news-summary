@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gemini Enterprise: Crossbeam データストア対応 & Gemini 3.5 Flash GA</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .ai-box {
+      background: var(--gc-purple-tint);
+      border-left: 4px solid var(--gc-purple);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.green {
+      background: linear-gradient(135deg, var(--gc-green), #1E8E3E);
+    }
+
+    .stat-card.orange {
+      background: linear-gradient(135deg, var(--gc-orange), #E65100);
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before {
+      background: var(--gc-red-tint);
+      border: 1px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after {
+      background: var(--gc-green-tint);
+      border: 1px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before h3, .after h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before h3 {
+      color: var(--gc-red);
+    }
+
+    .after h3 {
+      color: var(--gc-green);
+    }
+
+    .before ul, .after ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .before li, .after li {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-800);
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .usecase-card p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .region-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    .region-badge {
+      background: var(--gc-blue-50);
+      border: 1px solid var(--gc-blue-200);
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 14px;
+      color: var(--gc-blue-800);
+      font-weight: 500;
+    }
+
+    .related-services {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .related-service-card {
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .related-service-card h4 {
+      margin: 0 0 4px 0;
+      font-size: 14px;
+      color: var(--gc-on-surface);
+    }
+
+    .related-service-card p {
+      margin: 0;
+      font-size: 13px;
+      color: var(--gc-outline);
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 24px;
+      }
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+      .stat-cards {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>Gemini Enterprise: Crossbeam & Gemini 3.5 Flash</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Gemini Enterprise</span>
+          <span class="badge badge-preview">Crossbeam: Preview</span>
+          <span class="badge badge-ga">Gemini 3.5 Flash: GA</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-05-19</div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        Gemini Enterprise に 2 つの重要なアップデートが同時にリリースされた。
+        <span class="highlight">Crossbeam データストア接続</span> (Public Preview) と
+        <span class="highlight">Gemini 3.5 Flash モデル GA</span> (Global / US / EU) の提供開始により、
+        エンタープライズユーザーのデータ活用とモデル選択肢が大幅に拡張される。
+      </p>
+      <p>
+        Crossbeam は企業間のパートナーシップデータを管理するプラットフォームであり、この統合により自然言語での検索やグラウンディングが可能になる。
+        Gemini 3.5 Flash の GA 化は、従来の Gemini 2.5 Flash を置き換え、最新の高速モデルを本番ワークロードで活用できることを意味する。
+      </p>
+    </div>
+
+    <!-- Before / After -->
+    <div class="section">
+      <h2>🔄 Before / After</h2>
+      <div class="before-after">
+        <div class="before">
+          <h3>❌ Before</h3>
+          <ul>
+            <li>Crossbeam データは手動エクスポート・変換が必要</li>
+            <li>Gemini 2.5 Flash が最新の Flash モデル</li>
+            <li>Agent Designer で利用可能な Flash モデルは前世代に限定</li>
+          </ul>
+        </div>
+        <div class="after">
+          <h3>✅ After</h3>
+          <ul>
+            <li>Crossbeam データストアをネイティブ接続し直接活用可能</li>
+            <li>Gemini 3.5 Flash が GA として利用可能</li>
+            <li>Agent Designer でも Gemini 3.5 Flash を選択してエージェント構築可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>Crossbeam データストアが Gemini Enterprise に接続され、アプリアシスタントおよび Agent Designer のモデルセレクターから Gemini 3.5 Flash (GA) を選択してデータを活用する構成。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph データソース
+        CB[🔗 Crossbeam\nパートナーシップデータ]
+        OTHER[📁 その他の\nデータソース]
+    end
+
+    subgraph Gemini Enterprise
+        DS[🗄️ データストア]
+        APP[🤖 アプリアシスタント]
+        AD[🛠️ Agent Designer]
+        MS{モデルセレクター}
+    end
+
+    subgraph モデル
+        FLASH35[⚡ Gemini 3.5 Flash\n GA]
+        PRO[🧠 その他の\nGemini モデル]
+    end
+
+    CB -->|Public Preview| DS
+    OTHER --> DS
+    DS --> APP
+    DS --> AD
+    APP --> MS
+    AD --> MS
+    MS --> FLASH35
+    MS --> PRO
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+
+      <div class="card card-orange">
+        <h3>🔗 Crossbeam データストア接続 (Public Preview)</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>Crossbeam のパートナーシップデータを Gemini Enterprise のデータストアとして接続可能</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>Google Cloud コンソールからサードパーティデータコネクターとして接続設定を実行</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>パーミッション対応のエンタープライズ検索やグラウンディングが利用可能</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>データフェデレーションまたはインジェスション (インデックス化) のいずれかの接続方式を選択可能</span></div>
+      </div>
+
+      <div class="card card-green">
+        <h3>⚡ Gemini 3.5 Flash GA 提供</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>Global、US、EU リージョンで一般提供開始</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>アプリアシスタントのモデルセレクタードロップダウンから選択可能</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>Agent Designer でエージェント構築時のモデルとして選択可能</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>Gemini 2.5 Flash はドロップダウンから削除 (Gemini 3.5 Flash に置き換え)</span></div>
+      </div>
+
+      <div class="card">
+        <h3>📋 モデルセレクターの更新</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>Gemini 3.5 Flash が最新の GA Flash モデルとしてデフォルト選択肢に追加</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>Gemini 2.5 Flash はモデルセレクタードロップダウンから削除</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>ユーザーは追加設定なしで新モデルを利用開始可能</span></div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>📐 技術仕様</h2>
+
+      <h3>Crossbeam データストア</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>ステータス</td><td><span class="badge badge-preview">Public Preview</span></td></tr>
+          <tr><td>接続方式</td><td>サードパーティデータコネクター</td></tr>
+          <tr><td>設定方法</td><td>Google Cloud コンソール</td></tr>
+          <tr><td>データ同期</td><td>フルシンクおよびインクリメンタルシンク対応</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Gemini 3.5 Flash</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>ステータス</td><td><span class="badge badge-ga">GA (一般提供)</span></td></tr>
+          <tr><td>利用可能リージョン</td><td>Global、US、EU</td></tr>
+          <tr><td>利用可能コンテキスト</td><td>アプリアシスタント、Agent Designer</td></tr>
+          <tr><td>置き換え対象</td><td>Gemini 2.5 Flash (ドロップダウンから削除)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup Steps -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <div class="ai-box">
+        <strong>前提条件:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>Gemini Enterprise サブスクリプション (Standard / Plus / Business)</li>
+          <li>Gemini Enterprise Admin ロール</li>
+          <li>Crossbeam 接続の場合: Crossbeam アカウントと認証情報</li>
+        </ul>
+      </div>
+
+      <h3>Crossbeam データストアの接続手順</h3>
+      <div class="flow-diagram">
+        <div class="flow-step">📂 Data Stores<br/>画面を開く</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">➕ Create<br/>Data Store</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🔍 Crossbeam<br/>を選択</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🔑 認証情報<br/>を入力</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">✅ 作成<br/>完了</div>
+      </div>
+
+      <h3>Gemini 3.5 Flash の利用手順</h3>
+      <div class="flow-diagram">
+        <div class="flow-step">🌐 Gemini<br/>Enterprise を開く</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">📋 モデル<br/>セレクターをクリック</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">⚡ Gemini 3.5<br/>Flash を選択</div>
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div>
+          <h3>ビジネス面</h3>
+          <div class="success-box">
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>パートナーデータの即座の活用</strong>: Crossbeam のパートナーシップデータを AI 検索・分析に直接活用でき、パートナー連携戦略の意思決定を高速化</span></div>
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>最新モデルによる生産性向上</strong>: Gemini 3.5 Flash の高速レスポンスにより、日常的な AI アシスタント利用体験が向上</span></div>
+          </div>
+        </div>
+        <div>
+          <h3>技術面</h3>
+          <div class="success-box">
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>ネイティブ統合</strong>: Crossbeam データを手動エクスポート・変換なしに直接利用可能</span></div>
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>エージェント性能の向上</strong>: Agent Designer で Gemini 3.5 Flash を利用することで推論品質と応答速度が改善</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <div class="warning-box">
+        <strong>制限事項:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>Crossbeam データストアは Public Preview であり、SLA の対象外</li>
+          <li>Gemini 2.5 Flash がモデルセレクターから削除されるため、既存ワークフローで明示的に Gemini 2.5 Flash を選択していた場合は影響を受ける可能性あり</li>
+          <li>Crossbeam コネクターの詳細な制限事項 (対応エンティティタイプ、同期頻度など) は個別ドキュメントを参照</li>
+        </ul>
+      </div>
+
+      <div class="note-box">
+        <strong>💡 考慮すべき点:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>Preview から GA への移行時にデータストアの再作成が必要になる可能性がある</li>
+          <li>Gemini 3.5 Flash は前世代と出力が異なる場合があるため、既存プロンプトの再検証を推奨</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>🤝 ユースケース 1: パートナーシップデータを活用した営業支援</h4>
+        <p><strong>シナリオ:</strong> 営業担当者が Crossbeam のパートナーオーバーラップデータを Gemini Enterprise で検索し、共同提案の機会を自然言語で発見する。</p>
+        <p><strong>効果:</strong> パートナーデータへのアクセスが Gemini Enterprise 内で完結し、別ツールへの切り替えが不要になるため、営業活動の効率が向上する。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>🤖 ユースケース 2: Agent Designer で高速レスポンスエージェントを構築</h4>
+        <p><strong>シナリオ:</strong> 社内ヘルプデスク用のカスタムエージェントを Agent Designer で構築する際に、Gemini 3.5 Flash を選択して高速かつコスト効率の良い応答を実現する。</p>
+        <p><strong>効果:</strong> 社内問い合わせ対応の自動化において、応答速度と推論精度のバランスが最適化される。</p>
+      </div>
+    </div>
+
+    <!-- Available Regions -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+
+      <h3>Gemini 3.5 Flash</h3>
+      <div class="region-list">
+        <span class="region-badge">🌐 Global</span>
+        <span class="region-badge">🇺🇸 US (米国マルチリージョン)</span>
+        <span class="region-badge">🇪🇺 EU (欧州マルチリージョン)</span>
+      </div>
+
+      <h3>Crossbeam データストア</h3>
+      <div class="region-list">
+        <span class="region-badge">🌐 Global</span>
+        <span class="region-badge">🇺🇸 US</span>
+        <span class="region-badge">🇪🇺 EU</span>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス</h2>
+      <div class="related-services">
+        <div class="related-service-card">
+          <h4>🛠️ Gemini Enterprise Agent Designer</h4>
+          <p>Gemini 3.5 Flash をモデルとして選択しカスタムエージェントを構築するノーコード・ローコードプラットフォーム</p>
+        </div>
+        <div class="related-service-card">
+          <h4>🔌 Gemini Enterprise データコネクター</h4>
+          <p>Crossbeam を含むサードパーティデータソースとの統合フレームワーク</p>
+        </div>
+        <div class="related-service-card">
+          <h4>🧠 Gemini Enterprise Agent Platform (Vertex AI)</h4>
+          <p>より高度な API ベースのエージェント構築プラットフォーム</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <p>
+        今回のアップデートにより、Gemini Enterprise のデータ接続エコシステムが Crossbeam の追加で拡張されるとともに、
+        最新の Gemini 3.5 Flash モデルが本番利用可能になった。
+      </p>
+      <div class="note-box">
+        <strong>推奨アクション:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>Crossbeam を利用している組織はパートナーデータの AI 活用を検討</li>
+          <li>全ユーザーはモデルセレクターで Gemini 3.5 Flash を試用し、既存ワークフローへの適用を評価</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="list-style: none; padding: 0; margin: 4px 0;">
+        <li><a href="https://cloud.google.com/release-notes#May_19_2026" target="_blank" rel="noopener noreferrer">Google Cloud Release Notes (May 19, 2026)</a></li>
+        <li><a href="https://cloud.google.com/gemini/enterprise/docs/connectors/connect-third-party-data-source" target="_blank" rel="noopener noreferrer">Gemini Enterprise データコネクター</a></li>
+        <li><a href="https://cloud.google.com/gemini/enterprise/docs/agent-designer" target="_blank" rel="noopener noreferrer">Agent Designer 概要</a></li>
+        <li><a href="https://cloud.google.com/gemini/enterprise/docs/editions" target="_blank" rel="noopener noreferrer">Gemini Enterprise エディション比較</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline);">#GeminiEnterprise #Crossbeam #Gemini35Flash #DataConnector #AgentDesigner #GA #Preview</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

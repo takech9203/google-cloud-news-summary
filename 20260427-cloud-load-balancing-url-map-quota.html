@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Load Balancing: URL Map 構成サイズクォータシステム</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; min-width: 280px; }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 12px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .badge, .badge-preview {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-preview { background: var(--gc-orange); }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green { border-left-color: var(--gc-green); }
+    .card-red { border-left-color: var(--gc-red); }
+    .card-teal { border-left-color: var(--gc-teal); }
+    .card-orange { border-left-color: var(--gc-orange); }
+    .card-purple { border-left-color: var(--gc-purple); }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* Stats grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 20px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.green { background: linear-gradient(135deg, var(--gc-green), #1B8A3A); }
+    .stat-card.teal { background: linear-gradient(135deg, var(--gc-teal), #00838F); }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Before/After */
+    .before-after-grid {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 16px;
+      align-items: stretch;
+      margin: 20px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-box h3 { color: var(--gc-red); }
+    .after-box h3 { color: var(--gc-green); }
+
+    .arrow-center {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      color: var(--gc-blue-600);
+      font-weight: bold;
+    }
+
+    .before-after-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      font-size: 14px;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .before-after-item .icon { flex-shrink: 0; }
+
+    /* Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* Feature cards grid */
+    .features-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .feature-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .feature-card .feature-title {
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      font-size: 16px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .feature-card .feature-desc {
+      color: var(--gc-on-surface-variant);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* Use case cards */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-900);
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .usecase-card .scenario {
+      font-size: 14px;
+      color: var(--gc-on-surface-variant);
+      margin-bottom: 8px;
+    }
+
+    .usecase-card .effect {
+      font-size: 14px;
+      color: var(--gc-green);
+      font-weight: 500;
+    }
+
+    /* Note/Warning boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Code blocks */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid) {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Mermaid container */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Merits/Demerits */
+    .merit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .merit-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .merit-item .icon { flex-shrink: 0; font-size: 16px; }
+
+    /* Related services */
+    .related-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .related-item {
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 8px;
+      padding: 16px;
+      text-align: center;
+      font-size: 14px;
+    }
+
+    .related-item .related-icon {
+      font-size: 28px;
+      margin-bottom: 8px;
+    }
+
+    .related-item .related-name {
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      font-size: 14px;
+    }
+
+    .related-item .related-desc {
+      font-size: 12px;
+      color: var(--gc-outline);
+      margin-top: 4px;
+    }
+
+    /* Quota formula */
+    .formula-box {
+      background: var(--gc-blue-50);
+      border: 2px solid var(--gc-blue-300);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+      text-align: center;
+    }
+
+    .formula-box .formula {
+      font-family: 'Roboto Mono', 'Source Code Pro', monospace;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--gc-blue-900);
+      margin-bottom: 12px;
+    }
+
+    .formula-box .formula-desc {
+      font-size: 14px;
+      color: var(--gc-on-surface-variant);
+    }
+
+    /* Scope cards */
+    .scope-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .scope-card {
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 8px;
+      padding: 16px;
+      font-size: 13px;
+    }
+
+    .scope-card .scope-type {
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+
+    .scope-card .scope-metric {
+      font-family: 'Roboto Mono', monospace;
+      font-size: 11px;
+      color: var(--gc-outline);
+      word-break: break-all;
+    }
+
+    .scope-card .scope-level {
+      color: var(--gc-on-surface-variant);
+      margin-top: 4px;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .before-after-grid { grid-template-columns: 1fr; }
+      .arrow-center { transform: rotate(90deg); padding: 8px 0; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .merit-grid { grid-template-columns: 1fr; }
+      .scope-grid { grid-template-columns: 1fr; }
+      .header { flex-direction: column; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>&#9889; Cloud Load Balancing: URL Map 構成サイズクォータシステム</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Cloud Load Balancing</span>
+          <span class="badge-preview">Preview</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-04-27</div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>&#128203; 概要</h2>
+      <p>Google Cloud は、Application Load Balancer の構成サイズを管理する<span class="highlight">新しいクォータシステム</span>を Preview として公開しました。個々の URL マップのデータサイズ上限が従来の 64 KB / 128 KB から<span class="highlight">最大 1 MB</span> へと大幅に引き上げられます。</p>
+      <p style="margin-top: 12px;">変更の核心は、単純なデータサイズベースの制限から<strong>「複雑性ベースのクォータ (quota units)」</strong>への移行です。URL マップ内のルール数、ホスト名数、パスマッチャー数などの構成の複雑さに応じてクォータユニットが計算され、プロジェクト単位、VPC ネットワーク単位、またはリージョン単位で使用量が測定・適用されます。</p>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value">16x</div>
+        <div class="stat-label">最大サイズ拡大率<br>(64 KB &#8594; 1 MB)</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-value">1 MB</div>
+        <div class="stat-label">新しい URL マップ<br>サイズ上限</div>
+      </div>
+      <div class="stat-card teal">
+        <div class="stat-value">4 種類</div>
+        <div class="stat-label">対象ロードバランサー<br>タイプ</div>
+      </div>
+    </div>
+
+    <!-- Before / After -->
+    <div class="section">
+      <h2>&#128260; Before / After</h2>
+      <div class="before-after-grid">
+        <div class="before-box">
+          <h3>&#10060; Before (旧制限)</h3>
+          <div class="before-after-item">
+            <span class="icon">&#8226;</span>
+            <span>External ALB の URL マップサイズ: 最大 <strong>64 KB</strong></span>
+          </div>
+          <div class="before-after-item">
+            <span class="icon">&#8226;</span>
+            <span>Internal ALB の URL マップサイズ: 最大 <strong>128 KB</strong></span>
+          </div>
+          <div class="before-after-item">
+            <span class="icon">&#8226;</span>
+            <span>データサイズのみに基づくクォータ</span>
+          </div>
+          <div class="before-after-item">
+            <span class="icon">&#8226;</span>
+            <span>大規模環境では URL マップの分割が必要</span>
+          </div>
+        </div>
+        <div class="arrow-center">&#8594;</div>
+        <div class="after-box">
+          <h3>&#9989; After (新クォータ)</h3>
+          <div class="before-after-item">
+            <span class="icon">&#8226;</span>
+            <span>全対象 ALB の URL マップサイズ: 最大 <strong>1 MB</strong></span>
+          </div>
+          <div class="before-after-item">
+            <span class="icon">&#8226;</span>
+            <span>複雑性ベースのクォータユニットで正確に測定</span>
+          </div>
+          <div class="before-after-item">
+            <span class="icon">&#8226;</span>
+            <span><code>gcloud</code> でクォータ使用量を確認可能</span>
+          </div>
+          <div class="before-after-item">
+            <span class="icon">&#8226;</span>
+            <span>1 つの LB で数百のサービスを統合管理</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>&#128736; アーキテクチャ図</h2>
+      <p>Application Load Balancer の構成要素と新しいクォータユニット計算の関係を示します。URL マップ内の Host Rules、Path Matchers、Route Rules の複雑さからクォータユニットが算出され、それに参照する Forwarding Rule の数を乗じた値がプロジェクトやリージョン単位のクォータとして適用されます。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TB
+    subgraph Project["Google Cloud プロジェクト"]
+        subgraph ALB["Application Load Balancer 構成"]
+            FR1["Forwarding Rule 1"]
+            FR2["Forwarding Rule 2"]
+            TP["Target HTTP/HTTPS Proxy"]
+            UM["URL Map\n最大 1 MB"]
+
+            subgraph URLMapDetail["URL Map 内部構成"]
+                HR["Host Rules\nホスト名の定義"]
+                PM["Path Matchers\nパスマッチング"]
+                RR["Route Rules\nルーティング規則"]
+            end
+
+            BS1["Backend Service A"]
+            BS2["Backend Service B"]
+            BS3["Backend Service C"]
+        end
+
+        subgraph Quota["クォータ計算"]
+            QU["Quota Units\n= URL Map 複雑性\n x Forwarding Rule 数"]
+            QE["プロジェクト / VPC /\nリージョン単位で適用"]
+        end
+    end
+
+    FR1 --> TP
+    FR2 --> TP
+    TP --> UM
+    UM --> HR
+    HR --> PM
+    PM --> RR
+    RR --> BS1
+    RR --> BS2
+    RR --> BS3
+    UM -.->|"複雑性を算出"| QU
+    QU --> QE
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>&#11088; 主要機能</h2>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-title">&#128200; URL マップサイズ上限の拡大</div>
+          <div class="feature-desc">
+            <ul style="margin: 0; padding-left: 20px;">
+              <li>Global external / Regional external ALB: <strong>64 KB &#8594; 1 MB</strong></li>
+              <li>Internal ALB (Regional / Cross-region): <strong>128 KB &#8594; 1 MB</strong></li>
+              <li>Classic ALB: <strong>64 KB のまま</strong> (変更なし)</li>
+            </ul>
+          </div>
+        </div>
+        <div class="feature-card" style="border-left-color: var(--gc-teal);">
+          <div class="feature-title">&#9889; 複雑性ベースのクォータユニット</div>
+          <div class="feature-desc">
+            URL マップの構成の複雑さ (ルール数、ホスト名数、パスマッチャー数) に基づいてクォータユニットを算出。シンプルな構成は少ないユニットを消費し、複雑な構成はより多くのユニットを消費します。Forwarding Rule の数に比例してスケールします (例: 1 FR で 50,000 ユニットの URL マップは、3 FR で 150,000 ユニット)。
+          </div>
+        </div>
+        <div class="feature-card" style="border-left-color: var(--gc-green);">
+          <div class="feature-title">&#128205; スコープ別のクォータ測定</div>
+          <div class="feature-desc">
+            プロジェクト単位、VPC ネットワーク単位、リージョン単位でクォータが管理されるため、マルチテナント環境での制御が向上します。
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specs: Size Comparison Table -->
+    <div class="section">
+      <h2>&#128221; 技術仕様</h2>
+
+      <h3>URL マップサイズ上限の比較</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>ロードバランサータイプ</th>
+            <th>旧サイズ上限</th>
+            <th>新サイズ上限</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Global external Application LB</td>
+            <td>64 KB</td>
+            <td><strong style="color: var(--gc-green);">1 MB</strong></td>
+          </tr>
+          <tr>
+            <td>Regional external Application LB</td>
+            <td>64 KB</td>
+            <td><strong style="color: var(--gc-green);">1 MB</strong></td>
+          </tr>
+          <tr>
+            <td>Classic Application LB</td>
+            <td>64 KB</td>
+            <td><span style="color: var(--gc-outline);">64 KB (変更なし)</span></td>
+          </tr>
+          <tr>
+            <td>Cross-region internal Application LB</td>
+            <td>128 KB</td>
+            <td><strong style="color: var(--gc-green);">1 MB</strong></td>
+          </tr>
+          <tr>
+            <td>Regional internal Application LB</td>
+            <td>128 KB</td>
+            <td><strong style="color: var(--gc-green);">1 MB</strong></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top: 24px;">クォータ計算式</h3>
+      <div class="formula-box">
+        <div class="formula">Quota usage = SUM( URL Map クォータユニット x Forwarding Rule 数 )</div>
+        <div class="formula-desc">
+          クォータユニットに影響する要素: Host Rules 数 / Path Matchers 数 / Route Rules ・ Path Rules 数 / Header matches ・ Query parameter matches 数
+        </div>
+      </div>
+
+      <h3 style="margin-top: 24px;">スコープ別クォータメトリクス</h3>
+      <div class="scope-grid">
+        <div class="scope-card">
+          <div class="scope-type">&#127760; Global external ALB / Classic ALB</div>
+          <div class="scope-level">プロジェクト単位</div>
+          <div class="scope-metric">GLOBAL_EXTERNAL_PROXY_LB_CONFIG</div>
+        </div>
+        <div class="scope-card">
+          <div class="scope-type">&#127759; Regional external ALB</div>
+          <div class="scope-level">VPC ネットワーク x リージョン単位</div>
+          <div class="scope-metric">REGIONAL_EXTERNAL_PROXY_LB_CONFIG_PER_REGION_PER_VPC_NETWORK</div>
+        </div>
+        <div class="scope-card">
+          <div class="scope-type">&#128279; Cross-region internal ALB</div>
+          <div class="scope-level">VPC ネットワーク単位</div>
+          <div class="scope-metric">CROSS_REGIONAL_INTERNAL_PROXY_LB_CONFIG_PER_REGION_PER_VPC_NETWORK</div>
+        </div>
+        <div class="scope-card">
+          <div class="scope-type">&#127968; Regional internal ALB</div>
+          <div class="scope-level">VPC ネットワーク x リージョン単位</div>
+          <div class="scope-metric">REGIONAL_INTERNAL_PROXY_LB_CONFIG_PER_REGION_PER_VPC_NETWORK</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quota Check Command -->
+    <div class="section">
+      <h2>&#128187; クォータ使用量の確認方法</h2>
+      <p>以下のコマンドで URL マップのクォータユニット使用量を確認できます。出力の <code>status.quotaUsage</code> オブジェクトに、合計クォータユニット数と Forwarding Rule 数が表示されます。</p>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud beta compute url-maps describe URL_MAP_NAME \
+    [--region=REGION_NAME | --global] \
+    --format="value(status)"</code></pre>
+    </div>
+
+    <!-- Merits -->
+    <div class="section">
+      <h2>&#9989; メリット</h2>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <div>
+          <h3>&#128188; ビジネス面</h3>
+          <div class="merit-item">
+            <span class="icon">&#10003;</span>
+            <span><strong>大規模構成への対応</strong>: サイズ上限が最大 16 倍に拡大。数百のマイクロサービスを 1 つの LB で管理可能</span>
+          </div>
+          <div class="merit-item">
+            <span class="icon">&#10003;</span>
+            <span><strong>運用の簡素化</strong>: URL マップ分割の必要が減少し、構成管理が容易に</span>
+          </div>
+        </div>
+        <div>
+          <h3>&#128295; 技術面</h3>
+          <div class="merit-item">
+            <span class="icon">&#10003;</span>
+            <span><strong>正確なリソース反映</strong>: 複雑性ベースのクォータで実際のリソース消費に即した制限</span>
+          </div>
+          <div class="merit-item">
+            <span class="icon">&#10003;</span>
+            <span><strong>スコープ別管理</strong>: プロジェクト / VPC / リージョン単位でクォータ管理が可能</span>
+          </div>
+          <div class="merit-item">
+            <span class="icon">&#10003;</span>
+            <span><strong>可視性の向上</strong>: <code>gcloud</code> でクォータユニット使用量を確認でき、キャパシティプランニングが容易に</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Demerits / Constraints -->
+    <div class="section">
+      <h2>&#9888;&#65039; デメリット・制約事項</h2>
+
+      <div class="warning-box">
+        <strong>&#9888;&#65039; Preview ステータス</strong>: 本機能は Preview であり、「Pre-GA Offerings Terms」が適用されます。サポートが限定的な場合があり、GA に向けて仕様変更の可能性があります。
+      </div>
+
+      <div class="card card-orange" style="margin-top: 16px;">
+        <div class="feature-title">&#128679; 制限事項</div>
+        <ul style="padding-left: 20px; font-size: 14px; color: var(--gc-on-surface-variant);">
+          <li>Classic Application Load Balancer は従来の 64 KB 制限を維持。新クォータシステムの恩恵を受けるには Global external ALB への移行が必要</li>
+          <li>URL マップがクォータに影響するのは、Forwarding Rule から Target Proxy を経由して参照される「完全な構成」の場合のみ</li>
+        </ul>
+      </div>
+
+      <div class="card card-red" style="margin-top: 12px;">
+        <div class="feature-title">&#128161; 考慮すべき点</div>
+        <ul style="padding-left: 20px; font-size: 14px; color: var(--gc-on-surface-variant);">
+          <li>Forwarding Rule の数に比例してクォータ消費が増加するため、同一 URL マップを多数の FR で共有する場合はクォータ上限に注意</li>
+          <li>新クォータシステムが適用されていないプロジェクトでは従来のサイズ制限が引き続き適用される</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>&#127919; ユースケース</h2>
+      <div class="usecase-card">
+        <h4>&#128187; ユースケース 1: 大規模マイクロサービスのルーティング統合</h4>
+        <div class="scenario">
+          <strong>シナリオ:</strong> 数百のマイクロサービスを運用するエンタープライズ企業が、従来の 64 KB 制限により複数のロードバランサーに URL マップを分割して管理していた。
+        </div>
+        <div class="effect">
+          &#10148; <strong>効果:</strong> 1 MB の URL マップサイズ上限により、1 つのロードバランサーで統合管理が可能に。ルーティング構成の一貫性と運用効率が向上。
+        </div>
+      </div>
+      <div class="usecase-card">
+        <h4>&#127760; ユースケース 2: マルチテナント SaaS プラットフォーム</h4>
+        <div class="scenario">
+          <strong>シナリオ:</strong> テナントごとに異なるホスト名とパスルーティングを持つ SaaS プラットフォームで、テナント数の増加に伴い URL マップサイズが制限に達していた。
+        </div>
+        <div class="effect">
+          &#10148; <strong>効果:</strong> サイズ上限の拡大とスコープ別クォータにより、テナント数の増加に対応しつつ、VPC ネットワークやリージョン単位でクォータを管理可能に。
+        </div>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#128279; 関連サービス・機能</h2>
+      <div class="related-grid">
+        <div class="related-item">
+          <div class="related-icon">&#128466;</div>
+          <div class="related-name">URL Map</div>
+          <div class="related-desc">LB のルーティング構成を定義するリソース。今回のクォータシステムの直接的な対象</div>
+        </div>
+        <div class="related-item">
+          <div class="related-icon">&#9881;&#65039;</div>
+          <div class="related-name">Backend Service</div>
+          <div class="related-desc">URL マップからルーティングされるバックエンド。URL マップ 1 つあたり最大 2,500 参照可能</div>
+        </div>
+        <div class="related-item">
+          <div class="related-icon">&#128737;&#65039;</div>
+          <div class="related-name">Cloud Armor</div>
+          <div class="related-desc">ALB と連携するセキュリティサービス。大規模構成でもポリシー適用可能</div>
+        </div>
+        <div class="related-item">
+          <div class="related-icon">&#128268;</div>
+          <div class="related-name">Cloud Service Mesh</div>
+          <div class="related-desc">サービスメッシュ環境でのトラフィック管理。独自の URL マップ制限 (524 KB) を持つ</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="note-box">
+      <strong>&#128221; まとめ:</strong> 今回の Application Load Balancer 構成サイズクォータシステム (Preview) は、URL マップのサイズ上限を最大 1 MB に引き上げるとともに、複雑性ベースのクォータユニットによるより正確なリソース管理を実現する重要なアップデートです。大規模なルーティング構成を必要とするエンタープライズユーザーは、既存の URL マップのクォータユニット使用量を確認し、新クォータシステムへの移行を検討することを推奨します。Classic ALB を使用している場合は、Global external ALB への移行を計画することで、サイズ上限拡大のメリットを享受できます。
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>&#128206; 出典:</strong></p>
+      <ul style="list-style: none; padding: 0; margin-top: 8px;">
+        <li>&#8226; <a href="https://docs.cloud.google.com/release-notes#April_27_2026" target="_blank" rel="noopener noreferrer">Google Cloud 公式リリースノート (2026-04-27)</a></li>
+        <li>&#8226; <a href="https://docs.cloud.google.com/load-balancing/docs/url-map-size-quota" target="_blank" rel="noopener noreferrer">URL map size and quota units ドキュメント</a></li>
+        <li>&#8226; <a href="https://docs.cloud.google.com/load-balancing/docs/quotas" target="_blank" rel="noopener noreferrer">Cloud Load Balancing クォータと上限</a></li>
+        <li>&#8226; <a href="https://docs.cloud.google.com/load-balancing/docs/application-load-balancer" target="_blank" rel="noopener noreferrer">Application Load Balancer の概要</a></li>
+      </ul>
+      <p style="margin-top: 12px; font-size: 11px; color: var(--gc-outline);">#CloudLoadBalancing #ApplicationLoadBalancer #URLMap #Quota #Preview #ネットワーキング</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

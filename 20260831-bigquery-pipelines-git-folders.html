@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BigQuery: パイプラインの Git フォルダ対応 (Preview) とフォルダ管理の GA</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 12px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .badge-deprecated {
+      background: var(--gc-red);
+      color: #FFFFFF;
+    }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 720px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-box h3 { color: #B3261E; }
+    .after-box h3 { color: #1E8E3E; }
+
+    .before-box ul, .after-box ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 6px 0;
+    }
+
+    /* フロー図スタイル */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+      font-size: 14px;
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* チェックリストスタイル */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+    }
+
+    /* コードブロック */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block {
+      overflow: hidden;
+      padding: 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブルスタイル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .table-scroll {
+      overflow-x: auto;
+    }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* ユースケース */
+    .usecase-box {
+      background: var(--gc-blue-tint);
+      border: 1px solid var(--gc-blue-200);
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin: 16px 0;
+    }
+
+    .usecase-box h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* ステップリスト */
+    .step-list {
+      counter-reset: step;
+      list-style: none;
+      padding-left: 0;
+      margin: 12px 0;
+    }
+
+    .step-list li {
+      counter-increment: step;
+      position: relative;
+      padding: 8px 0 8px 44px;
+      margin: 4px 0;
+    }
+
+    .step-list li::before {
+      content: counter(step);
+      position: absolute;
+      left: 0;
+      top: 8px;
+      width: 28px;
+      height: 28px;
+      background: var(--gc-blue-600);
+      color: #FFFFFF;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      word-break: break-all;
+    }
+
+    ul {
+      padding-left: 22px;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <div style="margin-bottom: 8px;">
+          <span class="badge">☁️ BigQuery</span>
+          <span class="badge-preview">Git フォルダ: Preview</span>
+          <span class="badge-ga">フォルダ管理: GA</span>
+        </div>
+        <h1>📁 BigQuery パイプライン<br>Git フォルダ対応 (Preview) &amp; フォルダ管理 GA</h1>
+      </div>
+      <div class="subtitle">リリース日: 2026-08-31</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📌 概要</h2>
+      <p>
+        BigQuery パイプラインの保存・管理方法に関する 2 つの関連アップデートが発表されました。
+        1 つ目は、BigQuery Studio の <span class="highlight">Git フォルダ内でパイプラインを作成・保存・管理できる機能 (Preview)</span> です。
+        Git フォルダは <strong>Developer Connect</strong> を使用して接続されたリモートの GitHub / GitLab リポジトリを表し、1 つのリポジトリ内に複数の独立したパイプラインをホスト・整理できます。
+        2 つ目は、<span class="highlight">フォルダ (ユーザーフォルダ / チームフォルダ) によるパイプライン管理の GA (一般提供)</span> です。
+      </p>
+      <p>
+        BigQuery パイプラインは <strong>Dataform</strong> を基盤とする機能で、SQL クエリ、ノートブック、データ準備、SQLX タスクなどのコードアセットを依存関係に基づいた順序でスケジュール実行できます。
+        今回のアップデートにより、パイプラインを Files ペイン上で階層的に整理し、<strong>IAM ポリシー継承によるアクセス制御</strong>や <strong>Git によるバージョン管理</strong>を適用できるようになりました。
+      </p>
+      <div class="note-box">
+        <strong>🎯 対象ユーザー:</strong> BigQuery 上でデータ変換パイプライン (ELT) を構築・運用するデータエンジニア / データアナリスト、およびパイプラインのコード管理に CI/CD やバージョン管理のプラクティスを適用したいチーム
+      </div>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before (アップデート前の課題)</h3>
+          <ul>
+            <li>パイプラインをリモート Git リポジトリ (GitHub / GitLab) と直接統合されたフォルダ構造で管理する手段が BigQuery Studio になかった</li>
+            <li>フォルダによる階層管理と IAM ポリシー継承を GA 品質 (SLA・フルサポート付き) で利用できなかった</li>
+            <li>複数の独立したパイプラインを 1 つの Git リポジトリでバージョン管理しながら BigQuery Studio 上で操作するワークフローが未確立</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After (アップデート後の改善)</h3>
+          <ul>
+            <li>Git フォルダ (Preview) により GitHub / GitLab リポジトリ内でパイプラインを直接作成・管理。1 リポジトリに複数パイプライン、または <code>workflow_settings.yaml</code> によるルートレベルパイプラインをホスト可能</li>
+            <li>Git リポジトリのパイプラインは Dataform のデプロイメント機能 (リリース構成・マルチ環境オーケストレーション) をサポート</li>
+            <li>フォルダ管理が GA となり、ユーザー / チームフォルダで階層整理と IAM ポリシー継承によるアクセス制御を本番運用可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Git["🔗 Git フォルダ (Preview)"]
+        GH["🐙 GitHub / GitLab リポジトリ"]
+        DC["🔌 Developer Connect"]
+        GF["📁 Git フォルダ"]
+        GH --> DC --> GF
+        GF --> P1["⚙️ パイプライン A<br/>(workflow_settings.yaml)"]
+        GF --> P2["⚙️ パイプライン B"]
+    end
+
+    subgraph Folders["📂 フォルダ (GA)"]
+        UF["👤 ユーザーフォルダ"]
+        TF["👥 チームフォルダ<br/>(IAM ポリシー継承)"]
+        UF --> P3["⚙️ パイプライン C"]
+        TF --> P4["⚙️ パイプライン D"]
+    end
+
+    P1 & P2 & P3 & P4 --> DF["🛠️ Dataform (実行基盤)"]
+    DF --> BQ[("🗄️ BigQuery")]
+        </pre>
+      </div>
+      <p>
+        BigQuery Studio の Files ペインでは、Developer Connect 経由で接続した Git フォルダ (Preview) と、ユーザー / チームフォルダ (GA) の両方でパイプラインを作成・整理でき、いずれも Dataform を基盤として BigQuery 上で実行されます。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+
+      <div class="card">
+        <h3>🔗 1. Git フォルダ内でのパイプライン作成・管理 <span class="badge-preview">Preview</span></h3>
+        <div class="icon-text"><span class="arrow">→</span><span>Git フォルダは、Developer Connect を使用して BigQuery Studio に接続されたリモートの GitHub / GitLab リポジトリを表す</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>1 つの Git リポジトリ内に<strong>複数の独立したパイプライン</strong>をホスト・整理できる</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>パイプライン作成時に <code>workflow_settings.yaml</code> (パイプライン構成) と <code>definitions/actions.yaml</code> (タスク定義) がデフォルトファイルとして初期化される</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>リポジトリルートに <code>workflow_settings.yaml</code> があると、リポジトリ全体を<strong>「ルートレベルパイプライン」</strong>として自動認識し、リポジトリフォルダにパイプラインアイコンが表示される</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>Dataform のデプロイメント (スケジューリング、リリース構成、マルチ環境オーケストレーション) をサポート</span></div>
+      </div>
+
+      <div class="card" style="border-left-color: var(--gc-green);">
+        <h3>📂 2. フォルダによるパイプライン管理 <span class="badge-ga">GA</span></h3>
+        <div class="icon-text"><span class="arrow">→</span><span>Files ペインで、個人の<strong>ユーザーフォルダ</strong>または共有の<strong>チームフォルダ</strong>内に直接パイプラインを作成・整理できる</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>フォルダの「+ (作成)」ボタンやコンテキストメニューからパイプラインを作成可能</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>作成したパイプラインはパイプラインアイコン付きのフォルダとしてファイルツリーに表示される</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>IAM ポリシー継承</strong>により、親フォルダに付与した権限がサブフォルダとファイルに伝播する</span></div>
+      </div>
+
+      <div class="card" style="border-left-color: var(--gc-purple);">
+        <h3>📊 3. Pipeline Viewer による可視化</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>パイプラインフォルダをクリックすると Pipeline Viewer が開き、コンパイルされたタスクの <strong>DAG (有向非巡回グラフ)</strong>、実行ステータス、構成タブが表示される</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>definitions/</code> などのネストされたディレクトリや個々のタスクファイルをファイルブラウザで参照できる</span></div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3>📋 パイプラインの保存先の比較</h3>
+      <div class="table-scroll">
+        <table>
+          <tr>
+            <th>項目</th>
+            <th>フォルダ <span class="badge-ga" style="font-size:11px; padding:2px 8px;">GA</span></th>
+            <th>Git フォルダ <span class="badge-preview" style="font-size:11px; padding:2px 8px;">Preview</span></th>
+          </tr>
+          <tr>
+            <td><strong>保存場所</strong></td>
+            <td>ユーザーフォルダ / チームフォルダ</td>
+            <td>Developer Connect で接続した GitHub / GitLab リポジトリ</td>
+          </tr>
+          <tr>
+            <td><strong>バージョン管理</strong></td>
+            <td>なし (フォルダ階層による整理)</td>
+            <td>Git によるバージョン管理</td>
+          </tr>
+          <tr>
+            <td><strong>アクセス制御</strong></td>
+            <td>フォルダの IAM ポリシー継承</td>
+            <td>Developer Connect OAuth User ロールなど</td>
+          </tr>
+          <tr>
+            <td><strong>Explorer ペインでの表示</strong></td>
+            <td>表示される</td>
+            <td>表示されない (Files ペインのみ)</td>
+          </tr>
+          <tr>
+            <td><strong>デプロイメント</strong></td>
+            <td>標準のスケジューリング</td>
+            <td>Dataform デプロイメント (リリース構成、マルチ環境)</td>
+          </tr>
+        </table>
+      </div>
+
+      <h3>🔐 必要な IAM ロール</h3>
+      <div class="table-scroll">
+        <table>
+          <tr>
+            <th>操作</th>
+            <th>必要なロール</th>
+          </tr>
+          <tr>
+            <td>パイプラインの閲覧・実行</td>
+            <td>Dataform Viewer (<code>roles/dataform.viewer</code>) + BigQuery Job User (<code>roles/bigquery.jobUser</code>) をプロジェクトに付与</td>
+          </tr>
+          <tr>
+            <td>ユーザー資格情報での実行</td>
+            <td>BigQuery Data Editor (<code>roles/bigquery.dataEditor</code>) をプロジェクトまたはデータセットに付与</td>
+          </tr>
+          <tr>
+            <td>ユーザーフォルダ内の管理</td>
+            <td>Code Owner / Code Editor / Code Viewer (<code>roles/dataform.codeOwner</code> など) をフォルダに付与</td>
+          </tr>
+          <tr>
+            <td>チームフォルダ内の管理</td>
+            <td>Team Folder Owner / Contributor / Viewer (<code>roles/dataform.teamFolderOwner</code> など) をチームフォルダに付与</td>
+          </tr>
+          <tr>
+            <td>Git リポジトリ内の管理</td>
+            <td>Developer Connect OAuth User (<code>roles/developerconnect.oauthUser</code>) をプロジェクトに付与</td>
+          </tr>
+        </table>
+      </div>
+      <div class="note-box">
+        <strong>💡 補足:</strong> パイプラインを作成したユーザーには、そのパイプラインに対する Dataform Admin ロール (<code>roles/dataform.admin</code>) が自動的に付与されます。
+      </div>
+
+      <h3>📄 Git フォルダ作成時のデフォルトファイル</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">YAML</span>
+          <span class="code-title">パイプライン初期化時に生成されるファイル</span>
+        </div>
+        <pre><code class="language-yaml"># workflow_settings.yaml: パイプライン構成
+# definitions/actions.yaml: タスク定義 (初期状態は空)</code></pre>
+      </div>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>✅ 前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>BigQuery パイプラインの利用に必要な IAM ロールが付与されていること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>Git フォルダを使用する場合: BigQuery Studio Git リポジトリを Developer Connect 経由で作成・接続済みであること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>Knowledge Catalog でパイプラインメタデータを管理する場合: プロジェクトで Dataplex API が有効化されていること</span></div>
+
+      <h3>📂 ステップ 1: フォルダ内にパイプラインを作成する (GA)</h3>
+      <ol class="step-list">
+        <li>Google Cloud コンソールで BigQuery ページに移動する</li>
+        <li>左ペインで「Files」をクリックしてファイルブラウザを開く</li>
+        <li>次のいずれかの方法でパイプラインを作成する: ユーザー / チームフォルダを選択してツールバーの「+ (作成)」→「Pipeline」、またはフォルダ名横の「View actions」→「Create」→「Pipeline」</li>
+        <li>作成ダイアログでパイプライン名を入力し、「Create」をクリックする</li>
+        <li>パイプラインフォルダをクリックして Pipeline Viewer を開き、パイプライン設定を構成する</li>
+      </ol>
+
+      <h3>🔗 ステップ 2: Git フォルダ内にパイプラインを作成する (Preview)</h3>
+      <ol class="step-list">
+        <li>Google Cloud コンソールで BigQuery ページに移動する</li>
+        <li>Git リポジトリ未接続の場合は、ユーザールートノード横の「View actions」→「Create」→「Git repository」からリモートリポジトリの URL を入力し、Developer Connect のアカウントコネクタで接続する</li>
+        <li>左ペインで「Files」をクリックし、接続済みの Git リポジトリフォルダまたはその中のディレクトリを見つける</li>
+        <li>フォルダ名横の「View actions」をクリックし、「Create」→「Pipeline」を選択する</li>
+        <li>ダイアログでパイプライン名を入力して「Save」をクリックすると、<code>workflow_settings.yaml</code> と <code>definitions/actions.yaml</code> で初期化されたパイプラインディレクトリが作成される</li>
+        <li>ファイルブラウザでパイプラインディレクトリをクリックして Pipeline Viewer を開く</li>
+      </ol>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>👍 メリット</h2>
+
+      <h3>💼 ビジネス面</h3>
+      <div class="success-box">
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>チームコラボレーションの強化:</strong> チームフォルダと IAM ポリシー継承 (GA) により、チーム単位でパイプラインへのアクセスを効率的に管理でき、統制の取れたデータ基盤運用が可能になる</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>ガバナンスと監査性の向上:</strong> Git フォルダ (Preview) によりパイプラインの変更履歴が Git で追跡でき、コードレビューを通じた変更管理プロセスを適用できる</span></div>
+      </div>
+
+      <h3>⚙️ 技術面</h3>
+      <div class="success-box">
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>バージョン管理との統合:</strong> GitHub / GitLab リポジトリに Developer Connect 経由で接続し、BigQuery Studio を離れることなくパイプラインのコードをバージョン管理できる</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>マルチ環境デプロイ:</strong> Git リポジトリのパイプラインは Dataform のデプロイメント機能 (リリース構成) をサポートし、開発・本番など複数環境のオーケストレーションに対応する</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>一元的なコード整理:</strong> パイプラインをノートブックや保存済みクエリなどの他のコードアセットと同じ Files ペインで階層的に管理できる</span></div>
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>🚧 制限事項</h3>
+      <div class="warning-box">
+        <div class="check-item"><span class="cross-icon">•</span><span>Git フォルダでのパイプライン管理は Preview であり、Pre-GA 利用規約が適用される (サポートが限定される可能性がある)</span></div>
+        <div class="check-item"><span class="cross-icon">•</span><span>Git フォルダに保存されたパイプラインは Explorer ペインには表示されない (Files ペインでのみ閲覧可能)</span></div>
+        <div class="check-item"><span class="cross-icon">•</span><span>BigQuery Studio Git リポジトリはユーザールートフォルダのコンテキストに制限され、個人利用が想定されている (他のユーザーとの共有は非推奨)</span></div>
+        <div class="check-item"><span class="cross-icon">•</span><span>Git Proxy を使用する Developer Connect アカウントコネクタはサポートされない</span></div>
+        <div class="check-item"><span class="cross-icon">•</span><span>パイプラインは Google Cloud コンソールでのみ利用可能で、作成後にリージョンを変更できない</span></div>
+        <div class="check-item"><span class="cross-icon">•</span><span>フォルダのネストは最大 5 階層まで。100 個を超えるファイル / フォルダを含むフォルダは移動できない</span></div>
+      </div>
+
+      <h3>🤔 考慮すべき点</h3>
+      <div class="note-box">
+        <div class="check-item"><span class="arrow">→</span><span>ファイル数が多い、ファイルサイズが大きい、ブランチが多い、コミット履歴が深いリポジトリはクローンに時間がかかり、タイムアウトする可能性がある (shallow clone の利用で軽減可能)</span></div>
+        <div class="check-item"><span class="arrow">→</span><span>BigQuery パイプラインは Dataform のクォータと制限の対象となる</span></div>
+        <div class="check-item"><span class="arrow">→</span><span>スケジュール実行されたパイプラインが次回の実行開始までに完了しない場合、次回の実行はスキップされエラーとしてマークされる</span></div>
+        <div class="check-item"><span class="arrow">→</span><span>Preview 機能へのフィードバックは cloud-pipelines-ui@google.com 宛てに送信できる</span></div>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+
+      <div class="usecase-box">
+        <h3>🔄 ユースケース 1: Git ベースの ELT パイプライン開発ワークフロー</h3>
+        <p><strong>シナリオ:</strong> データエンジニアリングチームが、BigQuery 上の ELT パイプラインのコードを GitHub で管理し、プルリクエストベースのコードレビューを経て本番反映したい。</p>
+        <div class="flow-diagram">
+          <div class="flow-step">🔌 GitHub リポジトリを<br>Developer Connect で接続</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">📁 Git フォルダ内に<br>パイプライン作成</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">📝 SQL / SQLX タスクを<br>追加しコミット</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">👀 PR レビュー<br>&amp; マージ</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">🚀 リリース構成で<br>本番デプロイ</div>
+        </div>
+        <p><strong>効果:</strong> パイプラインの変更がすべて Git で追跡され、レビュー済みのコードのみが本番環境で実行される。マルチ環境 (開発 / 本番) のオーケストレーションも実現できる。</p>
+      </div>
+
+      <div class="usecase-box">
+        <h3>👥 ユースケース 2: チームフォルダによる部門別パイプライン管理</h3>
+        <p><strong>シナリオ:</strong> 分析部門で複数チームがそれぞれパイプラインを運用しており、チームごとにアクセス権限を分離しつつ、フォルダ階層で整理したい。</p>
+        <p><strong>効果:</strong> GA となったフォルダ機能により、チームフォルダに Team Folder Owner / Contributor / Viewer ロールを付与するだけで、配下のすべてのパイプラインに権限が継承される。個々のパイプラインへの権限付与作業が不要になり、本番環境での利用にも GA として安心して採用できる。</p>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>フォルダや Git フォルダによるパイプラインの整理自体に<strong>追加料金はありません</strong>が、パイプラインの実行には以下の料金が発生します。</p>
+      <div class="table-scroll">
+        <table>
+          <tr>
+            <th>項目</th>
+            <th>料金</th>
+          </tr>
+          <tr>
+            <td>パイプラインタスクの実行</td>
+            <td>BigQuery のコンピューティングおよびストレージ料金</td>
+          </tr>
+          <tr>
+            <td>ノートブックを含むパイプライン</td>
+            <td>Colab Enterprise ランタイム料金 (デフォルトマシンタイプに基づく)</td>
+          </tr>
+          <tr>
+            <td>パイプライン実行ログ</td>
+            <td>Cloud Logging の料金 (ログ記録は自動的に有効化される)</td>
+          </tr>
+        </table>
+      </div>
+      <p>詳細は <a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">BigQuery の料金ページ</a> を参照してください。</p>
+    </div>
+
+    <!-- 利用可能リージョン -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <p>
+        BigQuery フォルダはすべての <a href="https://docs.cloud.google.com/dataform/docs/locations" target="_blank" rel="noopener noreferrer" class="gc-link">Dataform ロケーション</a>でサポートされます。
+        コードアセットは作成時にデフォルトのコードリージョンに保存され、<strong>作成後にリージョンを変更することはできません</strong>。
+      </p>
+    </div>
+
+    <!-- 関連サービス・機能 -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Dataform:</strong> BigQuery パイプラインとフォルダの実行・管理基盤。パイプラインのスケジューリング、リリース構成、アクセス制御 (IAM) は Dataform の仕組みを利用する</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Developer Connect:</strong> GitHub / GitLab リポジトリを BigQuery Studio に接続するためのマネージド統合サービス。OAuth 認証フローによる安全な接続を提供する</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Knowledge Catalog (Dataplex):</strong> パイプラインで作成されたテーブルのメタデータが自動的に同期され、メタデータの検索・管理が可能</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Cloud Logging / Cloud Monitoring:</strong> パイプライン実行は Dataform リポジトリ ID 単位で Cloud Logging に記録され、ログベースのアラートポリシーで実行失敗を通知できる</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Colab Enterprise:</strong> パイプライン内のノートブックタスクの実行ランタイム</span></div>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>🎯 まとめ</h2>
+      <div class="success-box">
+        <p style="margin: 0;">
+          BigQuery パイプラインの<strong>フォルダ管理が GA</strong> となり、チームフォルダと IAM ポリシー継承を活用した本番運用が可能になりました。
+          さらに <strong>Git フォルダ (Preview)</strong> により、GitHub / GitLab との直接統合でパイプラインのバージョン管理と CI/CD プラクティスの適用が視野に入ります。
+          まずは GA となったフォルダ機能でパイプラインの整理とアクセス制御を見直し、Git ベースの開発ワークフローを検討しているチームは Preview の Git フォルダを評価することをお勧めします。
+        </p>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p><strong>📎 出典:</strong></p>
+      <ul>
+        <li><a href="https://docs.cloud.google.com/release-notes#August_31_2026" target="_blank" rel="noopener noreferrer" class="gc-link">Google Cloud Release Notes (2026-08-31)</a></li>
+        <li><a href="https://docs.cloud.google.com/bigquery/docs/create-pipelines" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: パイプラインの作成</a></li>
+        <li><a href="https://docs.cloud.google.com/bigquery/docs/manage-pipelines" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: パイプラインの管理</a></li>
+        <li><a href="https://docs.cloud.google.com/bigquery/docs/code-asset-folders" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: フォルダによるコードアセットの整理</a></li>
+        <li><a href="https://docs.cloud.google.com/bigquery/docs/git-repositories" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: BigQuery Studio Git リポジトリによるコード管理</a></li>
+        <li><a href="https://docs.cloud.google.com/bigquery/docs/pipelines-introduction" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: BigQuery パイプラインの概要</a></li>
+        <li><a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">BigQuery 料金ページ</a></li>
+      </ul>
+      <p>レポート: reports/2026/2026-08-31-bigquery-pipelines-git-folders.md | 生成日: 2026-08-31</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

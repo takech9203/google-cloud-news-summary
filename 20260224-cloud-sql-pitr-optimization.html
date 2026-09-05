@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud SQL: PITR インスタンス作成の高速化</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; min-width: 280px; }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--gc-outline);
+      text-align: right;
+    }
+
+    .badge, .badge-ga {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green { border-left-color: var(--gc-green); }
+    .card-yellow { border-left-color: var(--gc-yellow); }
+    .card-red { border-left-color: var(--gc-red); }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* Before/After comparison */
+    .comparison-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-red);
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-green);
+    }
+
+    .before-card h3 { color: var(--gc-red); margin-top: 0; }
+    .after-card h3 { color: var(--gc-green); margin-top: 0; }
+
+    .before-card ul, .after-card ul {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    .before-card li, .after-card li {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    /* Stats grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.green { background: linear-gradient(135deg, var(--gc-green), #2E7D32); }
+    .stat-card.yellow { background: linear-gradient(135deg, #F9A825, #F57F17); }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    /* Feature cards grid */
+    .features-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    /* Use case */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h3 {
+      color: var(--gc-blue-800);
+      margin-top: 0;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 13px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 13px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* Note/Warning boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Mermaid */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Code blocks */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      background: #1E1E1E;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Flow diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+      font-size: 14px;
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Merit/Demerit */
+    .merit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .merit-section { }
+    .demerit-section { }
+
+    .merit-section .card { border-left-color: var(--gc-green); }
+    .demerit-section .card { border-left-color: var(--gc-red); }
+
+    /* Related services */
+    .related-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .related-card {
+      background: var(--gc-surface);
+      border-radius: 8px;
+      padding: 16px;
+      border: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    .related-card strong {
+      color: var(--gc-blue-800);
+    }
+
+    /* Footer */
+    footer {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    footer a:hover { text-decoration: underline; }
+
+    footer ul {
+      list-style: none;
+      padding: 0;
+      margin: 8px 0;
+    }
+
+    footer li {
+      margin: 4px 0;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .comparison-grid, .stats-grid, .merit-grid, .related-grid {
+        grid-template-columns: 1fr;
+      }
+      .header { flex-direction: column; }
+      .subtitle { text-align: left; margin-top: 8px; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>&#x2601;&#xFE0F; Cloud SQL: Point-in-Time Recovery (PITR) インスタンス作成の高速化</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Cloud SQL for MySQL</span>
+          <span class="badge">Cloud SQL for PostgreSQL</span>
+          <span class="badge-ga">GA</span>
+        </div>
+      </div>
+      <div class="subtitle">
+        &#x1F4C5; 2026-02-24<br>
+        PITR 有効時のインスタンス作成最適化
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>&#x1F4CB; 概要</h2>
+      <p>Cloud SQL において、<span class="highlight">Point-in-Time Recovery (PITR) が有効な状態でのインスタンス作成時間が短縮</span>された。Google Cloud コンソールではデフォルトで PITR が有効になっているため、多くのユーザーがこの改善の恩恵を受けることができる。</p>
+      <p>技術的には、PITR が有効な場合のインスタンス作成時に、従来の標準バックアップの代わりに <span class="highlight">Instant Snapshot (インスタントスナップショット)</span> を使用する仕組みに変更された。Instant Snapshot はメタデータのみの操作であるため、データサイズに依存しない高速な処理が可能となる。</p>
+
+      <div class="note-box">
+        <strong>&#x1F4A1; ポイント:</strong> このアップデートは、データベースインスタンスのプロビジョニング速度を重視する開発者、データベース管理者、および DevOps エンジニアにとって特に有益です。
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value">&#x26A1; 高速</div>
+        <div class="stat-label">Instant Snapshot による<br>メタデータのみの操作</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-value">0 円</div>
+        <div class="stat-label">追加料金なし<br>自動的に適用</div>
+      </div>
+      <div class="stat-card yellow">
+        <div class="stat-value">2 エンジン</div>
+        <div class="stat-label">MySQL / PostgreSQL<br>両方に対応</div>
+      </div>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>&#x1F504; Before / After 比較</h2>
+      <div class="comparison-grid">
+        <div class="before-card">
+          <h3>&#x274C; アップデート前</h3>
+          <ul>
+            <li>PITR 有効時のインスタンス作成に<strong>標準バックアップの取得が必要</strong>で、作成完了までに長時間かかっていた</li>
+            <li>標準バックアップは Cloud Storage へのデータコピーが必要で、<strong>データベースサイズに比例して時間が増加</strong></li>
+            <li>コンソールでは PITR がデフォルト有効のため、多くのユーザーが意図せず長い作成時間を経験</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h3>&#x2705; アップデート後</h3>
+          <ul>
+            <li><strong>Instant Snapshot</strong> を使用し、作成時間が大幅に短縮</li>
+            <li>メタデータのみの操作のため、<strong>データベースサイズに関わらず高速に完了</strong></li>
+            <li>Instant Snapshot はバックグラウンドで標準バックアップに自動変換され、<strong>リストア機能に影響なし</strong></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>&#x1F3D7;&#xFE0F; アーキテクチャ図</h2>
+      <p>従来の標準バックアップベースのフローと、Instant Snapshot を活用した最適化後のフローの比較。最適化後はメタデータ操作のみでインスタンスが利用可能になり、標準バックアップへの変換はバックグラウンドで実行される。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph before["従来のインスタンス作成フロー"]
+        A1["ユーザー\nインスタンス作成要求"] --> B1["Cloud SQL\nインスタンス初期化"]
+        B1 --> C1["標準バックアップ取得\n(Cloud Storage へコピー)"]
+        C1 --> D1["PITR 有効化"]
+        D1 --> E1["インスタンス利用可能\n(データサイズに比例して時間増大)"]
+    end
+
+    subgraph after["最適化後のインスタンス作成フロー"]
+        A2["ユーザー\nインスタンス作成要求"] --> B2["Cloud SQL\nインスタンス初期化"]
+        B2 --> C2["Instant Snapshot 取得\n(メタデータ操作のみ)"]
+        C2 --> D2["PITR 有効化"]
+        D2 --> E2["インスタンス利用可能\n(高速完了)"]
+        C2 -.->|"バックグラウンド変換"| F2["標準バックアップ\n(リストア用)"]
+    end
+
+    style before fill:#fee,stroke:#c33
+    style after fill:#efe,stroke:#3c3
+    style C2 fill:#cfc,stroke:#393
+    style F2 fill:#ffc,stroke:#993
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>&#x1F527; 主要機能</h2>
+      <div class="features-grid">
+        <div class="card">
+          <h3>&#x26A1; Instant Snapshot を活用した高速インスタンス作成</h3>
+          <div class="icon-text"><span>&#x2192;</span><span>PITR 有効時のインスタンス作成において、初回バックアップに Instant Snapshot を使用</span></div>
+          <div class="icon-text"><span>&#x2192;</span><span>Instant Snapshot はソースディスクと同じゾーンに保存されるメタデータのみの操作</span></div>
+          <div class="icon-text"><span>&#x2192;</span><span>データサイズに依存せず、数秒から数分でスナップショット取得が完了</span></div>
+        </div>
+        <div class="card">
+          <h3>&#x1F504; バックグラウンドでの標準バックアップ変換</h3>
+          <div class="icon-text"><span>&#x2192;</span><span>初期の Instant Snapshot は、バックグラウンドで自動的に標準バックアップに変換</span></div>
+          <div class="icon-text"><span>&#x2192;</span><span>標準バックアップへの変換により、リストア操作やクロスリージョンのデータ保護をサポート</span></div>
+          <div class="icon-text"><span>&#x2192;</span><span>ユーザー側での追加操作は不要</span></div>
+        </div>
+        <div class="card">
+          <h3>&#x1F5C3;&#xFE0F; 対象データベースエンジン</h3>
+          <div class="icon-text"><span>&#x2192;</span><span><strong>Cloud SQL for MySQL</strong>: バイナリログベースの PITR に対応</span></div>
+          <div class="icon-text"><span>&#x2192;</span><span><strong>Cloud SQL for PostgreSQL</strong>: WAL (Write-Ahead Logging) ベースの PITR に対応</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>&#x1F4D0; 技術仕様</h2>
+
+      <h3>PITR のデフォルト動作</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>Enterprise Plus edition</th>
+            <th>Enterprise edition</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>PITR デフォルト有効化</td>
+            <td>作成方法を問わず、デフォルトで有効</td>
+            <td>コンソールのみデフォルト有効。gcloud CLI / Terraform / API では無効</td>
+          </tr>
+          <tr>
+            <td>トランザクションログ保持期間</td>
+            <td>最大 35 日</td>
+            <td>最大 7 日</td>
+          </tr>
+          <tr>
+            <td>可用性 SLA</td>
+            <td>99.99% (メンテナンス含む)</td>
+            <td>99.95% (メンテナンス除く)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Instant Snapshot と標準スナップショットの比較</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>特性</th>
+            <th>Instant Snapshot</th>
+            <th>標準スナップショット</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>保存場所</td>
+            <td>ソースディスクと同一ゾーン/リージョン</td>
+            <td>1 つ以上のリージョン (ゾーン/リージョンに依存しない)</td>
+          </tr>
+          <tr>
+            <td>データ冗長性</td>
+            <td>冗長化なし (同一ゾーンのみ)</td>
+            <td>複数ロケーションに冗長化</td>
+          </tr>
+          <tr>
+            <td>リカバリ時間 (RTO)</td>
+            <td>最短 (最も高速)</td>
+            <td>中程度</td>
+          </tr>
+          <tr>
+            <td>ソースディスク削除時</td>
+            <td>削除される</td>
+            <td>保持される</td>
+          </tr>
+          <tr>
+            <td>ディスクサイズへの依存</td>
+            <td>なし (メタデータ操作)</td>
+            <td>あり (データサイズに比例)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Configuration / Code Samples -->
+    <div class="section">
+      <h2>&#x2699;&#xFE0F; 設定方法</h2>
+
+      <h3>前提条件</h3>
+      <div class="icon-text"><span>&#x2713;</span><span>Google Cloud プロジェクトが作成されていること</span></div>
+      <div class="icon-text"><span>&#x2713;</span><span>Cloud SQL Admin API が有効であること</span></div>
+      <div class="icon-text"><span>&#x2713;</span><span>適切な IAM 権限 (<code>roles/cloudsql.admin</code> または <code>roles/cloudsql.editor</code>) が付与されていること</span></div>
+
+      <h3>gcloud CLI: PITR を有効化してインスタンスを作成</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">MySQL: PITR を有効化してインスタンス作成</span>
+        </div>
+        <pre><code class="language-bash">gcloud sql instances create INSTANCE_NAME \
+  --database-version=MYSQL_8_0 \
+  --tier=db-custom-2-7680 \
+  --region=asia-northeast1 \
+  --backup-start-time=20:00 \
+  --enable-bin-log \
+  --retained-transaction-log-days=7</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">PostgreSQL: PITR を有効化してインスタンス作成</span>
+        </div>
+        <pre><code class="language-bash">gcloud sql instances create INSTANCE_NAME \
+  --database-version=POSTGRES_14 \
+  --tier=db-custom-2-7680 \
+  --region=asia-northeast1 \
+  --backup-start-time=20:00 \
+  --enable-point-in-time-recovery \
+  --retained-transaction-log-days=7</code></pre>
+      </div>
+
+      <h3>Terraform 設定例</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">HCL</span>
+          <span class="code-title">MySQL インスタンス (PITR 有効)</span>
+        </div>
+        <pre><code class="language-hcl">resource "google_sql_database_instance" "mysql_pitr" {
+  name             = "mysql-instance-pitr"
+  region           = "asia-northeast1"
+  database_version = "MYSQL_8_0"
+
+  settings {
+    tier = "db-custom-2-7680"
+    backup_configuration {
+      enabled                        = true
+      binary_log_enabled             = true
+      start_time                     = "20:55"
+      transaction_log_retention_days = 3
+    }
+  }
+}</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">HCL</span>
+          <span class="code-title">PostgreSQL インスタンス (PITR 有効)</span>
+        </div>
+        <pre><code class="language-hcl">resource "google_sql_database_instance" "postgres_pitr" {
+  name             = "postgres-instance-pitr"
+  region           = "asia-northeast1"
+  database_version = "POSTGRES_14"
+
+  settings {
+    tier = "db-custom-2-7680"
+    backup_configuration {
+      enabled                        = true
+      point_in_time_recovery_enabled = true
+      start_time                     = "20:55"
+      transaction_log_retention_days = 3
+    }
+  }
+
+  deletion_protection = true
+}</code></pre>
+      </div>
+
+      <h3>既存インスタンスで PITR を有効化する場合</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">既存インスタンスの PITR 有効化</span>
+        </div>
+        <pre><code class="language-bash"># 既存インスタンスの設定を確認
+gcloud sql instances describe INSTANCE_NAME
+
+# MySQL: PITR を有効化
+gcloud sql instances patch INSTANCE_NAME \
+  --enable-bin-log
+
+# PostgreSQL: PITR を有効化
+gcloud sql instances patch INSTANCE_NAME \
+  --enable-point-in-time-recovery
+
+# 設定を確認
+gcloud sql instances describe INSTANCE_NAME</code></pre>
+      </div>
+
+      <div class="note-box">
+        <strong>&#x1F4A1; 確認:</strong> バックアップ設定セクションで、MySQL の場合は <code>binaryLogEnabled: true</code>、PostgreSQL の場合は <code>pointInTimeRecoveryEnabled: true</code> が表示されていることを確認してください。
+      </div>
+    </div>
+
+    <!-- Merits -->
+    <div class="section">
+      <h2>&#x2705; メリット</h2>
+      <div class="merit-grid">
+        <div class="merit-section">
+          <h3>&#x1F4BC; ビジネス面</h3>
+          <div class="card card-green">
+            <strong>開発・テスト環境の迅速な構築</strong>
+            <p style="font-size:14px; margin:8px 0 0;">データベースインスタンスの作成時間短縮により、開発チームの生産性が向上。CI/CD パイプラインでのデータベースプロビジョニングが高速化される。</p>
+          </div>
+          <div class="card card-green">
+            <strong>運用コストの削減</strong>
+            <p style="font-size:14px; margin:8px 0 0;">インスタンス作成の待ち時間が減少し、運用担当者の作業効率が改善される。</p>
+          </div>
+        </div>
+        <div class="merit-section">
+          <h3>&#x1F4BB; 技術面</h3>
+          <div class="card card-green">
+            <strong>データサイズ非依存の高速化</strong>
+            <p style="font-size:14px; margin:8px 0 0;">Instant Snapshot がメタデータのみの操作であるため、大規模データベースでも一定時間でインスタンスを作成可能。</p>
+          </div>
+          <div class="card card-green">
+            <strong>リストア機能への影響なし</strong>
+            <p style="font-size:14px; margin:8px 0 0;">バックグラウンドで Instant Snapshot から標準バックアップへの自動変換が行われるため、PITR によるリストア機能は完全に維持。</p>
+          </div>
+          <div class="card card-green">
+            <strong>追加設定不要</strong>
+            <p style="font-size:14px; margin:8px 0 0;">最適化は Cloud SQL 側で自動的に適用されるため、ユーザー側で設定変更や追加操作は不要。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Demerits / Limitations -->
+    <div class="section">
+      <h2>&#x26A0;&#xFE0F; デメリット・制約事項</h2>
+
+      <h3>制限事項</h3>
+      <div class="warning-box">
+        <div class="icon-text"><span>&#x26A0;&#xFE0F;</span><span>Instant Snapshot はソースディスクと同一ゾーンに保存されるため、<strong>ゾーン障害時には利用できない</strong>。ただし、バックグラウンドで標準バックアップに変換されるため、最終的なデータ保護レベルに影響はない。</span></div>
+      </div>
+      <div class="warning-box">
+        <div class="icon-text"><span>&#x26A0;&#xFE0F;</span><span>Cloud SQL Enterprise edition では、gcloud CLI / Terraform / Cloud SQL Admin API でインスタンスを作成した場合、<strong>PITR はデフォルトで無効</strong>。この最適化の恩恵を受けるには手動で PITR を有効化する必要がある。</span></div>
+      </div>
+
+      <h3>考慮すべき点</h3>
+      <div class="card card-yellow">
+        <div class="icon-text"><span>&#x1F4DD;</span><span>Instant Snapshot から標準バックアップへのバックグラウンド変換中は、標準バックアップに依存するリストア操作が制限される可能性がある。</span></div>
+      </div>
+      <div class="card card-yellow">
+        <div class="icon-text"><span>&#x1F4DD;</span><span>MySQL と PostgreSQL でトランザクションログの仕組みが異なる (MySQL: バイナリログ、PostgreSQL: WAL) ため、PITR の設定パラメータが異なる。</span></div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>&#x1F3AF; ユースケース</h2>
+
+      <div class="usecase-card">
+        <h3>&#x1F680; ユースケース 1: CI/CD パイプラインでのデータベース自動プロビジョニング</h3>
+        <p><strong>シナリオ:</strong> マイクロサービスの CI/CD パイプラインにおいて、テスト実行前に Cloud SQL インスタンスを毎回作成し、テスト完了後に削除するフロー。PITR が有効な本番同等の設定でインスタンスを作成する必要がある。</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">CI/CD パイプラインでのインスタンス作成</span>
+          </div>
+          <pre><code class="language-bash"># CI/CD パイプラインでのインスタンス作成 (PITR 有効)
+gcloud sql instances create test-db-${BUILD_ID} \
+  --database-version=POSTGRES_14 \
+  --tier=db-custom-2-7680 \
+  --region=asia-northeast1 \
+  --enable-point-in-time-recovery \
+  --backup-start-time=00:00
+
+# テスト実行
+run_integration_tests
+
+# クリーンアップ
+gcloud sql instances delete test-db-${BUILD_ID} --quiet</code></pre>
+        </div>
+
+        <p><strong>効果:</strong> インスタンス作成時間の短縮により、CI/CD パイプライン全体の実行時間が削減される。特に大規模データベースを使用するテスト環境で顕著な効果が期待できる。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>&#x1F6E1;&#xFE0F; ユースケース 2: 災害復旧 (DR) テスト環境の迅速な構築</h3>
+        <p><strong>シナリオ:</strong> 定期的な DR テストにおいて、本番環境と同等の Cloud SQL インスタンスを迅速に作成し、フェイルオーバー手順を検証する。</p>
+        <p><strong>効果:</strong> DR テスト用インスタンスの作成が高速化されることで、テストの実施頻度を上げやすくなり、DR 対策の信頼性が向上する。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>&#x1F4B0; 料金</h2>
+      <p>PITR インスタンス作成の高速化自体に<span class="highlight">追加料金はない</span>。Cloud SQL の料金は従来通り、以下の要素で構成される。</p>
+      <div class="related-grid">
+        <div class="related-card">
+          <strong>&#x1F4BB; インスタンス料金</strong><br>
+          vCPU とメモリに基づく時間課金
+        </div>
+        <div class="related-card">
+          <strong>&#x1F4BE; ストレージ料金</strong><br>
+          プロビジョニングされたストレージ容量に基づく課金
+        </div>
+        <div class="related-card">
+          <strong>&#x1F5C2;&#xFE0F; バックアップ料金</strong><br>
+          バックアップに使用されるストレージ容量に基づく課金
+        </div>
+        <div class="related-card">
+          <strong>&#x1F310; ネットワーク料金</strong><br>
+          送信データ転送量に基づく課金
+        </div>
+      </div>
+      <p style="font-size:14px;">詳細な料金については <a href="https://cloud.google.com/sql/pricing" target="_blank" class="gc-link">Cloud SQL 料金ページ</a> を参照。</p>
+    </div>
+
+    <!-- Regions -->
+    <div class="section">
+      <h2>&#x1F30D; 利用可能リージョン</h2>
+      <p>この最適化は <strong>Cloud SQL for MySQL および Cloud SQL for PostgreSQL が利用可能なすべてのリージョン</strong>で適用される。詳細なリージョン一覧については <a href="https://cloud.google.com/sql/docs/mysql/locations" target="_blank" class="gc-link">Cloud SQL ロケーション</a> を参照。</p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#x1F517; 関連サービス・機能</h2>
+      <div class="related-grid">
+        <div class="related-card">
+          <strong>&#x1F4F8; Compute Engine Instant Snapshots</strong><br>
+          Cloud SQL の PITR 最適化の基盤技術。メタデータのみの操作で高速なディスクスナップショットを実現する。
+        </div>
+        <div class="related-card">
+          <strong>&#x1F6E1;&#xFE0F; Cloud SQL Enhanced Backups</strong><br>
+          Backup and DR Service を活用した一元的なバックアップ管理機能。強制保持、スケジューリング、モニタリングを提供する。
+        </div>
+        <div class="related-card">
+          <strong>&#x1F4CB; Cloud SQL Fast Clone</strong><br>
+          Instant Snapshot を使用した高速クローン機能。同一ゾーン内でのクローン作成をメタデータ操作のみで実行する。
+        </div>
+        <div class="related-card">
+          <strong>&#x1F4CA; Cloud Monitoring</strong><br>
+          Cloud SQL インスタンスのバックアップステータスやパフォーマンスメトリクスの監視に使用。
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section" style="background: var(--gc-blue-tint); border: 2px solid var(--gc-blue-300);">
+      <h2>&#x1F4DD; まとめ</h2>
+      <p>Cloud SQL における PITR 有効時のインスタンス作成高速化は、<span class="highlight">Instant Snapshot 技術</span>を活用することでデータベースサイズに依存しない一定時間でのプロビジョニングを実現した重要な改善である。</p>
+      <p>Google Cloud コンソールではデフォルトで PITR が有効なため、特別な設定変更なく多くのユーザーがこの恩恵を受けられる。データベースの開発・テスト環境の構築や CI/CD パイプラインの効率化を検討しているチームは、この最適化を活用してワークフローの高速化を図ることを推奨する。</p>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>&#x1F4CE; 出典・参考リンク:</strong></p>
+      <ul>
+        <li>&#x1F4C4; <a href="https://cloud.google.com/release-notes#February_24_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li>&#x1F4D6; <a href="https://cloud.google.com/sql/docs/mysql/backup-recovery/configure-pitr" target="_blank" rel="noopener noreferrer">Cloud SQL for MySQL: PITR の構成</a></li>
+        <li>&#x1F4D6; <a href="https://cloud.google.com/sql/docs/postgres/backup-recovery/configure-pitr" target="_blank" rel="noopener noreferrer">Cloud SQL for PostgreSQL: PITR の構成</a></li>
+        <li>&#x1F4D6; <a href="https://cloud.google.com/compute/docs/disks/instant-snapshots" target="_blank" rel="noopener noreferrer">Compute Engine: Instant Snapshots</a></li>
+        <li>&#x1F4D6; <a href="https://cloud.google.com/sql/docs/mysql/editions-intro" target="_blank" rel="noopener noreferrer">Cloud SQL エディションの概要</a></li>
+        <li>&#x1F4B0; <a href="https://cloud.google.com/sql/pricing" target="_blank" rel="noopener noreferrer">Cloud SQL 料金ページ</a></li>
+      </ul>
+      <p style="margin-top: 12px; font-size: 11px; color: var(--gc-outline);">&#x1F3F7;&#xFE0F; #CloudSQL #MySQL #PostgreSQL #PITR #PointInTimeRecovery #InstantSnapshot</p>
+    </footer>
+
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

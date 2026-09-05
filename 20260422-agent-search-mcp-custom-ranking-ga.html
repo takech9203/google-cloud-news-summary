@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Search: MCP Server GA, Custom Ranking & Relevance Filter</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; min-width: 280px; }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+      text-align: right;
+    }
+
+    .badges { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 4px; }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      background: var(--gc-green);
+    }
+
+    .badge-rebrand {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      background: var(--gc-purple);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green { border-left-color: var(--gc-green); }
+    .card-purple { border-left-color: var(--gc-purple); }
+    .card-orange { border-left-color: var(--gc-orange); }
+    .card-teal { border-left-color: var(--gc-teal); }
+    .card-red { border-left-color: var(--gc-red); }
+
+    .card h3 { margin-top: 0; }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* Before/After */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-red);
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-green);
+    }
+
+    .before-card h3 { color: var(--gc-red); }
+    .after-card h3 { color: var(--gc-green); }
+
+    .before-card ul, .after-card ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .before-card li, .after-card li {
+      padding: 6px 0;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .before-card li::before { content: "✗ "; color: var(--gc-red); font-weight: 700; }
+    .after-card li::before { content: "✓ "; color: var(--gc-green); font-weight: 700; }
+
+    /* Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.green { background: linear-gradient(135deg, var(--gc-green), #1E8E3E); }
+    .stat-card.purple { background: linear-gradient(135deg, var(--gc-purple), #7627BB); }
+    .stat-card.teal { background: linear-gradient(135deg, var(--gc-teal), #00838F); }
+    .stat-card.orange { background: linear-gradient(135deg, var(--gc-orange), #E65100); }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Feature grid */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    /* Flow diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* Boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .ai-box {
+      background: var(--gc-purple-tint);
+      border-left: 4px solid var(--gc-purple);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Code blocks */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    .code-block .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      margin: -16px -16px 12px -16px;
+      border-radius: 8px 8px 0 0;
+    }
+
+    .code-lang { color: #9CDCFE; font-weight: bold; }
+    .code-title { color: #AAAAAA; }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Mermaid */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Use case */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+    }
+
+    .usecase-card h3 { color: var(--gc-blue-800); margin-top: 0; }
+    .usecase-card p { font-size: 14px; margin: 4px 0; }
+
+    .usecase-effect {
+      background: var(--gc-green-tint);
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-top: 10px;
+      font-size: 14px;
+      color: var(--gc-on-surface);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .header { flex-direction: column; }
+      .subtitle { text-align: left; margin-top: 8px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr 1fr; }
+      .flow-diagram { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); }
+      .section { padding: 16px; }
+    }
+
+    @media (max-width: 480px) {
+      body { padding: 12px; }
+      .stats-grid { grid-template-columns: 1fr; }
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>🔍 Agent Search (旧 Vertex AI Search)<br>MCP Server GA / カスタムランキング強化 / 関連性フィルタ</h1>
+        <div class="badges">
+          <span class="badge-ga">GA</span>
+          <span class="badge">Agent Search</span>
+          <span class="badge">MCP Server</span>
+          <span class="badge">DRR</span>
+          <span class="badge">Geodistance</span>
+          <span class="badge-rebrand">Rebranding</span>
+        </div>
+      </div>
+      <div class="subtitle">
+        2026-04-22<br>Google Cloud
+      </div>
+    </div>
+
+    <!-- Overview / Stats -->
+    <div class="section">
+      <h2>📊 数字で見るアップデート</h2>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value">5</div>
+          <div class="stat-label">同時発表された<br>アップデート数</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-value">2</div>
+          <div class="stat-label">MCP ツール<br>search / conversational_search</div>
+        </div>
+        <div class="stat-card purple">
+          <div class="stat-value">3</div>
+          <div class="stat-label">新カスタムランキング<br>関数 (drr / geo_distance / rr)</div>
+        </div>
+        <div class="stat-card teal">
+          <div class="stat-value">4</div>
+          <div class="stat-label">関連性閾値レベル<br>HIGH / MEDIUM / LOW / LOWEST</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>📝 概要</h2>
+      <p>Google Cloud は <span class="highlight">Agent Search</span> (旧 Vertex AI Search) に対して 5 つの重要なアップデートを同時に発表しました。MCP サーバーの GA 昇格、カスタムランキングにおける <span class="highlight">Dense Reciprocal Rank (DRR)</span> と <span class="highlight">Geodistance</span> の GA、ドキュメントレベル関連性フィルタの GA、そして Vertex AI Search から Agent Search への製品名変更です。</p>
+
+      <div class="ai-box">
+        <strong>🤖 対象ユーザー:</strong> AI エージェント開発者、検索アプリケーション構築者、RAG システム運用エンジニア、位置情報を活用した検索サービス事業者
+      </div>
+    </div>
+
+    <!-- Before / After -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-card">
+          <h3>❌ Before</h3>
+          <ul>
+            <li>AI エージェントから Agent Search へのアクセスには独自の統合コードが必要</li>
+            <li><code>rr</code> 関数では同一スコアのドキュメントのランキング品質が低下</li>
+            <li>位置情報ベースのランキング調整は別途計算ロジックが必要</li>
+            <li>ドキュメントレベルの関連性フィルタリングが GA 未提供</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h3>✅ After</h3>
+          <ul>
+            <li>MCP 標準プロトコルで Claude / Gemini CLI / ADK から直接アクセス可能</li>
+            <li><code>drr</code> 関数で重複スコア問題を解消し、高品質ランキングを実現</li>
+            <li><code>geo_distance</code> 関数で距離ベースランキングを式に直接組み込み可能</li>
+            <li>キーワード / セマンティック検索それぞれに独立した関連性閾値を設定可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>MCP クライアントから Agent Search MCP サーバーを経由して検索リクエストが送信され、カスタムランキングエンジンで DRR / Geodistance 等の関数を使った順位付けが行われた後、関連性フィルタによって閾値を満たすドキュメントのみが返却されます。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Clients["MCP クライアント"]
+        Claude["Claude Desktop / CLI"]
+        GeminiCLI["Gemini CLI"]
+        ADK["Agent Development Kit"]
+        Custom["カスタム MCP クライアント"]
+    end
+
+    subgraph MCP["Agent Search MCP Server - GA"]
+        Endpoint["discoveryengine.googleapis.com/mcp"]
+        SearchTool["search ツール"]
+        ConvTool["conversational_search ツール"]
+    end
+
+    subgraph Ranking["カスタムランキングエンジン"]
+        DRR["drr - Dense Reciprocal Rank"]
+        RR["rr - Reciprocal Rank"]
+        GeoDist["geo_distance - 距離計算"]
+        Signals["標準シグナル: semantic / keyword / topicality"]
+    end
+
+    subgraph Filter["関連性フィルタ"]
+        KeywordFilter["キーワード検索閾値: HIGH / MEDIUM / LOW / LOWEST"]
+        SemanticFilter["セマンティック検索閾値: 0.0 - 1.0"]
+    end
+
+    subgraph DataStore["Agent Search データストア"]
+        Structured["構造化データ"]
+        Unstructured["非構造化データ"]
+        Website["ウェブサイトデータ"]
+    end
+
+    Clients --> Endpoint
+    Endpoint --> SearchTool
+    Endpoint --> ConvTool
+    SearchTool --> Ranking
+    ConvTool --> Ranking
+    Ranking --> Filter
+    Filter --> DataStore
+        </pre>
+      </div>
+    </div>
+
+    <!-- Feature 1: MCP Server -->
+    <div class="section">
+      <h2>⚡ 主要機能 1: MCP Server (GA)</h2>
+      <div class="card">
+        <h3>🌐 MCP サーバーによるエージェント統合</h3>
+        <p>Agent Search のデータストアに対して <span class="highlight">Model Context Protocol (MCP)</span> 経由で検索を実行可能に。2026 年 2 月の Public Preview を経て今回 GA に昇格しました。</p>
+        <div style="margin-top: 12px;">
+          <div class="icon-text"><span class="arrow">→</span><span><strong>エンドポイント:</strong> <code>https://discoveryengine.googleapis.com/mcp</code></span></div>
+          <div class="icon-text"><span class="arrow">→</span><span><strong>プロトコル:</strong> JSON-RPC 2.0 over HTTPS</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span><strong>認証:</strong> OAuth 2.0 / OIDC</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span><strong>MCP メソッド:</strong> <code>tools/list</code>, <code>tools/call</code></span></div>
+        </div>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px;">
+        <div class="card">
+          <h3>🔎 search ツール</h3>
+          <p style="font-size:14px;">データストアに取り込まれたデータに対する検索を実行</p>
+        </div>
+        <div class="card card-purple">
+          <h3>💬 conversational_search ツール</h3>
+          <p style="font-size:14px;">データストアに対する会話型検索を実行</p>
+        </div>
+      </div>
+
+      <div style="margin-top: 16px;">
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">JSON</span>
+            <span class="code-title">MCP クライアント設定例</span>
+          </div>
+          <pre><code class="language-json">{
+  "mcpServers": {
+    "agent-search": {
+      "httpUrl": "https://discoveryengine.googleapis.com/mcp",
+      "headers": {
+        "Authorization": "Bearer $(gcloud auth print-access-token)"
+      }
+    }
+  }
+}</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Feature 2: DRR -->
+    <div class="section">
+      <h2>📈 主要機能 2: Dense Reciprocal Rank (DRR) によるカスタムランキング (GA)</h2>
+      <div class="card card-green">
+        <h3>🎯 drr() - 重複シグナル値の問題を解消</h3>
+        <p>従来の <code>rr</code> (Reciprocal Rank) 関数の改良版。同一のシグナル値を持つドキュメントが複数存在する場合に、<code>rr</code> では任意の順序が割り当てられていた問題を解消し、より高品質なランキングを実現します。</p>
+        <div class="icon-text"><span class="arrow">→</span><span>カスタムランキング式内で他のシグナルや関数と組み合わせて使用可能</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>構文: <code>drr(expression, k)</code></span></div>
+      </div>
+    </div>
+
+    <!-- Feature 3: Geodistance -->
+    <div class="section">
+      <h2>📍 主要機能 3: Geodistance 関数によるカスタムランキング (GA)</h2>
+      <div class="card card-teal">
+        <h3>🗺️ geo_distance() - 距離ベースランキング</h3>
+        <p><code>geo_distance</code> 関数をカスタムランキング式で使用して、ソース位置とデスティネーション位置の間の距離をメートル単位で計算します。</p>
+      </div>
+      <p style="margin-top: 12px; font-weight: 600; color: var(--gc-on-surface);">ソース位置として 3 種類をサポート:</p>
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 8px;">
+        <div class="card">
+          <h3>💬 query_loc</h3>
+          <p style="font-size: 13px;">自然言語クエリから自動抽出。ポイント、ポリライン、サークル、ポリゴンに対応</p>
+        </div>
+        <div class="card card-green">
+          <h3>📌 request_loc (座標)</h3>
+          <p style="font-size: 13px;">明示的に提供された緯度・経度の座標</p>
+        </div>
+        <div class="card card-orange">
+          <h3>🏠 request_loc (住所)</h3>
+          <p style="font-size: 13px;">明示的に提供された住所文字列</p>
+        </div>
+      </div>
+      <div class="note-box" style="margin-top: 12px;">
+        <strong>💡 デスティネーション位置:</strong> カスタム取得可能フィールド (例: <code>c.hotel_location</code>, <code>c.office_location</code>) を使用。<code>rr</code> や <code>drr</code> 関数と組み合わせて距離ベースのランキング重み付けが可能。
+      </div>
+    </div>
+
+    <!-- Feature 4: Relevance Filter -->
+    <div class="section">
+      <h2>🎚️ 主要機能 4: ドキュメントレベル関連性フィルタ (GA)</h2>
+      <p>検索リクエストにドキュメントレベルの関連性フィルタを指定し、閾値を満たすドキュメントのみを返却。2025 年 12 月に Public Preview として提供開始、今回 GA に昇格しました。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>閾値タイプ</th>
+            <th>検索タイプ</th>
+            <th>値の範囲</th>
+            <th>粒度</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>relevanceThreshold</code></td>
+            <td>キーワード / セマンティック</td>
+            <td><code>HIGH</code>, <code>MEDIUM</code>, <code>LOW</code>, <code>LOWEST</code></td>
+            <td>粗粒度</td>
+          </tr>
+          <tr>
+            <td><code>semanticRelevanceThreshold</code></td>
+            <td>キーワード / セマンティック</td>
+            <td>0.0 - 1.0 (浮動小数点)</td>
+            <td>細粒度</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="note-box">
+        <strong>💡 対応データストア:</strong> Advanced Website Indexing によるウェブサイトデータ、カスタム非構造化データ、カスタム構造化データ
+      </div>
+    </div>
+
+    <!-- Feature 5: Rebranding -->
+    <div class="section">
+      <h2>🏷️ 主要機能 5: Vertex AI Search から Agent Search へのリブランディング</h2>
+      <div class="card card-purple">
+        <h3>✨ 名称変更の概要</h3>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>新名称:</strong> <span class="highlight">Agent Search</span></span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>コンソール UI:</strong> 引き続き「Vertex AI Search and AI Applications」と表示</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>API:</strong> 引き続き Discovery Engine API エンドポイントを使用</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>機能変更:</strong> なし (名称のみの変更)</span></div>
+      </div>
+      <p style="font-size: 14px; margin-top: 12px; color: var(--gc-outline);">過去の名称: AI Applications → Agent Builder → Vertex AI Search and Conversation → Enterprise Search → Generative AI App Builder</p>
+    </div>
+
+    <!-- Technical Specs -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+      <h3>MCP Server 仕様</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>エンドポイント</td><td><code>https://discoveryengine.googleapis.com/mcp</code></td></tr>
+          <tr><td>プロトコル</td><td>JSON-RPC 2.0 over HTTPS</td></tr>
+          <tr><td>認証</td><td>OAuth 2.0 / OIDC</td></tr>
+          <tr><td>提供ツール</td><td><code>search</code>, <code>conversational_search</code></td></tr>
+          <tr><td>MCP メソッド</td><td><code>tools/list</code>, <code>tools/call</code></td></tr>
+          <tr><td>ステータス</td><td>GA (2026-04-22)</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top: 20px;">カスタムランキング関数一覧</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>関数</th>
+            <th>構文</th>
+            <th>説明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Reciprocal Rank</td><td><code>rr(expression, k)</code></td><td>ドキュメントを式の値で降順ソートし <code>1 / (rank_i + k)</code> を計算</td></tr>
+          <tr><td>Dense Reciprocal Rank</td><td><code>drr(expression, k)</code></td><td>rr の改良版。重複シグナル値がある場合に高品質なランキングを実現</td></tr>
+          <tr><td>Geodistance</td><td><code>geo_distance(source, dest)</code></td><td>ソースとデスティネーション間の距離 (メートル) を計算</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Implementation Examples -->
+    <div class="section">
+      <h2>💻 設定方法・実装例</h2>
+
+      <h3>ステップ 1: MCP サーバーのツール一覧を取得</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">MCP ツール一覧取得</span>
+        </div>
+        <pre><code class="language-bash">curl --location 'https://discoveryengine.googleapis.com/mcp' \
+  --header 'content-type: application/json' \
+  --header 'accept: application/json, text/event-stream' \
+  --header "Authorization: Bearer $(gcloud auth print-access-token)" \
+  --data '{
+    "method": "tools/list",
+    "jsonrpc": "2.0",
+    "id": 1
+  }'</code></pre>
+      </div>
+
+      <h3>ステップ 2: DRR + Geodistance を使用したカスタムランキング検索</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">DRR + Geodistance によるランキング検索</span>
+        </div>
+        <pre><code class="language-bash">curl -X POST \
+  -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Content-Type: application/json" \
+  "https://discoveryengine.googleapis.com/v1/projects/PROJECT_ID/locations/global/collections/default_collection/engines/APP_ID/servingConfigs/default_search:search" \
+  -d '{
+    "query": "東京駅近くのホテル",
+    "rankingExpression": "drr(semantic_similarity_score, 32) * 0.4 + drr(keyword_similarity_score, 32) * 0.3 + drr(geo_distance(query_loc, c.hotel_location) * -1, 32) * 0.3",
+    "rankingExpressionBackend": "RANK_BY_FORMULA",
+    "userInfo": {
+      "preciseLocation": {
+        "point": { "lat": 35.6812, "lon": 139.7671 }
+      }
+    }
+  }'</code></pre>
+      </div>
+      <div class="note-box">
+        <strong>💡 ポイント:</strong> 距離の乗算係数を <code>-1</code> にすることで、近い場所ほど高いランクが付与されます。DRR でセマンティック類似度・キーワード類似度を正規化しつつ、Geodistance で距離調整を行います。
+      </div>
+
+      <h3 style="margin-top: 16px;">ステップ 3: ドキュメントレベル関連性フィルタの適用</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">関連性フィルタの適用</span>
+        </div>
+        <pre><code class="language-bash">curl -X POST \
+  -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Content-Type: application/json" \
+  "https://discoveryengine.googleapis.com/v1/projects/PROJECT_ID/locations/global/collections/default_collection/engines/APP_ID/servingConfigs/default_search:search" \
+  -d '{
+    "query": "検索クエリ",
+    "relevanceFilterSpec": {
+      "keywordSearchThreshold": {
+        "relevanceThreshold": "MEDIUM"
+      },
+      "semanticSearchThreshold": {
+        "semanticRelevanceThreshold": 0.75
+      }
+    }
+  }'</code></pre>
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div>
+          <h3>💼 ビジネス面</h3>
+          <div class="card card-green">
+            <div class="icon-text"><span class="arrow">→</span><span><strong>エージェント統合の簡素化:</strong> MCP 標準プロトコルにより、カスタム統合コードの開発・保守コストを削減</span></div>
+          </div>
+          <div class="card card-green">
+            <div class="icon-text"><span class="arrow">→</span><span><strong>検索品質の向上:</strong> DRR + 関連性フィルタで検索離脱率低下とコンバージョン率改善</span></div>
+          </div>
+          <div class="card card-green">
+            <div class="icon-text"><span class="arrow">→</span><span><strong>位置情報サービス強化:</strong> 不動産、旅行、小売、物流で距離を考慮した検索体験を迅速構築</span></div>
+          </div>
+        </div>
+        <div>
+          <h3>⚙️ 技術面</h3>
+          <div class="card">
+            <div class="icon-text"><span class="arrow">→</span><span><strong>MCP 標準準拠:</strong> Claude / Gemini CLI / ADK との相互運用性を確保</span></div>
+          </div>
+          <div class="card">
+            <div class="icon-text"><span class="arrow">→</span><span><strong>ランキング精度改善:</strong> 同一スコアの大量ドキュメントでも適切なランキング</span></div>
+          </div>
+          <div class="card">
+            <div class="icon-text"><span class="arrow">→</span><span><strong>柔軟な関連性制御:</strong> キーワード / セマンティック検索に独立した閾値</span></div>
+          </div>
+          <div class="card">
+            <div class="icon-text"><span class="arrow">→</span><span><strong>自然言語位置抽出:</strong> ユーザーが座標を指定不要、クエリから自動抽出</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <div class="warning-box">
+        <strong>制限事項:</strong>
+        <ul style="margin: 8px 0 0 20px; font-size: 14px;">
+          <li>関連性フィルタは Basic Website Indexing、メディアデータ、ヘルスケアデータには未対応</li>
+          <li>関連性フィルタはブレンド検索アプリ (複数データストア接続) では使用不可</li>
+          <li>コンソール UI は引き続き「Vertex AI Search and AI Applications」と表示 (名称不一致)</li>
+          <li>API エンドポイントは引き続き Discovery Engine API (API レベルの名称変更なし)</li>
+        </ul>
+      </div>
+      <div class="warning-box">
+        <strong>考慮すべき点:</strong>
+        <ul style="margin: 8px 0 0 20px; font-size: 14px;">
+          <li>MCP サーバー利用には事前に認証設定 (OAuth 2.0 / OIDC) と IAM 権限が必要</li>
+          <li>既存の <code>rr</code> 使用箇所は <code>drr</code> への移行を検討</li>
+          <li>関連性フィルタの閾値は本番適用前に複数クエリでテストを推奨</li>
+          <li>名称変更に伴い、既存ドキュメント・社内ガイド・自動化スクリプトの参照更新が必要</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h3>📚 ユースケース 1: AI エージェントによる社内ナレッジベース検索</h3>
+        <p>社内の FAQ、マニュアル、ポリシー文書を Agent Search に格納し、MCP サーバー経由で AI エージェント (Claude Desktop / ADK) が直接検索。関連性フィルタで <code>HIGH</code> 閾値を設定し、高精度な回答のみを返却。</p>
+        <div class="code-block" style="margin: 12px 0;">
+          <div class="code-header">
+            <span class="code-lang">JSON</span>
+            <span class="code-title">MCP ツール呼び出し例</span>
+          </div>
+          <pre><code class="language-json">{
+  "method": "tools/call",
+  "jsonrpc": "2.0",
+  "id": 2,
+  "params": {
+    "name": "search",
+    "arguments": {
+      "query": "リモートワークの経費精算ルール",
+      "app_id": "internal-knowledge-base",
+      "relevanceFilterSpec": {
+        "keywordSearchThreshold": {
+          "relevanceThreshold": "HIGH"
+        }
+      }
+    }
+  }
+}</code></pre>
+        </div>
+        <div class="usecase-effect">✅ <strong>効果:</strong> AI エージェントが関連性の高い社内文書のみを参照して回答 → 回答精度向上、ハルシネーションリスク低減</div>
+      </div>
+
+      <div class="usecase-card">
+        <h3>🏢 ユースケース 2: 不動産・旅行サイトの距離ベース検索ランキング</h3>
+        <p>「渋谷駅近くのオフィス」というクエリに対して、Geodistance + DRR で距離・セマンティック類似度・キーワード一致度を総合的にランキング。</p>
+        <div class="code-block" style="margin: 12px 0;">
+          <div class="code-header">
+            <span class="code-lang">Text</span>
+            <span class="code-title">カスタムランキング式</span>
+          </div>
+          <pre><code>drr(semantic_similarity_score, 32) * 0.3
++ drr(keyword_similarity_score, 32) * 0.2
++ drr(geo_distance(query_loc, c.office_location) * -1, 32) * 0.5</code></pre>
+        </div>
+        <div class="usecase-effect">✅ <strong>効果:</strong> 自然言語クエリから位置情報を自動抽出、距離重視 + テキスト関連性考慮 → ユーザー満足度・コンバージョン率向上</div>
+      </div>
+
+      <div class="usecase-card">
+        <h3>🛒 ユースケース 3: E コマースの高精度商品検索</h3>
+        <p>大量の類似商品が存在するカタログで DRR 関数を使用して重複スコア問題を解消。セマンティック関連性 0.8 以上のドキュメントのみを返却し、検索結果の質を向上。</p>
+        <div class="usecase-effect">✅ <strong>効果:</strong> 類似商品が多数あるカタログでもユーザーの検索意図に最も合致する商品が上位表示 → 検索離脱率低下</div>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金情報</h2>
+      <p>Agent Search の料金体系は従来の Vertex AI Search と同様。名称変更による料金体系の変更はありません。</p>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 12px;">
+        <div class="card">
+          <h3>📊 General (従量課金制)</h3>
+          <p style="font-size: 14px;">Pay-as-you-go の消費ベースモデル</p>
+        </div>
+        <div class="card card-purple">
+          <h3>⚙️ Configurable (サブスクリプション型)</h3>
+          <p style="font-size: 14px;">ストレージ + 検索クエリの月額サブスクリプション + アドオン (セマンティッククエリ、AI Overview 等)</p>
+        </div>
+      </div>
+      <div class="note-box" style="margin-top: 12px;">
+        <strong>💡 注意:</strong> MCP サーバー経由の検索リクエストは通常の検索クエリと同様に課金されます。
+      </div>
+    </div>
+
+    <!-- Region -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <p>Agent Search はグローバルロケーション (<code>global</code>) および複数のリージョンで利用可能。MCP サーバーのエンドポイントはグローバルエンドポイントとして提供されます。</p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div class="card">
+          <h3>🤖 Gemini Enterprise Agent Platform</h3>
+          <p style="font-size: 13px;">Agent Runtime / Agent Identity / Agent Registry 等と連携</p>
+        </div>
+        <div class="card card-green">
+          <h3>🛠️ Agent Development Kit (ADK)</h3>
+          <p style="font-size: 13px;"><code>McpToolset</code> で Agent Search MCP をツールとして組み込み</p>
+        </div>
+        <div class="card card-purple">
+          <h3>📋 Agent Registry</h3>
+          <p style="font-size: 13px;">MCP サーバーとツールの一元管理カタログ</p>
+        </div>
+        <div class="card card-teal">
+          <h3>🔍 Discovery Engine API</h3>
+          <p style="font-size: 13px;">Agent Search の基盤 API。MCP はそのラッパー</p>
+        </div>
+        <div class="card card-orange">
+          <h3>🧮 Vector Search</h3>
+          <p style="font-size: 13px;">ベクトル検索機能。セマンティック検索と補完的に使用</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- References -->
+    <div class="section">
+      <h2>📎 参考リンク</h2>
+      <ul style="list-style: none; padding: 0;">
+        <li style="padding: 6px 0;"><span class="arrow">→</span> <a href="https://cloud.google.com/release-notes#April_22_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート</a></li>
+        <li style="padding: 6px 0;"><span class="arrow">→</span> <a href="https://docs.cloud.google.com/generative-ai-app-builder/docs/reference/mcp" target="_blank" rel="noopener noreferrer" class="gc-link">MCP Reference: discoveryengine.googleapis.com</a></li>
+        <li style="padding: 6px 0;"><span class="arrow">→</span> <a href="https://docs.cloud.google.com/generative-ai-app-builder/docs/custom-ranking" target="_blank" rel="noopener noreferrer" class="gc-link">カスタムランキングのドキュメント</a></li>
+        <li style="padding: 6px 0;"><span class="arrow">→</span> <a href="https://docs.cloud.google.com/generative-ai-app-builder/docs/filter-by-relevance" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメントレベル関連性フィルタのドキュメント</a></li>
+        <li style="padding: 6px 0;"><span class="arrow">→</span> <a href="https://docs.cloud.google.com/generative-ai-app-builder/docs/introduction" target="_blank" rel="noopener noreferrer" class="gc-link">Agent Search とは</a></li>
+        <li style="padding: 6px 0;"><span class="arrow">→</span> <a href="https://cloud.google.com/generative-ai-app-builder/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Agent Search 料金ページ</a></li>
+        <li style="padding: 6px 0;"><span class="arrow">→</span> <a href="https://docs.cloud.google.com/mcp/overview" target="_blank" rel="noopener noreferrer" class="gc-link">Google Cloud MCP サーバー概要</a></li>
+      </ul>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>📎 出典: <a href="https://cloud.google.com/release-notes#April_22_2026" target="_blank" rel="noopener noreferrer">https://cloud.google.com/release-notes#April_22_2026</a></p>
+      <p style="margin-top: 4px;">Generated from: reports/2026/2026-04-22-agent-search-mcp-custom-ranking-ga.md</p>
+    </footer>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

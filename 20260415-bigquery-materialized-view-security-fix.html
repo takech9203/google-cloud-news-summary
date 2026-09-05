@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BigQuery: マテリアライズドビューのリフレッシュにおけるセキュリティ修正</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-red);
+    }
+
+    .header-left { flex: 1; min-width: 280px; }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .header-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-security {
+      border-left-color: var(--gc-red);
+    }
+
+    .card-fix {
+      border-left-color: var(--gc-green);
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge-security {
+      background: var(--gc-red);
+      color: #FFFFFF;
+    }
+
+    .badge-service {
+      background: var(--gc-blue-600);
+      color: #FFFFFF;
+    }
+
+    .badge-fixed {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    /* Before/After comparison */
+    .comparison-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 600px) {
+      .comparison-grid { grid-template-columns: 1fr; }
+    }
+
+    .comparison-before {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .comparison-after {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .comparison-label {
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+    }
+
+    .comparison-before .comparison-label { color: var(--gc-red); }
+    .comparison-after .comparison-label { color: var(--gc-green); }
+
+    .comparison-before ul, .comparison-after ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .comparison-before li, .comparison-after li {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    /* Impact table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* Flow diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Note/Warning boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Feature cards grid */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 600px) {
+      .feature-grid { grid-template-columns: 1fr; }
+    }
+
+    .feature-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid var(--gc-outline-variant);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .feature-card-icon {
+      font-size: 28px;
+      margin-bottom: 8px;
+    }
+
+    .feature-card h4 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+    }
+
+    .feature-card p {
+      font-size: 14px;
+      color: var(--gc-on-surface-variant);
+      margin: 0;
+      line-height: 1.6;
+    }
+
+    /* Usecase cards */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+      border: 1px solid rgba(66, 133, 244, 0.2);
+    }
+
+    .usecase-card h4 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--gc-blue-900);
+      margin: 0 0 8px 0;
+    }
+
+    .usecase-card p {
+      font-size: 14px;
+      color: var(--gc-on-surface-variant);
+      margin: 4px 0;
+      line-height: 1.6;
+    }
+
+    .usecase-label {
+      display: inline-block;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-bottom: 4px;
+    }
+
+    .label-scenario { background: var(--gc-blue-50); color: var(--gc-blue-800); }
+    .label-risk { background: var(--gc-red-tint); color: var(--gc-red); }
+    .label-fixed { background: var(--gc-green-tint); color: var(--gc-green); }
+
+    /* IAM table */
+    .iam-table td:first-child {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 13px;
+      color: var(--gc-blue-900);
+      white-space: nowrap;
+    }
+
+    /* Stat cards */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 600px) {
+      .stat-grid { grid-template-columns: 1fr; }
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.security {
+      background: linear-gradient(135deg, var(--gc-red), #C62828);
+    }
+
+    .stat-card.success {
+      background: linear-gradient(135deg, var(--gc-green), #1B5E20);
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Mermaid */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Code blocks */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Related services */
+    .related-services {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 16px 0;
+    }
+
+    .related-service-tag {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-800);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      border: 1px solid rgba(66, 133, 244, 0.3);
+    }
+
+    /* Links list */
+    .links-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .links-list li {
+      margin: 8px 0;
+      font-size: 14px;
+    }
+
+    .links-list a {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .links-list a:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* Checklist */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      font-size: 14px;
+    }
+
+    .check-icon { color: var(--gc-green); font-size: 18px; }
+    .cross-icon { color: var(--gc-red); font-size: 18px; }
+
+    /* Security exposure path */
+    .exposure-path {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 20px 0;
+      padding: 16px;
+      background: var(--gc-red-tint);
+      border-radius: 12px;
+      border: 1px dashed var(--gc-red);
+    }
+
+    .exposure-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-red);
+      border-radius: 8px;
+      padding: 10px 16px;
+      text-align: center;
+      font-size: 13px;
+      color: var(--gc-on-surface);
+    }
+
+    .exposure-arrow {
+      color: var(--gc-red);
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    footer a:hover {
+      color: var(--gc-blue-800);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>🔒 BigQuery: マテリアライズドビューのリフレッシュにおけるきめ細かいアクセス制御のセキュリティ修正</h1>
+        <div class="subtitle">2026-04-15 | BigQuery | セキュリティ修正</div>
+        <div class="header-badges">
+          <span class="badge badge-service">BigQuery</span>
+          <span class="badge badge-security">Security Fix</span>
+          <span class="badge badge-fixed">修正完了</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary stats -->
+    <div class="stat-grid">
+      <div class="stat-card security">
+        <div class="stat-value">🛡️</div>
+        <div class="stat-label">セキュリティ修正<br>データ露出リスク排除</div>
+      </div>
+      <div class="stat-card success">
+        <div class="stat-value">0</div>
+        <div class="stat-label">ユーザー側の<br>対応作業</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">3</div>
+        <div class="stat-label">保護レイヤー<br>列/行/マスキング</div>
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        BigQuery のマテリアライズドビューリフレッシュ処理において、<span class="highlight">きめ細かいアクセス制御 (Fine-Grained Access Control)</span> ポリシーで保護されるべきデータが、リフレッシュ失敗時の<span class="highlight">エラーメッセージ内に露出する可能性</span>があった問題が修正されました。
+      </p>
+      <p>
+        この修正は Google Cloud 側で既に完了しており、ユーザー側での追加対応は不要です。列レベルセキュリティ、データマスキング、行レベルセキュリティの各保護レイヤーが、エラーハンドリングを含む全ての処理パスで正しく機能するようになりました。
+      </p>
+
+      <h3>Before / After 比較</h3>
+      <div class="comparison-grid">
+        <div class="comparison-before">
+          <div class="comparison-label">❌ 修正前</div>
+          <ul>
+            <li>リフレッシュエラー時に保護データがエラーメッセージに含まれる可能性</li>
+            <li>列レベルセキュリティでマスクされるべきデータがエラーに露出</li>
+            <li>行レベルセキュリティでフィルタリングされるべきデータがエラーに露出</li>
+            <li>ジョブ履歴やログを通じて権限外ユーザーがデータ断片を閲覧可能</li>
+          </ul>
+        </div>
+        <div class="comparison-after">
+          <div class="comparison-label">✅ 修正後</div>
+          <ul>
+            <li>エラーメッセージにおいても保護データが適切にフィルタリング</li>
+            <li>きめ細かいアクセス制御ポリシーがエラーハンドリングにも一貫適用</li>
+            <li>ユーザー側での追加対応は一切不要</li>
+            <li>全 BigQuery ユーザーに自動的に修正が適用</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>
+        マテリアライズドビューのリフレッシュが失敗した際、エラーメッセージが生成される前にセキュリティフィルタが適用され、きめ細かいアクセス制御ポリシーで保護されたデータがエラーメッセージに含まれないようになりました。
+      </p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph base_table["ベーステーブル"]
+        BT["データ"]
+        CLS["列レベルセキュリティ\n(ポリシータグ)"]
+        RLS["行レベルセキュリティ\n(行アクセスポリシー)"]
+        DM["データマスキング\n(マスキングルール)"]
+    end
+
+    subgraph refresh_process["マテリアライズドビュー リフレッシュ"]
+        AR["自動リフレッシュ\n(bigquery-adminbot)"]
+        MR["手動リフレッシュ\n(BQ.REFRESH_MATERIALIZED_VIEW)"]
+    end
+
+    subgraph security_boundary["セキュリティ境界 (修正箇所)"]
+        direction TB
+        EH["エラーハンドリング"]
+        SF["セキュリティフィルタ"]
+        EH --> SF
+    end
+
+    subgraph output["出力"]
+        MV["マテリアライズドビュー\n(キャッシュデータ)"]
+        EM["エラーメッセージ"]
+    end
+
+    BT --> AR
+    BT --> MR
+    CLS -.->|保護ポリシー適用| SF
+    RLS -.->|保護ポリシー適用| SF
+    DM -.->|保護ポリシー適用| SF
+
+    AR --> |成功| MV
+    MR --> |成功| MV
+    AR --> |失敗| EH
+    MR --> |失敗| EH
+    SF --> |保護データを除外| EM
+
+    style security_boundary fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style base_table fill:#e3f2fd,stroke:#1565c0
+    style refresh_process fill:#fff3e0,stroke:#f57c00
+    style EM fill:#ffcdd2,stroke:#d32f2f
+    style MV fill:#c8e6c9,stroke:#388e3c
+        </pre>
+      </div>
+    </div>
+
+    <!-- Data Exposure Path -->
+    <div class="section">
+      <h2>⚠️ データ露出の経路 (修正前)</h2>
+      <p>修正前は、以下の経路で保護データが意図せず露出する可能性がありました。</p>
+      <div class="exposure-path">
+        <div class="exposure-step">🗄️ ベーステーブル<br><small>保護データ含む</small></div>
+        <span class="exposure-arrow">→</span>
+        <div class="exposure-step">🔄 リフレッシュ処理<br><small>エラー発生</small></div>
+        <span class="exposure-arrow">→</span>
+        <div class="exposure-step">💬 エラーメッセージ<br><small>データ断片が混入</small></div>
+        <span class="exposure-arrow">→</span>
+        <div class="exposure-step">📋 ジョブ履歴/ログ<br><small>権限外ユーザーが閲覧</small></div>
+      </div>
+      <div class="success-box">
+        <strong>✅ 修正後:</strong> エラーメッセージ生成前にセキュリティフィルタが適用され、保護データがエラーメッセージから除外されます。
+      </div>
+    </div>
+
+    <!-- Security Fix Details -->
+    <div class="section">
+      <h2>🔍 セキュリティ修正の詳細</h2>
+
+      <h3>問題の背景</h3>
+
+      <div class="card">
+        <h4 style="margin: 0 0 8px 0; color: var(--gc-on-surface);">🔄 マテリアライズドビューのリフレッシュ処理</h4>
+        <div class="check-item"><span>→</span> マテリアライズドビューはベーステーブルのデータをキャッシュとして保持し、クエリパフォーマンスを向上させる</div>
+        <div class="check-item"><span>→</span> 自動リフレッシュはベーステーブル変更後 <strong>5~30 分以内</strong>に <code>bigquery-adminbot@system.gserviceaccount.com</code> で実行</div>
+        <div class="check-item"><span>→</span> 手動リフレッシュは <code>BQ.REFRESH_MATERIALIZED_VIEW</code> システムプロシージャで実行</div>
+        <div class="check-item"><span>→</span> 失敗時のエラーは <code>INFORMATION_SCHEMA.MATERIALIZED_VIEWS</code> の <code>last_refresh_status</code> に記録</div>
+      </div>
+
+      <div class="card">
+        <h4 style="margin: 0 0 8px 0; color: var(--gc-on-surface);">🛡️ きめ細かいアクセス制御の仕組み</h4>
+        <div class="check-item"><span class="check-icon">✓</span> <strong>列レベルセキュリティ:</strong> ポリシータグでアクセスを制限。Data Catalog Fine-Grained Reader ロールが必要</div>
+        <div class="check-item"><span class="check-icon">✓</span> <strong>データマスキング:</strong> SHA-256 ハッシュや NULL 置換でマスク。BigQuery Masked Reader ロールが必要</div>
+        <div class="check-item"><span class="check-icon">✓</span> <strong>行レベルセキュリティ:</strong> <code>FILTER USING</code> 句で条件指定し表示行を制限</div>
+      </div>
+
+      <h3>影響範囲</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>影響を受ける機能</td><td>マテリアライズドビューのリフレッシュ (自動/手動)</td></tr>
+          <tr><td>影響を受ける条件</td><td>きめ細かいアクセス制御ポリシーが設定されたベーステーブルを参照するMV</td></tr>
+          <tr><td>データ露出の経路</td><td>リフレッシュ失敗時のエラーメッセージ</td></tr>
+          <tr><td>露出する可能性があったデータ</td><td>マスクされた列データ、フィルタリングされた行データの断片</td></tr>
+          <tr><td>修正状況</td><td><span class="badge badge-fixed">Google Cloud 側で修正完了済み</span></td></tr>
+          <tr><td>ユーザーの対応</td><td><strong>不要</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Security Layers -->
+    <div class="section">
+      <h2>🔐 3 つの保護レイヤー</h2>
+      <p>BigQuery のきめ細かいアクセス制御は、以下の 3 つのレイヤーで構成されています。今回の修正により、全レイヤーがエラーハンドリングを含む全処理パスで正しく機能するようになりました。</p>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-card-icon">📊</div>
+          <h4>列レベルセキュリティ</h4>
+          <p>ポリシータグをテーブル列に割り当て、Data Catalog Fine-Grained Reader ロールを持つユーザーのみが保護された列データにアクセス可能。特定の列のアクセスを制限する。</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card-icon">🎭</div>
+          <h4>データマスキング</h4>
+          <p>BigQuery Masked Reader ロールを持つユーザーには SHA-256 ハッシュや NULL 置換などのマスキングルールが適用されたデータが返される。生データの直接閲覧を防止。</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card-icon">📝</div>
+          <h4>行レベルセキュリティ</h4>
+          <p>行アクセスポリシーにより <code>FILTER USING</code> 句で指定された条件に合致する行のみがユーザーに表示される。テナント分離等に活用。</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card-icon">🔧</div>
+          <h4>エラーハンドリング (修正箇所)</h4>
+          <p>リフレッシュ失敗時にもセキュリティフィルタが適用され、上記 3 つの保護レイヤーがエラーメッセージ生成時にも一貫して機能。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- IAM Roles -->
+    <div class="section">
+      <h2>👥 関連する IAM ロール</h2>
+      <table class="iam-table">
+        <thead>
+          <tr><th>ロール</th><th>説明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Data Catalog Fine-Grained Reader</td><td>列レベルセキュリティで保護された生データへのアクセスを付与</td></tr>
+          <tr><td>BigQuery Masked Reader</td><td>マスクされたデータへのアクセスを付与</td></tr>
+          <tr><td>BigQuery Data Policy Admin</td><td>データポリシーの作成と管理</td></tr>
+          <tr><td>Data Catalog Policy Tag Admin</td><td>ポリシータグの分類体系の作成と管理</td></tr>
+          <tr><td>BigQuery Admin / Data Owner</td><td>マテリアライズドビューの管理およびアクセス制御の設定</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✨ メリット</h2>
+
+      <h3>🔒 セキュリティ面</h3>
+      <div class="card card-fix">
+        <div class="check-item"><span class="check-icon">✓</span> <strong>データ漏洩リスクの排除:</strong> リフレッシュエラー時にもアクセス制御ポリシーが一貫して適用され、意図しないデータ露出のリスクが排除</div>
+        <div class="check-item"><span class="check-icon">✓</span> <strong>コンプライアンス強化:</strong> PII や機密データの保護信頼性が向上し、GDPR や HIPAA などの規制準拠に貢献</div>
+        <div class="check-item"><span class="check-icon">✓</span> <strong>多層防御の完全性:</strong> 列/行/マスキングの各レイヤーが全処理パスで正しく機能することを保証</div>
+      </div>
+
+      <h3>⚙️ 運用面</h3>
+      <div class="card card-fix">
+        <div class="check-item"><span class="check-icon">✓</span> <strong>対応不要:</strong> ユーザー側での設定変更やコード修正は一切不要、運用負荷ゼロ</div>
+        <div class="check-item"><span class="check-icon">✓</span> <strong>自動適用:</strong> Google Cloud 側で既に適用済み、全 BigQuery ユーザーに自動反映</div>
+      </div>
+    </div>
+
+    <!-- Considerations -->
+    <div class="section">
+      <h2>📌 考慮すべき点</h2>
+
+      <div class="warning-box">
+        <strong>⚠️ セキュリティ監査の推奨:</strong> 本問題が存在していた期間中にマテリアライズドビューのリフレッシュエラーが発生していた場合、エラーログに保護データの断片が含まれている可能性があります。セキュリティ要件が厳格な組織では、過去のリフレッシュエラーログの確認を推奨します。
+      </div>
+
+      <h3>推奨される監査手順</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">過去のリフレッシュジョブのエラー確認</span>
+        </div>
+        <pre><code class="language-sql">-- INFORMATION_SCHEMA.JOBS でリフレッシュエラーを確認
+SELECT
+  job_id,
+  creation_time,
+  error_result.message AS error_message
+FROM
+  `region-us`.INFORMATION_SCHEMA.JOBS
+WHERE
+  job_type = 'QUERY'
+  AND statement_type = 'SCRIPT'
+  AND error_result IS NOT NULL
+  AND CONTAINS_SUBSTR(query, 'REFRESH MATERIALIZED VIEW')
+ORDER BY
+  creation_time DESC;</code></pre>
+      </div>
+
+      <h3>ベストプラクティス</h3>
+      <div class="card">
+        <div class="check-item"><span>→</span> マテリアライズドビューのリフレッシュ状態を定期的に監視し、エラー発生時は速やかに原因を調査</div>
+        <div class="check-item"><span>→</span> <code>INFORMATION_SCHEMA.MATERIALIZED_VIEWS</code> の <code>last_refresh_status</code> を定期的にチェック</div>
+        <div class="check-item"><span>→</span> Cloud Logging と Cloud Monitoring でリフレッシュ失敗検知アラートを設定</div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>ユースケース 1: PII データを含むテーブルでのマテリアライズドビュー運用</h4>
+        <p><span class="usecase-label label-scenario">シナリオ</span></p>
+        <p>顧客情報テーブルに氏名、メールアドレス、電話番号などの PII 列が存在し、列レベルセキュリティとデータマスキングで保護。分析チームはマテリアライズドビューで集計クエリのパフォーマンスを向上。</p>
+        <p><span class="usecase-label label-risk">修正前のリスク</span></p>
+        <p>スキーマ変更等でリフレッシュが失敗した場合、エラーメッセージに PII データの断片が含まれ、ジョブ履歴を閲覧できるユーザーに露出する可能性があった。</p>
+        <p><span class="usecase-label label-fixed">修正後</span></p>
+        <p>リフレッシュエラーが発生しても、PII データはエラーメッセージから適切に除外される。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>ユースケース 2: 行レベルセキュリティを適用したマルチテナントデータ分析</h4>
+        <p><span class="usecase-label label-scenario">シナリオ</span></p>
+        <p>複数テナントのデータを単一テーブルに格納し、行アクセスポリシーで各テナントが自身のデータのみにアクセスできるよう制御。マテリアライズドビューでテナントごとの集計を高速化。</p>
+        <p><span class="usecase-label label-risk">修正前のリスク</span></p>
+        <p>リフレッシュエラー時に、他テナントのデータがエラーメッセージに含まれる可能性があった。</p>
+        <p><span class="usecase-label label-fixed">修正後</span></p>
+        <p>エラーメッセージにおいても行レベルセキュリティが適用され、テナント間のデータ分離が保証される。</p>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="related-services">
+        <span class="related-service-tag">BigQuery 列レベルセキュリティ</span>
+        <span class="related-service-tag">BigQuery データマスキング</span>
+        <span class="related-service-tag">BigQuery 行レベルセキュリティ</span>
+        <span class="related-service-tag">Data Catalog</span>
+        <span class="related-service-tag">Cloud Logging</span>
+        <span class="related-service-tag">Cloud Monitoring</span>
+      </div>
+      <div class="card">
+        <div class="check-item"><span>→</span> <strong>BigQuery 列レベルセキュリティ:</strong> ポリシータグを使用したテーブル列単位のアクセス制御</div>
+        <div class="check-item"><span>→</span> <strong>BigQuery データマスキング:</strong> SHA-256、NULL 置換、カスタムマスキングルーチンなどによるデータ保護</div>
+        <div class="check-item"><span>→</span> <strong>BigQuery 行レベルセキュリティ:</strong> 行アクセスポリシーによるテーブル行単位のアクセス制御</div>
+        <div class="check-item"><span>→</span> <strong>Data Catalog:</strong> ポリシータグの分類体系管理、データガバナンスおよびメタデータ管理</div>
+        <div class="check-item"><span>→</span> <strong>Cloud Logging / Cloud Monitoring:</strong> BigQuery ジョブの監査ログ記録およびアラート設定</div>
+      </div>
+    </div>
+
+    <!-- Reference Links -->
+    <div class="section">
+      <h2>📚 参考リンク</h2>
+      <ul class="links-list">
+        <li>📎 <a href="https://cloud.google.com/release-notes#April_15_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li>📖 <a href="https://cloud.google.com/bigquery/docs/materialized-views-manage" target="_blank" rel="noopener noreferrer">BigQuery マテリアライズドビューの管理</a></li>
+        <li>🔒 <a href="https://cloud.google.com/bigquery/docs/column-level-security-intro" target="_blank" rel="noopener noreferrer">BigQuery 列レベルセキュリティの概要</a></li>
+        <li>🔧 <a href="https://cloud.google.com/bigquery/docs/column-level-security" target="_blank" rel="noopener noreferrer">BigQuery 列レベルセキュリティの設定</a></li>
+        <li>🎭 <a href="https://cloud.google.com/bigquery/docs/column-data-masking-intro" target="_blank" rel="noopener noreferrer">BigQuery データマスキングの概要</a></li>
+        <li>📝 <a href="https://cloud.google.com/bigquery/docs/row-level-security-intro" target="_blank" rel="noopener noreferrer">BigQuery 行レベルセキュリティの概要</a></li>
+        <li>📊 <a href="https://cloud.google.com/bigquery/docs/materialized-views-monitor" target="_blank" rel="noopener noreferrer">BigQuery マテリアライズドビューのモニタリング</a></li>
+      </ul>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>📎 出典: <a href="https://cloud.google.com/release-notes#April_15_2026" target="_blank" rel="noopener noreferrer">https://cloud.google.com/release-notes#April_15_2026</a></p>
+      <p>🏷️ #BigQuery #Security #MaterializedView #FineGrainedAccessControl #ColumnLevelSecurity #DataMasking #RowLevelSecurity #SecurityFix</p>
+    </footer>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

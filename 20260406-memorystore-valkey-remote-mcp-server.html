@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Memorystore for Valkey: Remote MCP Server (Preview)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1 {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .card-teal {
+      border-left-color: var(--gc-teal);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .badge, .badge-ga, .badge-preview, .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+    .badge-ga { background: var(--gc-green); color: #FFFFFF; }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h3 {
+      color: var(--gc-red);
+      font-size: 16px;
+      margin-bottom: 8px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box h3 {
+      color: var(--gc-green);
+      font-size: 16px;
+      margin-bottom: 8px;
+    }
+
+    .before-box ul, .after-box ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .before-box li, .after-box li {
+      padding: 4px 0;
+      font-size: 14px;
+    }
+
+    .before-box li::before { content: "❌ "; }
+    .after-box li::before { content: "✅ "; }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .ai-box {
+      background: var(--gc-purple-tint);
+      border-left: 4px solid var(--gc-purple);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    .code-block, pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      border-radius: 8px 8px 0 0;
+    }
+
+    .code-lang { color: #9CDCFE; font-weight: bold; }
+    .code-title { color: #AAAAAA; }
+
+    .code-header + pre:not(.mermaid) {
+      border-top-left-radius: 0;
+      border-top-right-radius: 0;
+      margin-top: 0;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-900);
+      font-size: 18px;
+      margin-bottom: 8px;
+    }
+
+    .usecase-card p {
+      font-size: 14px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .target-audience {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .audience-card {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-outline-variant);
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .audience-card .emoji {
+      font-size: 32px;
+      margin-bottom: 8px;
+    }
+
+    .audience-card h4 {
+      font-size: 15px;
+      color: var(--gc-on-surface);
+      margin-bottom: 4px;
+    }
+
+    .audience-card p {
+      font-size: 13px;
+      color: var(--gc-outline);
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stat-grid { grid-template-columns: 1fr; }
+      .flow-diagram { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); }
+      .target-audience { grid-template-columns: 1fr; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>🗄️ Memorystore for Valkey: Remote MCP Server</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Memorystore for Valkey</span>
+          <span class="badge-preview">Preview</span>
+          <span class="badge" style="background: var(--gc-purple);">MCP</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-04-06</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>Google Cloud は Memorystore for Valkey の<span class="highlight">リモート MCP (Model Context Protocol) サーバー</span>を Preview としてリリースしました。この MCP サーバーにより、LLM、AI アプリケーション、AI 対応の開発プラットフォームから Memorystore for Valkey インスタンスに接続し、<span class="highlight">Valkey クラスタの管理操作を MCP プロトコルを通じて実行</span>できるようになります。</p>
+
+      <div class="ai-box" style="margin-top: 16px;">
+        <strong>🤖 Valkey とは:</strong> Redis 互換のオープンソースプロジェクトに基づく水平スケーラブルなクラスタサービス。シャーディングによるデータ分散、ベクトル検索機能、クロスリージョンレプリケーション、Cluster Mode Enabled / Disabled の選択などの機能を持ちます。
+      </div>
+    </div>
+
+    <!-- Target Audience -->
+    <div class="section">
+      <h2>🎯 対象ユーザー</h2>
+      <div class="target-audience">
+        <div class="audience-card">
+          <div class="emoji">🏗️</div>
+          <h4>インフラストラクチャエンジニア</h4>
+          <p>Memorystore for Valkey を運用している方</p>
+        </div>
+        <div class="audience-card">
+          <div class="emoji">🤖</div>
+          <h4>プラットフォームエンジニア</h4>
+          <p>AI エージェントを活用したキャッシュ管理やベクトル検索基盤の自動化を検討している方</p>
+        </div>
+        <div class="audience-card">
+          <div class="emoji">💻</div>
+          <h4>開発者</h4>
+          <p>Gemini CLI、Claude Code、Gemini Code Assist などの AI ツールから Valkey インスタンスを管理したい方</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Before / After -->
+    <div class="section">
+      <h2>🔄 Before / After</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before</h3>
+          <ul>
+            <li>Google Cloud Console、gcloud CLI、REST/RPC API を直接使用する必要があった</li>
+            <li>AI エージェントからの管理にはカスタム統合コードの開発が必要</li>
+            <li>水平スケーリング操作を自然言語で AI エージェントに指示する手段がなかった</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After</h3>
+          <ul>
+            <li>AI エージェントが MCP プロトコルで Valkey クラスタの管理操作を実行可能に</li>
+            <li>MCP 対応 AI アプリから標準インターフェースで管理可能に</li>
+            <li>IAM 認可、OAuth 2.0 認証、Model Armor、監査ログを標準で利用可能に</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>🏛️ アーキテクチャ図</h2>
+      <p>AI アプリケーションからのリクエストは、IAM / OAuth 2.0 による認証・認可を経て、Model Armor セキュリティスキャンを通過した後、MCP サーバーに到達します。MCP サーバーはリクエストを Memorystore for Valkey API の操作に変換し、クラスタに対する管理操作を実行します。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    subgraph Hosts["MCP ホスト (AI アプリケーション)"]
+        direction TB
+        Gemini(["Gemini CLI"])
+        Claude(["Claude Code"])
+        Custom(["カスタム AI エージェント"])
+    end
+
+    subgraph GCP["Google Cloud"]
+        subgraph MCP_Layer["MCP サーバーレイヤー"]
+            Auth["IAM / OAuth 2.0\n認証・認可"]
+            MA["Model Armor\nセキュリティ"]
+            Valkey_MCP["Memorystore for Valkey\nMCP Server"]
+        end
+
+        subgraph Valkey_Layer["Memorystore for Valkey"]
+            Instance[("Valkey クラスタ\nインスタンス")]
+            Shards[("シャード /\nプライマリノード")]
+            Replicas[("レプリカノード")]
+        end
+    end
+
+    Hosts -- "HTTPS / MCP プロトコル" --> Auth
+    Auth --> MA
+    MA --> Valkey_MCP
+    Valkey_MCP --> Instance
+    Valkey_MCP --> Shards
+    Valkey_MCP --> Replicas
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+
+      <div class="card">
+        <h4 style="color: var(--gc-on-surface); margin-bottom: 8px;">🔌 1. リモート MCP サーバー</h4>
+        <div class="icon-text"><span>→</span><span>Memorystore for Valkey の管理機能を MCP プロトコルで公開</span></div>
+        <div class="icon-text"><span>→</span><span>Google Cloud インフラ上のリモート MCP サーバーとして HTTPS エンドポイント経由でアクセス</span></div>
+        <div class="icon-text"><span>→</span><span>AI アプリは <code>tools/list</code> メソッドでツールを自動検出可能</span></div>
+      </div>
+
+      <div class="card card-green">
+        <h4 style="color: var(--gc-on-surface); margin-bottom: 8px;">🎛️ 2. Valkey クラスタ管理のエージェント操作</h4>
+        <div class="icon-text"><span>→</span><span>インスタンスの作成、取得、一覧表示、更新、削除などの管理操作</span></div>
+        <div class="icon-text"><span>→</span><span>シャード数の変更、ノードタイプの変更、レプリカ数の管理</span></div>
+        <div class="icon-text"><span>→</span><span>水平スケーリング操作を AI エージェントから実行可能</span></div>
+      </div>
+
+      <div class="card card-purple">
+        <h4 style="color: var(--gc-on-surface); margin-bottom: 8px;">🤖 3. LLM / AI アプリケーションとの接続</h4>
+        <div class="icon-text"><span>→</span><span>Gemini CLI、Claude Code、Gemini Code Assist、ChatGPT など MCP 対応アプリから直接接続</span></div>
+        <div class="icon-text"><span>→</span><span>カスタム AI エージェントやプラットフォームからも MCP クライアントを通じて利用可能</span></div>
+        <div class="icon-text"><span>→</span><span>自然言語によるインスタンス管理の指示を実現</span></div>
+      </div>
+
+      <div class="card card-orange">
+        <h4 style="color: var(--gc-on-surface); margin-bottom: 8px;">🔒 4. エンタープライズ向けセキュリティ・ガバナンス</h4>
+        <div class="icon-text"><span>→</span><span>IAM による細粒度のアクセス制御 (<code>roles/mcp.toolUser</code> ロール)</span></div>
+        <div class="icon-text"><span>→</span><span>OAuth 2.0 認証による安全なアクセス</span></div>
+        <div class="icon-text"><span>→</span><span>Model Armor によるプロンプトとレスポンスのセキュリティスキャン</span></div>
+        <div class="icon-text"><span>→</span><span>Cloud Audit Logs による一元的な監査ログ記録</span></div>
+      </div>
+    </div>
+
+    <!-- Valkey vs Redis MCP Comparison -->
+    <div class="section">
+      <h2>📊 Valkey MCP vs Redis MCP 比較</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>比較項目</th>
+            <th>Memorystore for Valkey MCP</th>
+            <th>Memorystore for Redis MCP</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>API エンドポイント</td>
+            <td><code>memorystore.googleapis.com</code></td>
+            <td><code>redis.googleapis.com</code></td>
+          </tr>
+          <tr>
+            <td>アーキテクチャ</td>
+            <td>水平スケーラブル (シャーディング)</td>
+            <td>垂直スケーラブル (Basic/Standard Tier)</td>
+          </tr>
+          <tr>
+            <td>クラスタモード</td>
+            <td>Enabled / Disabled 選択可能</td>
+            <td>クラスタモードなし</td>
+          </tr>
+          <tr>
+            <td>スケーリング操作</td>
+            <td>シャード数・ノードタイプの変更</td>
+            <td>メモリサイズの変更</td>
+          </tr>
+          <tr>
+            <td>ベクトル検索</td>
+            <td>対応 (HNSW / FLAT)</td>
+            <td>対応 (Redis 7.2 以降)</td>
+          </tr>
+          <tr>
+            <td>サポートバージョン</td>
+            <td>Valkey 7.2, 8.0, 9.0</td>
+            <td>Redis 5.0, 6.x, 7.0, 7.2</td>
+          </tr>
+          <tr>
+            <td>ベースプロジェクト</td>
+            <td>Valkey (Redis 互換 OSS)</td>
+            <td>Redis</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Technical Specs -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3 style="color: var(--gc-on-surface); margin-bottom: 12px; font-size: 18px;">MCP サーバーエンドポイント</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>サービス名</td><td><code>memorystore.googleapis.com</code></td></tr>
+          <tr><td>MCP エンドポイント (推定)</td><td><code>https://memorystore.googleapis.com/mcp</code></td></tr>
+          <tr><td>トランスポート</td><td>HTTPS (リモート MCP サーバー)</td></tr>
+          <tr><td>認証方式</td><td>OAuth 2.0 + IAM</td></tr>
+          <tr><td>ステータス</td><td><span class="badge-preview" style="font-size: 11px; padding: 2px 8px;">Preview</span></td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="color: var(--gc-on-surface); margin: 20px 0 12px; font-size: 18px;">🔑 必要な IAM ロール</h3>
+      <div class="code-block" style="padding: 0; overflow: hidden;">
+        <div class="code-header">
+          <span class="code-lang">JSON</span>
+          <span class="code-title">必要な IAM ロールと権限</span>
+        </div>
+        <pre style="margin: 0; border-radius: 0;"><code class="language-json">{
+  "required_roles": [
+    {
+      "role": "roles/serviceusage.serviceUsageAdmin",
+      "purpose": "MCP サーバーの有効化"
+    },
+    {
+      "role": "roles/mcp.toolUser",
+      "purpose": "MCP ツール呼び出しの実行"
+    },
+    {
+      "role": "roles/memorystore.admin",
+      "purpose": "Memorystore for Valkey リソースへの管理アクセス"
+    }
+  ]
+}</code></pre>
+      </div>
+    </div>
+
+    <!-- Setup -->
+    <div class="section">
+      <h2>🚀 設定方法</h2>
+
+      <h3 style="color: var(--gc-on-surface); margin-bottom: 12px; font-size: 18px;">前提条件</h3>
+      <div class="check-item"><span>✅</span><span>Google Cloud プロジェクトが作成済みであること</span></div>
+      <div class="check-item"><span>✅</span><span>Memorystore API (<code>memorystore.googleapis.com</code>) が有効化されていること</span></div>
+      <div class="check-item"><span>✅</span><span>必要な IAM ロール (Service Usage Admin, MCP Tool User, Memorystore Admin) が付与されていること</span></div>
+
+      <h3 style="color: var(--gc-on-surface); margin: 20px 0 12px; font-size: 18px;">Step 1: MCP サーバーの有効化</h3>
+      <div class="code-block" style="padding: 0; overflow: hidden;">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">MCP サーバーの有効化</span>
+        </div>
+        <pre style="margin: 0; border-radius: 0;"><code class="language-bash"># gcloud CLI beta コンポーネントのインストール
+gcloud components install beta
+
+# Memorystore for Valkey の MCP サーバーを有効化
+gcloud beta services mcp enable memorystore.googleapis.com \
+  --project=PROJECT_ID</code></pre>
+      </div>
+
+      <h3 style="color: var(--gc-on-surface); margin: 20px 0 12px; font-size: 18px;">Step 2: IAM ロールの付与</h3>
+      <div class="code-block" style="padding: 0; overflow: hidden;">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">IAM ロールの付与</span>
+        </div>
+        <pre style="margin: 0; border-radius: 0;"><code class="language-bash"># MCP Tool User ロールの付与
+gcloud projects add-iam-policy-binding PROJECT_ID \
+  --member="user:USER_EMAIL" \
+  --role="roles/mcp.toolUser"
+
+# Memorystore 管理者ロールの付与
+gcloud projects add-iam-policy-binding PROJECT_ID \
+  --member="user:USER_EMAIL" \
+  --role="roles/memorystore.admin"</code></pre>
+      </div>
+
+      <h3 style="color: var(--gc-on-surface); margin: 20px 0 12px; font-size: 18px;">Step 3: MCP クライアントの設定 (Claude Code)</h3>
+      <div class="code-block" style="padding: 0; overflow: hidden;">
+        <div class="code-header">
+          <span class="code-lang">JSON</span>
+          <span class="code-title">Claude Code 用設定</span>
+        </div>
+        <pre style="margin: 0; border-radius: 0;"><code class="language-json">{
+  "mcpServers": {
+    "memorystore-valkey": {
+      "url": "https://memorystore.googleapis.com/mcp",
+      "transport": "http",
+      "auth": {
+        "type": "google_credentials",
+        "scopes": ["https://www.googleapis.com/auth/cloud-platform"]
+      }
+    }
+  }
+}</code></pre>
+      </div>
+
+      <h3 style="color: var(--gc-on-surface); margin: 20px 0 12px; font-size: 18px;">Step 4: MCP クライアントの設定 (Gemini CLI)</h3>
+      <div class="code-block" style="padding: 0; overflow: hidden;">
+        <div class="code-header">
+          <span class="code-lang">JSON</span>
+          <span class="code-title">Gemini CLI 用設定</span>
+        </div>
+        <pre style="margin: 0; border-radius: 0;"><code class="language-json">{
+  "name": "memorystore-valkey",
+  "version": "1.0.0",
+  "mcpServers": {
+    "memorystore-valkey": {
+      "httpUrl": "https://memorystore.googleapis.com/mcp",
+      "authProviderType": "google_credentials",
+      "oauth": {
+        "scopes": ["https://www.googleapis.com/auth/cloud-platform"]
+      },
+      "timeout": 30000,
+      "headers": {
+        "x-goog-user-project": "PROJECT_ID"
+      }
+    }
+  }
+}</code></pre>
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>💡 メリット</h2>
+
+      <h3 style="color: var(--gc-on-surface); margin-bottom: 12px; font-size: 18px;">📈 ビジネス面</h3>
+      <div class="card card-green">
+        <h4 style="color: var(--gc-on-surface); margin-bottom: 8px;">水平スケーリングの運用効率向上</h4>
+        <p>AI エージェントが自然言語の指示に基づいて Valkey クラスタのシャード数やノードタイプの変更を実行でき、複雑な水平スケーリング操作の運用が効率化される</p>
+      </div>
+      <div class="card card-green">
+        <h4 style="color: var(--gc-on-surface); margin-bottom: 8px;">スキルギャップの解消</h4>
+        <p>Memorystore for Valkey のクラスタアーキテクチャや <code>gcloud memorystore</code> コマンドに精通していなくても、AI エージェントを通じてインスタンス管理を実行でき、運用チームの対応範囲が拡大する</p>
+      </div>
+      <div class="card card-green">
+        <h4 style="color: var(--gc-on-surface); margin-bottom: 8px;">AI アプリケーション基盤の統合管理</h4>
+        <p>ベクトル検索機能を持つ Valkey インスタンスの管理を AI エージェントに統合することで、RAG パイプラインや LLM キャッシュの基盤管理が一元化される</p>
+      </div>
+
+      <h3 style="color: var(--gc-on-surface); margin: 20px 0 12px; font-size: 18px;">🔧 技術面</h3>
+      <div class="card">
+        <h4 style="color: var(--gc-on-surface); margin-bottom: 8px;">標準化されたインターフェース</h4>
+        <p>MCP プロトコルにより、複数の AI アプリケーションから統一されたインターフェースで Memorystore for Valkey を管理可能</p>
+      </div>
+      <div class="card">
+        <h4 style="color: var(--gc-on-surface); margin-bottom: 8px;">エンタープライズセキュリティ</h4>
+        <p>IAM、OAuth 2.0、Model Armor、監査ログによる包括的なセキュリティ・ガバナンス基盤が標準で提供</p>
+      </div>
+      <div class="card">
+        <h4 style="color: var(--gc-on-surface); margin-bottom: 8px;">MCP エコシステムとの統合</h4>
+        <p>BigQuery、Cloud SQL、Firestore、Bigtable、GKE、Memorystore for Redis など他の Google Cloud MCP サーバーと組み合わせたマルチサービスのエージェントワークフローを構築可能</p>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3 style="color: var(--gc-on-surface); margin-bottom: 12px; font-size: 18px;">制限事項</h3>
+      <div class="warning-box">
+        <div class="icon-text"><span>⚠️</span><span>Preview 機能であるため、本番環境での使用は推奨されない。Pre-GA Offerings Terms が適用</span></div>
+        <div class="icon-text"><span>⚠️</span><span>MCP ツール、パラメータ、説明、出力は予告なく変更・追加・削除される可能性がある</span></div>
+        <div class="icon-text"><span>⚠️</span><span>MCP ツールの出力は非決定的であり、同一の呼び出しでも内容やフォーマットが変わる可能性がある</span></div>
+        <div class="icon-text"><span>⚠️</span><span>Valkey のブロックされたコマンド (CONFIG、SHUTDOWN 等) は MCP サーバーからも制限される可能性がある</span></div>
+      </div>
+
+      <h3 style="color: var(--gc-on-surface); margin: 20px 0 12px; font-size: 18px;">考慮すべき点</h3>
+      <div class="note-box">
+        <div class="icon-text"><span>📌</span><span>MCP サーバーは管理操作 (コントロールプレーン) に焦点。Valkey のデータ読み書き (GET/SET) やベクトル検索 (FT.SEARCH) とは区別が必要</span></div>
+        <div class="icon-text"><span>📌</span><span>AI エージェントによる破壊的操作 (削除、シャード数削減) のリスクがあるため、IAM 最小権限 + Human-in-the-Middle モード推奨</span></div>
+        <div class="icon-text"><span>📌</span><span>Memorystore for Valkey は Private Service Connect を使用したネットワーク接続が必要。管理操作とデータプレーンの接続要件は異なる</span></div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>🔄 UC1: AI エージェントによる Valkey クラスタの水平スケーリング</h4>
+        <p>トラフィック増加時に、AI エージェントが自然言語の指示でシャード数の変更やノードタイプの変更を実行。複数シャードにまたがるデータ再分散を伴う複雑な操作を安全に実行可能。</p>
+        <div class="code-block" style="padding: 0; overflow: hidden; margin-top: 12px;">
+          <div class="code-header">
+            <span class="code-lang">Text</span>
+            <span class="code-title">実装例: 自然言語による指示</span>
+          </div>
+          <pre style="margin: 0; border-radius: 0;"><code class="language-plaintext">ユーザー: "本番環境の Valkey インスタンス prod-cache の現在の
+           シャード数とノードタイプを確認して、シャード数を
+           10 から 20 に増やして"
+
+AI エージェント:
+  1. GetInstance で prod-cache のインスタンス情報を取得
+  2. 現在のシャード数 (10) とノードタイプ (highmem-medium) を確認
+  3. UpdateInstance でシャード数を 20 に変更
+  4. 変更結果とリシャーディングの進行状況を報告</code></pre>
+        </div>
+      </div>
+
+      <div class="usecase-card">
+        <h4>🔍 UC2: ベクトル検索基盤としての Valkey インスタンス管理</h4>
+        <p>RAG パイプラインのベクトルストアとして Memorystore for Valkey を使用している環境で、AI エージェントがインスタンスの状態確認、レプリカ数の調整、バックアップの管理を実行。クエリスループット低下時にレプリカ数を増やして検索スループットを線形にスケール。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>🌐 UC3: マルチサービス AI ワークフローによるデータ基盤の統合管理</h4>
+        <p>AI エージェントが Memorystore for Valkey MCP、Memorystore for Redis MCP、Cloud SQL MCP、BigQuery MCP を組み合わせて、キャッシュ層、データベース層、分析層を横断的に構成確認・管理。Valkey (キャッシュ/ベクトル検索) と Redis (セッション管理/キャッシュ) の両方を統一的に管理可能。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>Memorystore for Valkey MCP サーバー自体の追加料金についての公式情報は未確認。他の Google Cloud MCP サーバーと同様に、MCP サーバーの利用自体は追加料金なしで、基盤となる Memorystore for Valkey の利用料金が適用されるものと考えられます。</p>
+
+      <div class="stat-grid" style="margin-top: 16px;">
+        <div class="stat-card">
+          <div class="stat-value">$0.154</div>
+          <div class="stat-label">highmem-medium ノード/時間<br>(us-central1)</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-green), #1B5E20);">
+          <div class="stat-value">20%</div>
+          <div class="stat-label">1 年 CUD 割引</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, #34A853, #0D652D);">
+          <div class="stat-value">40%</div>
+          <div class="stat-label">3 年 CUD 割引</div>
+        </div>
+      </div>
+
+      <div class="note-box" style="margin-top: 16px;">
+        <strong>💡</strong> CUD (Committed Use Discounts) は Memorystore for Valkey、Redis Cluster、Redis、Memcached の全サービス間で互換性があります。
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <h4 style="color: var(--gc-on-surface); margin-bottom: 4px;">Memorystore for Redis MCP サーバー</h4>
+        <p style="font-size: 14px;">同日に Preview リリースされた Redis 向け MCP サーバー。Redis インスタンスの管理操作を MCP プロトコルで実行可能。</p>
+      </div>
+      <div class="card card-purple">
+        <h4 style="color: var(--gc-on-surface); margin-bottom: 4px;">Google Cloud MCP サーバーエコシステム</h4>
+        <p style="font-size: 14px;">BigQuery、Cloud SQL、Firestore、Bigtable、Compute Engine、GKE、Cloud Run、Pub/Sub、Cloud Logging、Spanner など多数のサービスがリモート MCP サーバーを提供。</p>
+      </div>
+      <div class="card card-teal">
+        <h4 style="color: var(--gc-on-surface); margin-bottom: 4px;">Memorystore for Valkey ベクトル検索</h4>
+        <p style="font-size: 14px;">HNSW / FLAT アルゴリズムによるベクトル検索。LangChain 統合で RAG、LLM キャッシュ、セマンティック検索などの生成 AI ユースケースを実現。</p>
+      </div>
+      <div class="card card-green">
+        <h4 style="color: var(--gc-on-surface); margin-bottom: 4px;">クロスリージョンレプリケーション (GA)</h4>
+        <p style="font-size: 14px;">災害復旧シナリオでの Valkey データの保護が可能。</p>
+      </div>
+      <div class="card card-orange">
+        <h4 style="color: var(--gc-on-surface); margin-bottom: 4px;">Model Armor / IAM MCP Tool User ロール</h4>
+        <p style="font-size: 14px;">MCP ツール呼び出しとレスポンスに対するセキュリティスキャン。<code>roles/mcp.toolUser</code> ロールできめ細かい権限制御。</p>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section" style="background: var(--gc-blue-tint); border: 2px solid var(--gc-blue-300);">
+      <h2>📝 まとめ</h2>
+      <p>Memorystore for Valkey リモート MCP サーバーの Preview リリースは、Google Cloud の MCP エコシステムにインメモリデータストア管理の領域を本格的に加える重要なアップデートです。水平スケーラブルなクラスタアーキテクチャ、ベクトル検索機能、クロスリージョンレプリケーションなどの先進的な機能を持つ Valkey は、AI エージェントによる管理の恩恵が特に大きいサービスです。</p>
+      <div class="warning-box" style="margin-top: 12px;">
+        <strong>推奨アクション:</strong> Preview 段階のため、まずは非本番環境で AI エージェントを通じた Valkey クラスタ管理を試験的に実施し、IAM による最小権限の設定と Model Armor の有効化を組み合わせた安全な運用パターンの確立を推奨します。
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="list-style: none; padding: 0; margin-top: 4px;">
+        <li style="margin: 4px 0;"><a href="https://docs.cloud.google.com/release-notes#April_06_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/memorystore/docs/valkey/product-overview" target="_blank" rel="noopener noreferrer">Memorystore for Valkey ドキュメント</a></li>
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/memorystore/docs/valkey/release-notes" target="_blank" rel="noopener noreferrer">Memorystore for Valkey リリースノート</a></li>
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/mcp/overview" target="_blank" rel="noopener noreferrer">Google Cloud MCP サーバー概要</a></li>
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/mcp/supported-products" target="_blank" rel="noopener noreferrer">MCP サポート対象プロダクト</a></li>
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/mcp/authenticate-mcp" target="_blank" rel="noopener noreferrer">MCP サーバーへの認証</a></li>
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/memorystore/valkey/pricing" target="_blank" rel="noopener noreferrer">Memorystore for Valkey 料金ページ</a></li>
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/memorystore/docs/valkey/cuds" target="_blank" rel="noopener noreferrer">Memorystore for Valkey CUD</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline);">Generated on 2026-04-07 | Google Cloud News Infographic</p>
+    </footer>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bigtable: CLUSTER_ATTRIBUTE() フィルタによる継続的マテリアライズドビューのクラスタ分離 (GA)</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+:root {
+  --gc-blue: #4285F4;
+  --gc-red: #EA4335;
+  --gc-yellow: #FBBC04;
+  --gc-green: #34A853;
+  --gc-blue-900: #174EA6;
+  --gc-blue-800: #185ABC;
+  --gc-blue-700: #1967D2;
+  --gc-blue-600: #1A73E8;
+  --gc-blue-500: #4285F4;
+  --gc-blue-300: #669DF6;
+  --gc-blue-200: #8AB4F8;
+  --gc-blue-100: #AECBFA;
+  --gc-blue-50: #E8F0FE;
+  --gc-on-surface: #202124;
+  --gc-on-surface-variant: #5F6368;
+  --gc-outline: #80868B;
+  --gc-surface: #FFFFFF;
+  --gc-surface-container-lowest: #F8F9FA;
+  --gc-surface-container-low: #F1F3F4;
+  --gc-surface-container: #E8EAED;
+  --gc-outline-variant: #DADCE0;
+  --gc-blue-tint: #E8F0FE;
+  --gc-green-tint: #E6F4EA;
+  --gc-red-tint: #FCE8E6;
+  --gc-yellow-tint: #FEF7E0;
+  --gc-purple-tint: #F3E8FD;
+  --gc-teal-tint: #E0F7FA;
+  --gc-purple: #A142F4;
+  --gc-teal: #00BCD4;
+  --gc-orange: #FF6D00;
+  --gc-database: #F4B400;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background-color: var(--gc-surface);
+  font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+  color: var(--gc-on-surface-variant);
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 20px;
+  margin: 0;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.header {
+  margin-bottom: 32px;
+  padding-bottom: 16px;
+  border-bottom: 3px solid var(--gc-blue-600);
+}
+
+.header-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+h1, .title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--gc-on-surface);
+  margin: 0;
+  line-height: 1.4;
+}
+
+h2, .section-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 20px 0 8px 0;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: var(--gc-outline);
+}
+
+.section {
+  background: var(--gc-surface-container-low);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid var(--gc-outline-variant);
+}
+
+.highlight {
+  background-color: var(--gc-blue-50);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--gc-blue-800);
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+.card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border-left: 4px solid var(--gc-blue-600);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+}
+
+.card h3 { margin-top: 0; }
+
+.badge,
+.badge-ga,
+.badge-service {
+  display: inline-block;
+  color: #FFFFFF;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+  margin: 4px 8px 4px 0;
+}
+
+.badge { background: var(--gc-blue-600); }
+.badge-ga { background: var(--gc-green); color: #FFFFFF; }
+.badge-service { background: var(--gc-database); color: #FFFFFF; }
+
+/* Before/After 比較 */
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.before-col, .after-col {
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.before-col {
+  background: var(--gc-red-tint);
+  border: 1px solid rgba(234, 67, 53, 0.3);
+}
+
+.after-col {
+  background: var(--gc-green-tint);
+  border: 1px solid rgba(52, 168, 83, 0.3);
+}
+
+.before-col h3, .after-col h3 {
+  margin-top: 0;
+  font-size: 16px;
+}
+
+.before-col h3 { color: #C5221F; }
+.after-col h3 { color: #188038; }
+
+.before-col ul, .after-col ul {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 14px;
+}
+
+.before-col li, .after-col li { margin: 8px 0; }
+
+@media (max-width: 700px) {
+  .before-after { grid-template-columns: 1fr; }
+  h1 { font-size: 26px; }
+}
+
+/* Mermaid コンテナ */
+.mermaid-container {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 20px 0;
+  border: 2px solid rgba(66, 133, 244, 0.3);
+  overflow-x: auto;
+}
+
+.mermaid {
+  display: flex;
+  justify-content: center;
+}
+
+/* コードブロック */
+.code-block {
+  background: #1E1E1E;
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 16px 0;
+}
+
+.code-header {
+  background: #2D2D2D;
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.code-lang {
+  color: #9CDCFE;
+  font-weight: bold;
+}
+
+.code-title { color: #AAAAAA; }
+
+.code-block pre {
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+}
+
+pre:not(.mermaid) {
+  background: #1E1E1E;
+  border-radius: 8px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: #E8E8E8;
+  margin: 16px 0;
+}
+
+.code-block code {
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 16px !important;
+  display: block;
+}
+
+pre code {
+  background: none;
+  border: none;
+  font-size: inherit;
+}
+
+code:not(pre code) {
+  background: var(--gc-surface-container-low);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 0.9em;
+  color: var(--gc-blue-900);
+}
+
+.section code:not(pre code) {
+  background: var(--gc-surface);
+}
+
+/* テーブル */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--gc-outline-variant);
+  background: var(--gc-surface);
+}
+
+th {
+  background: var(--gc-blue-50);
+  color: var(--gc-blue-900);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 2px solid var(--gc-blue-200);
+}
+
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--gc-outline-variant);
+  font-size: 14px;
+}
+
+tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+tr:hover { background: var(--gc-blue-50); }
+
+/* ボックス */
+.note-box {
+  background: var(--gc-blue-tint);
+  border-left: 4px solid var(--gc-blue-600);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.warning-box {
+  background: var(--gc-yellow-tint);
+  border-left: 4px solid var(--gc-yellow);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.error-box {
+  background: var(--gc-red-tint);
+  border-left: 4px solid var(--gc-red);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.success-box {
+  background: var(--gc-green-tint);
+  border-left: 4px solid var(--gc-green);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+/* チェックリスト */
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.check-icon { color: var(--gc-green); font-size: 18px; flex-shrink: 0; }
+.cross-icon { color: var(--gc-red); font-size: 18px; flex-shrink: 0; }
+.warn-icon { color: var(--gc-yellow); font-size: 18px; flex-shrink: 0; }
+
+/* ステップ */
+.step-item {
+  display: flex;
+  gap: 16px;
+  margin: 16px 0;
+  align-items: flex-start;
+}
+
+.step-number {
+  background: var(--gc-blue-600);
+  color: #FFFFFF;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.step-content { flex: 1; min-width: 0; }
+
+.step-content h3 { margin-top: 0; }
+
+/* ユースケース */
+.usecase-card {
+  background: var(--gc-blue-tint);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 16px 0;
+  border: 1px solid var(--gc-blue-100);
+}
+
+.usecase-card h3 {
+  margin-top: 0;
+  color: var(--gc-blue-800);
+}
+
+.usecase-effect {
+  background: var(--gc-surface);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-top: 12px;
+  font-size: 14px;
+  border-left: 4px solid var(--gc-green);
+}
+
+/* メリットグリッド */
+.merit-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 700px) {
+  .merit-grid { grid-template-columns: 1fr; }
+}
+
+.merit-col {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  border-top: 4px solid var(--gc-green);
+}
+
+.merit-col h3 { margin-top: 0; font-size: 16px; }
+
+ul { padding-left: 22px; }
+li { margin: 6px 0; }
+
+.gc-link { color: var(--gc-blue-600); text-decoration: none; }
+.gc-link:hover { color: var(--gc-blue-800); text-decoration: underline; }
+
+/* 関連サービス */
+.related-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 10px 0;
+  font-size: 14px;
+}
+
+.related-item .rel-icon { flex-shrink: 0; font-size: 18px; }
+
+footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gc-outline-variant);
+  font-size: 13px;
+  color: var(--gc-outline);
+}
+
+footer a { word-break: break-all; }
+
+.summary-box {
+  background: linear-gradient(135deg, var(--gc-blue-50), #FFFFFF);
+  border: 2px solid var(--gc-blue-200);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.tag-list { margin-top: 12px; }
+
+.tag {
+  display: inline-block;
+  background: var(--gc-surface);
+  border: 1px solid var(--gc-blue-200);
+  color: var(--gc-blue-800);
+  border-radius: 16px;
+  padding: 2px 12px;
+  font-size: 12px;
+  margin: 3px 4px 3px 0;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ヘッダー -->
+  <div class="header">
+    <div class="header-meta">
+      <div>
+        <span class="badge-service badge">🗄️ Bigtable</span>
+        <span class="badge badge-ga">✅ 一般提供 (GA)</span>
+      </div>
+      <div class="subtitle">📅 リリース日: 2026-08-12</div>
+    </div>
+    <h1>CLUSTER_ATTRIBUTE() フィルタによる<br>継続的マテリアライズドビューのクラスタ分離</h1>
+    <p style="margin: 12px 0 0 0;">レプリケーション構成のインスタンスで、ビューの計算とストレージを<span class="highlight">特定のクラスタだけに分離</span>できるようになりました</p>
+  </div>
+
+  <!-- 概要 -->
+  <div class="section">
+    <h2>📌 概要</h2>
+    <p>
+      Bigtable の<strong>継続的マテリアライズドビュー (continuous materialized view)</strong> で、<code>CLUSTER_ATTRIBUTE()</code> フィルタを使用してビューの処理を特定のクラスタに制限できる機能が一般提供 (GA) になりました。
+    </p>
+    <p>
+      <code>CLUSTER_ATTRIBUTE()</code> は、ビューのクエリを実行している Bigtable クラスタのメタデータにアクセスできる<span class="highlight">非決定的 (non-deterministic) SQL 関数</span>です。<code>cluster_id</code> 属性を指定すると処理クラスタの文字列識別子が返され、これを <code>WHERE</code> 句で定数と比較することで、指定したクラスタ (分析・レポーティング専用クラスタなど) 上でのみビューの計算とストレージを行い、他のクラスタでは処理をスキップさせることができます。
+    </p>
+    <div class="note-box">
+      <strong>💡 誰に有用?</strong> レプリケーションを使用する Bigtable インスタンスで、サービング用クラスタと分析用クラスタのワークロードを分離しつつ、事前集計されたビューを分析用クラスタだけに維持したいユーザーに有用なアップデートです。
+    </div>
+
+    <div class="before-after">
+      <div class="before-col">
+        <h3>❌ Before: アップデート前の課題</h3>
+        <ul>
+          <li>継続的マテリアライズドビューは各クラスタが独立して処理する仕組みのため、レプリケーション構成では<strong>すべてのクラスタ</strong>でビューの計算・ビューデータ・中間ストレージの保持が発生</li>
+          <li>ビューの処理対象を特定のクラスタに制限する手段がなく、インスタンス内でビューを分離できなかった</li>
+          <li>全クラスタで一貫した結果を保証するため、デフォルトでは決定的 (deterministic) 関数のみサポートで、非決定的関数は使用不可</li>
+        </ul>
+      </div>
+      <div class="after-col">
+        <h3>✅ After: アップデート後の改善</h3>
+        <ul>
+          <li><code>CLUSTER_ATTRIBUTE('cluster_id')</code> を <code>WHERE</code> 句で使用し、ビューの処理を<strong>特定のクラスタに制限</strong>できるように</li>
+          <li>指定クラスタ以外ではビューの行を計算・保存しないため、<strong>コンピュートとストレージのリソースを節約</strong></li>
+          <li>ソーステーブルの行に書き込んだクラスタ情報 (例: <code>origin_cluster</code> 列) と処理クラスタを照合し、<strong>データの発生元クラスタごとのフィルタリング</strong>も可能に</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- アーキテクチャ図 -->
+  <div class="section">
+    <h2>🏗️ アーキテクチャ図</h2>
+    <div class="mermaid-container">
+      <pre class="mermaid">
+flowchart TD
+    subgraph Instance["🏢 Bigtable インスタンス (レプリケーション構成)"]
+        subgraph ClusterA["🖥️ クラスタ A (サービング用)"]
+            TableA[("📋 ソーステーブル<br/>レプリカ")]
+            SkipA["⏭️ CMV 処理スキップ<br/>WHERE 条件 = false<br/>(計算・保存なし)"]
+        end
+        subgraph ClusterB["📊 クラスタ B (分析用: analytics-cluster)"]
+            TableB[("📋 ソーステーブル<br/>レプリカ")]
+            CMV[("📈 継続的マテリアライズドビュー<br/>WHERE CLUSTER_ATTRIBUTE('cluster_id')<br/>= 'analytics-cluster'")]
+        end
+    end
+    App(["👤 アプリケーション"]) -->|書き込み| TableA
+    TableA -.->|レプリケーション| TableB
+    TableA --> SkipA
+    TableB -->|バックグラウンド処理<br/>(クラスタ B のみ)| CMV
+    Analyst(["👤 分析ユーザー"]) -->|シングルクラスタルーティングの<br/>アプリプロファイルで読み取り| CMV
+      </pre>
+    </div>
+    <p>
+      <code>CLUSTER_ATTRIBUTE('cluster_id')</code> を定数と比較するフィルタにより、<code>WHERE</code> 条件が true になる分析用クラスタ B だけがビューを計算・保存し、サービング用クラスタ A はビュー処理を行わないためリソースを節約できます。
+    </p>
+  </div>
+
+  <!-- 主要機能 -->
+  <div class="section">
+    <h2>⚙️ 主要機能</h2>
+
+    <div class="card">
+      <h3>1️⃣ CLUSTER_ATTRIBUTE() 関数 (GA)</h3>
+      <p style="margin: 8px 0; font-size: 14px;">
+        継続的マテリアライズドビューのクエリを実行する Bigtable クラスタのメタデータにアクセスできる<strong>非決定的 SQL 関数</strong>。<code>cluster_id</code> 属性はビューを処理するクラスタの文字列識別子を返します。
+      </p>
+      <div class="note-box" style="font-size: 14px; margin-bottom: 0;">
+        <strong>📖 意味論のポイント:</strong> <code>CLUSTER_ATTRIBUTE</code> は「処理クラスタ」のプロパティであり、ソーステーブルに保存されたデータのプロパティではありません。ビューの処理は各クラスタで独立して実行されるため、<code>CLUSTER_ATTRIBUTE('cluster_id')</code> はローカルのビュー維持処理中にそのクラスタの識別子として評価されます。
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>2️⃣ 単一クラスタへのビュー分離</h3>
+      <p style="margin: 8px 0; font-size: 14px;">
+        <code>CLUSTER_ATTRIBUTE('cluster_id')</code> をクラスタ識別子の定数文字列リテラルと比較することで、ビューの計算とストレージを単一クラスタ (専用の分析・レポーティングクラスタなど) に分離できます。
+      </p>
+      <div class="check-item"><span class="check-icon">✓</span><span style="font-size: 14px;">指定クラスタでは <code>WHERE</code> 条件が true と評価され、どのクラスタで取り込み・レプリケーションされたかに関わらず<strong>ソーステーブルの全データ</strong>が集計・マテリアライズされる</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span style="font-size: 14px;">他のクラスタでは <code>WHERE</code> 条件が false となり、ビューの行を計算も保存もしない → <strong>コンピュートとストレージを節約</strong></span></div>
+    </div>
+
+    <div class="card">
+      <h3>3️⃣ データの発生元クラスタによるフィルタリング</h3>
+      <p style="margin: 8px 0; font-size: 14px;">
+        アプリケーションがクラスタのメタデータをソーステーブルの行 (例: <code>origin_cluster</code> 列) に書き込んでいる場合、行の発生元クラスタと処理クラスタを照合できます。
+      </p>
+      <div class="check-item"><span class="check-icon">✓</span><span style="font-size: 14px;">各クラスタのビューのレプリカは、保存された <code>origin_cluster</code> がそのクラスタの ID と一致する行のみを集計</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span style="font-size: 14px;">発生元クラスタが未指定の行がある場合は、<code>IF_NULL</code> でフォールバック用クラスタを割り当て可能</span></div>
+    </div>
+  </div>
+
+  <!-- 技術仕様 -->
+  <div class="section">
+    <h2>🔬 技術仕様</h2>
+    <h3 style="margin-top: 0;">CLUSTER_ATTRIBUTE() の主な仕様</h3>
+    <table>
+      <tr><th style="width: 30%;">項目</th><th>詳細</th></tr>
+      <tr><td>関数の種類</td><td>非決定的 (non-deterministic) SQL 関数</td></tr>
+      <tr><td>属性</td><td><code>cluster_id</code>: ビューを処理するクラスタの文字列識別子を返す</td></tr>
+      <tr><td>作成時の要件</td><td>ビュー作成時に <code>--ignore-warnings</code> フラグ (gcloud CLI) で意味論的差異の可能性を承認する必要がある。省略するとクエリ検証が失敗する</td></tr>
+      <tr><td>作成方法</td><td>非決定的関数を使用するビューの作成は gcloud CLI を使用 (Google Cloud コンソールでは不可)</td></tr>
+      <tr><td>ビューの読み取り</td><td>シングルクラスタルーティングのアプリプロファイルを使用 (マルチクラスタルーティングは非サポート)</td></tr>
+      <tr><td>GROUP BY 列の扱い</td><td><code>GROUP BY</code> 句の列は継続的マテリアライズドビューの行キーの一部になる</td></tr>
+    </table>
+
+    <h3>単一クラスタへ分離するクエリ例</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">SQL</span>
+        <span class="code-title">継続的マテリアライズドビューの定義クエリ</span>
+      </div>
+      <pre><code class="language-sql">SELECT
+  metrics['sensor_id'] AS sensor_id,
+  COUNT(1) AS reading_count
+FROM `TABLE_ID`
+WHERE CLUSTER_ATTRIBUTE('cluster_id') = 'CLUSTER_ID'
+GROUP BY 1</code></pre>
+    </div>
+    <ul style="font-size: 14px;">
+      <li><code>TABLE_ID</code>: Bigtable テーブルの一意の識別子</li>
+      <li><code>CLUSTER_ID</code>: ビューをマテリアライズするクラスタの識別子</li>
+    </ul>
+  </div>
+
+  <!-- 設定方法 -->
+  <div class="section">
+    <h2>🛠️ 設定方法</h2>
+
+    <h3 style="margin-top: 0;">✅ 前提条件</h3>
+    <div class="check-item"><span class="check-icon">✓</span><span>ソーステーブルと同じインスタンス内に継続的マテリアライズドビューを作成すること</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span>ビューの処理と同期、追加のストレージ使用に対応できるよう、クラスタに十分なノードがあること (オートスケーリングの有効化がベストプラクティス)</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span>ソーステーブルの読み取り権限があること</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span>継続的マテリアライズドビューのクエリ要件 (SELECT 文、GROUP BY 句または ORDER BY 句、サポート対象の集計関数など) を満たす SQL クエリを準備すること</span></div>
+
+    <div class="step-item">
+      <div class="step-number">1</div>
+      <div class="step-content">
+        <h3>CLUSTER_ATTRIBUTE() フィルタ付きのビューを作成する</h3>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">gcloud CLI でビューを作成</span>
+          </div>
+          <pre><code class="language-bash">gcloud bigtable materialized-views create VIEW \
+  --instance=INSTANCE \
+  --query="SELECT metrics['sensor_id'] AS sensor_id, COUNT(1) AS reading_count FROM \`TABLE_ID\` WHERE CLUSTER_ATTRIBUTE('cluster_id') = 'CLUSTER_ID' GROUP BY 1" \
+  --ignore-warnings</code></pre>
+        </div>
+        <div class="warning-box" style="font-size: 14px;">
+          <strong>⚠️ --ignore-warnings フラグが必須:</strong> 非決定的関数を使用する SQL クエリの場合、このフラグは「非決定的関数によって同じビューでもクラスタごとに異なる結果が生成される可能性」を承認するものです。省略するとクエリ検証が失敗します。なお、非決定的関数を使用するビューはコンソールでは作成できず、gcloud CLI を使用します。
+        </div>
+      </div>
+    </div>
+
+    <div class="step-item">
+      <div class="step-number">2</div>
+      <div class="step-content">
+        <h3>シングルクラスタルーティングのアプリプロファイルでビューを読み取る</h3>
+        <p style="font-size: 14px; margin: 8px 0;">
+          <code>CLUSTER_ATTRIBUTE</code> を使用するビューをクエリする際は、<span class="highlight">シングルクラスタルーティング</span>を構成したアプリプロファイルを使用します。ビューを特定のクラスタに分離した場合は、アプリプロファイルをそのクラスタに直接向けます。ビューが作成されてからアクティブになりクエリ可能になるまで数分かかることがあります。
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- メリット -->
+  <div class="section">
+    <h2>👍 メリット</h2>
+    <div class="merit-grid">
+      <div class="merit-col">
+        <h3>💼 ビジネス面</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span style="font-size: 14px;"><strong>リソースコストの削減</strong>: 指定クラスタ以外ではビューの行を計算・保存しないため、レプリケーション構成のインスタンスにおけるコンピュートとストレージの消費を抑えられる</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span style="font-size: 14px;"><strong>ワークロード分離による安定運用</strong>: 分析・レポーティング用の事前集計処理を専用クラスタに閉じ込めることで、サービング用クラスタへの影響を抑えたアーキテクチャを構成できる</span></div>
+      </div>
+      <div class="merit-col">
+        <h3>🔧 技術面</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span style="font-size: 14px;"><strong>インスタンス内でのビュー分離</strong>: これまで全クラスタで独立に処理されていたビューを、SQL の <code>WHERE</code> 句だけで特定クラスタに限定できる</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span style="font-size: 14px;"><strong>発生元クラスタ単位の集計</strong>: 行に記録した発生元クラスタ情報と処理クラスタを照合し、クラスタごとに異なる内容のビューレプリカを維持する柔軟な設計が可能</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span style="font-size: 14px;"><strong>フルマネージド</strong>: ビューは低優先度のバックグラウンドジョブとして増分更新されるため、フィルタ適用後も追加の ETL ジョブや運用作業は不要</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- デメリット・制約事項 -->
+  <div class="section">
+    <h2>⚠️ デメリット・制約事項</h2>
+
+    <h3 style="margin-top: 0;">🚫 制限事項</h3>
+    <div class="check-item"><span class="cross-icon">✗</span><span style="font-size: 14px;"><strong>マルチクラスタルーティング非サポート</strong>: 関数の出力は実行する物理クラスタに依存するため、マルチクラスタルーティングでは非決定的な結果となる。<code>CLUSTER_ATTRIBUTE</code> を使用するビューのクエリにはシングルクラスタルーティングのアプリプロファイルが必要</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span style="font-size: 14px;"><strong>指定クラスタ以外への問い合わせは空の結果</strong>: ビューを特定クラスタに分離した場合、他のクラスタにはビューが作成されないため、他のクラスタへのクエリは空の結果を返す</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span style="font-size: 14px;"><strong>クエリの更新は不可</strong>: 継続的マテリアライズドビューの SQL クエリは変更できない。変更が必要な場合はビューを削除して再作成する必要がある</span></div>
+
+    <h3>🤔 考慮すべき点</h3>
+    <div class="check-item"><span class="warn-icon">⚠</span><span style="font-size: 14px;">ビュー作成時に <code>--ignore-warnings</code> フラグで「クラスタごとに異なる結果が生成される可能性」を明示的に承認する必要がある</span></div>
+    <div class="check-item"><span class="warn-icon">⚠</span><span style="font-size: 14px;"><code>CLUSTER_ATTRIBUTE</code> は処理クラスタのプロパティであり、データのプロパティではないという意味論を理解して設計する必要がある</span></div>
+    <div class="check-item"><span class="warn-icon">⚠</span><span style="font-size: 14px;">ビューを分離したクラスタが利用できない場合の可用性設計 (フェイルオーバー時の挙動) を考慮する必要がある</span></div>
+    <div class="check-item"><span class="warn-icon">⚠</span><span style="font-size: 14px;">継続的マテリアライズドビューはインスタンスあたり 1,000 テーブルの上限にカウントされる</span></div>
+  </div>
+
+  <!-- ユースケース -->
+  <div class="section">
+    <h2>🎯 ユースケース</h2>
+
+    <div class="usecase-card">
+      <h3>📊 ユースケース 1: 分析専用クラスタへのビュー分離</h3>
+      <p style="font-size: 14px; margin: 8px 0;">
+        <strong>シナリオ:</strong> レプリケーション構成の Bigtable インスタンスで、IoT センサーデータをサービング用クラスタで取り込みつつ、ダッシュボード向けの事前集計は分析専用クラスタでのみ実施したい。
+      </p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">実装例</span>
+        </div>
+        <pre><code class="language-sql">SELECT
+  metrics['sensor_id'] AS sensor_id,
+  COUNT(1) AS reading_count
+FROM `sensor_table`
+WHERE CLUSTER_ATTRIBUTE('cluster_id') = 'analytics-cluster'
+GROUP BY 1</code></pre>
+      </div>
+      <div class="usecase-effect">
+        <strong>✨ 効果:</strong> 分析用クラスタだけが全データを集計・保存し、サービング用クラスタではビューの計算もストレージ消費も発生しない。集計ワークロードとサービングワークロードをインスタンス内で分離できる。
+      </div>
+    </div>
+
+    <div class="usecase-card">
+      <h3>🌏 ユースケース 2: 発生元クラスタごとの集計ビュー</h3>
+      <p style="font-size: 14px; margin: 8px 0;">
+        <strong>シナリオ:</strong> 複数リージョンのクラスタでそれぞれデータを取り込んでおり、各クラスタで「そのクラスタが発生元のデータ」だけを集計したビューを保持したい。
+      </p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">実装例</span>
+        </div>
+        <pre><code class="language-sql">SELECT
+  metrics['sensor_id'] AS sensor_id,
+  COUNT(1) AS reading_count
+FROM `sensor_table`
+WHERE metrics['origin_cluster'] = CLUSTER_ATTRIBUTE('cluster_id')
+GROUP BY 1</code></pre>
+      </div>
+      <div class="usecase-effect">
+        <strong>✨ 効果:</strong> 各クラスタのビューレプリカは、行に記録された <code>origin_cluster</code> が自クラスタ ID と一致する行のみを集計する。発生元が未指定の行には <code>IF_NULL(metrics['origin_cluster'], 'DEFAULT_CLUSTER_ID')</code> でフォールバッククラスタを割り当てられる。
+      </div>
+    </div>
+  </div>
+
+  <!-- 料金 -->
+  <div class="section">
+    <h2>💰 料金</h2>
+    <p>
+      継続的マテリアライズドビュー自体に<span class="highlight">リソース単位の追加料金はありません</span>。ただし、ビューの作成と同期には処理とストレージが必要で、標準レートで課金されます。
+    </p>
+    <table>
+      <tr><th style="width: 25%;">課金対象</th><th>内容</th></tr>
+      <tr><td>🗄️ ストレージ</td><td>ビュー内のデータと中間ストレージ (intermediate storage) の保存に対して課金される</td></tr>
+      <tr><td>⚡ コンピュート</td><td>ソーステーブルとビューの継続的な同期に CPU 処理が必要で、バックグラウンド処理のために追加ノードが必要になる場合がある</td></tr>
+    </table>
+    <div class="success-box" style="font-size: 14px;">
+      <strong>💡 節約ポイント:</strong> <code>CLUSTER_ATTRIBUTE()</code> でビューを単一クラスタに分離した場合、他のクラスタではビューの行を計算・保存しないため、その分のコンピュートとストレージのリソースを節約できます。詳細は <a href="https://cloud.google.com/bigtable/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Bigtable の料金ページ</a> を参照してください。
+    </div>
+  </div>
+
+  <!-- 関連サービス・機能 -->
+  <div class="section">
+    <h2>🔗 関連サービス・機能</h2>
+    <div class="related-item"><span class="rel-icon">📈</span><span><strong>継続的マテリアライズドビュー (Continuous materialized views)</strong>: 本機能の対象。ソーステーブルの変更を増分反映するフルマネージドの事前計算テーブルで、データの事前集計、ラムダ/カッパアーキテクチャの自動化、非同期セカンダリインデックスの作成などに使用される</span></div>
+    <div class="related-item"><span class="rel-icon">🧭</span><span><strong>アプリプロファイル / ルーティングポリシー</strong>: <code>CLUSTER_ATTRIBUTE</code> を使用するビューの読み取りにはシングルクラスタルーティングのアプリプロファイルが必要</span></div>
+    <div class="related-item"><span class="rel-icon">🔄</span><span><strong>レプリケーション</strong>: 継続的マテリアライズドビューは通常のテーブルと異なり、各クラスタが自身のソーステーブルのコピーを使って独立して処理する。本機能はこの動作を制御するもの</span></div>
+    <div class="related-item"><span class="rel-icon">📝</span><span><strong>GoogleSQL for Bigtable</strong>: 継続的マテリアライズドビューの定義に使用する SQL。<code>CLUSTER_ATTRIBUTE()</code> は GoogleSQL クエリの <code>WHERE</code> 句で使用する</span></div>
+    <div class="related-item"><span class="rel-icon">📐</span><span><strong>オートスケーリング</strong>: ビューの処理オーバーヘッドとストレージ需要に応じてノードを自動調整するため、ビューを含むインスタンスのクラスタでの有効化が推奨される</span></div>
+    <div class="related-item"><span class="rel-icon">📊</span><span><strong>Cloud Logging / メトリクス</strong>: <code>materialized_view/max_delay</code>、<code>materialized_view/storage</code>、<code>materialized_view/intermediate_storage</code>、<code>materialized_view/user_errors</code> などのメトリクスでビューの状態を監視できる</span></div>
+  </div>
+
+  <!-- まとめ -->
+  <div class="summary-box">
+    <h2 style="border-bottom: none; padding-bottom: 0;">✍️ まとめ</h2>
+    <p style="margin-bottom: 0;">
+      <code>CLUSTER_ATTRIBUTE()</code> フィルタの GA により、Bigtable の継続的マテリアライズドビューを特定のクラスタに分離し、レプリケーション構成のインスタンスで<span class="highlight">コンピュートとストレージを節約</span>しながら<span class="highlight">分析ワークロードとサービングワークロードを分離</span>できるようになりました。レプリケーションを使用しつつ継続的マテリアライズドビューを運用しているチームは、分析専用クラスタへのビュー分離を検討し、ビュー作成時の <code>--ignore-warnings</code> フラグとシングルクラスタルーティングの要件を確認することを推奨します。
+    </p>
+    <div class="tag-list">
+      <span class="tag">#Bigtable</span>
+      <span class="tag">#継続的マテリアライズドビュー</span>
+      <span class="tag">#CLUSTER_ATTRIBUTE</span>
+      <span class="tag">#クラスタ分離</span>
+      <span class="tag">#レプリケーション</span>
+      <span class="tag">#GoogleSQL</span>
+      <span class="tag">#GA</span>
+    </div>
+  </div>
+
+  <!-- フッター -->
+  <footer>
+    <p><strong>📎 出典 / 参考リンク</strong></p>
+    <ul style="margin: 8px 0; padding-left: 20px;">
+      <li><a href="https://docs.cloud.google.com/release-notes#August_12_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026-08-12)</a></li>
+      <li><a href="https://docs.cloud.google.com/bigtable/docs/continuous-materialized-views#non-deterministic-functions" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: Non-deterministic SQL functions (継続的マテリアライズドビュー概要)</a></li>
+      <li><a href="https://docs.cloud.google.com/bigtable/docs/continuous-materialized-view-queries#non-deterministic-queries" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: Non-deterministic queries (CLUSTER_ATTRIBUTE の詳細)</a></li>
+      <li><a href="https://docs.cloud.google.com/bigtable/docs/manage-continuous-materialized-views" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: 継続的マテリアライズドビューの作成と管理</a></li>
+      <li><a href="https://cloud.google.com/bigtable/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Bigtable 料金ページ</a></li>
+    </ul>
+    <p>本インフォグラフィックは Google Cloud News レポート (2026-08-12) をもとに生成されました。</p>
+  </footer>
+
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#4285F4',
+      primaryTextColor: '#202124',
+      primaryBorderColor: '#4285F4',
+      lineColor: '#4285F4',
+      secondaryColor: '#F1F3F4',
+      tertiaryColor: '#FAFAFA',
+      background: '#FFFFFF',
+      mainBkg: '#E8F0FE',
+      nodeBorder: '#4285F4',
+      clusterBkg: '#E8F0FE',
+      clusterBorder: '#4285F4',
+      edgeLabelBackground: '#FFFFFF',
+      textColor: '#202124'
+    }
+  });
+  hljs.highlightAll();
+</script>
+</body>
+</html>

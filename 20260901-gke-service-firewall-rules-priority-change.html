@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GKE: Service 用自動作成ファイアウォールルールの優先度変更と Deny ルール追加</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated,
+    .badge-change {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-change {
+      background: var(--gc-orange);
+    }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box, .after-box {
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid rgba(234, 67, 53, 0.3);
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid rgba(52, 168, 83, 0.3);
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-box h3 { color: #C5221F; }
+    .after-box h3 { color: #188038; }
+
+    .before-box ul, .after-box ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin-bottom: 8px;
+    }
+
+    @media (max-width: 720px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* 優先度比較ビジュアル */
+    .priority-visual {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin: 16px 0;
+    }
+
+    .priority-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .priority-num {
+      background: var(--gc-blue-600);
+      color: #FFFFFF;
+      font-weight: 700;
+      border-radius: 8px;
+      padding: 6px 14px;
+      min-width: 64px;
+      text-align: center;
+      font-size: 15px;
+    }
+
+    .priority-num.deny {
+      background: var(--gc-red);
+    }
+
+    .priority-desc {
+      flex: 1;
+      min-width: 200px;
+      font-size: 14px;
+      color: var(--gc-on-surface);
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* コードブロック */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block {
+      overflow: hidden;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.88em;
+      color: var(--gc-blue-900);
+      word-break: break-all;
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブル */
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* チェックリスト */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+    }
+
+    /* フロー図 */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+      font-size: 14px;
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+      border: 1px solid var(--gc-blue-100);
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      word-break: break-all;
+    }
+
+    footer ul {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    ul {
+      padding-left: 24px;
+    }
+
+    li {
+      margin-bottom: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <div style="margin-bottom: 8px;">
+          <span class="badge">Google Kubernetes Engine</span>
+          <span class="badge badge-change">Change</span>
+          <span class="badge" style="background: var(--gc-red);">Breaking Change 注意</span>
+        </div>
+        <h1>🛡️ GKE: Service 用自動作成ファイアウォールルールの優先度変更と Deny ルール追加</h1>
+        <div class="subtitle" style="margin-top: 8px;">許可ルールが優先度 1000 → 999 に変更、明示的 Deny ルール (優先度 1000) を新規作成</div>
+      </div>
+      <div class="subtitle">リリース日: 2026-09-01<br>適用: GKE 1.35.1-gke.1031000 以降</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📌 概要</h2>
+      <p>
+        GKE バージョン <span class="highlight">1.35.1-gke.1031000 以降</span>では、LoadBalancer Service 用に GKE が自動作成する VPC ファイアウォールルールの挙動が変更されます。変更点は 2 つです。
+      </p>
+      <div class="card">
+        <div class="icon-text"><span class="arrow">1️⃣</span><span>Service 用の複数の既存自動作成ルール (許可ルール) の優先度が <strong>1000 から 999</strong> に変更される</span></div>
+        <div class="icon-text"><span class="arrow">2️⃣</span><span>他の自動作成ルールで明示的に許可されていないトラフィックを<strong>拒否する追加のファイアウォールルール (優先度 1000)</strong> が新規作成される</span></div>
+      </div>
+      <p>
+        これにより、LoadBalancer の仮想 IP アドレス (VIP) 宛のトラフィックは「<span class="highlight">許可ルール (999) で許可されたもの以外はデフォルトで拒否 (1000)</span>」という、より安全なモデルに移行します。
+      </p>
+      <div class="error-box">
+        <strong>🚨 重要:</strong> <strong>優先度 1000 のカスタムファイアウォールルール</strong>で GKE の自動作成ルールを上書き (オーバーライド) している環境では、新しい Deny ルールと<strong>同一優先度</strong>となり予期しない動作が発生する可能性があります。該当するクラスタの管理者は、1.35.1-gke.1031000 以降へのアップグレード<strong>前</strong>に必ずカスタムルールの見直しが必要です。
+      </div>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before (アップデート前の課題)</h3>
+          <ul>
+            <li>GKE 自動作成の Service 用許可ルールは<strong>優先度 1000</strong> で作成され、明示的な Deny ルールは存在しなかった</li>
+            <li>LoadBalancer VIP 宛で許可ルールに一致しないトラフィックは、VPC の他のルールや暗黙のルールに従って評価され、Service 単位の明示的な拒否はなかった</li>
+            <li>ユーザーが優先度 1000 のカスタムルールで自動作成ルールと同一優先度の制御を行っているケースがあった</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After (アップデート後の改善と影響)</h3>
+          <ul>
+            <li>自動作成の許可ルールが<strong>優先度 999</strong> となり、新設の Deny ルール (1000) より確実に優先評価される</li>
+            <li>VIP 宛で明示的に許可されていないトラフィックは自動作成の Deny ルールで拒否され、<strong>セキュリティ姿勢が向上</strong></li>
+            <li>⚠️ 優先度 1000 のカスタムルール利用時は、新 Deny ルールと同順位となり<strong>意図した優先関係が崩れる可能性</strong></li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>🔢 変更後のファイアウォール評価イメージ</h3>
+      <div class="priority-visual">
+        <div class="priority-row">
+          <div class="priority-num">〜998</div>
+          <div class="priority-desc">🔧 カスタムルール (アップグレード前に 999 以下へ変更推奨)</div>
+        </div>
+        <div class="priority-row">
+          <div class="priority-num">999</div>
+          <div class="priority-desc">✅ GKE 自動作成の許可ルール (1000 から変更)</div>
+        </div>
+        <div class="priority-row">
+          <div class="priority-num deny">1000</div>
+          <div class="priority-desc">⛔ GKE 自動作成の Deny ルール (新規、明示的に許可されないトラフィックを拒否)</div>
+        </div>
+        <div class="priority-row">
+          <div class="priority-num" style="background: var(--gc-outline);">1001〜</div>
+          <div class="priority-desc">📋 その他のルール / 暗黙のルール</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図 (Before / After)</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Before["Before: 1.35.1-gke.1031000 より前"]
+        T1([🌐 クライアント]) --> V1["LoadBalancer VIP"]
+        V1 --> A1["✅ 自動作成 許可ルール<br/>k8s2-...-#91;suffixhash#93;<br/>優先度: 1000"]
+        V1 --> C1["🔧 カスタムルール<br/>優先度: 1000 (同順位)"]
+        A1 --> N1["🖥️ GKE ノード / Pod"]
+    end
+
+    subgraph After["After: 1.35.1-gke.1031000 以降"]
+        T2([🌐 クライアント]) --> V2["LoadBalancer VIP"]
+        V2 --> A2["✅ 自動作成 許可ルール<br/>k8s2-...-#91;suffixhash#93;<br/>優先度: 999 に変更"]
+        V2 --> D2["⛔ 自動作成 Deny ルール<br/>k8s2-...-#91;suffixhash#93;-deny<br/>優先度: 1000 (新規)"]
+        A2 --> N2["🖥️ GKE ノード / Pod"]
+        D2 --> X2["🚫 許可されないトラフィックを拒否"]
+    end
+
+    Before -.->|"アップグレード前に<br/>カスタムルールを 999 以下へ変更"| After
+        </pre>
+      </div>
+      <p>
+        アップグレード後は、許可ルール (999) → Deny ルール (1000) の順で評価されるため、優先度 1000 のカスタムルールは新しい Deny ルールと同順位となり、意図しない動作の原因になります。<span class="highlight">カスタムルールは 999 以下 (数値としてより小さい値) へ変更が必要</span>です。
+      </p>
+    </div>
+
+    <!-- サービスアップデートの詳細 -->
+    <div class="section">
+      <h2>🔍 サービスアップデートの詳細</h2>
+      <h3>主要な変更点</h3>
+      <div class="card">
+        <h3>1️⃣ 既存の許可ルールの優先度変更 (1000 → 999)</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>Service 用に自動作成される複数の既存ファイアウォールルールの優先度が 1000 から 999 に変更</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>GKE Subsetting またはバックエンドサービスベースのリージョン外部パススルー Network Load Balancer で使用される <code>k8s2-[cluster-id]-[namespace]-[service-name]-[suffixhash]</code> (IPv4)、同 <code>-ipv6</code> (IPv6)、ヘルスチェック用の同 <code>-fw</code>、<code>k8s2-[cluster-id]-l4-shared-hc-fw</code> などが対象</span></div>
+      </div>
+      <div class="card" style="border-left-color: var(--gc-red);">
+        <h3>2️⃣ 明示的な Deny ルールの新規作成 (優先度 1000)</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>他の自動作成ルールで明示的に許可されていないトラフィックを拒否するルールが追加作成される</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>k8s2-...-[suffixhash]-deny</code> (IPv4、送信元 <code>0.0.0.0/0</code>)、同 <code>-deny-ipv6</code> (IPv6、送信元 <code>::/0</code>) が該当。ターゲットは LoadBalancer VIP、プロトコル/ポートは All</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>これらの Deny ルールは 1.35.1-gke.1031000 より前のバージョンには存在しない</span></div>
+      </div>
+      <div class="card" style="border-left-color: var(--gc-yellow);">
+        <h3>3️⃣ カスタムファイアウォールルール利用者への影響</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>カスタムルールで GKE の Service 用ファイアウォールルールを上書きしている場合、この変更により予期しない動作が発生する可能性がある</span></div>
+      </div>
+
+      <h3>⚠️ アップグレード前に必要なアクション (Release Notes 記載)</h3>
+      <div class="warning-box">
+        <p style="margin-top: 0;">クラスタを 1.35.1-gke.1031000 以降にアップグレードする<strong>前に</strong>、以下を実施してください。</p>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>優先度 1000 のカスタムルールの優先度変更</strong>: 優先度 1000 でトラフィックを許可または拒否するカスタムルールがある場合、優先順位を維持するために優先度を数値的により小さい値 (999 以下) に変更する</span></div>
+        <div class="check-item" style="margin-bottom: 0;"><span class="check-icon">✓</span><span><strong>Deny ルールによる必要トラフィックの遮断がないか確認</strong>: 新しく自動作成される Deny ルールが、外部 IP アドレスを使用するロードバランサーに必要なトラフィックをブロックしないことを確認する</span></div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>⚙️ 技術仕様</h2>
+      <h3>対象となる主な自動作成ルール (1.35.1-gke.1031000 で変更)</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ルール名</th>
+              <th>用途</th>
+              <th>変更前</th>
+              <th>変更後</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>k8s2-[cluster-id]-[namespace]-[service-name]-[suffixhash]</code></td>
+              <td>Service への IPv4 Ingress トラフィック許可 (GKE Subsetting / バックエンドサービスベース外部パススルー NLB)</td>
+              <td>1000</td>
+              <td><strong>999</strong></td>
+            </tr>
+            <tr>
+              <td><code>k8s2-...-[suffixhash]-ipv6</code></td>
+              <td>Service への IPv6 Ingress トラフィック許可</td>
+              <td>1000</td>
+              <td><strong>999</strong></td>
+            </tr>
+            <tr>
+              <td><code>k8s2-...-[suffixhash]-fw</code></td>
+              <td>ヘルスチェック許可 (<code>externalTrafficPolicy: Local</code>)</td>
+              <td>1000</td>
+              <td><strong>999</strong></td>
+            </tr>
+            <tr>
+              <td><code>k8s2-[cluster-id]-l4-shared-hc-fw</code></td>
+              <td>ヘルスチェック許可 (<code>externalTrafficPolicy: Cluster</code>)</td>
+              <td>1000</td>
+              <td><strong>999</strong></td>
+            </tr>
+            <tr>
+              <td><code>k8s2-...-[suffixhash]-deny</code></td>
+              <td>許可ルールで明示的に許可されていない IPv4 トラフィックを拒否 (送信元 <code>0.0.0.0/0</code>、全プロトコル)</td>
+              <td>(存在しない)</td>
+              <td><strong>1000 (新規)</strong></td>
+            </tr>
+            <tr>
+              <td><code>k8s2-...-[suffixhash]-deny-ipv6</code></td>
+              <td>許可ルールで明示的に許可されていない IPv6 トラフィックを拒否 (送信元 <code>::/0</code>、全プロトコル)</td>
+              <td>(存在しない)</td>
+              <td><strong>1000 (新規)</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note-box">
+        <strong>💡 補足:</strong> 公式ドキュメントには、ターゲットプールベースの Service 用ルールについても同様の変更 (<code>k8s-fw-[loadbalancer-hash]</code> の優先度 999 化と <code>k8s-fw-[loadbalancer-hash]-deny</code> の追加など) が <strong>GKE 1.35.1-gke.1473000 以降</strong>で適用される旨が記載されています。
+      </div>
+
+      <h3>ファイアウォール評価順序のポイント</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>項目</th>
+              <th>詳細</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>VPC ファイアウォールルールの優先度</td>
+              <td>数値が小さいほど優先 (0 が最高、65535 が最低)</td>
+            </tr>
+            <tr>
+              <td>変更後の評価順序</td>
+              <td>許可ルール (999) → Deny ルール (1000) → その他のルール / 暗黙のルール</td>
+            </tr>
+            <tr>
+              <td>Deny ルールのスコープ</td>
+              <td>ターゲットは LoadBalancer VIP、プロトコル/ポートは All</td>
+            </tr>
+            <tr>
+              <td>適用範囲の注意</td>
+              <td>GKE 管理のファイアウォールルールは、GKE がファイアウォール作成を管理しているリソースにのみ適用される。階層型ファイアウォールポリシーやネットワークファイアウォールポリシーなど他のルールも合わせて評価される</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🛠️ 設定方法 (アップグレード前の確認・対応)</h2>
+
+      <h3>前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>GKE クラスタで LoadBalancer Service を使用しており、GKE の自動作成ファイアウォールルールが有効であること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>カスタムファイアウォールルールで GKE の Service 用ルールを上書きしているかどうかを把握していること</span></div>
+
+      <div class="flow-diagram">
+        <div class="flow-step">🔍 Step 1<br>優先度 1000 の<br>カスタムルール洗い出し</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🔧 Step 2<br>優先度を<br>999 以下へ変更</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🧪 Step 3<br>必要トラフィックの<br>疎通確認</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🚀 Step 4<br>クラスタ<br>アップグレード</div>
+      </div>
+
+      <h3>ステップ 1: 優先度 1000 のカスタムルールを洗い出す</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">優先度 1000 のファイアウォールルールを一覧表示</span>
+        </div>
+        <pre><code class="language-bash"># VPC 内の優先度 1000 のファイアウォールルールを一覧表示
+gcloud compute firewall-rules list \
+  --filter="priority=1000 AND network=NETWORK_NAME" \
+  --format="table(name, priority, direction, sourceRanges.list(), allowed[].map().firewall_rule().list(), denied[].map().firewall_rule().list())"</code></pre>
+      </div>
+      <p>GKE が自動作成したルール (<code>k8s-</code>、<code>k8s2-</code>、<code>gke-</code> プレフィックス) 以外で、優先度 1000 の許可/拒否カスタムルールを特定します。</p>
+
+      <h3>ステップ 2: カスタムルールの優先度を 999 以下に変更する</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">カスタムルールの優先度変更</span>
+        </div>
+        <pre><code class="language-bash"># カスタムルールの優先度を数値的に小さい値へ変更 (例: 998)
+gcloud compute firewall-rules update CUSTOM_RULE_NAME --priority=998</code></pre>
+      </div>
+      <p>GKE の自動作成許可ルール (999) より優先させたい場合は、999 より小さい値を指定します。</p>
+
+      <h3>ステップ 3: 外部 IP を使うロードバランサーの必要トラフィックを確認する</h3>
+      <p>新しく作成される Deny ルールが、外部 IP アドレスを使用するロードバランサーに必要なトラフィックをブロックしないことを確認します。確認には Connectivity Tests やファイアウォールルールのロギングが利用できます。</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">Connectivity Tests による到達性検証</span>
+        </div>
+        <pre><code class="language-bash"># 例: 対象 VIP 宛の到達性を Connectivity Tests で検証
+gcloud network-management connectivity-tests create lb-vip-test \
+  --source-ip-address=SOURCE_IP \
+  --destination-ip-address=LB_VIP \
+  --destination-port=443 \
+  --protocol=TCP</code></pre>
+      </div>
+
+      <h3>ステップ 4: クラスタをアップグレードする</h3>
+      <p>上記の確認・対応が完了してから、クラスタを 1.35.1-gke.1031000 以降にアップグレードします。</p>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <h3>💼 ビジネス面</h3>
+      <div class="card" style="border-left-color: var(--gc-green);">
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>セキュリティ姿勢の強化</strong>: LoadBalancer VIP 宛の明示的に許可されていないトラフィックが自動的に拒否されるため、意図しない露出のリスクが低減する</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>挙動の予測可能性向上</strong>: 許可 (999) と拒否 (1000) の優先関係が明確になり、Service 単位のトラフィック制御が把握しやすくなる</span></div>
+      </div>
+      <h3>🔧 技術面</h3>
+      <div class="card" style="border-left-color: var(--gc-green);">
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>明示的な Deny によるフェイルセーフ</strong>: <code>spec.loadBalancerSourceRanges</code> で許可した送信元以外からのトラフィックが、VIP 宛では明示的に拒否される</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>IPv4 / IPv6 双方に対応</strong>: Deny ルールは IPv4 (<code>-deny</code>) と IPv6 (<code>-deny-ipv6</code>) の両方が作成される</span></div>
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <h3>制限事項</h3>
+      <div class="check-item"><span class="cross-icon">✗</span><span>1.35.1-gke.1031000 より前のバージョンでは Deny ルールは存在せず、許可ルールの優先度も 1000 のまま (アップグレードにより挙動が変わる)</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>対象は GKE がファイアウォール作成を管理している Service 用ルール。自動作成を無効化して手動管理している場合の挙動は「Manage automatic firewall rule creation」のドキュメントを参照</span></div>
+      <h3>考慮すべき点</h3>
+      <div class="warning-box">
+        <div class="check-item" style="margin-top: 0;"><span class="check-icon" style="color: var(--gc-yellow);">⚠</span><span><strong>カスタムルール利用者は要対応</strong>: 優先度 1000 のカスタムルールで GKE ルールを上書きしている場合、アップグレード前に優先度を 999 以下に変更しないと、新しい Deny ルールと同順位になり予期しない動作 (必要なトラフィックの遮断など) が発生する可能性がある</span></div>
+        <div class="check-item"><span class="check-icon" style="color: var(--gc-yellow);">⚠</span><span><strong>外部 IP のロードバランサーの疎通確認</strong>: 新しい Deny ルールが必要なトラフィックをブロックしないか、アップグレード前に検証が必要</span></div>
+        <div class="check-item" style="margin-bottom: 0;"><span class="check-icon" style="color: var(--gc-yellow);">⚠</span><span>階層型ファイアウォールポリシー、グローバル/リージョンネットワークファイアウォールポリシーなど、他のファイアウォール制御との評価順序も含めて全体像を確認すること</span></div>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>📋 ユースケース 1: 特定の送信元だけに LoadBalancer Service を公開している環境のアップグレード準備</h3>
+        <p><strong>シナリオ</strong>: <code>spec.loadBalancerSourceRanges</code> を使わず、優先度 1000 のカスタム許可/拒否ルールで LoadBalancer VIP へのアクセスを制御している。クラスタを 1.35 系へアップグレードしたい。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">実装例</span>
+          </div>
+          <pre><code class="language-bash"># 1. 該当 VIP をターゲットとするカスタムルールを確認
+gcloud compute firewall-rules list --filter="priority=1000"
+
+# 2. カスタムルールの優先度を 999 より小さい値へ変更
+gcloud compute firewall-rules update allow-partner-to-lb --priority=900
+gcloud compute firewall-rules update deny-others-to-lb --priority=901
+
+# 3. その後にクラスタをアップグレード</code></pre>
+        </div>
+        <p style="margin-bottom: 0;"><strong>効果</strong>: アップグレード後も、カスタムルールが GKE の自動作成 Deny ルール (1000) より確実に優先され、意図した優先関係が維持される。</p>
+      </div>
+
+      <div class="usecase">
+        <h3>🧪 ユースケース 2: 外部公開 LoadBalancer の疎通をアップグレード前に検証する</h3>
+        <p><strong>シナリオ</strong>: 外部 IP アドレスを使用する複数の LoadBalancer Service を運用しており、新しい Deny ルールによって必要なトラフィックが遮断されないか事前に確認したい。</p>
+        <p style="margin-bottom: 0;"><strong>効果</strong>: Connectivity Tests とファイアウォールルールロギングを用いて、自動作成の許可ルール (999) で必要なトラフィックがすべてカバーされていることを確認でき、アップグレード起因の障害を未然に防げる。</p>
+      </div>
+    </div>
+
+    <!-- 料金・リージョン -->
+    <div class="section">
+      <h2>💰 料金・利用可能リージョン</h2>
+      <div class="card">
+        <h3>💵 料金</h3>
+        <p style="margin-bottom: 0;">このアップデート自体に追加料金はありません。VPC ファイアウォールルールの作成・使用に料金は発生しません (ファイアウォールルールロギングを有効化した場合はロギング料金が発生します)。GKE の料金は <a href="https://cloud.google.com/kubernetes-engine/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">GKE 料金ページ</a>を参照してください。</p>
+      </div>
+      <div class="card">
+        <h3>🌍 利用可能リージョン</h3>
+        <p style="margin-bottom: 0;">GKE バージョン 1.35.1-gke.1031000 以降を実行するクラスタに適用されます。リージョン固有の制限に関する記載はありません。</p>
+      </div>
+    </div>
+
+    <!-- 関連サービス -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card" style="border-left-color: var(--gc-teal);">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Cloud Load Balancing</strong>: Service (type: LoadBalancer) の背後で使用されるパススルー Network Load Balancer。今回の変更対象は主に GKE Subsetting / バックエンドサービスベースの外部パススルー NLB 用ルール</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Cloud NGFW / VPC ファイアウォール</strong>: 自動作成ルールは VPC ファイアウォールルールとして作成される。階層型・ネットワークファイアウォールポリシーとの評価順序にも注意</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Network Intelligence Center (Connectivity Tests)</strong>: アップグレード前後の疎通確認に有用</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>ファイアウォールルールロギング</strong>: どのルールがトラフィックを許可/拒否したかの特定に有用</span></div>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="success-box">
+        <p style="margin: 0;">
+          GKE <strong>1.35.1-gke.1031000 以降</strong>では、Service 用の自動作成ファイアウォールルールの優先度が <strong>1000 から 999</strong> に変更され、明示的に許可されていないトラフィックを拒否する<strong>優先度 1000 の Deny ルール</strong>が新たに作成されます。セキュリティ強化につながる一方、優先度 1000 のカスタムファイアウォールルールで GKE ルールを上書きしている環境では予期しない動作の原因となるため、<strong>アップグレード前にカスタムルールの優先度を 999 以下に変更し、外部 IP を使用するロードバランサーの必要トラフィックが遮断されないことを確認</strong>してください。
+        </p>
+      </div>
+      <p style="font-size: 14px;">
+        🏷️ タグ: #GKE #Kubernetes #Firewall #VPC #LoadBalancer #Networking #Security #BreakingChange
+      </p>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p><strong>📎 出典・参考リンク</strong></p>
+      <ul>
+        <li>公式リリースノート (2026-09-01): <a href="https://docs.cloud.google.com/release-notes#September_01_2026" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/release-notes#September_01_2026</a></li>
+        <li>GKE の自動作成ファイアウォールルール (Service firewall rules): <a href="https://docs.cloud.google.com/kubernetes-engine/docs/concepts/firewall-rules#service-fws" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/kubernetes-engine/docs/concepts/firewall-rules#service-fws</a></li>
+        <li>VPC ファイアウォールルールの作成を管理する: <a href="https://docs.cloud.google.com/kubernetes-engine/docs/concepts/firewall-rules#manage-firewall-rule-creation" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/kubernetes-engine/docs/concepts/firewall-rules#manage-firewall-rule-creation</a></li>
+        <li>GKE 料金ページ: <a href="https://cloud.google.com/kubernetes-engine/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">https://cloud.google.com/kubernetes-engine/pricing</a></li>
+      </ul>
+      <p>レポート: reports/2026/2026-09-01-gke-service-firewall-rules-priority-change.md | 生成日: 2026-09-02</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

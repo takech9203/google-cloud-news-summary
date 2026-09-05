@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gemini Enterprise Agent Platform: エージェントリビジョン管理とトラフィック分割</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left {
+      flex: 1;
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+    }
+
+    h2, .section-title {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .card-teal {
+      border-left-color: var(--gc-teal);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    /* Before/After comparison */
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h3 {
+      color: var(--gc-red);
+      margin-top: 0;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box h3 {
+      color: var(--gc-green);
+      margin-top: 0;
+    }
+
+    .before-box ul, .after-box ul {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    /* Flow diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Feature grid */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    /* Use case cards */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h3 {
+      color: var(--gc-blue-800);
+      margin-top: 0;
+    }
+
+    /* Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    /* Code blocks */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid) {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Mermaid container */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Note and warning boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Stat cards */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    /* Related services */
+    .related-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .related-item {
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 14px;
+    }
+
+    .related-item strong {
+      color: var(--gc-on-surface);
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    footer {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      .comparison {
+        grid-template-columns: 1fr;
+      }
+      .feature-grid {
+        grid-template-columns: 1fr;
+      }
+      .stat-grid {
+        grid-template-columns: 1fr;
+      }
+      .related-grid {
+        grid-template-columns: 1fr;
+      }
+      h1 {
+        font-size: 24px;
+      }
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>🤖 Gemini Enterprise Agent Platform:<br>エージェントリビジョン管理とトラフィック分割</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Gemini Enterprise Agent Platform</span>
+          <span class="badge-preview">Preview</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-05-15</div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        Gemini Enterprise Agent Platform において、<span class="highlight">エージェントリビジョン管理</span>と<span class="highlight">トラフィック分割</span>機能が Public Preview として利用可能になりました。
+      </p>
+      <p>
+        デプロイされたエージェントのイミュータブル（不変）なリビジョンを作成し、複数のアクティブなリビジョン間でトラフィックを分割することで、カナリアデプロイメントや安全なテストが実現します。
+      </p>
+
+      <div class="note-box">
+        <strong>💡 ポイント:</strong> リビジョンの作成機能は常に有効であり、明示的に有効化する必要はありません。v1beta1 API、Console、Agent Platform SDK、REST API のいずれからも設定が可能です。
+      </div>
+    </div>
+
+    <!-- Before/After Section -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="comparison">
+        <div class="before-box">
+          <h3>❌ Before</h3>
+          <ul>
+            <li>新バージョンのデプロイで全トラフィックが即座に切り替わり、問題発生時の影響範囲が大きかった</li>
+            <li>以前のバージョンへの迅速なロールバック手段がなかった</li>
+            <li>段階的なデプロイメント戦略が取れなかった</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After</h3>
+          <ul>
+            <li>イミュータブルなリビジョンによるバージョン管理が可能に</li>
+            <li>パーセンテージベースのトラフィック分割でカナリアデプロイメントを実現</li>
+            <li>トラフィック設定の変更だけで即座にロールバック可能</li>
+            <li>特定リビジョンへの直接クエリで個別テストも可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>エージェントへのクエリはルート ReasoningEngine リソースを経由し、トラフィック設定に基づいて各アクティブリビジョンに分散されます。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Client["クライアント"]
+        Q[クエリリクエスト]
+    end
+
+    subgraph AgentPlatform["Gemini Enterprise Agent Platform"]
+        RE[ReasoningEngine<br/>ルートリソース]
+        TC{トラフィック設定}
+
+        subgraph Revisions["リビジョン"]
+            R1[Revision 1<br/>Active - 90%]
+            R2[Revision 2<br/>Active - 10%]
+            R3[Revision 3<br/>Deprecated]
+        end
+    end
+
+    Q --> RE
+    RE --> TC
+    TC -->|90%| R1
+    TC -->|10%| R2
+    R3 -.->|クエリ不可| R3
+
+    subgraph Config["トラフィック分割モード"]
+        M1[Manual: パーセンテージ指定]
+        M2[Always Latest: 最新リビジョンに100%]
+    end
+
+    Config -.-> TC
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Stats -->
+    <div class="section">
+      <h2>📊 数字で見るアップデート</h2>
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">2</div>
+          <div class="stat-label">トラフィック分割モード<br>(Manual / Always Latest)</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-green), #1B5E20);">
+          <div class="stat-value">100%</div>
+          <div class="stat-label">合計パーセンテージ<br>(整数値で分配)</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-purple), #6A1B9A);">
+          <div class="stat-value">3</div>
+          <div class="stat-label">リビジョン状態<br>(Active / Deprecated / Deleted)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h3>📦 イミュータブルリビジョン</h3>
+          <p style="font-size:14px; margin:8px 0 0;">Versioned fields を更新すると自動的に新しい不変リビジョンを作成。一意のリソース名で識別され、動作の再現性を保証。</p>
+        </div>
+        <div class="card card-green">
+          <h3>🔀 トラフィック分割</h3>
+          <p style="font-size:14px; margin:8px 0 0;"><strong>Manual:</strong> 整数パーセンテージで各リビジョンにトラフィックを配分（合計100%）<br><strong>Always Latest:</strong> 全トラフィックを最新リビジョンに自動ルーティング</p>
+        </div>
+        <div class="card card-purple">
+          <h3>📋 リビジョン状態管理</h3>
+          <p style="font-size:14px; margin:8px 0 0;"><strong>Active:</strong> クエリ受付可能<br><strong>Deprecated:</strong> クエリ不可（削除対象候補）<br>古いリビジョンの非推奨化でリソースクォータを管理</p>
+        </div>
+        <div class="card card-orange">
+          <h3>🎯 直接クエリ</h3>
+          <p style="font-size:14px; margin:8px 0 0;">特定リビジョンのリソースパスに直接クエリを送信可能。トラフィック分割ルールをバイパスして個別テストができる。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+      <h3>Versioned Fields（リビジョン作成トリガー）</h3>
+      <p style="font-size:14px;">以下のフィールドを更新すると新しいリビジョンが作成されます。Unversioned fields の更新は全リビジョンに共通で適用されます。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>カテゴリ</th>
+            <th>フィールド</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>PackageSpec</strong></td>
+            <td>pickleObjectGcsUri, dependencyFilesGcsUri, requirementsGcsUri, pythonVersion</td>
+          </tr>
+          <tr>
+            <td><strong>DeploymentSpec</strong></td>
+            <td>env[], secretEnv[], firstPartyImageOverride, agentServerMode, pscInterfaceConfig, minInstances, maxInstances, resourceLimits, containerConcurrency</td>
+          </tr>
+          <tr>
+            <td><strong>その他</strong></td>
+            <td>classMethods[], agentFramework, SourceCodeSpec (source, languageSpec), identityType, agentCard[]</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>API エンドポイント</h3>
+      <span class="code-label">HTTP</span>
+      <pre><code class="language-http">PATCH https://{LOCATION}-aiplatform.googleapis.com/v1beta1/projects/{PROJECT_ID}/locations/{LOCATION}/reasoningEngines/{RESOURCE_ID}?update_mask=traffic_config</code></pre>
+    </div>
+
+    <!-- Setup Guide -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <div class="warning-box">
+        <strong>📝 前提条件:</strong>
+        <ul style="margin: 8px 0; padding-left: 20px; font-size: 14px;">
+          <li>Gemini Enterprise Agent Platform にエージェントがデプロイ済みであること</li>
+          <li>v1beta1 API へのアクセスが可能であること</li>
+          <li>エージェントのリソース ID を把握していること</li>
+        </ul>
+      </div>
+
+      <h3>Step 1: クライアント初期化</h3>
+      <span class="code-label">Python</span>
+      <pre><code class="language-python">import vertexai
+from google.genai import types as genai_types
+
+http_options = genai_types.HttpOptions(
+    api_version="v1beta1",
+)
+
+client = vertexai.Client(
+    project="PROJECT_ID",
+    location="LOCATION",
+    http_options=http_options,
+)</code></pre>
+
+      <h3>Step 2: リビジョンの一覧確認</h3>
+      <span class="code-label">Python</span>
+      <pre><code class="language-python">revisions = client.agent_engines.runtimes.revisions.list(
+    name="projects/PROJECT_ID/locations/LOCATION/reasoningEngines/RESOURCE_ID"
+)
+
+for revision in revisions:
+    print(revision)</code></pre>
+
+      <h3>Step 3: トラフィック分割の設定（パーセンテージベース）</h3>
+      <span class="code-label">Python</span>
+      <pre><code class="language-python">client.agent_engines.update(
+    name="projects/PROJECT_ID/locations/LOCATION/reasoningEngines/RESOURCE_ID",
+    config={
+        "traffic_config": {
+            "trafficSplitManual": {
+                "targets": [
+                    {
+                        "runtimeRevisionName": "...runtimeRevisions/REVISION_ID_1",
+                        "percent": 90,
+                    },
+                    {
+                        "runtimeRevisionName": "...runtimeRevisions/REVISION_ID_2",
+                        "percent": 10,
+                    },
+                ]
+            }
+        }
+    },
+)</code></pre>
+
+      <h3>Step 4: Console からの設定（代替方法）</h3>
+      <div class="flow-diagram">
+        <div class="flow-step">📂 Govern ><br>Deployments</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🤖 エージェント名<br>クリック</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">📑 Revisions<br>タブ</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">⚙️ Manage<br>traffic</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">💾 Save</div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+      <div class="usecase-card">
+        <h3>🐤 ユースケース 1: カナリアデプロイメント</h3>
+        <p style="font-size:14px;"><strong>シナリオ:</strong> 本番環境のカスタマーサポート AI エージェントの新バージョンをリリースする際、まず10%のトラフィックで動作確認してから全面展開。</p>
+        <p style="font-size:14px;"><strong>効果:</strong> 新バージョンに問題があった場合、影響は10%のトラフィックのみ。即座にトラフィックを元のリビジョンに戻してロールバック可能。</p>
+        <div class="flow-diagram" style="margin:12px 0;">
+          <div class="flow-step" style="font-size:13px;">新リビジョン<br>作成</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step" style="font-size:13px;">10%<br>トラフィック</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step" style="font-size:13px;">50/50<br>分割</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step" style="font-size:13px;">100%<br>全面展開</div>
+        </div>
+      </div>
+      <div class="usecase-card">
+        <h3>🔬 ユースケース 2: A/B テスト</h3>
+        <p style="font-size:14px;"><strong>シナリオ:</strong> 異なるプロンプト設定や処理ロジックを持つ2つのエージェントバージョンの性能を比較。</p>
+        <p style="font-size:14px;"><strong>効果:</strong> 同一条件下でリアルトラフィックを使った比較テストが可能。データに基づいた意思決定ができる。</p>
+      </div>
+      <div class="usecase-card">
+        <h3>⏪ ユースケース 3: 安全なロールバック</h3>
+        <p style="font-size:14px;"><strong>シナリオ:</strong> 新バージョンのエージェントで応答品質の低下が検知されたため、即座に前バージョンに戻したい。</p>
+        <p style="font-size:14px;"><strong>効果:</strong> トラフィック設定を変更するだけで、再デプロイを待たずに即座にロールバックが完了。</p>
+      </div>
+    </div>
+
+    <!-- Merits Section -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div class="feature-grid">
+        <div>
+          <h3>💼 ビジネス面</h3>
+          <div class="icon-text"><span class="arrow">→</span><span><strong>リスクの最小化:</strong> カナリアデプロイメントで全ユーザーへの影響を回避</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span><strong>ダウンタイムの削減:</strong> トラフィック設定変更だけで即座にロールバック</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span><strong>段階的な展開:</strong> ビジネスクリティカルなエージェントを安全に更新</span></div>
+        </div>
+        <div>
+          <h3>🔧 技術面</h3>
+          <div class="icon-text"><span class="arrow">→</span><span><strong>イミュータブル性:</strong> 動作の再現性と追跡可能性を保証</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span><strong>柔軟なトラフィック制御:</strong> A/B テストやカナリアリリースに対応</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span><strong>API 互換性:</strong> REST API と SDK の両方から操作可能、CI/CD 統合も容易</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations Section -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <div class="warning-box">
+        <strong>制限事項</strong>
+        <ul style="margin: 8px 0; padding-left: 20px; font-size: 14px;">
+          <li>現時点では v1beta1 API でのみ利用可能（Preview ステータス）</li>
+          <li>トラフィック分割はルート ReasoningEngine リソースへのクエリのみが対象</li>
+          <li>パーセンテージは整数値のみ対応し、合計が100%になる必要がある</li>
+          <li>Pre-GA 機能のため、サポートが限定的である可能性</li>
+        </ul>
+      </div>
+      <div class="note-box">
+        <strong>考慮すべき点</strong>
+        <ul style="margin: 8px 0; padding-left: 20px; font-size: 14px;">
+          <li>古いリビジョンを放置するとリソースクォータを消費するため、定期的な非推奨化・削除が必要</li>
+          <li>セキュリティ脆弱性を含む古いリビジョンが残存するリスクがあるため、適切なライフサイクル管理が必要</li>
+          <li>特定リビジョンへのクエリ権限とルートエージェントへのクエリ権限が独立しているため、IAM 設定に注意</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス</h2>
+      <div class="related-grid">
+        <div class="related-item">
+          <strong>⚙️ Agent Platform Runtime</strong>
+          エージェントのデプロイ・実行環境。リビジョン管理はこのランタイム上で動作する。
+        </div>
+        <div class="related-item">
+          <strong>📊 Cloud Logging / Cloud Trace</strong>
+          リビジョン番号をメタデータとしてログに記録し、リビジョンごとのパフォーマンス監視が可能。
+        </div>
+        <div class="related-item">
+          <strong>🛠️ Agent Development Kit (ADK)</strong>
+          エージェント開発フレームワーク。開発したエージェントをリビジョン管理付きでデプロイ可能。
+        </div>
+        <div class="related-item">
+          <strong>🔒 IAM</strong>
+          リビジョンごとのアクセス制御と権限管理。
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>📎 出典:</strong></p>
+      <ul style="list-style: none; padding: 0; margin: 8px 0;">
+        <li style="margin: 4px 0;">- <a href="https://docs.cloud.google.com/release-notes#May_15_2026" target="_blank" rel="noopener noreferrer">Google Cloud Release Notes (May 15, 2026)</a></li>
+        <li style="margin: 4px 0;">- <a href="https://docs.cloud.google.com/gemini-enterprise-agent-platform/scale/runtime/manage-revisions-and-traffic" target="_blank" rel="noopener noreferrer">Manage revisions and traffic - Documentation</a></li>
+        <li style="margin: 4px 0;">- <a href="https://docs.cloud.google.com/gemini-enterprise-agent-platform/scale/runtime/deploy-an-agent" target="_blank" rel="noopener noreferrer">Deploy an agent - Documentation</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline);">Generated: 2026-05-16 | #GeminiEnterpriseAgentPlatform #AgentRevisions #TrafficSplitting #CanaryDeployment</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

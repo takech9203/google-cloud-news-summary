@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Memorystore for Valkey: 3 つの新リージョンが利用可能に</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1 {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+      text-align: right;
+      white-space: nowrap;
+      margin-top: 8px;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-teal {
+      border-left-color: var(--gc-teal);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-green);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* Stats grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 20px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.green {
+      background: linear-gradient(135deg, var(--gc-green), #1B8A3A);
+    }
+
+    .stat-card.teal {
+      background: linear-gradient(135deg, var(--gc-teal), #0097A7);
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Before/After */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-box ul, .after-box ul {
+      margin: 8px 0 0 0;
+      padding-left: 20px;
+    }
+
+    .before-box li, .after-box li {
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+
+    /* Region cards */
+    .region-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .region-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      border: 2px solid var(--gc-green);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .region-card .region-emoji {
+      font-size: 36px;
+      margin-bottom: 8px;
+    }
+
+    .region-card .region-name {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin-bottom: 4px;
+    }
+
+    .region-card .region-id {
+      font-size: 13px;
+      color: var(--gc-blue-600);
+      font-weight: 600;
+      background: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      display: inline-block;
+      margin-bottom: 4px;
+    }
+
+    .region-card .region-desc {
+      font-size: 13px;
+      color: var(--gc-outline);
+      margin-top: 6px;
+    }
+
+    /* Usecase cards */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+    }
+
+    .usecase-card h3 {
+      color: var(--gc-blue-900);
+      margin-top: 0;
+    }
+
+    .usecase-card .scenario {
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+
+    .usecase-card .effect {
+      background: var(--gc-surface);
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      border-left: 3px solid var(--gc-green);
+    }
+
+    /* Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* Note/Warning boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Code blocks */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-block {
+      overflow: hidden;
+      padding: 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre:not(.mermaid) {
+      margin: 0;
+      border-radius: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Mermaid */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Pricing grid */
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .pricing-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      border: 1px solid var(--gc-outline-variant);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .pricing-card.featured {
+      border: 2px solid var(--gc-green);
+      position: relative;
+    }
+
+    .pricing-card .price {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 8px 0;
+    }
+
+    .pricing-card .plan-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--gc-blue-600);
+      margin-bottom: 4px;
+    }
+
+    .pricing-card .discount {
+      display: inline-block;
+      background: var(--gc-green-tint);
+      color: var(--gc-green);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .pricing-card .note {
+      font-size: 12px;
+      color: var(--gc-outline);
+      margin-top: 4px;
+    }
+
+    /* Related services */
+    .services-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .service-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--gc-surface);
+      padding: 14px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    .service-item .service-icon {
+      font-size: 22px;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      font-size: 14px;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; }
+      .subtitle { text-align: left; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .region-grid { grid-template-columns: 1fr; }
+      .before-after { grid-template-columns: 1fr; }
+      .pricing-grid { grid-template-columns: 1fr; }
+      .services-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>&#x1F30F; Memorystore for Valkey:<br>3 つの新リージョンが利用可能に</h1>
+        <div style="margin-top: 12px;">
+          <span class="badge">Memorystore for Valkey</span>
+          <span class="badge-ga">Feature</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-03-17</div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card green">
+        <div class="stat-value">+3</div>
+        <div class="stat-label">新規追加リージョン</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">~43</div>
+        <div class="stat-label">合計利用可能リージョン</div>
+      </div>
+      <div class="stat-card teal">
+        <div class="stat-value">3 地域</div>
+        <div class="stat-label">東南アジア / 北欧 / 中米</div>
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>&#x1F4CB; 概要</h2>
+      <p>Memorystore for Valkey が新たに <span class="highlight">asia-southeast3 (バンコク)</span>、<span class="highlight">europe-north2 (ストックホルム)</span>、<span class="highlight">northamerica-south1 (メキシコ)</span> の 3 つのリージョンでインスタンスのデプロイに対応しました。</p>
+      <p>Memorystore for Valkey は Google Cloud のフルマネージド Valkey サービスであり、Cluster Mode Enabled と Cluster Mode Disabled の両方のインスタンスをサポートしています。今回のリージョン拡張により、東南アジア、北欧、中米地域のユーザーがより低レイテンシでキャッシュサービスを利用できるようになりました。</p>
+    </div>
+
+    <!-- New Regions -->
+    <div class="section">
+      <h2>&#x1F4CD; 新規追加リージョン</h2>
+      <div class="region-grid">
+        <div class="region-card">
+          <div class="region-emoji">&#x1F1F9;&#x1F1ED;</div>
+          <div class="region-name">バンコク</div>
+          <div class="region-id">asia-southeast3</div>
+          <div class="region-desc">東南アジア地域<br>タイ、カンボジア、ミャンマー、ラオス周辺</div>
+        </div>
+        <div class="region-card">
+          <div class="region-emoji">&#x1F1F8;&#x1F1EA;</div>
+          <div class="region-name">ストックホルム</div>
+          <div class="region-id">europe-north2</div>
+          <div class="region-desc">北欧地域<br>スウェーデン、ノルウェー、デンマーク、フィンランド</div>
+        </div>
+        <div class="region-card">
+          <div class="region-emoji">&#x1F1F2;&#x1F1FD;</div>
+          <div class="region-name">メキシコ</div>
+          <div class="region-id">northamerica-south1</div>
+          <div class="region-desc">中米地域<br>メキシコ、ラテンアメリカ北部</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>&#x1F504; Before / After</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h3>&#x274C; アップデート前の課題</h3>
+          <ul>
+            <li>バンコクリージョンで Memorystore for Valkey を利用できず、シンガポール等を使用する必要があった</li>
+            <li>ストックホルムリージョンが未対応で、北欧のデータレジデンシー要件を満たせないケースがあった</li>
+            <li>メキシコリージョンが利用できず、中米のワークロードは米国リージョンに依存していた</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>&#x2705; アップデート後の改善</h3>
+          <ul>
+            <li>asia-southeast3 (バンコク) でのデプロイが可能に。タイ周辺地域からの低レイテンシアクセスを実現</li>
+            <li>europe-north2 (ストックホルム) で北欧地域のデータレジデンシー要件に対応可能</li>
+            <li>northamerica-south1 (メキシコ) で中米地域に近いロケーションでの利用が可能に</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>&#x1F3D7;&#xFE0F; アーキテクチャ図</h2>
+      <p>今回のアップデートで追加された 3 つの新リージョン (緑色) と、既存の主要リージョンを示した構成図です。Memorystore for Valkey は合計約 43 リージョンでグローバルに展開されています。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph NEW["新規追加リージョン"]
+        ASE3["asia-southeast3&lt;br/&gt;Bangkok"]
+        EN2["europe-north2&lt;br/&gt;Stockholm"]
+        NAS1["northamerica-south1&lt;br/&gt;Mexico"]
+    end
+
+    subgraph APAC["Asia Pacific (既存)"]
+        AE1["asia-east1&lt;br/&gt;Taiwan"]
+        ANE1["asia-northeast1&lt;br/&gt;Tokyo"]
+        ASE1["asia-southeast1&lt;br/&gt;Singapore"]
+        AS1["asia-south1&lt;br/&gt;Mumbai"]
+        AUS1["australia-southeast1&lt;br/&gt;Sydney"]
+    end
+
+    subgraph EUROPE["Europe (既存)"]
+        EN1["europe-north1&lt;br/&gt;Finland"]
+        EW1["europe-west1&lt;br/&gt;Belgium"]
+        EW3["europe-west3&lt;br/&gt;Frankfurt"]
+        EW9["europe-west9&lt;br/&gt;Paris"]
+    end
+
+    subgraph AMERICAS["Americas (既存)"]
+        UC1["us-central1&lt;br/&gt;Iowa"]
+        UE4["us-east4&lt;br/&gt;N. Virginia"]
+        UW1["us-west1&lt;br/&gt;Oregon"]
+        NNE1["northamerica-northeast1&lt;br/&gt;Montreal"]
+    end
+
+    MV["Memorystore for Valkey"] --> APAC
+    MV --> EUROPE
+    MV --> AMERICAS
+    MV --> NEW
+
+    style NEW fill:#e8f5e9,stroke:#4caf50,stroke-width:3px
+    style ASE3 fill:#c8e6c9,stroke:#388e3c
+    style EN2 fill:#c8e6c9,stroke:#388e3c
+    style NAS1 fill:#c8e6c9,stroke:#388e3c
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>&#x2B50; 主要機能</h2>
+
+      <div class="card">
+        <h3>&#x1F1F9;&#x1F1ED; asia-southeast3 (バンコク) リージョン対応</h3>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>タイのバンコクに位置するリージョンでインスタンスのデプロイが可能に</span></div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>東南アジア地域、特にタイ、カンボジア、ミャンマー、ラオスなど周辺国のワークロードに最適</span></div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>Cluster Mode Enabled / Disabled の両方をサポート</span></div>
+      </div>
+
+      <div class="card card-green">
+        <h3>&#x1F1F8;&#x1F1EA; europe-north2 (ストックホルム) リージョン対応</h3>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>スウェーデンのストックホルムに位置するリージョンでインスタンスのデプロイが可能に</span></div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>北欧諸国 (スウェーデン、ノルウェー、デンマーク、フィンランド) のデータレジデンシー要件に対応</span></div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>既存の europe-north1 (フィンランド) と合わせて北欧地域での冗長構成が可能</span></div>
+      </div>
+
+      <div class="card card-teal">
+        <h3>&#x1F1F2;&#x1F1FD; northamerica-south1 (メキシコ) リージョン対応</h3>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>メキシコに位置するリージョンでインスタンスのデプロイが可能に</span></div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>中米・ラテンアメリカ北部のワークロードのレイテンシ削減に貢献</span></div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>メキシコのデータ保護規制への対応が容易に</span></div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>&#x1F4D0; 技術仕様</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>対応リージョン</td>
+            <td><code>asia-southeast3</code>, <code>europe-north2</code>, <code>northamerica-south1</code></td>
+          </tr>
+          <tr>
+            <td>サポートモード</td>
+            <td>Cluster Mode Enabled / Cluster Mode Disabled</td>
+          </tr>
+          <tr>
+            <td>サポートバージョン</td>
+            <td>Valkey 7.2, 8.0, 9.0</td>
+          </tr>
+          <tr>
+            <td>レプリカ数</td>
+            <td>シャードあたり 0-5</td>
+          </tr>
+          <tr>
+            <td>高可用性</td>
+            <td>マルチゾーン構成をサポート</td>
+          </tr>
+          <tr>
+            <td>クロスリージョンレプリケーション</td>
+            <td>サポート (他リージョンとのレプリケーション可能)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="note-box">
+        <strong>&#x1F4A1; ポイント:</strong> 新規追加された 3 リージョンは、既存リージョンと同等の機能セットを提供します。Cluster Mode、レプリケーション、バックアップ管理、クロスリージョンレプリケーションなどの全機能が利用可能です。
+      </div>
+    </div>
+
+    <!-- Setup -->
+    <div class="section">
+      <h2>&#x2699;&#xFE0F; 設定方法</h2>
+
+      <h3>前提条件</h3>
+      <div class="check-item"><span class="arrow">&#x2192;</span><span>Google Cloud プロジェクトで Memorystore API が有効化されていること</span></div>
+      <div class="check-item"><span class="arrow">&#x2192;</span><span>ネットワーキングの前提条件 (VPC ネットワーク、PSC/PSA 接続) が設定済みであること</span></div>
+
+      <h3>ステップ 1: gcloud CLI でインスタンスを作成</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">asia-southeast3 (バンコク) にインスタンスを作成する例</span>
+        </div>
+        <pre><code class="language-bash"># asia-southeast3 (バンコク) にインスタンスを作成する例
+gcloud memorystore instances create my-valkey-instance \
+    --region=asia-southeast3 \
+    --network=projects/PROJECT_ID/global/networks/NETWORK_NAME \
+    --node-type=standard-small \
+    --shard-count=3 \
+    --replica-count=1</code></pre>
+      </div>
+
+      <h3>ステップ 2: インスタンスの確認</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">作成したインスタンスの詳細を確認</span>
+        </div>
+        <pre><code class="language-bash"># 作成したインスタンスの詳細を確認
+gcloud memorystore instances describe my-valkey-instance \
+    --region=asia-southeast3</code></pre>
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>&#x1F4C8; メリット</h2>
+
+      <h3>&#x1F4BC; ビジネス面</h3>
+      <div class="card card-green">
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span><strong>データレジデンシー要件への対応</strong>: タイ、スウェーデン、メキシコの各国でデータを保管・処理する必要がある規制要件に対応可能</span></div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span><strong>グローバル展開の柔軟性向上</strong>: 東南アジア、北欧、中米の 3 地域で新たにキャッシュサービスを利用でき、グローバルなアプリケーション展開がさらに容易に</span></div>
+      </div>
+
+      <h3>&#x26A1; 技術面</h3>
+      <div class="card">
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span><strong>レイテンシの削減</strong>: 各地域のエンドユーザーに近いロケーションにキャッシュを配置することで、応答時間を短縮</span></div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span><strong>災害復旧オプションの拡充</strong>: クロスリージョンレプリケーションの対象リージョンが増加し、DR 構成の選択肢が広がる</span></div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>&#x26A0;&#xFE0F; 制約事項・考慮点</h2>
+
+      <div class="warning-box">
+        <strong>&#x26A0;&#xFE0F; 制限事項</strong>
+        <div class="check-item"><span class="cross-icon">&#x26A0;</span><span>新規リージョンの料金は、既存リージョンと異なる場合がある (料金ページで確認が必要)</span></div>
+        <div class="check-item"><span class="cross-icon">&#x26A0;</span><span>リージョン間のデータ転送にはネットワーク料金 (Egress) が発生する</span></div>
+      </div>
+
+      <div class="note-box">
+        <strong>&#x1F4DD; 考慮すべき点</strong>
+        <div class="check-item"><span class="arrow">&#x2192;</span><span>新規リージョンでは初期のキャパシティが限られる可能性があるため、大規模なデプロイを計画する場合は事前に確認を推奨</span></div>
+        <div class="check-item"><span class="arrow">&#x2192;</span><span>既存のインスタンスは自動的に新リージョンに移行されないため、新リージョンを利用するには新規にインスタンスを作成する必要がある</span></div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>&#x1F4A1; ユースケース</h2>
+
+      <div class="usecase-card">
+        <h3>&#x1F6D2; ユースケース 1: タイ国内向け EC サイトのセッション管理</h3>
+        <p class="scenario"><strong>シナリオ:</strong> タイ国内でオンラインショッピングサイトを運営しており、ユーザーセッションの管理にインメモリキャッシュを使用している。これまで asia-southeast1 (シンガポール) を利用していたが、バンコクリージョンの追加によりレイテンシを削減できる。</p>
+        <div class="effect"><strong>&#x2705; 効果:</strong> シンガポール経由と比較して、タイ国内ユーザーのセッション読み書きレイテンシを数ミリ秒短縮。ユーザー体験の向上と離脱率の低減が期待できる。</div>
+      </div>
+
+      <div class="usecase-card">
+        <h3>&#x1F512; ユースケース 2: 北欧企業の GDPR 準拠キャッシュ構成</h3>
+        <p class="scenario"><strong>シナリオ:</strong> スウェーデンに本社を置く企業が、GDPR およびスウェーデンの国内規制に準拠するため、キャッシュデータを北欧リージョン内に保持する必要がある。europe-north2 (ストックホルム) の追加により、europe-north1 (フィンランド) と組み合わせた冗長構成が可能になる。</p>
+        <div class="effect"><strong>&#x2705; 効果:</strong> 北欧 2 リージョンでのクロスリージョンレプリケーションにより、データレジデンシー要件を満たしつつ高可用性を確保。</div>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>&#x1F4B0; 料金</h2>
+      <p>Memorystore for Valkey の料金はノード単位の時間課金制です。Committed Use Discount (CUD) を利用することで、1 年契約で 20%、3 年契約で 40% の割引が適用されます。CUD は Memorystore for Valkey、Redis Cluster、Redis、Memcached の各サービス間で共用可能です。</p>
+
+      <h3>料金例 (参考: us-central1 / highmem-medium x 30 ノード)</h3>
+      <div class="pricing-grid">
+        <div class="pricing-card">
+          <div class="plan-name">オンデマンド</div>
+          <div class="price">$4,212</div>
+          <div class="note">/ 月 (概算)</div>
+        </div>
+        <div class="pricing-card">
+          <div class="plan-name">1 年 CUD</div>
+          <div class="price">$3,370</div>
+          <div class="discount">20% OFF</div>
+          <div class="note">/ 月 (概算)</div>
+        </div>
+        <div class="pricing-card featured">
+          <div class="plan-name">3 年 CUD</div>
+          <div class="price">$2,527</div>
+          <div class="discount">40% OFF</div>
+          <div class="note">/ 月 (概算)</div>
+        </div>
+      </div>
+
+      <div class="note-box">
+        <strong>&#x1F4A1; 注意:</strong> 新規追加リージョンの具体的な料金は、<a href="https://cloud.google.com/memorystore/valkey/pricing" target="_blank" class="gc-link">公式料金ページ</a>を参照してください。
+      </div>
+    </div>
+
+    <!-- Available Regions -->
+    <div class="section">
+      <h2>&#x1F30D; 利用可能リージョン</h2>
+      <p>今回の追加により、Memorystore for Valkey は以下を含む<strong>約 43 リージョン</strong>で利用可能となりました。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>地域</th>
+            <th>新規追加リージョン</th>
+            <th>既存の主要リージョン</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>アジア太平洋</td>
+            <td><strong>asia-southeast3 (バンコク)</strong></td>
+            <td>asia-east1 (台湾), asia-northeast1 (東京), asia-southeast1 (シンガポール), asia-south1 (ムンバイ) 他</td>
+          </tr>
+          <tr>
+            <td>ヨーロッパ</td>
+            <td><strong>europe-north2 (ストックホルム)</strong></td>
+            <td>europe-north1 (フィンランド), europe-west1 (ベルギー), europe-west3 (フランクフルト) 他</td>
+          </tr>
+          <tr>
+            <td>アメリカ</td>
+            <td><strong>northamerica-south1 (メキシコ)</strong></td>
+            <td>us-central1 (アイオワ), us-east4 (北バージニア), us-west1 (オレゴン) 他</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#x1F517; 関連サービス・機能</h2>
+      <div class="services-grid">
+        <div class="service-item">
+          <span class="service-icon">&#x1F5C4;&#xFE0F;</span>
+          <div>
+            <strong>Memorystore for Redis Cluster</strong><br>
+            <span style="font-size:13px; color: var(--gc-outline);">Redis 互換が必要な場合のフルマネージドインメモリデータストア</span>
+          </div>
+        </div>
+        <div class="service-item">
+          <span class="service-icon">&#x1F4CA;</span>
+          <div>
+            <strong>Cloud Monitoring / Logging</strong><br>
+            <span style="font-size:13px; color: var(--gc-outline);">インスタンスのモニタリングとログ管理</span>
+          </div>
+        </div>
+        <div class="service-item">
+          <span class="service-icon">&#x1F310;</span>
+          <div>
+            <strong>VPC / Private Service Connect</strong><br>
+            <span style="font-size:13px; color: var(--gc-outline);">ネットワーキング接続に使用</span>
+          </div>
+        </div>
+        <div class="service-item">
+          <span class="service-icon">&#x1F504;</span>
+          <div>
+            <strong>クロスリージョンレプリケーション</strong><br>
+            <span style="font-size:13px; color: var(--gc-outline);">リージョン間のデータレプリケーションによる DR 構成</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>&#x1F4CE; 出典・参考リンク:</strong></p>
+      <ul style="margin: 8px 0; padding-left: 20px;">
+        <li><a href="https://cloud.google.com/release-notes#March_17_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li><a href="https://cloud.google.com/memorystore/docs/valkey/product-overview" target="_blank" rel="noopener noreferrer">Memorystore for Valkey ドキュメント</a></li>
+        <li><a href="https://cloud.google.com/memorystore/docs/valkey/locations" target="_blank" rel="noopener noreferrer">利用可能ロケーション</a></li>
+        <li><a href="https://cloud.google.com/memorystore/valkey/pricing" target="_blank" rel="noopener noreferrer">料金ページ</a></li>
+        <li><a href="https://cloud.google.com/memorystore/docs/valkey/about-cross-region-replication" target="_blank" rel="noopener noreferrer">クロスリージョンレプリケーション</a></li>
+      </ul>
+      <p style="margin-top: 12px; font-size: 11px; color: var(--gc-outline);">Generated on 2026-03-18</p>
+    </footer>
+
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>
