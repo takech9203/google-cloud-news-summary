@@ -5,7 +5,13 @@
 
 ## 2026 年
 
+- [2026-09-04 - Gemini Enterprise: プロジェクトの作成と管理が GA](2026/2026-09-04-gemini-enterprise-projects-ga.md)
+- [2026-09-04 - Cloud SQL: インスタンス インフラストラクチャのインプレース アップグレード / ダウングレード対応](2026/2026-09-04-cloud-sql-in-place-upgrades.md)
+- [2026-09-04 - Gemini Enterprise: Monday フェデレーテッド データストアが GA](2026/2026-09-04-gemini-enterprise-monday-federated-data-store.md)
+- [2026-09-04 - Cloud SQL: C4 マシンシリーズが 6 つの新リージョンで利用可能に (MySQL / PostgreSQL / SQL Server)](2026/2026-09-04-cloud-sql-c4-machine-series-new-regions.md)
 - [2026-09-04 - Gemini: Gemini Code Assist サブスクリプションのコンソール購入条件変更](2026/2026-09-04-gemini-code-assist-subscription-purchase-change.md)
+- [2026-09-04 - Cloud Billing: Incentives ページの導入 (条件付きインセンティブの一元トラッキング)](2026/2026-09-04-cloud-billing-incentives-page.md)
+- [2026-09-04 - Looker: 26.16 リリース - Semantic Search GA / Admin Assistant Preview](2026/2026-09-04-looker-26-16-semantic-search-admin-assistant.md)
 - [2026-09-04 - Cloud SQL for SQL Server: 書き込みエンドポイントによる Auth Proxy / 言語コネクタ接続のサポート](2026/2026-09-04-cloud-sql-sql-server-write-endpoint-connectors.md)
 - [2026-09-03 - Google Kubernetes Engine (GKE): c3-standard-*-lssd マシンタイプによる Confidential GKE Nodes (Intel TDX) が GA](2026/2026-09-03-gke-confidential-nodes-c3-lssd-intel-tdx-ga.md)
 - [2026-09-03 - Google SecOps (SIEM): Bindplane Enterprise ライセンスのセルフサービスダウンロード](2026/2026-09-03-google-secops-bindplane-license-self-service.md)
