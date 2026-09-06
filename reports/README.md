@@ -5,6 +5,8 @@
 
 ## 2026 年
 
+- [2026-09-06 - Google SecOps SOAR: ケースプレイブック (Case playbooks)](2026/2026-09-06-google-secops-soar-case-playbooks.md)
+- [2026-09-05 - Google SecOps SOAR: Release 6.3.99 全リージョン提供開始](2026/2026-09-05-google-secops-soar-release-6-3-99.md)
 - [2026-09-04 - Gemini Enterprise: プロジェクトの作成と管理が GA](2026/2026-09-04-gemini-enterprise-projects-ga.md)
 - [2026-09-04 - Cloud SQL: インスタンス インフラストラクチャのインプレース アップグレード / ダウングレード対応](2026/2026-09-04-cloud-sql-in-place-upgrades.md)
 - [2026-09-04 - Gemini Enterprise: Monday フェデレーテッド データストアが GA](2026/2026-09-04-gemini-enterprise-monday-federated-data-store.md)
