@@ -5,6 +5,10 @@
 
 ## 2026 年
 
+- [2026-09-07 - AI Hypercomputer / Cluster Toolkit / Cluster Director: Slurm sbcast の脆弱性 (CVE-2026-65107) への対応](2026/2026-09-07-slurm-cve-2026-65107.md)
+- [2026-09-07 - Access Approval / Access Transparency: Privileged Access Manager 対応が一般提供 (GA)](2026/2026-09-07-privileged-access-manager-ga.md)
+- [2026-09-06 - Google SecOps SOAR: Release 6.3.100 の第一段階リージョンへのロールアウト開始](2026/2026-09-06-google-secops-soar-release-6-3-100.md)
+- [2026-09-06 - Google SecOps: リアクショントリガー (Reaction Triggers) によるプレイブックの自動実行 (Preview)](2026/2026-09-06-google-secops-reaction-triggers.md)
 - [2026-09-06 - Google SecOps SOAR: ケースプレイブック (Case playbooks)](2026/2026-09-06-google-secops-soar-case-playbooks.md)
 - [2026-09-05 - Google SecOps SOAR: Release 6.3.99 全リージョン提供開始](2026/2026-09-05-google-secops-soar-release-6-3-99.md)
 - [2026-09-04 - Gemini Enterprise: プロジェクトの作成と管理が GA](2026/2026-09-04-gemini-enterprise-projects-ga.md)
