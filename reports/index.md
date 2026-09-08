@@ -5,7 +5,13 @@
 
 ## 2026 年
 
+- [2026-09-08 - Cloud SQL: Admin API リージョナルエンドポイント (REP) が GA](2026/2026-09-08-cloud-sql-regional-endpoints-ga.md)
+- [2026-09-08 - Cloud Run: ジョブの遅延実行 (Delayed Jobs) (Preview)](2026/2026-09-08-cloud-run-delayed-jobs.md)
+- [2026-09-08 - Google Cloud Contact Center as a Service: ダッシュボード・レポーティングの不具合修正](2026/2026-09-08-ccaas-dashboard-reporting-fixes.md)
+- [2026-09-08 - Cloud Trace / VPC Service Controls: Observability API の VPC Service Controls 対応が GA](2026/2026-09-08-observability-api-vpc-service-controls-ga.md)
+- [2026-09-08 - Compute Engine: 予約の共有タイプ変更 (単一プロジェクト予約と共有予約の相互変換) が GA](2026/2026-09-08-compute-engine-reservation-share-type-conversion-ga.md)
 - [2026-09-07 - AI Hypercomputer / Cluster Toolkit / Cluster Director: Slurm sbcast の脆弱性 (CVE-2026-65107) への対応](2026/2026-09-07-slurm-cve-2026-65107.md)
+- [2026-09-07 - Knowledge Catalog (Dataplex): データドメイン (Preview)](2026/2026-09-07-knowledge-catalog-data-domains.md)
 - [2026-09-07 - Access Approval / Access Transparency: Privileged Access Manager 対応が一般提供 (GA)](2026/2026-09-07-privileged-access-manager-ga.md)
 - [2026-09-06 - Google SecOps SOAR: Release 6.3.100 の第一段階リージョンへのロールアウト開始](2026/2026-09-06-google-secops-soar-release-6-3-100.md)
 - [2026-09-06 - Google SecOps: リアクショントリガー (Reaction Triggers) によるプレイブックの自動実行 (Preview)](2026/2026-09-06-google-secops-reaction-triggers.md)
