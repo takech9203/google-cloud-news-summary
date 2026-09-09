@@ -5,9 +5,17 @@
 
 ## 2026 年
 
+- [2026-09-09 - Gemini Enterprise Agent Platform: Agent Gateway が VPC Service Controls をサポート](2026/2026-09-09-gemini-agent-platform-agent-gateway-vpc-service-controls.md)
+- [2026-09-09 - NetApp Volumes: Flex Unified サービスレベルが新規 3 リージョンで利用可能に](2026/2026-09-09-netapp-volumes-flex-unified-new-regions.md)
+- [2026-09-08 - Container-Optimized OS (COS): 複数イメージのセキュリティ修正・バージョンアップデート](2026/2026-09-08-container-optimized-os-image-updates.md)
 - [2026-09-08 - Cloud SQL: Admin API リージョナルエンドポイント (REP) が GA](2026/2026-09-08-cloud-sql-regional-endpoints-ga.md)
+- [2026-09-08 - Gemini Enterprise Agent Platform: Agent Gateway のエージェント接続テンプレートによる VPC 接続](2026/2026-09-08-gemini-agent-platform-agent-connectivity-templates.md)
+- [2026-09-08 - Google Kubernetes Engine (GKE): バージョンアップデート 2026-R38](2026/2026-09-08-gke-2026-r38-version-updates.md)
 - [2026-09-08 - Cloud Run: ジョブの遅延実行 (Delayed Jobs) (Preview)](2026/2026-09-08-cloud-run-delayed-jobs.md)
 - [2026-09-08 - Google Cloud Contact Center as a Service: ダッシュボード・レポーティングの不具合修正](2026/2026-09-08-ccaas-dashboard-reporting-fixes.md)
+- [2026-09-08 - BigQuery: Conversational Analytics が AI.PREDICT による予測モデリングの質問に対応 (Preview)](2026/2026-09-08-bigquery-conversational-analytics-ai-predict.md)
+- [2026-09-08 - Secret Manager (Parameter Manager): タグによるパラメータのグループ化と条件付き IAM アクセス制御をサポート](2026/2026-09-08-secret-manager-parameter-manager-tags.md)
+- [2026-09-08 - Gemini Enterprise: Google Cloud Marketplace エージェント検索のセマンティック検索対応 (Preview)](2026/2026-09-08-gemini-enterprise-marketplace-semantic-search.md)
 - [2026-09-08 - Cloud Trace / VPC Service Controls: Observability API の VPC Service Controls 対応が GA](2026/2026-09-08-observability-api-vpc-service-controls-ga.md)
 - [2026-09-08 - Compute Engine: 予約の共有タイプ変更 (単一プロジェクト予約と共有予約の相互変換) が GA](2026/2026-09-08-compute-engine-reservation-share-type-conversion-ga.md)
 - [2026-09-07 - AI Hypercomputer / Cluster Toolkit / Cluster Director: Slurm sbcast の脆弱性 (CVE-2026-65107) への対応](2026/2026-09-07-slurm-cve-2026-65107.md)
