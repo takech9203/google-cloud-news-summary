@@ -5,10 +5,20 @@
 
 ## 2026 年
 
+- [2026-09-11 - Google SecOps / Google SecOps SIEM: chronicle.readonly OAuth スコープからの書き込み権限の廃止](2026/2026-09-11-google-secops-chronicle-readonly-scope-deprecation.md)
+- [2026-09-11 - Google Cloud Contact Center as a Service (CCaaS): 2026 年 9 月バグ修正リリース](2026/2026-09-11-ccaas-bug-fixes-september.md)
+- [2026-09-11 - Cluster Toolkit: Slurm の複数の脆弱性への対応 (セキュリティ情報 GCP-2026-062)](2026/2026-09-11-cluster-toolkit-slurm-security-gcp-2026-062.md)
+- [2026-09-11 - AlloyDB for PostgreSQL: 監査ログパイプラインのモニタリング](2026/2026-09-11-alloydb-audit-log-pipeline-monitoring.md)
+- [2026-09-11 - API Gateway: Model Context Protocol (MCP) サーバー機能](2026/2026-09-11-api-gateway-mcp-server.md)
+- [2026-09-10 - BigQuery: ML.METRICS 関数と AI.CAUSAL_EFFECT 関数 (Preview)](2026/2026-09-10-bigquery-ml-metrics-ai-causal-effect-preview.md)
 - [2026-09-10 - BigQuery: Data Engineering Agent と BigQuery Graph の統合 (GA)](2026/2026-09-10-bigquery-data-engineering-agent-graph-integration.md)
+- [2026-09-10 - Cloud SQL for MySQL / PostgreSQL: リモート MCP サーバーの sqlcommenter タグ付与が一時的に無効化](2026/2026-09-10-cloud-sql-mcp-sqlcommenter-disabled.md)
 - [2026-09-10 - Gemini Enterprise: Pay-as-you-go エディション / AI 開発者ツールの提供拡大と Slack アプリの会話機能強化](2026/2026-09-10-gemini-enterprise-paygo-and-chat-app-enhancements.md)
 - [2026-09-10 - Identity and Access Management: IAM リモート MCP サーバーが一般提供 (GA) に](2026/2026-09-10-iam-mcp-server-ga.md)
+- [2026-09-10 - BigQuery: Conversational Analytics が ML.CORRELATION 関数をサポート (Preview)](2026/2026-09-10-bigquery-conversational-analytics-ml-correlation.md)
 - [2026-09-10 - Cloud Storage: Storage Intelligence advisor が一般提供 (GA) に](2026/2026-09-10-cloud-storage-storage-intelligence-advisor-ga.md)
+- [2026-09-10 - Looker: VS Code 拡張機能が一般提供 (GA) 開始](2026/2026-09-10-looker-vscode-extension-ga.md)
+- [2026-09-10 - Network Connectivity Center / VPC: グローバル Google API 向け Private Service Connect エンドポイントの伝播 (Preview)](2026/2026-09-10-ncc-vpc-propagated-connections-global-google-apis.md)
 - [2026-09-10 - Google Cloud Managed Service for Apache Kafka: パブリッククラスタ構成によるインターネット経由のクライアント接続](2026/2026-09-10-managed-kafka-public-cluster.md)
 - [2026-09-09 - Google Cloud Contact Center as a Service: コールドトランスファー自動再開と Agent Desktop 強化 (プレリリースノート 6.12)](2026/2026-09-09-ccaas-cold-transfer-and-agent-desktop-updates.md)
 - [2026-09-09 - Cloud SDK: バージョン 584.0.0 リリース (Breaking Changes を含む)](2026/2026-09-09-cloud-sdk-584-breaking-changes.md)
