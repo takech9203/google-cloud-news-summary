@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Spanner: GoogleSQL INSERT 文における ON CONFLICT 句のサポート</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card.database {
+      border-left-color: #F4B400;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+    .badge { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); color: #FFFFFF; }
+    .badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+    .check-icon { color: var(--gc-green); font-size: 18px; }
+    .cross-icon { color: var(--gc-red); font-size: 18px; }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-block {
+      overflow: hidden;
+      padding: 0;
+    }
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+    .code-title {
+      color: #AAAAAA;
+    }
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      border-radius: 0;
+    }
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 20px 0;
+    }
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+    .stat-card.database-stat {
+      background: linear-gradient(135deg, #F4B400, #E8A000);
+    }
+    .stat-card.green-stat {
+      background: linear-gradient(135deg, var(--gc-green), #2E8B47);
+    }
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+    .before-card {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+    .after-card {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+    .before-card h4, .after-card h4 {
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+    .before-card ul, .after-card ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+    .before-card li, .after-card li {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+    .usecase-card h4 {
+      color: var(--gc-blue-900);
+      margin: 0 0 8px 0;
+    }
+    .usecase-card p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stat-cards { grid-template-columns: 1fr; }
+      .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>Cloud Spanner: GoogleSQL INSERT 文における ON CONFLICT 句のサポート</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge" style="background: #F4B400;">Cloud Spanner</span>
+          <span class="badge badge-ga">GA</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-03-03</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>☁️ 概要</h2>
+      <p>
+        Cloud Spanner の GoogleSQL 方言において、INSERT 文で <code>ON CONFLICT</code> 句がサポートされました。
+        一意制約違反 (主キーの重複) が発生した場合の動作を<span class="highlight">宣言的に制御</span>できるようになり、
+        <span class="highlight">ON CONFLICT DO NOTHING</span> と <span class="highlight">ON CONFLICT DO UPDATE</span> の 2 つのアクションが利用可能です。
+      </p>
+      <p>
+        PostgreSQL や他のデータベースで広く使われている標準的な UPSERT パターンが GoogleSQL でも利用できるようになり、
+        他のデータベースからの移行やマルチデータベース環境での SQL の共通化が容易になります。
+      </p>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-card">
+          <h4>❌ Before (アップデート前)</h4>
+          <ul>
+            <li>重複キー処理には Spanner 独自の <code>INSERT OR IGNORE</code> / <code>INSERT OR UPDATE</code> 構文が必要</li>
+            <li>PostgreSQL 方言では <code>ON CONFLICT</code> が使えたが、GoogleSQL では利用不可</li>
+            <li>他 DB からの移行時に SQL 書き換えが必要</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>✅ After (アップデート後)</h4>
+          <ul>
+            <li><code>ON CONFLICT DO NOTHING</code> で重複行を安全にスキップ可能</li>
+            <li><code>ON CONFLICT DO UPDATE</code> で標準的な UPSERT 操作が可能</li>
+            <li>PostgreSQL 等との SQL 互換性が向上し、移行が容易に</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stat-cards">
+      <div class="stat-card database-stat">
+        <div class="stat-value">2</div>
+        <div class="stat-label">ON CONFLICT アクション<br>(DO NOTHING / DO UPDATE)</div>
+      </div>
+      <div class="stat-card green-stat">
+        <div class="stat-value">GA</div>
+        <div class="stat-label">本番環境で利用可能<br>SLA 対象</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">0</div>
+        <div class="stat-label">追加料金<br>通常の Spanner 料金のみ</div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>📊 アーキテクチャ図</h2>
+      <p>ON CONFLICT 句を含む INSERT 文の処理フロー。主キーの重複が検出された場合、指定されたアクションに応じて挿入のスキップまたは既存行の更新が行われます。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    A["INSERT 文 + ON CONFLICT 句"] --> B{"主キー重複チェック"}
+    B -->|重複なし| C["新規行を挿入"]
+    B -->|重複あり| D{"ON CONFLICT アクション"}
+    D -->|DO NOTHING| E["挿入をスキップ\nエラーなし"]
+    D -->|DO UPDATE| F["既存行を更新\nexcluded で値を参照"]
+    C --> G["コミット"]
+    E --> G
+    F --> G
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚙️ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="card database">
+          <h3>1. ON CONFLICT DO NOTHING</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span>挿入しようとする行が既に存在する場合、一意制約違反エラーをスローせずにスキップ</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>バッチ挿入時に一部の行が既存でもステートメント全体が失敗しない</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>冪等な書き込み操作の実装に最適</span></div>
+        </div>
+        <div class="card database">
+          <h3>2. ON CONFLICT DO UPDATE</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span>重複行がある場合、エラーなしで既存行を更新 (UPSERT)</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><code>excluded</code> エイリアスで挿入しようとした値を UPDATE の値として参照可能</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>ON UPDATE 式が定義されたカラムは自動的に値が設定される</span></div>
+        </div>
+        <div class="card database">
+          <h3>3. conflict_target の指定</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span>主キーカラムを conflict_target として指定</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>複合主キーの場合は、すべての主キーカラムを指定する必要がある</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>📋 技術仕様</h2>
+      <h3>構文の詳細</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>対象方言</td><td>GoogleSQL</td></tr>
+          <tr><td>サポートされるアクション</td><td><code>DO NOTHING</code>, <code>DO UPDATE SET</code></td></tr>
+          <tr><td>conflict_target</td><td>主キーカラムのみ</td></tr>
+          <tr><td>複合主キー</td><td>すべての主キーカラムの指定が必要</td></tr>
+          <tr><td>excluded エイリアス</td><td><code>DO UPDATE SET</code> で挿入値を参照するために使用</td></tr>
+          <tr><td>WHERE 句</td><td><code>ON CONFLICT DO UPDATE</code> 内の WHERE 句は非サポート</td></tr>
+        </tbody>
+      </table>
+
+      <h3>従来構文との比較</h3>
+      <table>
+        <thead>
+          <tr><th>従来の構文</th><th>ON CONFLICT 構文</th><th>動作</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>INSERT OR IGNORE</code></td><td><code>INSERT ... ON CONFLICT DO NOTHING</code></td><td>重複行をスキップ</td></tr>
+          <tr><td><code>INSERT OR UPDATE</code></td><td><code>INSERT ... ON CONFLICT DO UPDATE SET ...</code></td><td>重複行を更新 (UPSERT)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Code Examples -->
+    <div class="section">
+      <h2>💻 コードサンプル</h2>
+
+      <h3>ON CONFLICT DO NOTHING: 重複行をスキップ</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">重複行の安全な挿入</span>
+        </div>
+        <pre><code class="language-sql">-- ON CONFLICT DO NOTHING: 重複行をスキップ
+INSERT INTO Singers (SingerId, FirstName, LastName)
+VALUES (1, 'Marc', 'Richards')
+ON CONFLICT (SingerId) DO NOTHING;</code></pre>
+      </div>
+
+      <h3>ON CONFLICT DO UPDATE: UPSERT</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">重複行を更新 (UPSERT)</span>
+        </div>
+        <pre><code class="language-sql">-- ON CONFLICT DO UPDATE: 重複行を更新 (UPSERT)
+INSERT INTO Singers (SingerId, FirstName, LastName)
+VALUES (1, 'Marc', 'Richards')
+ON CONFLICT (SingerId)
+DO UPDATE SET
+  SingerId = excluded.SingerId,
+  FirstName = excluded.FirstName,
+  LastName = excluded.LastName;</code></pre>
+      </div>
+
+      <h3>バッチ挿入 (DO NOTHING)</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">複数行の安全な一括挿入</span>
+        </div>
+        <pre><code class="language-sql">-- 既存データとの重複を無視して挿入
+INSERT INTO Singers (SingerId, FirstName, LastName)
+VALUES
+  (1, 'Marc', 'Richards'),
+  (2, 'Catalina', 'Smith'),
+  (3, 'Alice', 'Trentor')
+ON CONFLICT (SingerId) DO NOTHING;</code></pre>
+      </div>
+
+      <h3>複合主キーでの使用</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">複合主キーの UPSERT</span>
+        </div>
+        <pre><code class="language-sql">-- 複合主キーの場合、すべての主キーカラムを conflict_target に指定
+INSERT INTO AlbumInfo (SingerId, AlbumId, AlbumTitle, MarketingBudget)
+VALUES (1, 1, 'Total Junk', 100000)
+ON CONFLICT (SingerId, AlbumId)
+DO UPDATE SET
+  SingerId = excluded.SingerId,
+  AlbumId = excluded.AlbumId,
+  AlbumTitle = excluded.AlbumTitle,
+  MarketingBudget = excluded.MarketingBudget;</code></pre>
+      </div>
+    </div>
+
+    <!-- Setup -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+      <h3>前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>Cloud Spanner インスタンスおよび GoogleSQL 方言のデータベースが作成済み</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>テーブルに主キーが定義されている</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>適切な IAM 権限 (<code>spanner.databases.write</code>) を持つサービスアカウントまたはユーザー</span></div>
+
+      <div class="note-box" style="margin-top: 16px;">
+        <strong>💡 ヒント:</strong> 特別な設定やオプトインは不要です。GoogleSQL 方言のデータベースで即座に利用できます。
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div>
+          <h3>ビジネス面</h3>
+          <div class="card">
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>移行コストの削減</strong>: ON CONFLICT を使用した SQL の書き換えが不要に</span></div>
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>開発生産性の向上</strong>: 標準 SQL パターンで学習コストが低減、コードの可読性が向上</span></div>
+          </div>
+        </div>
+        <div>
+          <h3>技術面</h3>
+          <div class="card">
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>SQL 互換性の向上</strong>: マルチデータベース環境での SQL 共通化が容易に</span></div>
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>冪等な書き込み</strong>: DO NOTHING でリトライ時のエラーハンドリングを簡素化</span></div>
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>宣言的な UPSERT</strong>: 1 つの SQL 文で「存在すれば更新、なければ挿入」を表現</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ 制約事項・注意点</h2>
+      <div class="warning-box">
+        <strong>制限事項</strong>
+        <div class="check-item"><span class="cross-icon">✗</span><span>conflict_target には<strong>主キーカラムのみ</strong>指定可能 (ユニークインデックスは指定不可)</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>複合主キーの場合、<strong>すべての主キーカラム</strong>を conflict_target に指定する必要がある</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span><code>DO UPDATE SET</code> 句では、INSERT リストの<strong>すべてのカラム</strong>を SET 句にも記載する必要がある</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span><code>ON CONFLICT DO UPDATE</code> 内の <strong>WHERE 句</strong>はサポートされていない</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>Partitioned DML では INSERT 自体がサポートされていないため、ON CONFLICT 句も使用不可</span></div>
+      </div>
+
+      <div class="note-box">
+        <strong>💡 考慮すべき点:</strong>
+        <ul style="margin: 8px 0; padding-left: 20px;">
+          <li>従来の <code>INSERT OR IGNORE</code> / <code>INSERT OR UPDATE</code> 構文も引き続き利用可能</li>
+          <li>DO UPDATE SET の制約 (全カラム指定必須) は PostgreSQL とは異なるため、移行時に注意が必要</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+      <div class="usecase-card">
+        <h4>📦 ユースケース 1: 冪等なデータ同期</h4>
+        <p><strong>シナリオ:</strong> 外部システムからのデータを定期的に Spanner に同期する際、既存データとの重複を安全に処理したい。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">冪等なデータ同期</span>
+          </div>
+          <pre><code class="language-sql">-- 外部システムからのデータを冪等に挿入
+INSERT INTO Products (ProductId, Name, Price, LastSyncTime)
+VALUES
+  (101, 'Widget A', 29.99, CURRENT_TIMESTAMP()),
+  (102, 'Widget B', 49.99, CURRENT_TIMESTAMP()),
+  (103, 'Widget C', 19.99, CURRENT_TIMESTAMP())
+ON CONFLICT (ProductId)
+DO UPDATE SET
+  ProductId = excluded.ProductId,
+  Name = excluded.Name,
+  Price = excluded.Price,
+  LastSyncTime = excluded.LastSyncTime;</code></pre>
+        </div>
+        <p><strong>効果:</strong> リトライやスケジュール実行時に重複エラーが発生せず、常に最新データが反映される。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>📨 ユースケース 2: イベントの重複排除</h4>
+        <p><strong>シナリオ:</strong> メッセージキューから受信したイベントを Spanner に記録する際、At-Least-Once 配信による重複イベントを安全に処理したい。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">イベント重複排除</span>
+          </div>
+          <pre><code class="language-sql">-- イベント ID で重複を排除
+INSERT INTO Events (EventId, EventType, Payload, ReceivedAt)
+VALUES (@eventId, @eventType, @payload, CURRENT_TIMESTAMP())
+ON CONFLICT (EventId) DO NOTHING;</code></pre>
+        </div>
+        <p><strong>効果:</strong> 重複イベントの受信時にエラーが発生せず、アプリケーション側での重複チェックロジックを簡素化できる。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金情報</h2>
+      <div class="success-box">
+        <strong>追加料金なし:</strong> ON CONFLICT 句の利用に追加料金は発生しません。通常の Spanner の料金体系 (コンピュートキャパシティ + ストレージ) が適用されます。
+      </div>
+      <table>
+        <thead>
+          <tr><th>エディション</th><th>ノード単価 (時間あたり)</th><th>1 年 CUD 割引</th><th>3 年 CUD 割引</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Standard</td><td>$0.90</td><td>20%</td><td>40%</td></tr>
+          <tr><td>Enterprise</td><td>リージョンにより異なる</td><td>20%</td><td>40%</td></tr>
+          <tr><td>Enterprise Plus</td><td>リージョンにより異なる</td><td>20%</td><td>40%</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size: 13px; color: var(--gc-outline);">詳細は <a href="https://cloud.google.com/spanner/pricing" target="_blank" class="gc-link">Spanner 料金ページ</a> を参照。無料トライアルインスタンスも利用可能。</p>
+    </div>
+
+    <!-- Region -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <p>Cloud Spanner が利用可能な<strong>すべてのリージョン</strong>で ON CONFLICT 句を使用できます。リージョン一覧は <a href="https://cloud.google.com/spanner/docs/instance-configurations" target="_blank" class="gc-link">Spanner インスタンス構成</a> を参照してください。</p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card database">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Cloud Spanner PostgreSQL 方言</strong>: 以前から ON CONFLICT 句がサポートされており、今回 GoogleSQL 方言にも同等の機能が追加された</span></div>
+      </div>
+      <div class="card database">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>INSERT OR IGNORE / INSERT OR UPDATE</strong>: GoogleSQL 方言の従来からの重複処理構文。ON CONFLICT 句と同等の機能を提供</span></div>
+      </div>
+      <div class="card database">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Cloud Spanner Mutation API</strong>: DML とは別のデータ変更手段。<code>InsertOrUpdate</code> ミューテーションで同様の UPSERT 操作が可能</span></div>
+      </div>
+      <div class="card database">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Partitioned DML</strong>: 大量データの一括変更に使用。ただし INSERT (および ON CONFLICT) はサポートされていない</span></div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <p>
+        Cloud Spanner の GoogleSQL 方言で <code>ON CONFLICT</code> 句がサポートされたことにより、標準的な SQL パターンを使用した UPSERT 操作や重複排除が可能になりました。
+        他のデータベースからの移行の容易化、冪等な書き込み処理の簡素化、コードの可読性向上に寄与します。
+        既存の <code>INSERT OR IGNORE</code> / <code>INSERT OR UPDATE</code> 構文も引き続き利用可能なため、既存アプリケーションへの影響はありません。
+        <strong>新規開発や移行プロジェクトでは ON CONFLICT 句の採用を検討してください。</strong>
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="margin: 4px 0; padding-left: 20px; list-style: none;">
+        <li><a href="https://cloud.google.com/spanner/docs/reference/standard-sql/dml-syntax" target="_blank" rel="noopener noreferrer">GoogleSQL DML 構文リファレンス</a></li>
+        <li><a href="https://cloud.google.com/spanner/docs/dml-tasks" target="_blank" rel="noopener noreferrer">DML を使用したデータの挿入・更新・削除</a></li>
+        <li><a href="https://cloud.google.com/spanner/pricing" target="_blank" rel="noopener noreferrer">Spanner 料金ページ</a></li>
+      </ul>
+      <p style="margin-top: 12px; font-size: 11px; color: var(--gc-outline);">#CloudSpanner #GoogleSQL #DML #UPSERT #OnConflict</p>
+    </footer>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

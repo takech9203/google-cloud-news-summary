@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GKE: PSI メトリクス、Confidential GPU、Gateway mTLS、VPA ログ、サージアップグレード</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card.green { border-left-color: var(--gc-green); }
+    .card.purple { border-left-color: var(--gc-purple); }
+    .card.teal { border-left-color: var(--gc-teal); }
+    .card.orange { border-left-color: var(--gc-orange); }
+    .card.red { border-left-color: var(--gc-red); }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin: 20px 0;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px;
+    }
+
+    .after {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px;
+    }
+
+    .before h4, .after h4 {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .before h4 { color: var(--gc-red); }
+    .after h4 { color: var(--gc-green); }
+
+    .before ul, .after ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before li, .after li {
+      margin: 4px 0;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-800);
+      margin: 0 0 8px 0;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .pillar-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 16px;
+    }
+
+    .pillar-observability { background: var(--gc-blue-tint); color: var(--gc-blue-800); }
+    .pillar-security { background: var(--gc-red-tint); color: var(--gc-red); }
+    .pillar-operations { background: var(--gc-green-tint); color: var(--gc-green); }
+
+    .region-list {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    .region-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: var(--gc-surface);
+      border-radius: 8px;
+      border: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr 1fr; }
+      .flow-diagram { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>&#9781; GKE 5 大アップデート</h1>
+      <div class="subtitle">2026-07-07 | Google Kubernetes Engine</div>
+    </div>
+
+    <!-- Badges -->
+    <div style="margin-bottom: 24px;">
+      <span class="badge">GKE</span>
+      <span class="badge-ga">GA: PSI メトリクス</span>
+      <span class="badge-ga">GA: Gateway mTLS</span>
+      <span class="badge-ga">GA: サージアップグレード</span>
+      <span class="badge-preview">Preview: Confidential GPU</span>
+      <span class="badge-preview">Preview: VPA ログ</span>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>&#128203; 概要</h2>
+      <p>GKE において <span class="highlight">可観測性</span>、<span class="highlight">セキュリティ</span>、<span class="highlight">運用効率</span> の3つの柱で5つの重要なアップデートが発表されました。PSI メトリクスと VPA 決定ログによるリソース監視の透明性向上、Confidential GPU と Gateway mTLS によるセキュリティ強化、そしてサージアップグレード上限引き上げによる大規模クラスタ運用の効率化を実現します。</p>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value">5</div>
+          <div class="stat-label">新機能・改善</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-green), #1B5E20);">
+          <div class="stat-value">3</div>
+          <div class="stat-label">GA リリース</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-orange), #E65100);">
+          <div class="stat-value">2</div>
+          <div class="stat-label">Preview リリース</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-purple), #6A1B9A);">
+          <div class="stat-value">100</div>
+          <div class="stat-label">サージ上限ノード数</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Before/After Section -->
+    <div class="section">
+      <h2>&#128260; Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before">
+          <h4>&#10060; Before</h4>
+          <ul>
+            <li>PSI メトリクスを GKE で直接収集できず、リソース競合状態の把握が困難</li>
+            <li>GPU ワークロードを Confidential Computing 環境で実行する手段が限定的</li>
+            <li>VPA がなぜ特定のスケーリング決定を行ったか追跡手段がない</li>
+            <li>Gateway LB からバックエンド Pod への身元証明ができない</li>
+            <li>サージアップグレードの並列数に制限、大規模クラスタの更新に時間がかかる</li>
+          </ul>
+        </div>
+        <div class="after">
+          <h4>&#10004; After</h4>
+          <ul>
+            <li>ClusterNodeMonitoring で PSI メトリクスを Prometheus に収集・可視化</li>
+            <li>G4 + NVIDIA RTX PRO 6000 で Confidential GKE Nodes が GPU 対応</li>
+            <li>VPA 推奨決定・Pod 退避・リソース適用を Cloud Logging に記録</li>
+            <li>Gateway API で バックエンド mTLS を構成し双方向認証を実現</li>
+            <li>maxSurge + maxUnavailable 合計上限が 100 に引き上げ</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>&#128736; アーキテクチャ図</h2>
+      <p>5つのアップデートを可観測性、セキュリティ、運用効率の3カテゴリに分類し、各機能がどのコンポーネントと連携するかを示します。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TB
+    subgraph Observability["可観測性"]
+        PSI["PSI メトリクス\nv1.34+"]
+        VPA_LOG["VPA 決定ログ\nv1.36+ Preview"]
+        PSI --> Prometheus["Cloud Managed\nService for Prometheus"]
+        VPA_LOG --> Logging["Cloud Logging"]
+        Prometheus --> Monitoring["Cloud Monitoring"]
+    end
+
+    subgraph Security["セキュリティ"]
+        CONF_GPU["Confidential GKE Nodes\n+ GPU v1.35.3+ Preview"]
+        MTLS["Gateway バックエンド mTLS"]
+        CONF_GPU --> TDX["Intel TDX\nメモリ暗号化"]
+        MTLS --> LB["Gateway LB\nクライアント証明書提示"]
+        LB --> Backend["バックエンド Pod\n証明書検証"]
+    end
+
+    subgraph Operations["運用効率"]
+        SURGE["サージアップグレード\n上限 100 ノード"]
+        SURGE --> FAST["大規模クラスタ\n高速アップグレード"]
+    end
+
+    subgraph GKE_Cluster["GKE クラスタ"]
+        Node["ノード"]
+        Pod["Pod"]
+        cAdvisor["cAdvisor"]
+        Node --> cAdvisor
+        cAdvisor --> PSI
+        Pod --> VPA["VPA Controller"]
+        VPA --> VPA_LOG
+    end
+        </pre>
+      </div>
+    </div>
+
+    <!-- Feature 1: PSI Metrics -->
+    <div class="section">
+      <h2>&#128200; 機能 1: PSI メトリクス収集</h2>
+      <div class="pillar-header pillar-observability">&#128065; 可観測性 | GKE 1.34+ | GA</div>
+
+      <p>Linux カーネルの <strong>Pressure Stall Information (PSI)</strong> メトリクスを cAdvisor 経由で収集し、CPU・メモリ・I/O の輻輳時間とストール時間を監視可能にします。</p>
+
+      <div class="card">
+        <h3>収集されるメトリクス</h3>
+        <div class="icon-text"><span class="arrow">&#8594;</span><span><code>container_pressure_cpu_stalled_seconds_total</code> - CPU ストール時間</span></div>
+        <div class="icon-text"><span class="arrow">&#8594;</span><span><code>container_pressure_memory_stalled_seconds_total</code> - メモリストール時間</span></div>
+        <div class="icon-text"><span class="arrow">&#8594;</span><span><code>container_pressure_io_stalled_seconds_total</code> - I/O ストール時間</span></div>
+      </div>
+
+      <div class="flow-diagram">
+        <div class="flow-step">&#128187; ノード<br/>(Linux Kernel PSI)</div>
+        <span class="flow-arrow">&#8594;</span>
+        <div class="flow-step">&#9881; cAdvisor<br/>(メトリクス公開)</div>
+        <span class="flow-arrow">&#8594;</span>
+        <div class="flow-step">&#128202; Prometheus<br/>(収集・保存)</div>
+        <span class="flow-arrow">&#8594;</span>
+        <div class="flow-step">&#128200; Cloud Monitoring<br/>(可視化・アラート)</div>
+      </div>
+
+      <table>
+        <tr><th>項目</th><th>詳細</th></tr>
+        <tr><td>必要バージョン</td><td>GKE 1.34 以降</td></tr>
+        <tr><td>収集方法</td><td>ClusterNodeMonitoring カスタムリソース</td></tr>
+        <tr><td>メトリクスソース</td><td>cAdvisor</td></tr>
+        <tr><td>収集間隔</td><td>30秒 (デフォルト)</td></tr>
+        <tr><td>対象リソース</td><td>CPU、メモリ、I/O</td></tr>
+        <tr><td>メトリクス形式</td><td>Prometheus counter</td></tr>
+      </table>
+
+      <h3>設定方法</h3>
+      <span class="code-label">YAML</span>
+      <pre><code class="language-yaml">apiVersion: monitoring.googleapis.com/v1
+kind: ClusterNodeMonitoring
+metadata:
+  name: psi-collector
+spec:
+  selector:
+    matchLabels: {}
+  endpoints:
+    - path: /metrics/cadvisor
+      scheme: https
+      interval: 30s
+      tls:
+        insecureSkipVerify: true
+      metricRelabeling:
+        - action: keep
+          sourceLabels: [__name__]
+          regex: container_pressure_(cpu|memory|io)_(waiting|stalled)_seconds_total</code></pre>
+
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">kubectl apply -f psi-prometheus-collector.yaml</code></pre>
+    </div>
+
+    <!-- Feature 2: Confidential GPU -->
+    <div class="section">
+      <h2>&#128274; 機能 2: Confidential GKE Nodes + GPU</h2>
+      <div class="pillar-header pillar-security">&#128737; セキュリティ | GKE 1.35.3+ | Preview</div>
+
+      <p>GPU ワークロードを <strong>Confidential Computing</strong> 環境で実行可能に。Intel TDX (Trust Domain Extensions) によりGPU メモリ内のデータを使用中も暗号化保護します。</p>
+
+      <div class="card purple">
+        <h3>主要要件</h3>
+        <div class="icon-text"><span class="arrow">&#8594;</span><span>GKE バージョン 1.35.3-gke.1389000 以降</span></div>
+        <div class="icon-text"><span class="arrow">&#8594;</span><span>対応 GPU: NVIDIA RTX PRO 6000</span></div>
+        <div class="icon-text"><span class="arrow">&#8594;</span><span>対応マシンタイプ: 特定の G4 マシンタイプ</span></div>
+        <div class="icon-text"><span class="arrow">&#8594;</span><span>Confidential 技術: Intel TDX</span></div>
+        <div class="icon-text"><span class="arrow">&#8594;</span><span>VM タイプ: Spot VM または Flex-start VM (必須)</span></div>
+      </div>
+
+      <div class="flow-diagram">
+        <div class="flow-step">&#129302; AI/ML<br/>ワークロード</div>
+        <span class="flow-arrow">&#8594;</span>
+        <div class="flow-step" style="border-color: var(--gc-purple);">&#128274; Confidential<br/>GKE Nodes</div>
+        <span class="flow-arrow">&#8594;</span>
+        <div class="flow-step" style="border-color: var(--gc-red);">&#128272; Intel TDX<br/>メモリ暗号化</div>
+        <span class="flow-arrow">&#8594;</span>
+        <div class="flow-step" style="border-color: var(--gc-green);">&#9989; データ保護<br/>実行中も暗号化</div>
+      </div>
+
+      <h3>ComputeClass 設定例</h3>
+      <span class="code-label">YAML</span>
+      <pre><code class="language-yaml">apiVersion: cloud.google.com/v1
+kind: ComputeClass
+metadata:
+  name: confidential-gpu-ml
+spec:
+  nodePoolConfig:
+    confidentialNodeType: TDX
+  priorityDefaults:
+    location:
+      zones: ['us-central1-a']
+    priorities:
+      - gpu:
+          type: nvidia-rtx-pro-6000
+          count: 1
+        driverVersion: default
+        spot: true
+  activeMigration:
+    optimizeRulePriority: true
+  nodePoolAutoCreation:
+    enabled: true</code></pre>
+    </div>
+
+    <!-- Feature 3: VPA Decision Logs -->
+    <div class="section">
+      <h2>&#128220; 機能 3: VPA 決定ログ</h2>
+      <div class="pillar-header pillar-observability">&#128065; 可観測性 | GKE 1.36.0+ | Preview</div>
+
+      <p>VerticalPodAutoscaler の決定イベントを <strong>Cloud Logging</strong> に記録し、オートスケーリングの動作理由を透明化します。</p>
+
+      <div class="card green">
+        <h3>記録される4種類のログ</h3>
+        <div class="icon-text"><span>1.</span><span><strong>推奨更新</strong> (Update recommendation) - VPA が新しいリソース推奨値を計算</span></div>
+        <div class="icon-text"><span>2.</span><span><strong>Pod 退避</strong> (Evict Pod) - VPA が Pod をスケーリングのため退避</span></div>
+        <div class="icon-text"><span>3.</span><span><strong>退避時の推奨適用</strong> (Apply recommendation on eviction) - 退避時にリソースを適用</span></div>
+        <div class="icon-text"><span>4.</span><span><strong>インプレース推奨適用</strong> (Apply recommendation in place) - 再起動なしでリソース変更</span></div>
+      </div>
+
+      <table>
+        <tr><th>項目</th><th>詳細</th></tr>
+        <tr><td>必要バージョン</td><td>GKE 1.36.0-gke.1601000 以降</td></tr>
+        <tr><td>ログ出力先</td><td>Cloud Logging</td></tr>
+        <tr><td>ログ名</td><td><code>container.googleapis.com/vpa-controller</code></td></tr>
+        <tr><td>ログ形式</td><td>JSON (jsonPayload)</td></tr>
+        <tr><td>有効化フラグ</td><td><code>--logging=SYSTEM,KCP_VPA</code></td></tr>
+      </table>
+
+      <h3>有効化コマンド</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># 新規クラスタ
+gcloud container clusters create CLUSTER_NAME \
+  --location=LOCATION \
+  --project=PROJECT_ID \
+  --logging=SYSTEM,KCP_VPA
+
+# 既存クラスタ
+gcloud container clusters update CLUSTER_NAME \
+  --location=LOCATION \
+  --project=PROJECT_ID \
+  --logging=SYSTEM,KCP_VPA</code></pre>
+    </div>
+
+    <!-- Feature 4: Gateway Backend mTLS -->
+    <div class="section">
+      <h2>&#128272; 機能 4: Gateway バックエンド mTLS</h2>
+      <div class="pillar-header pillar-security">&#128737; セキュリティ | Gateway API 1.5+ | GA</div>
+
+      <p>GKE Gateway ロードバランサーがバックエンド Pod に <strong>クライアント証明書を提示</strong> して自身の身元を証明。ゼロトラストアーキテクチャの実装を容易にします。</p>
+
+      <div class="card red">
+        <h3>対応 GatewayClass</h3>
+        <div class="icon-text"><span class="check-icon">&#10003;</span><span><code>gke-l7-global-external-managed</code> - グローバル外部 LB</span></div>
+        <div class="icon-text"><span class="check-icon">&#10003;</span><span><code>gke-l7-regional-external-managed</code> - リージョナル外部 LB</span></div>
+        <div class="icon-text"><span class="check-icon">&#10003;</span><span><code>gke-l7-rilb</code> - リージョナル内部 LB</span></div>
+      </div>
+
+      <div class="flow-diagram">
+        <div class="flow-step">&#127760; クライアント</div>
+        <span class="flow-arrow">&#8594;</span>
+        <div class="flow-step" style="border-color: var(--gc-red);">&#128274; Gateway LB<br/>(証明書提示)</div>
+        <span class="flow-arrow">&#8596;</span>
+        <div class="flow-step" style="border-color: var(--gc-green);">&#9989; バックエンド Pod<br/>(証明書検証)</div>
+      </div>
+
+      <div class="note-box">
+        <strong>&#128161; ポイント:</strong> <code>spec.tls.backend.clientCertificateRef</code> フィールドで構成。バックエンド認証 TLS (サーバー証明書検証) と組み合わせて完全な双方向 TLS を実現できます。
+      </div>
+
+      <h3>設定手順</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># Step 1: クライアント証明書の Secret 作成
+kubectl create secret tls gateway-client-identity \
+  --cert=PATH_TO_CERT_FILE \
+  --key=PATH_TO_KEY_FILE \
+  --namespace=default</code></pre>
+
+      <span class="code-label">YAML</span>
+      <pre><code class="language-yaml"># Step 2: Gateway リソースで証明書を参照
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: my-gateway
+  namespace: default
+spec:
+  gatewayClassName: gke-l7-global-external-managed
+  tls:
+    backend:
+      clientCertificateRef:
+        group: ""
+        kind: Secret
+        name: gateway-client-identity
+  listeners:
+    - name: https
+      protocol: HTTPS
+      port: 443
+      tls:
+        mode: Terminate</code></pre>
+    </div>
+
+    <!-- Feature 5: Surge Upgrade -->
+    <div class="section">
+      <h2>&#9889; 機能 5: サージアップグレード上限引き上げ</h2>
+      <div class="pillar-header pillar-operations">&#128295; 運用効率 | GKE Standard | GA</div>
+
+      <p>GKE Standard クラスタにおいて、同時にアップグレードできるノード数 (<code>maxSurge</code> + <code>maxUnavailable</code>) の合計上限が <strong>100</strong> に引き上げられました。</p>
+
+      <div class="card green">
+        <h3>新しい上限値</h3>
+        <table>
+          <tr><th>設定項目</th><th>上限値</th><th>デフォルト</th></tr>
+          <tr><td>maxSurge</td><td>100</td><td>1</td></tr>
+          <tr><td>maxUnavailable</td><td>100</td><td>0</td></tr>
+          <tr><td>maxSurge + maxUnavailable (合計)</td><td>100</td><td>1</td></tr>
+        </table>
+      </div>
+
+      <div class="success-box">
+        <strong>&#9889; 効果:</strong> 大規模ノードプール (数百〜数千ノード) のアップグレード時間を大幅に短縮。例: 1000 ノードクラスタで maxSurge=100 に設定すると、従来の 1/100 の速度でローリングアップグレードが完了します。
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>&#127919; ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>&#129302; ユースケース 1: AI/ML ワークロードの機密データ処理</h4>
+        <p><strong>シナリオ:</strong> 金融機関が顧客の取引データを使用した不正検知モデルを GKE 上で学習させたいが、データ保護規制によりデータが処理中も暗号化されている必要がある。</p>
+        <p><strong>効果:</strong> GPU メモリ内のモデルデータと学習データが Intel TDX により暗号化され、規制要件を満たしながら高性能な GPU 処理が可能。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>&#128274; ユースケース 2: ゼロトラストセキュリティ</h4>
+        <p><strong>シナリオ:</strong> マイクロサービスアーキテクチャの Web アプリケーションにおいて、外部ロードバランサーからバックエンド Pod までの通信を完全に暗号化し、双方向の認証を行いたい。</p>
+        <p><strong>効果:</strong> ロードバランサーとバックエンド Pod 間の通信が mTLS で保護され、中間者攻撃のリスクを排除。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>&#128200; ユースケース 3: リソースボトルネックの可視化と VPA 最適化</h4>
+        <p><strong>シナリオ:</strong> マイクロサービス群において、一部の Pod が断続的にレスポンス遅延を引き起こしているが、CPU 使用率は高くない。根本原因の特定と VPA チューニングが必要。</p>
+        <p><strong>効果:</strong> PSI メトリクスにより I/O やメモリの圧迫が原因と特定でき、VPA 決定ログによりオートスケーラーが適切にリソースを調整しているかを確認。データに基づいた VPA ポリシーの最適化が可能。</p>
+      </div>
+    </div>
+
+    <!-- Merits -->
+    <div class="section">
+      <h2>&#10004; メリット</h2>
+
+      <h3>ビジネス面</h3>
+      <div class="card">
+        <div class="check-item"><span class="check-icon">&#10003;</span><span><strong>障害の予防的検知:</strong> PSI メトリクスにより、リソース輻輳がパフォーマンス低下に至る前に検知・対処</span></div>
+        <div class="check-item"><span class="check-icon">&#10003;</span><span><strong>コンプライアンス対応:</strong> Confidential GPU により規制産業 (金融、医療) でも GPU ベースの AI/ML ワークロードを安全に実行可能</span></div>
+        <div class="check-item"><span class="check-icon">&#10003;</span><span><strong>運用コスト削減:</strong> サージアップグレード上限引き上げにより大規模クラスタのメンテナンスウィンドウを短縮</span></div>
+        <div class="check-item"><span class="check-icon">&#10003;</span><span><strong>セキュリティ態勢の強化:</strong> Gateway mTLS によりゼロトラストアーキテクチャの実装が容易</span></div>
+      </div>
+
+      <h3>技術面</h3>
+      <div class="card">
+        <div class="check-item"><span class="check-icon">&#10003;</span><span><strong>詳細なリソース監視:</strong> PSI メトリクスは従来の CPU/メモリ使用率よりも正確にリソース競合を検出</span></div>
+        <div class="check-item"><span class="check-icon">&#10003;</span><span><strong>VPA の透明性:</strong> 決定ログにより動作理由が明確、推奨値の信頼度 (LOW/HIGH) も把握可能</span></div>
+        <div class="check-item"><span class="check-icon">&#10003;</span><span><strong>標準 API 準拠:</strong> Gateway mTLS は標準 Gateway API 仕様に準拠、ポータビリティ確保</span></div>
+        <div class="check-item"><span class="check-icon">&#10003;</span><span><strong>スケーラビリティ:</strong> 100 ノード同時アップグレードで数千ノード規模のクラスタも高速更新</span></div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>&#9888; 制約事項・注意点</h2>
+
+      <div class="warning-box">
+        <strong>&#9888; 制限事項</strong>
+        <ul style="margin: 8px 0; padding-left: 20px;">
+          <li><strong>Confidential GPU:</strong> Preview 段階。G4 マシンタイプと NVIDIA RTX PRO 6000 に限定。Spot VM / Flex-start VM 必須</li>
+          <li><strong>VPA ログ:</strong> Preview 段階。GKE 1.36.0+ 必須。Cloud Logging の追加料金が発生</li>
+          <li><strong>PSI メトリクス:</strong> GKE 1.34+ 必須。ClusterNodeMonitoring の構成が必要 (デフォルト収集されない)</li>
+          <li><strong>Gateway mTLS:</strong> Gateway API 1.5+ 必須。一部の GatewayClass (gke-l7-gxlb) は非対応</li>
+          <li><strong>サージアップグレード:</strong> maxSurge を高く設定する場合、追加ノード分のリソースクォータとコストが必要</li>
+        </ul>
+      </div>
+
+      <div class="warning-box">
+        <strong>&#128161; 考慮すべき点</strong>
+        <ul style="margin: 8px 0; padding-left: 20px;">
+          <li>Confidential GKE Nodes の GPU ドライバ自動インストール使用時、コントロールプレーンのバージョンアップグレードが即座にノード再作成をトリガー (メンテナンスポリシー無視)</li>
+          <li>PSI メトリクスの収集は追加の Prometheus スクレイピングを導入するため、モニタリングコストが増加する可能性あり</li>
+          <li>VPA ログのフィールドに機密情報や個人情報を含めないよう注意</li>
+          <li>サージアップグレードの高い並列度は、リソースクォータ不足によるアップグレード失敗リスクあり</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>&#128176; 料金情報</h2>
+      <table>
+        <tr><th>機能</th><th>料金モデル</th></tr>
+        <tr><td>PSI メトリクス</td><td>Cloud Monitoring メトリクス取り込み料金 (Prometheus サンプル数ベース)</td></tr>
+        <tr><td>VPA 決定ログ</td><td>Cloud Logging 標準料金 (VPA 数と更新頻度に依存、各 VPA が毎分1ログ生成)</td></tr>
+        <tr><td>Confidential GKE Nodes</td><td>Confidential VM プレミアム料金 (Spot VM 割引適用可能)</td></tr>
+        <tr><td>サージアップグレード</td><td>追加サージノードに対してアップグレード中のみコンピューティング料金</td></tr>
+      </table>
+    </div>
+
+    <!-- Regions -->
+    <div class="section">
+      <h2>&#127758; 利用可能リージョン</h2>
+      <div class="region-list">
+        <div class="region-item"><span class="badge-ga" style="margin: 0;">GA</span> <strong>PSI メトリクス</strong> - GKE が利用可能なすべてのリージョン (GKE 1.34+)</div>
+        <div class="region-item"><span class="badge-preview" style="margin: 0;">Preview</span> <strong>Confidential GPU</strong> - NVIDIA Confidential Computing 対応ゾーンに限定</div>
+        <div class="region-item"><span class="badge-preview" style="margin: 0;">Preview</span> <strong>VPA 決定ログ</strong> - GKE が利用可能なすべてのリージョン (GKE 1.36.0+)</div>
+        <div class="region-item"><span class="badge-ga" style="margin: 0;">GA</span> <strong>Gateway mTLS</strong> - GKE Gateway が利用可能なすべてのリージョン</div>
+        <div class="region-item"><span class="badge-ga" style="margin: 0;">GA</span> <strong>サージアップグレード</strong> - GKE Standard が利用可能なすべてのリージョン</div>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#128279; 関連サービス</h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px;">
+        <div class="card"><strong>Google Cloud Managed Service for Prometheus</strong><br/>PSI メトリクスの収集基盤</div>
+        <div class="card"><strong>Cloud Monitoring</strong><br/>PSI メトリクスの可視化とアラート設定</div>
+        <div class="card"><strong>Cloud Logging</strong><br/>VPA 決定ログの保存と分析</div>
+        <div class="card"><strong>Certificate Manager</strong><br/>Gateway mTLS 証明書管理</div>
+        <div class="card"><strong>Confidential Computing</strong><br/>Confidential GKE Nodes の基盤技術</div>
+        <div class="card"><strong>Gateway API</strong><br/>バックエンド mTLS の標準 API</div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>&#128221; まとめ</h2>
+      <p>今回の GKE アップデートは、<span class="highlight">可観測性</span>、<span class="highlight">セキュリティ</span>、<span class="highlight">運用効率</span>の3領域にわたる包括的な強化です。</p>
+      <div class="note-box">
+        <strong>&#127919; 推奨アクション:</strong>
+        <ul style="margin: 8px 0; padding-left: 20px;">
+          <li>GKE 1.34 以降を使用中の組織は、まず <strong>PSI メトリクスの収集を有効化</strong> してリソース監視を改善</li>
+          <li>セキュリティ要件の高い環境では <strong>Gateway mTLS の導入</strong> を検討</li>
+          <li>大規模クラスタ運用者は <strong>サージアップグレード上限の活用</strong> でメンテナンス時間を短縮</li>
+          <li>機密データを扱う AI/ML ワークロードでは <strong>Confidential GPU の評価</strong> を開始</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>&#128206; 出典:</p>
+      <ul style="list-style: none; padding: 0; margin: 4px 0;">
+        <li><a href="https://cloud.google.com/release-notes#July_07_2026" target="_blank" rel="noopener noreferrer">Google Cloud Release Notes (July 7, 2026)</a></li>
+        <li><a href="https://cloud.google.com/kubernetes-engine/docs/how-to/collect-specific-prometheus-metrics" target="_blank" rel="noopener noreferrer">PSI メトリクス収集ドキュメント</a></li>
+        <li><a href="https://cloud.google.com/kubernetes-engine/docs/how-to/gpus-confidential-nodes" target="_blank" rel="noopener noreferrer">Confidential GKE Nodes GPU ドキュメント</a></li>
+        <li><a href="https://cloud.google.com/kubernetes-engine/docs/how-to/view-vertical-pod-autoscaling-events" target="_blank" rel="noopener noreferrer">VPA 決定ログドキュメント</a></li>
+        <li><a href="https://cloud.google.com/kubernetes-engine/docs/how-to/secure-gateway#configure-backend-mtls" target="_blank" rel="noopener noreferrer">Gateway バックエンド mTLS ドキュメント</a></li>
+        <li><a href="https://cloud.google.com/kubernetes-engine/docs/concepts/node-pool-upgrade-strategies#surge" target="_blank" rel="noopener noreferrer">サージアップグレード戦略ドキュメント</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline);">Generated: 2026-07-08</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

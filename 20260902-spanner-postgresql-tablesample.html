@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spanner: PostgreSQL 方言データベースで TABLESAMPLE 演算子をサポート</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 720px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid rgba(234, 67, 53, 0.3);
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid rgba(52, 168, 83, 0.3);
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .before-box h3 {
+      color: var(--gc-red);
+      margin-top: 0;
+    }
+
+    .after-box h3 {
+      color: var(--gc-green);
+      margin-top: 0;
+    }
+
+    .before-after ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-after li {
+      margin: 8px 0;
+    }
+
+    /* チェックリスト */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+    }
+
+    /* コードブロック (Mermaid の pre を除外) */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+      background: #FFFFFF;
+    }
+
+    /* 機能カードグリッド */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 720px) {
+      .feature-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .feature-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .feature-card h3 {
+      margin-top: 0;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .feature-card p, .feature-card ul {
+      font-size: 14px;
+      margin: 8px 0 0;
+    }
+
+    .feature-card ul {
+      padding-left: 20px;
+    }
+
+    /* ユースケース */
+    .usecase-box {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+      border: 1px solid var(--gc-blue-100);
+    }
+
+    .usecase-box h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+    }
+
+    .usecase-box p {
+      font-size: 14px;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      word-break: break-all;
+    }
+
+    footer ul {
+      padding-left: 20px;
+      margin: 8px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <div style="margin-bottom: 8px;">
+          <span class="badge">🗄️ Spanner</span>
+          <span class="badge badge-ga">一般提供 (GA)</span>
+        </div>
+        <h1>PostgreSQL 方言データベースで<br>TABLESAMPLE 演算子をサポート</h1>
+      </div>
+      <div class="subtitle">📅 リリース日: 2026-09-02</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📌 概要</h2>
+      <p>
+        Spanner の PostgreSQL 方言データベースで、<span class="highlight">TABLESAMPLE 演算子</span>が利用できるようになりました。
+        テーブルから<strong>ランダムなサンプルデータ</strong>を抽出するための SQL 演算子で、大量のデータを持つテーブルに対して厳密な結果を必要としない分析やデータ探索に有効です。
+      </p>
+      <p>
+        サンプリング方式は、各行を指定した確率で独立に選択する <code>BERNOULLI</code> と、指定した行数ちょうどのサンプルを等確率で抽出する <code>SPANNER.RESERVOIR</code> の 2 種類。
+        GoogleSQL 方言で提供されてきたテーブルサンプリング機能と同等の機能が、PostgreSQL 方言でも SQL 標準に近い構文で利用可能になります。
+      </p>
+      <div class="note-box">
+        <strong>🎯 対象ユーザー:</strong> Spanner の PostgreSQL 方言データベースを利用し、大規模テーブルに対するデータ品質チェック、統計的な傾向分析、機械学習用サンプルデータの抽出などを行うデータエンジニアやアプリケーション開発者
+      </div>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before (アップデート前)</h3>
+          <ul>
+            <li>PostgreSQL 方言では <code>TABLESAMPLE</code> が未サポートで、ランダムサンプリングを SQL で直接表現できなかった</li>
+            <li><code>spanner.farm_fingerprint</code> でハッシュ値を計算し剰余で絞り込む回避策を自前で実装する必要があった</li>
+            <li>GoogleSQL 方言との機能差があり、方言間の移行・併用時にクエリの書き換えが必要だった</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After (アップデート後)</h3>
+          <ul>
+            <li><code>TABLESAMPLE BERNOULLI (割合)</code> で各行を指定確率で独立に選択する確率的サンプリングを直接記述可能</li>
+            <li><code>TABLESAMPLE SPANNER.RESERVOIR (行数)</code> で正確に K 行のサンプルを等確率で抽出可能</li>
+            <li>ハッシュ関数を使った回避策が不要になり、クエリがシンプルに</li>
+            <li>JOIN・サブクエリ内のベーステーブル・ビューへの適用、キャスト・暗黙変換にも対応</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    A([👤 クライアント]) -->|PostgreSQL 方言クエリ| B[🔍 Spanner クエリ実行]
+    B --> C{TABLESAMPLE<br>sample_method}
+    C -->|BERNOULLI :<br>各行を確率 p% で選択| D[📊 約 N × p/100 行]
+    C -->|SPANNER.RESERVOIR :<br>K 行を等確率で抽出| E[📊 ちょうど K 行<br>入力が K 未満なら全行]
+    D --> F([✅ サンプル結果])
+    E --> F
+    subgraph S[🗄️ Spanner PostgreSQL 方言データベース]
+        B
+        C
+    end
+        </pre>
+      </div>
+      <p style="font-size: 14px;">
+        PostgreSQL 方言クエリの <code>TABLESAMPLE</code> 演算子で指定したサンプリング方式 (<code>BERNOULLI</code> または <code>SPANNER.RESERVOIR</code>) に応じて、Spanner がテーブルからランダムサンプルを抽出して返却する流れを示しています。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <h3>🎲 BERNOULLI サンプリング</h3>
+          <ul>
+            <li><code>sample_size</code> で指定した確率 (0〜100) で各行を独立に選択</li>
+            <li>結果は約 <code>N × sample_size / 100</code> 行 (行数は確率的に変動)</li>
+            <li>例: <code>TABLESAMPLE BERNOULLI (0.1)</code> で約 0.1% を抽出</li>
+          </ul>
+        </div>
+        <div class="feature-card">
+          <h3>🎯 SPANNER.RESERVOIR サンプリング</h3>
+          <ul>
+            <li>サンプルサイズ K を行数で指定 (0 以上)</li>
+            <li>入力が K 行より大きい場合、ちょうど K 行を出力し、どの K 行の組み合わせも等確率</li>
+            <li>入力が K 行より小さい場合は入力全体をそのまま出力</li>
+          </ul>
+        </div>
+        <div class="feature-card">
+          <h3>🔧 柔軟なサンプルサイズ指定</h3>
+          <ul>
+            <li>数値リテラルまたは数値パラメータを指定可能</li>
+            <li>リテラルのキャスト (<code>CAST(45.56 AS BIGINT)</code>、<code>'50'::DOUBLE PRECISION</code>) をサポート</li>
+            <li>暗黙の型変換 (<code>BERNOULLI ('50')</code>) にも対応</li>
+          </ul>
+        </div>
+        <div class="feature-card">
+          <h3>🔗 JOIN・サブクエリとの組み合わせ</h3>
+          <ul>
+            <li>複数テーブルにそれぞれ <code>TABLESAMPLE</code> を適用した JOIN が可能</li>
+            <li>サブクエリ内のベーステーブルやビューに対しても適用可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>📐 技術仕様</h2>
+
+      <h3>構文</h3>
+      <span class="code-label">SQL</span>
+      <pre><code class="language-sql">tablesample_operator:
+{
+  TABLESAMPLE sample_method (sample_size)
+}
+
+-- sample_method は次のいずれか:
+--   BERNOULLI | SPANNER.RESERVOIR
+-- sample_size は次のいずれか:
+--   { numeric_literal | numeric_parameter }</code></pre>
+
+      <h3>サンプリング方式の比較</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>BERNOULLI</th>
+            <th>SPANNER.RESERVOIR</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>指定方法</strong></td>
+            <td>割合 (%)</td>
+            <td>行数</td>
+          </tr>
+          <tr>
+            <td><strong>値の範囲</strong></td>
+            <td>0〜100 (両端含む)</td>
+            <td>0 以上</td>
+          </tr>
+          <tr>
+            <td><strong>結果の行数</strong></td>
+            <td>約 N × sample_size/100 行 (変動あり)</td>
+            <td>ちょうど K 行 (入力が K 未満なら全行)</td>
+          </tr>
+          <tr>
+            <td><strong>特徴</strong></td>
+            <td>各行を独立に確率選択</td>
+            <td>どの K 行の組み合わせも等確率</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>GoogleSQL 方言との構文差異</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>GoogleSQL 方言</th>
+            <th>PostgreSQL 方言</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>予約サンプリングの方式名</strong></td>
+            <td><code>RESERVOIR</code></td>
+            <td><code>SPANNER.RESERVOIR</code></td>
+          </tr>
+          <tr>
+            <td><strong>単位キーワード</strong></td>
+            <td><code>PERCENT</code> / <code>ROWS</code> を明示</td>
+            <td>なし (方式ごとに単位が決まる)</td>
+          </tr>
+          <tr>
+            <td><strong>サブクエリ由来の一時テーブルへの適用</strong></td>
+            <td>可能</td>
+            <td>不可</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>Spanner の PostgreSQL 方言データベースを利用していること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>追加の設定や API の有効化は不要 (SQL クエリ構文としてそのまま利用可能)</span></div>
+
+      <h3>例 1: RESERVOIR サンプリングで 100 行を抽出</h3>
+      <span class="code-label">SQL</span>
+      <pre><code class="language-sql">SELECT MessageId
+FROM Messages TABLESAMPLE SPANNER.RESERVOIR (100);</code></pre>
+
+      <h3>例 2: BERNOULLI サンプリングで約 0.1% を抽出</h3>
+      <span class="code-label">SQL</span>
+      <pre><code class="language-sql">SELECT MessageId
+FROM Messages TABLESAMPLE BERNOULLI (0.1);</code></pre>
+
+      <h3>例 3: JOIN との組み合わせ</h3>
+      <span class="code-label">SQL</span>
+      <pre><code class="language-sql">SELECT T.Subject, M.MessageId
+FROM Threads AS T TABLESAMPLE SPANNER.RESERVOIR(10),
+     Messages AS M TABLESAMPLE BERNOULLI(50)
+WHERE T.ServerId='test' AND T.ThreadId = M.ThreadId;</code></pre>
+
+      <h3>例 4: サブクエリ内のベーステーブルへの適用</h3>
+      <span class="code-label">SQL</span>
+      <pre><code class="language-sql">SELECT Subject
+FROM (SELECT MessageId, Subject
+      FROM Messages TABLESAMPLE BERNOULLI(50) WHERE ServerId = 'test') Messages2
+WHERE MessageId > 3;</code></pre>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>💡 メリット</h2>
+      <div class="card">
+        <h3>💼 ビジネス面</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>分析コストと時間の削減</strong>: 大規模テーブル全体を処理せずにサンプルで傾向を把握でき、データ探索や品質チェックの所要時間を短縮</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>移行のしやすさ向上</strong>: GoogleSQL 方言との機能差が縮まり、方言間の移行・併用時のクエリ書き換え負担を軽減</span></div>
+      </div>
+      <div class="card">
+        <h3>⚙️ 技術面</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>クエリの簡素化</strong>: <code>spanner.farm_fingerprint</code> によるハッシュ計算などの回避策が不要になり、意図が明確な SQL を記述できる</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>2 種類のサンプリング特性を選択可能</strong>: 「割合で近似的に抽出」なら BERNOULLI、「正確に K 行欲しい」なら SPANNER.RESERVOIR と用途に応じて使い分け</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>パラメータ化対応</strong>: サンプルサイズに数値パラメータを利用でき、アプリケーションから動的にサンプルサイズを制御可能</span></div>
+      </div>
+    </div>
+
+    <!-- 制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <div class="error-box">
+        <strong>🚫 制限事項</strong>
+        <ul style="margin: 8px 0 0; padding-left: 20px; font-size: 14px;">
+          <li>サンプルサイズリテラルのネストされたキャストはサポートされない</li>
+          <li>サンプルサイズパラメータのキャストはサポートされない</li>
+          <li>サブクエリから派生した一時テーブルに対するサンプリングはサポートされない (GoogleSQL 方言とは異なる点)</li>
+        </ul>
+      </div>
+      <div class="warning-box">
+        <strong>🤔 考慮すべき点</strong>
+        <ul style="margin: 8px 0 0; padding-left: 20px; font-size: 14px;">
+          <li>サンプリング結果はランダムであるため、同じクエリでも実行のたびに結果が変わり得る</li>
+          <li>BERNOULLI は行ごとの確率選択のため、返却行数は毎回変動する。正確な行数が必要な場合は SPANNER.RESERVOIR を使用する</li>
+          <li>サンプル結果は近似的な分析向けであり、厳密な集計が必要な処理には全件クエリを使用する</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase-box">
+        <h3>📋 ユースケース 1: 大規模テーブルのデータ品質チェック</h3>
+        <p><strong>シナリオ</strong>: 数億行規模のメッセージテーブルに対して、データ形式の妥当性や欠損の有無を定期的に確認したい。全件スキャンは時間がかかるため、代表的なサンプルで検査したい。</p>
+        <span class="code-label">SQL</span>
+        <pre><code class="language-sql">SELECT MessageId, Subject
+FROM Messages TABLESAMPLE SPANNER.RESERVOIR (1000);</code></pre>
+        <p><strong>効果</strong>: 正確に 1,000 行のランダムサンプルを取得でき、全件処理を行わずにデータ品質の傾向を把握できる。</p>
+      </div>
+
+      <div class="usecase-box">
+        <h3>🤖 ユースケース 2: 機械学習・分析用のサンプルデータ抽出</h3>
+        <p><strong>シナリオ</strong>: 本番の PostgreSQL 方言データベースから、モデル学習や探索的データ分析 (EDA) 用に一部のデータだけを抽出したい。</p>
+        <span class="code-label">SQL</span>
+        <pre><code class="language-sql">SELECT *
+FROM Transactions TABLESAMPLE BERNOULLI (1);</code></pre>
+        <p><strong>効果</strong>: テーブル全体の約 1% を確率的に抽出でき、ハッシュ関数による自前のサンプリング実装が不要になる。</p>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <div class="success-box">
+        <strong>✅ 追加料金なし:</strong> このアップデートは SQL クエリ構文の追加であり、追加料金は発生しません。Spanner の通常のコンピュート容量・ストレージに基づく料金体系が適用されます。
+      </div>
+      <p style="font-size: 14px;">詳細: <a href="https://cloud.google.com/spanner/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Spanner の料金</a></p>
+    </div>
+
+    <!-- 関連サービス・機能 -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <h3>🗄️ Spanner GoogleSQL 方言</h3>
+        <p style="font-size: 14px; margin: 0;"><code>TABLESAMPLE</code> 演算子 (BERNOULLI / RESERVOIR、<code>PERCENT</code> / <code>ROWS</code> 指定) を以前からサポートしており、パイプ構文の <code>|&gt; TABLESAMPLE</code> にも対応。今回のアップデートで PostgreSQL 方言との機能差が縮小。</p>
+      </div>
+      <div class="card">
+        <h3>⚙️ Spanner クエリ実行プラン (Random ID Assign 演算子)</h3>
+        <p style="font-size: 14px; margin: 0;">サンプリングクエリは内部的に Random ID Assign 演算子が各行に乱数を割り当て、Filter (Bernoulli) や Sort + LIMIT (Reservoir) と組み合わせて実行される。</p>
+      </div>
+      <div class="card">
+        <h3>📊 BigQuery のテーブルサンプリング</h3>
+        <p style="font-size: 14px; margin: 0;">BigQuery も <code>TABLESAMPLE SYSTEM</code> 句を提供しているが、データブロック単位のサンプリングであり、Spanner の行単位サンプリングとは動作が異なる。</p>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <p>
+        Spanner の PostgreSQL 方言データベースで <span class="highlight">TABLESAMPLE 演算子</span>が利用可能になり、ハッシュ関数による回避策なしにランダムサンプリングを SQL で直接記述できるようになりました。
+      </p>
+      <div class="note-box">
+        <strong>💡 推奨アクション:</strong> 大規模テーブルのデータ品質チェックや分析用サンプル抽出を行っている PostgreSQL 方言ユーザーは、BERNOULLI と SPANNER.RESERVOIR の特性 (割合指定か正確な行数か) を理解した上で、既存のサンプリング処理の置き換えを検討することを推奨します。
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p><strong>📎 出典・参考リンク</strong></p>
+      <ul>
+        <li>公式リリースノート: <a href="https://docs.cloud.google.com/release-notes#September_02_2026" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/release-notes#September_02_2026</a></li>
+        <li>ドキュメント: TABLESAMPLE 演算子 (PostgreSQL 方言クエリ構文): <a href="https://docs.cloud.google.com/spanner/docs/reference/postgresql/query-syntax#tablesample_operator" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/spanner/docs/reference/postgresql/query-syntax#tablesample_operator</a></li>
+        <li>ドキュメント: GoogleSQL 方言の TABLESAMPLE 演算子: <a href="https://docs.cloud.google.com/spanner/docs/reference/standard-sql/query-syntax#tablesample_operator" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/spanner/docs/reference/standard-sql/query-syntax#tablesample_operator</a></li>
+        <li>料金ページ: <a href="https://cloud.google.com/spanner/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">https://cloud.google.com/spanner/pricing</a></li>
+      </ul>
+      <p>タグ: #Spanner #PostgreSQL #TABLESAMPLE #SQL #サンプリング #データ分析</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

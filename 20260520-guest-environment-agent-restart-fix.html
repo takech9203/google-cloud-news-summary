@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guest Environment: ゲストエージェント再起動によるコアプラグイン障害の修正</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-red {
+      border-left-color: var(--gc-red);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-yellow {
+      border-left-color: var(--gc-yellow);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-fixed {
+      background: var(--gc-green);
+      color: #FFFFFF;
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge-incident {
+      background: var(--gc-red);
+      color: #FFFFFF;
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid) {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 24px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.red {
+      background: linear-gradient(135deg, var(--gc-red), #C62828);
+    }
+
+    .stat-card.green {
+      background: linear-gradient(135deg, var(--gc-green), #1B5E20);
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 20px 0;
+    }
+
+    .before-col {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-col {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-col h3, .after-col h3 {
+      margin-top: 0;
+    }
+
+    .timeline {
+      position: relative;
+      margin: 24px 0;
+      padding-left: 30px;
+    }
+
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 12px;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: var(--gc-blue-300);
+      border-radius: 2px;
+    }
+
+    .timeline-item {
+      position: relative;
+      margin-bottom: 20px;
+      padding-left: 24px;
+    }
+
+    .timeline-item::before {
+      content: '';
+      position: absolute;
+      left: -22px;
+      top: 6px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--gc-blue-600);
+      border: 3px solid var(--gc-blue-100);
+    }
+
+    .timeline-item.incident::before {
+      background: var(--gc-red);
+      border-color: #FFCDD2;
+    }
+
+    .timeline-item.resolved::before {
+      background: var(--gc-green);
+      border-color: #C8E6C9;
+    }
+
+    .timeline-date {
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      font-size: 14px;
+    }
+
+    .timeline-desc {
+      color: var(--gc-on-surface-variant);
+      font-size: 14px;
+      margin-top: 4px;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-900);
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 24px;
+      }
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+      .stat-cards {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>🛠️ Guest Environment: ゲストエージェント再起動によるコアプラグイン障害の修正</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Compute Engine</span>
+          <span class="badge-fixed">Fixed</span>
+          <span class="badge-incident">Incident Recovery</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-05-20</div>
+    </div>
+
+    <!-- 概要セクション -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        Compute Engine のゲストエージェント バージョン <span class="highlight">v20260511.00</span> が全サポート対象 OS 向けにリリースされました。
+        2026 年 5 月 4 日から 5 月 11 日の間に、コントロールプレーンが誤ってコアプラグインを削除するリクエストを送信する障害が発生し、
+        SSH 接続や Windows パスワードリセットなどの機能が利用不能になりました。今回のパッケージ更新により、ゲストエージェントが自動的に再起動され、正常な動作が回復します。
+      </p>
+
+      <!-- 統計カード -->
+      <div class="stat-cards">
+        <div class="stat-card red">
+          <div class="stat-value">7日間</div>
+          <div class="stat-label">障害期間 (5/4 - 5/11)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">全OS</div>
+          <div class="stat-label">修正対象 (Linux/Windows)</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-value">自動復旧</div>
+          <div class="stat-label">パッケージ更新のみで回復</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-col">
+          <h3>❌ Before (障害中)</h3>
+          <div class="check-item"><span class="cross-icon">✗</span><span>コントロールプレーンが誤ったコアプラグイン削除リクエストを送信</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>コアプラグインが削除されゲストエージェントが停止</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>SSH 接続が不能に</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>Windows パスワードリセットが機能しない</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>ネットワーク設定・メタデータアクセスが影響を受ける</span></div>
+        </div>
+        <div class="after-col">
+          <h3>✅ After (修正後)</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span>パッケージ更新でゲストエージェントが自動再起動</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>コアプラグインが正常に復元</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>SSH 接続が回復</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>Windows パスワードリセット機能が復旧</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>ネットワーク設定・メタデータアクセスが正常動作</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>コントロールプレーンからの誤ったリクエストによりコアプラグインが停止した障害の流れと、パッケージ更新による復旧の仕組みを示しています。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph ControlPlane["Google Cloud コントロールプレーン"]
+        CP["VM Extension Manager"]
+    end
+
+    subgraph VM["Compute Engine VM"]
+        Manager["Guest Agent Manager"]
+        Core["Core Plugin<br/>(SSH, ネットワーク設定, メタデータ)"]
+        Extensions["Extensions<br/>(Ops Agent など)"]
+    end
+
+    CP -->|"5/4-5/11: 誤ったコアプラグイン削除リクエスト送信"| Manager
+    Manager -->|"コアプラグイン停止"| Core
+    Core -.->|"機能停止"| SSH["SSH 接続"]
+    Core -.->|"機能停止"| PWReset["Windows パスワードリセット"]
+    Core -.->|"機能停止"| Network["ネットワーク設定"]
+
+    Package["パッケージ更新 v20260511.00"] -->|"再起動トリガー"| Manager
+    Manager -->|"コアプラグイン再起動"| Core
+
+    style Core fill:#ff6b6b,stroke:#333
+    style Package fill:#51cf66,stroke:#333
+    style CP fill:#ffd43b,stroke:#333
+        </pre>
+      </div>
+    </div>
+
+    <!-- 障害タイムライン -->
+    <div class="section">
+      <h2>📅 障害タイムライン</h2>
+      <div class="timeline">
+        <div class="timeline-item">
+          <div class="timeline-date">2026-04-27</div>
+          <div class="timeline-desc">バージョン 20260423.01 リリース</div>
+        </div>
+        <div class="timeline-item incident">
+          <div class="timeline-date">2026-05-04</div>
+          <div class="timeline-desc">コントロールプレーンが誤ったコアプラグイン削除リクエストの送信を開始</div>
+        </div>
+        <div class="timeline-item incident">
+          <div class="timeline-date">2026-05-11</div>
+          <div class="timeline-desc">誤ったリクエストの送信が停止</div>
+        </div>
+        <div class="timeline-item resolved">
+          <div class="timeline-date">2026-05-20</div>
+          <div class="timeline-desc">バージョン 20260511.00 リリース (再起動トリガーによる復旧)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚙️ 主要機能</h2>
+
+      <div class="card card-green">
+        <h3>🔄 ゲストエージェントの自動再起動</h3>
+        <p>バージョン 20260511.00 のパッケージインストールにより、ゲストエージェントが自動的に再起動されます。手動での介入は不要で、パッケージマネージャーによる更新で自動復旧します。</p>
+      </div>
+
+      <div class="card">
+        <h3>🧩 コアプラグインの復元</h3>
+        <p>コアプラグインはゲストエージェントの中核コンポーネントであり、無効化できない設計になっています。再起動により、コアプラグインが正常な状態で再ロードされ、SSH アクセス管理、ネットワーク設定、メタデータアクセスが復旧します。</p>
+      </div>
+
+      <div class="card card-yellow">
+        <h3>📦 既存バージョンのリビルド</h3>
+        <p>20260423.01 と同一の内容であり、新たな機能変更は含まれません。パッケージ更新による再起動のみを目的としたリリースです。副作用のリスクが低い非破壊的な修正です。</p>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>📊 技術仕様</h2>
+
+      <h3>コアプラグインの機能</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>機能</th>
+            <th>説明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ネットワーク設定</td>
+            <td>プライマリネットワークインターフェースの設定</td>
+          </tr>
+          <tr>
+            <td>SSH アクセス</td>
+            <td>ユーザー SSH キーの管理による安全な接続</td>
+          </tr>
+          <tr>
+            <td>メタデータアクセス</td>
+            <td>インスタンスおよびプロジェクトメタデータへのアクセス</td>
+          </tr>
+          <tr>
+            <td>MDS 認証情報ブートストラップ</td>
+            <td>セキュアなメタデータサーバー認証情報の管理</td>
+          </tr>
+          <tr>
+            <td>ホストキー設定</td>
+            <td>初期インスタンスセットアップ時のホストキー生成</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>ゲストエージェントのアーキテクチャ (プラグインベース)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>コンポーネント</th>
+            <th>Linux サービス名</th>
+            <th>Windows サービス名</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Guest Agent Manager</td>
+            <td><code>google-guest-agent-manager.service</code></td>
+            <td>GCEAgentManager</td>
+          </tr>
+          <tr>
+            <td>Core Plugin</td>
+            <td>(Manager が管理)</td>
+            <td>(Manager が管理)</td>
+          </tr>
+          <tr>
+            <td>Compatibility Manager</td>
+            <td><code>google-guest-compat-manager.service</code></td>
+            <td>GCEWindowsCompatManager</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🔧 設定方法・復旧手順</h2>
+
+      <div class="note-box">
+        <strong>💡 前提条件:</strong> 影響を受けた VM が稼働中であり、パッケージリポジトリにアクセス可能であること。
+      </div>
+
+      <h3>ステップ 1: バージョン確認</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># Linux: ゲストエージェントのバージョン確認
+dpkg -l google-guest-agent 2>/dev/null || rpm -q google-guest-agent</code></pre>
+
+      <span class="code-label">PowerShell</span>
+      <pre><code class="language-powershell"># Windows: GooGet でバージョン確認
+googet installed google-compute-engine-windows</code></pre>
+
+      <h3>ステップ 2: 手動でのエージェント再起動 (必要な場合)</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># Linux (プラグインベースアーキテクチャ: v20250901.00 以降)
+ggactl_plugin coreplugin restart
+
+# Linux (レガシー)
+systemctl restart google-guest-agent</code></pre>
+
+      <span class="code-label">PowerShell</span>
+      <pre><code class="language-powershell"># Windows (プラグインベースアーキテクチャ: v20250901.00 以降)
+ggactl_plugin coreplugin restart
+
+# Windows (レガシー)
+Restart-Service GCEAgent</code></pre>
+
+      <h3>ステップ 3: 動作確認</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># SSH 接続テスト
+gcloud compute ssh INSTANCE_NAME --zone=ZONE
+
+# エージェントのステータス確認 (Linux)
+systemctl status google-guest-agent-manager.service</code></pre>
+    </div>
+
+    <!-- メリット・デメリット -->
+    <div class="section">
+      <h2>⚖️ メリット・デメリット</h2>
+
+      <h3>✅ メリット</h3>
+      <div class="card card-green">
+        <h4 style="margin-top: 0; color: var(--gc-green);">ビジネス面</h4>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>サービス復旧の自動化</strong>: パッケージ更新のみで復旧でき、手動介入が不要</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>ダウンタイムの最小化</strong>: 自動更新が有効な環境では、ユーザーの操作なしで復旧</span></div>
+      </div>
+      <div class="card card-green">
+        <h4 style="margin-top: 0; color: var(--gc-green);">技術面</h4>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>非破壊的な修正</strong>: リビルドによる再起動のみで、副作用のリスクが低い</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>全 OS 対応</strong>: サポート対象のすべてのオペレーティングシステムで利用可能</span></div>
+      </div>
+
+      <h3>⚠️ 制限事項・注意点</h3>
+      <div class="warning-box">
+        <div class="check-item"><span class="cross-icon">✗</span><span>自動更新が無効化されている VM では手動でのパッケージ更新が必要</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>パッケージリポジトリにアクセスできないネットワーク環境では自動復旧されない</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>2026 年 5 月 4 日〜11 日の間に作成された VM も影響を受けている可能性あり</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>再起動後も問題が続く場合はサポートへの問い合わせが推奨される</span></div>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>🐧 ユースケース 1: SSH 接続不能な Linux VM の復旧</h4>
+        <p><strong>シナリオ:</strong> 5 月 4 日以降、SSH で接続できなくなった VM がある。シリアルコンソールからはアクセス可能。</p>
+        <span class="code-label">Bash</span>
+        <pre><code class="language-bash"># シリアルコンソールからパッケージ更新を実行
+sudo apt-get update && sudo apt-get install -y google-guest-agent
+# または
+sudo yum update google-guest-agent</code></pre>
+        <p><strong>効果:</strong> パッケージ更新によりゲストエージェントが再起動され、SSH 接続が復旧する。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>🪟 ユースケース 2: Windows VM のパスワードリセット不能からの復旧</h4>
+        <p><strong>シナリオ:</strong> Windows VM で <code>gcloud compute reset-windows-password</code> が機能しない。</p>
+        <span class="code-label">PowerShell</span>
+        <pre><code class="language-powershell"># GooGet でパッケージ更新
+googet -noconfirm update google-compute-engine-windows</code></pre>
+        <p><strong>効果:</strong> ゲストエージェントが再起動され、パスワードリセット機能が復旧する。</p>
+      </div>
+    </div>
+
+    <!-- 関連サービス -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Compute Engine</strong>: ゲストエージェントが動作する VM のホスト環境</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>OS Login</strong>: SSH キー管理にゲストエージェントのコアプラグインを使用</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>VM Extension Manager</strong>: ゲストエージェントのプラグインライフサイクルを管理するサービス (今回の障害元)</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Cloud Monitoring (Ops Agent)</strong>: ゲストエージェントの Extension として動作するモニタリングエージェント</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>メタデータサーバー</strong>: ゲストエージェントが通信するインスタンスごとの HTTP サーバー</span></div>
+      </div>
+    </div>
+
+    <!-- 復旧フロー図 -->
+    <div class="section">
+      <h2>🚀 復旧フロー</h2>
+      <div class="flow-diagram">
+        <div class="flow-step">📦 パッケージ<br/>更新配布</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🔄 エージェント<br/>再起動</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🧩 コアプラグイン<br/>再ロード</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">✅ 機能復旧<br/>(SSH等)</div>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="list-style: none; padding: 0; margin: 4px 0;">
+        <li><a href="https://docs.cloud.google.com/release-notes#May_20_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li><a href="https://docs.cloud.google.com/compute/docs/images/guest-environment" target="_blank" rel="noopener noreferrer">Guest Environment ドキュメント</a></li>
+        <li><a href="https://docs.cloud.google.com/compute/docs/images/guest-agent" target="_blank" rel="noopener noreferrer">Guest Agent アーキテクチャ</a></li>
+        <li><a href="https://github.com/GoogleCloudPlatform/guest-agent" target="_blank" rel="noopener noreferrer">Guest Agent GitHub リポジトリ</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline);">Generated: 2026-05-20 | #ComputeEngine #GuestEnvironment #GuestAgent #CorePlugin #SSH #IncidentRecovery</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

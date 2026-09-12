@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Network Intelligence Center: Connectivity Tests - GKE Pod エンドポイント対応、IP マスカレード評価、ネットワークポリシー評価</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; min-width: 280px; }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+      text-align: right;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-teal {
+      border-left-color: var(--gc-teal);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-feature {
+      background: var(--gc-green);
+      color: #FFFFFF;
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge-teal {
+      background: var(--gc-teal);
+      color: #FFFFFF;
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    /* Before/After comparison */
+    .comparison-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .before-card h3 {
+      color: var(--gc-red);
+      margin-top: 0;
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .after-card h3 {
+      color: var(--gc-green);
+      margin-top: 0;
+    }
+
+    .before-card ul, .after-card ul {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    .before-card li, .after-card li {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    /* Flow diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Stat cards */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.teal {
+      background: linear-gradient(135deg, var(--gc-teal), #00838F);
+    }
+
+    .stat-card.green {
+      background: linear-gradient(135deg, var(--gc-green), #1B5E20);
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Mermaid */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* Code blocks */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      border-radius: 8px 8px 0 0;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block-with-header {
+      margin: 16px 0;
+    }
+
+    .code-block-with-header pre:not(.mermaid) {
+      border-radius: 0 0 8px 8px;
+      margin-top: 0;
+    }
+
+    /* Inline code */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Note/Warning boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Usecase cards */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+    }
+
+    .usecase-card h3 {
+      color: var(--gc-blue-800);
+      margin-top: 0;
+    }
+
+    .usecase-card .scenario {
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 8px;
+    }
+
+    .usecase-card .effect {
+      color: var(--gc-on-surface-variant);
+    }
+
+    /* Feature grid */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    /* Check list */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    /* Link styles */
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .comparison-grid { grid-template-columns: 1fr; }
+      .stat-grid { grid-template-columns: 1fr; }
+      .flow-diagram { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>🌐 Network Intelligence Center: Connectivity Tests - GKE Pod 対応強化</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Network Intelligence Center</span>
+          <span class="badge-feature">Feature</span>
+          <span class="badge-teal">GKE</span>
+        </div>
+      </div>
+      <div class="subtitle">
+        2026-03-04<br>
+        Google Cloud
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        Network Intelligence Center の <span class="highlight">Connectivity Tests</span> に、GKE 環境のネットワーク診断を大幅に強化する <strong>3 つの新機能</strong> が追加されました。
+        GKE Pod をエンドポイントとして直接指定する機能、IP マスカレードの適用有無を自動評価する機能、そして GKE ネットワークポリシーを評価する機能です。
+      </p>
+      <p>
+        これにより、Pod レベルの精密なネットワーク診断が可能となり、<code>kubectl exec</code> による手動テストに頼ることなく、Google Cloud コンソールや gcloud CLI から統合的に GKE クラスタのネットワークトラブルシューティングが実行可能になりました。
+      </p>
+      <p>
+        主な対象ユーザーは GKE クラスタのネットワーク管理者、プラットフォームエンジニア、セキュリティエンジニアです。
+      </p>
+    </div>
+
+    <!-- Stats -->
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-value">3</div>
+        <div class="stat-label">新機能追加</div>
+      </div>
+      <div class="stat-card teal">
+        <div class="stat-value">Pod</div>
+        <div class="stat-label">レベルの精密診断</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-value">統合</div>
+        <div class="stat-label">コンソール / gcloud CLI 対応</div>
+      </div>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="comparison-grid">
+        <div class="before-card">
+          <h3>❌ アップデート前</h3>
+          <ul>
+            <li>GKE Pod をエンドポイントとして直接指定できなかった</li>
+            <li>IP マスカレード (ip-masq-agent) の設定が分析に反映されなかった</li>
+            <li>GKE ネットワークポリシーが構成分析で評価されなかった</li>
+            <li>Pod レベルの診断には <code>kubectl exec</code> で手動テスト実行が必要だった</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h3>✅ アップデート後</h3>
+          <ul>
+            <li>GKE Pod をソース/宛先エンドポイントとして直接指定可能に</li>
+            <li>IP マスカレードの適用有無を自動判定、SNAT 後のアドレスでテスト実行</li>
+            <li>GKE ネットワークポリシーの評価が構成分析に含まれるように</li>
+            <li>Google Cloud コンソール / gcloud CLI から統合的に診断可能に</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid from report) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>GKE Pod からの接続テストの評価フロー。Connectivity Tests はまず GKE ネットワークポリシーを評価し、次に IP マスカレードの適用有無を判定した上で、変換後のアドレスを使用して VPC レベルのルーティングおよびファイアウォール分析を実行します。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph GKECluster["GKE クラスタ VPC ネイティブ"]
+        Pod1["GKE Pod\nソースエンドポイント"]
+        NP{"GKE ネットワーク\nポリシー評価"}
+        MASQ{"IP マスカレード\n評価"}
+    end
+
+    CT{{"Connectivity Tests\n構成分析エンジン"}}
+
+    subgraph Destination["宛先"]
+        D1["外部サービス\nインターネット"]
+        D2["別の GKE Pod"]
+        D3["VM インスタンス"]
+        D4["Cloud SQL"]
+    end
+
+    Pod1 -->|"1. Pod IP で\nテスト開始"| NP
+    NP -->|"2a. ポリシー許可"| MASQ
+    NP -->|"2b. ポリシー拒否"| Block["Blocked\nテスト結果: Unreachable"]
+
+    MASQ -->|"3a. マスカレード適用\nPod IP to Node IP"| CT
+    MASQ -->|"3b. マスカレード非適用\nPod IP 維持"| CT
+
+    CT -->|"4. VPC ルーティング\nファイアウォール評価"| D1
+    CT --> D2
+    CT --> D3
+    CT --> D4
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h3>🎯 1. GKE Pod エンドポイント</h3>
+          <p>Connectivity Tests のソースまたは宛先として GKE Pod を直接指定可能。VPC ネイティブクラスタの Pod に対応し、Pod IP アドレスに基づいた接続性の構成分析が実行されます。</p>
+          <div class="check-item"><span class="check-icon">✓</span><span>Pod から外部サービスへの接続テスト</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>Pod 間の通信テスト</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>Pod から VM / Cloud SQL への接続テスト</span></div>
+        </div>
+
+        <div class="card card-teal">
+          <h3>🔀 2. IP マスカレード評価</h3>
+          <p>GKE Pod からのトラフィックに対し、IP マスカレードの適用有無を自動判定。マスカレード適用時は変換後のノード IP を使用してテストが実行されます。</p>
+          <div class="check-item"><span class="check-icon">✓</span><span>ip-masq-agent の ConfigMap 設定 (nonMasqueradeCIDRs) を考慮</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>Autopilot クラスタの EgressNATPolicy を考慮</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>マスカレード後のアドレスでファイアウォール評価</span></div>
+        </div>
+
+        <div class="card card-purple">
+          <h3>🛡️ 3. ネットワークポリシー評価</h3>
+          <p>FQDN ネットワークポリシーが有効でない GKE クラスタにおいて、Kubernetes NetworkPolicy を評価。Ingress/Egress ルールが構成分析に反映されます。</p>
+          <div class="check-item"><span class="check-icon">✓</span><span>Pod セレクタ / ネームスペースセレクタに基づく制御を反映</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>Ingress / Egress 両方のポリシーを評価</span></div>
+          <div class="warning-box" style="margin-top: 12px;">
+            <strong>⚠️ 注意:</strong> FQDN ネットワークポリシーが有効なクラスタでは、この評価は適用されません。
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3>対応条件</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>クラスタタイプ</td><td>VPC ネイティブクラスタ</td></tr>
+          <tr><td>Pod エンドポイント</td><td>ソースおよび宛先の両方で指定可能</td></tr>
+          <tr><td>IP マスカレード評価</td><td>ip-masq-agent (Standard) / EgressNATPolicy (Autopilot) の設定を考慮</td></tr>
+          <tr><td>ネットワークポリシー評価</td><td>FQDN ネットワークポリシーが有効でないクラスタのみ</td></tr>
+          <tr><td>プロトコル</td><td>TCP, UDP, ICMP</td></tr>
+        </tbody>
+      </table>
+
+      <h3>IP マスカレードの評価ロジック</h3>
+      <table>
+        <thead>
+          <tr><th>クラスタ構成</th><th>SNAT 動作</th><th>Connectivity Tests での扱い</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ip-masq-agent あり + カスタム nonMasqueradeCIDRs</td>
+            <td>nonMasqueradeCIDRs 以外の宛先で Pod IP をノード IP に変換</td>
+            <td>変換後のノード IP でテスト</td>
+          </tr>
+          <tr>
+            <td>ip-masq-agent あり + nonMasqueradeCIDRs 未設定</td>
+            <td>デフォルト非マスカレード宛先以外で変換</td>
+            <td>変換後のノード IP でテスト</td>
+          </tr>
+          <tr>
+            <td>ip-masq-agent なし + <code>--disable-default-snat</code> 未設定</td>
+            <td>デフォルト非マスカレード宛先以外で変換</td>
+            <td>変換後のノード IP でテスト</td>
+          </tr>
+          <tr>
+            <td>ip-masq-agent なし + <code>--disable-default-snat</code> 設定</td>
+            <td>全宛先で Pod IP を維持</td>
+            <td>Pod IP のままテスト</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>ネットワークポリシー評価の条件</h3>
+      <table>
+        <thead>
+          <tr><th>条件</th><th>ネットワークポリシー評価</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>FQDN ネットワークポリシー無効</td><td><span style="color: var(--gc-green); font-weight: 600;">評価される</span></td></tr>
+          <tr><td>FQDN ネットワークポリシー有効</td><td><span style="color: var(--gc-red); font-weight: 600;">評価されない</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup Steps -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>Google Cloud プロジェクトで Network Management API が有効化されていること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>GKE クラスタが VPC ネイティブモードで作成されていること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><code>roles/networkmanagement.admin</code> または <code>networkmanagement.connectivitytests.create</code> 権限が付与されていること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>テスト対象の GKE クラスタおよび Pod への読み取り権限があること</span></div>
+
+      <h3>ステップ 1: GKE Pod をソースとした接続テストの作成</h3>
+      <div class="flow-diagram">
+        <div class="flow-step">📂 Connectivity Tests<br>ページを開く</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">➕ Create<br>Connectivity Test</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🎯 Source:<br>GKE Pod を選択</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">📍 宛先・プロトコル<br>を設定</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">✅ Create</div>
+      </div>
+
+      <h3>ステップ 2: テスト結果の確認</h3>
+      <p>テスト結果には以下の情報が含まれます。</p>
+      <div class="card">
+        <div class="check-item"><span class="check-icon">✓</span><span>ネットワークポリシー評価の結果 (許可 / 拒否)</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>IP マスカレードの適用有無と変換後のアドレス</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>VPC ルーティングおよびファイアウォール評価</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>全体の到達性判定 (Reachable / Unreachable / Ambiguous)</span></div>
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div>
+          <h3>💼 ビジネス面</h3>
+          <div class="card card-green">
+            <div class="icon-text"><span>→</span><span><strong>トラブルシューティング時間の大幅短縮</strong>: Pod レベルの接続性をコンソールから直接診断、kubectl exec 不要</span></div>
+          </div>
+          <div class="card card-green">
+            <div class="icon-text"><span>→</span><span><strong>運用の標準化</strong>: VM、GKE Pod、サーバーレスなど全レイヤーの診断を統一ツールで実行</span></div>
+          </div>
+          <div class="card card-green">
+            <div class="icon-text"><span>→</span><span><strong>セキュリティ監査の効率化</strong>: ネットワークポリシーの適用状況を構成分析レベルで確認可能</span></div>
+          </div>
+        </div>
+        <div>
+          <h3>⚙️ 技術面</h3>
+          <div class="card card-teal">
+            <div class="icon-text"><span>→</span><span><strong>Pod レベルの精密診断</strong>: IP マスカレード後の実際のソースアドレスを考慮したファイアウォール評価</span></div>
+          </div>
+          <div class="card card-teal">
+            <div class="icon-text"><span>→</span><span><strong>GKE ネットワーク構成の可視化</strong>: ネットワークポリシー、IP マスカレード、VPC ファイアウォールの各レイヤーを一元確認</span></div>
+          </div>
+          <div class="card card-teal">
+            <div class="icon-text"><span>→</span><span><strong>マイクロサービス間通信の検証</strong>: トラフィックを流さず構成レベルで Pod 間通信を検証</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <div class="warning-box">
+        <strong>制限事項</strong>
+        <div class="check-item"><span class="cross-icon">✗</span><span>FQDN ネットワークポリシーが有効な GKE クラスタでは、ネットワークポリシー評価が適用されない</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>VPC ネイティブクラスタのみ対応 (ルートベースクラスタの Pod は非サポート)</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>構成分析はシミュレーションであり、データプレーンの実際の状態を保証するものではない</span></div>
+      </div>
+      <div class="note-box">
+        <strong>💡 考慮すべき点</strong>
+        <div class="check-item"><span style="color: var(--gc-blue-600);">📌</span><span>IP マスカレードの設定が複雑な場合、ip-masq-agent の設定内容を事前に把握しておくことを推奨</span></div>
+        <div class="check-item"><span style="color: var(--gc-blue-600);">📌</span><span>ネットワークポリシー評価を活用するには、FQDN ネットワークポリシーの有効/無効状態を確認が必要</span></div>
+        <div class="check-item"><span style="color: var(--gc-blue-600);">📌</span><span>Windows Server ノードプール上の Pod は IP マスカレード評価の対象外</span></div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h3>1. マイクロサービス間の通信障害の診断</h3>
+        <p class="scenario">📋 シナリオ: フロントエンド Pod からバックエンド API Pod への通信が失敗しており、ネットワークポリシーが原因かファイアウォールが原因かを切り分けたい。</p>
+        <p class="effect">✅ 効果: Connectivity Tests がネットワークポリシー、IP マスカレード、VPC ファイアウォールの各レイヤーを順番に評価し、どの段階でトラフィックがブロックされているかを明確に特定できます。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>2. Pod から外部 API への通信の検証</h3>
+        <p class="scenario">📋 シナリオ: GKE Pod から外部 SaaS API への HTTPS 通信を許可しているが、IP マスカレード後のノード IP が正しくファイアウォールで許可されているか確認したい。</p>
+        <p class="effect">✅ 効果: Connectivity Tests が IP マスカレードの適用を自動検出し、変換後のノード IP アドレスを使用してファイアウォール評価を実行。Pod IP とノード IP の違いによる設定の不整合を事前に発見できます。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>3. ネットワークポリシーの適用範囲の確認</h3>
+        <p class="scenario">📋 シナリオ: 新しい Kubernetes NetworkPolicy をデプロイする前に、既存の Pod 間通信への影響を事前に評価したい。</p>
+        <p class="effect">✅ 効果: Connectivity Tests でポリシー適用後の到達性を構成分析レベルで確認でき、本番環境に影響を与えることなくポリシー変更の影響範囲を検証可能です。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>Network Intelligence Center の Connectivity Tests は、Network Management API の一部として提供されています。料金の詳細は公式ドキュメントを参照してください。</p>
+      <p>→ <a href="https://cloud.google.com/network-intelligence-center/pricing" target="_blank" class="gc-link">Network Intelligence Center 料金ページ</a></p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <div class="icon-text"><span>🔍</span><span><strong>Network Analyzer (GKE IP マスカレード構成インサイト)</strong> - ip-masq-agent の設定と Pod CIDR 範囲の整合性を自動検出し、誤設定を警告</span></div>
+      </div>
+      <div class="card card-teal">
+        <div class="icon-text"><span>🌐</span><span><strong>GKE Dataplane V2</strong> - GKE ネットワークポリシーや FQDN ネットワークポリシーの基盤。Connectivity Tests のネットワークポリシー評価対象に影響</span></div>
+      </div>
+      <div class="card card-purple">
+        <div class="icon-text"><span>🗺️</span><span><strong>Network Topology (GKE Enterprise ビュー)</strong> - GKE クラスタ、ネームスペース、ワークロード、Pod のインフラストラクチャトポロジを可視化</span></div>
+      </div>
+      <div class="card card-green">
+        <div class="icon-text"><span>🔥</span><span><strong>Firewall Insights</strong> - ファイアウォールルールの使用状況を分析。IP マスカレード後のノード IP に対するファイアウォール評価と合わせて活用</span></div>
+      </div>
+      <div class="card">
+        <div class="icon-text"><span>⚙️</span><span><strong>ip-masq-agent / EgressNATPolicy</strong> - GKE クラスタの IP マスカレード設定を管理するコンポーネント。Connectivity Tests はこれらの設定を自動的に読み取って評価に反映</span></div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>📎 出典・参考リンク:</strong></p>
+      <ul style="margin: 8px 0; padding-left: 20px; list-style: none;">
+        <li>📄 <a href="https://cloud.google.com/release-notes#March_04_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li>📄 <a href="https://cloud.google.com/network-intelligence-center/docs/connectivity-tests/concepts/overview" target="_blank" rel="noopener noreferrer">Connectivity Tests 概要ドキュメント</a></li>
+        <li>📄 <a href="https://cloud.google.com/network-intelligence-center/docs/connectivity-tests/how-to/running-connectivity-tests" target="_blank" rel="noopener noreferrer">Connectivity Tests の作成と実行</a></li>
+        <li>📄 <a href="https://cloud.google.com/kubernetes-engine/docs/concepts/ip-masquerade-agent" target="_blank" rel="noopener noreferrer">GKE IP マスカレードエージェント</a></li>
+        <li>📄 <a href="https://cloud.google.com/kubernetes-engine/docs/how-to/network-policy" target="_blank" rel="noopener noreferrer">GKE ネットワークポリシー</a></li>
+        <li>📄 <a href="https://cloud.google.com/kubernetes-engine/docs/how-to/fqdn-network-policies" target="_blank" rel="noopener noreferrer">FQDN ネットワークポリシー</a></li>
+        <li>📄 <a href="https://cloud.google.com/network-intelligence-center/docs/overview" target="_blank" rel="noopener noreferrer">Network Intelligence Center 概要</a></li>
+      </ul>
+      <p style="margin-top: 12px; font-size: 11px; color: var(--gc-outline);">
+        #NetworkIntelligenceCenter #ConnectivityTests #GKE #Pod #IPMasquerade #NetworkPolicy #Kubernetes #GoogleCloud
+      </p>
+    </footer>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

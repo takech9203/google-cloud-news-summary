@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>API Gateway: モデルルーティングによる LLM リクエストのルーティング</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+:root {
+  --gc-blue: #4285F4;
+  --gc-red: #EA4335;
+  --gc-yellow: #FBBC04;
+  --gc-green: #34A853;
+  --gc-blue-900: #174EA6;
+  --gc-blue-800: #185ABC;
+  --gc-blue-700: #1967D2;
+  --gc-blue-600: #1A73E8;
+  --gc-blue-500: #4285F4;
+  --gc-blue-300: #669DF6;
+  --gc-blue-200: #8AB4F8;
+  --gc-blue-100: #AECBFA;
+  --gc-blue-50: #E8F0FE;
+  --gc-on-surface: #202124;
+  --gc-on-surface-variant: #5F6368;
+  --gc-outline: #80868B;
+  --gc-surface: #FFFFFF;
+  --gc-surface-container-lowest: #F8F9FA;
+  --gc-surface-container-low: #F1F3F4;
+  --gc-surface-container: #E8EAED;
+  --gc-outline-variant: #DADCE0;
+  --gc-blue-tint: #E8F0FE;
+  --gc-green-tint: #E6F4EA;
+  --gc-red-tint: #FCE8E6;
+  --gc-yellow-tint: #FEF7E0;
+  --gc-purple-tint: #F3E8FD;
+  --gc-teal-tint: #E0F7FA;
+  --gc-purple: #A142F4;
+  --gc-teal: #00BCD4;
+  --gc-orange: #FF6D00;
+}
+
+body {
+  background-color: var(--gc-surface);
+  font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+  color: var(--gc-on-surface-variant);
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 20px;
+  margin: 0;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 16px;
+  border-bottom: 3px solid var(--gc-blue-600);
+}
+
+h1, .title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--gc-on-surface);
+  margin: 0;
+  line-height: 1.35;
+}
+
+h2, .section-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 20px 0 8px 0;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: var(--gc-outline);
+}
+
+.section {
+  background: var(--gc-surface-container-low);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid var(--gc-outline-variant);
+}
+
+.highlight {
+  background-color: var(--gc-blue-50);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--gc-blue-800);
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+.card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border-left: 4px solid var(--gc-blue-600);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+}
+
+.card h3 {
+  margin-top: 0;
+}
+
+.gc-link {
+  color: var(--gc-blue-600);
+  text-decoration: none;
+}
+
+.gc-link:hover {
+  color: var(--gc-blue-800);
+  text-decoration: underline;
+}
+
+.badge,
+.badge-ga,
+.badge-preview,
+.badge-deprecated {
+  display: inline-block;
+  color: #FFFFFF;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+  margin: 4px 8px 4px 0;
+}
+
+.badge {
+  background: var(--gc-blue-600);
+}
+
+.badge-preview {
+  background: var(--gc-orange);
+  color: #FFFFFF;
+}
+
+/* フロー図 */
+.flow-diagram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 24px 0;
+}
+
+.flow-step {
+  background: var(--gc-surface);
+  border: 2px solid var(--gc-blue-600);
+  border-radius: 12px;
+  padding: 12px 20px;
+  text-align: center;
+  min-width: 100px;
+  color: var(--gc-on-surface);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+  font-size: 14px;
+}
+
+.flow-arrow {
+  color: var(--gc-blue-600);
+  font-size: 24px;
+  font-weight: bold;
+}
+
+/* Before/After 比較 */
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+@media (max-width: 720px) {
+  .before-after {
+    grid-template-columns: 1fr;
+  }
+}
+
+.before-box, .after-box {
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.before-box {
+  background: var(--gc-red-tint);
+  border: 1px solid rgba(234, 67, 53, 0.3);
+}
+
+.after-box {
+  background: var(--gc-green-tint);
+  border: 1px solid rgba(52, 168, 83, 0.3);
+}
+
+.before-box h3, .after-box h3 {
+  margin-top: 0;
+  font-size: 16px;
+}
+
+.before-box h3 { color: #C5221F; }
+.after-box h3 { color: #188038; }
+
+.before-box ul, .after-box ul {
+  margin: 8px 0 0 0;
+  padding-left: 20px;
+  font-size: 14px;
+}
+
+.before-box li, .after-box li {
+  margin: 6px 0;
+}
+
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.check-icon {
+  color: var(--gc-green);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.cross-icon {
+  color: var(--gc-red);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+/* コードブロック */
+.code-block,
+pre:not(.mermaid) {
+  background: #1E1E1E;
+  border-radius: 8px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: #E8E8E8;
+  margin: 16px 0;
+}
+
+.code-block {
+  overflow: hidden;
+}
+
+.code-header {
+  background: #2D2D2D;
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.code-lang {
+  color: #9CDCFE;
+  font-weight: bold;
+}
+
+.code-title {
+  color: #AAAAAA;
+}
+
+.code-block pre {
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+}
+
+.code-block code {
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 16px !important;
+  display: block;
+}
+
+pre code {
+  background: none;
+  border: none;
+  font-size: inherit;
+}
+
+/* インラインコード */
+code:not(pre code) {
+  background: var(--gc-surface-container-low);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 0.9em;
+  color: var(--gc-blue-900);
+}
+
+.section code:not(pre code) {
+  background: var(--gc-surface);
+}
+
+/* テーブル */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--gc-outline-variant);
+  background: var(--gc-surface);
+}
+
+th {
+  background: var(--gc-blue-50);
+  color: var(--gc-blue-900);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 2px solid var(--gc-blue-200);
+}
+
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--gc-outline-variant);
+  font-size: 14px;
+}
+
+tr:nth-child(even) {
+  background: var(--gc-surface-container-lowest);
+}
+
+tr:hover {
+  background: var(--gc-blue-50);
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+/* ボックス */
+.note-box {
+  background: var(--gc-blue-tint);
+  border-left: 4px solid var(--gc-blue-600);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.warning-box {
+  background: var(--gc-yellow-tint);
+  border-left: 4px solid var(--gc-yellow);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.success-box {
+  background: var(--gc-green-tint);
+  border-left: 4px solid var(--gc-green);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.ai-box {
+  background: var(--gc-purple-tint);
+  border-left: 4px solid var(--gc-purple);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+/* Mermaid コンテナ */
+.mermaid-container {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 20px 0;
+  border: 2px solid rgba(66, 133, 244, 0.3);
+  overflow-x: auto;
+}
+
+.mermaid {
+  display: flex;
+  justify-content: center;
+}
+
+/* ユースケース */
+.usecase {
+  background: var(--gc-blue-tint);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border: 1px solid var(--gc-blue-100);
+}
+
+.usecase h3 {
+  margin-top: 0;
+  color: var(--gc-blue-900);
+}
+
+/* ステップリスト */
+.step-list {
+  counter-reset: step;
+  list-style: none;
+  padding: 0;
+  margin: 16px 0;
+}
+
+.step-list > li {
+  counter-increment: step;
+  position: relative;
+  padding: 12px 16px 12px 56px;
+  background: var(--gc-surface);
+  border-radius: 12px;
+  margin: 10px 0;
+  border: 1px solid var(--gc-outline-variant);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.08);
+}
+
+.step-list > li::before {
+  content: counter(step);
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  width: 28px;
+  height: 28px;
+  background: var(--gc-blue-600);
+  color: #FFFFFF;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+/* 関連サービスグリッド */
+.related-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.related-item {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid var(--gc-outline-variant);
+  font-size: 14px;
+}
+
+.related-item strong {
+  color: var(--gc-on-surface);
+  display: block;
+  margin-bottom: 4px;
+}
+
+ul.plain {
+  padding-left: 20px;
+  margin: 8px 0;
+}
+
+ul.plain li {
+  margin: 6px 0;
+}
+
+.tags {
+  margin-top: 12px;
+}
+
+.tag {
+  display: inline-block;
+  background: var(--gc-blue-50);
+  color: var(--gc-blue-800);
+  border-radius: 16px;
+  padding: 2px 10px;
+  font-size: 12px;
+  margin: 3px 4px 3px 0;
+}
+
+footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gc-outline-variant);
+  font-size: 12px;
+  color: var(--gc-outline);
+}
+
+footer a {
+  word-break: break-all;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <div>
+      <div style="margin-bottom: 8px;">
+        <span class="badge">☁️ API Gateway</span>
+        <span class="badge badge-preview">Public Preview</span>
+      </div>
+      <h1>🚪 API Gateway: モデルルーティングによる<br>LLM リクエストのルーティング</h1>
+    </div>
+    <div class="subtitle">📅 リリース日: 2026-08-03</div>
+  </div>
+
+  <!-- 概要 -->
+  <div class="section">
+    <h2>📋 概要</h2>
+    <p>
+      API Gateway に、LLM リクエストをルーティングする<span class="highlight">モデルルーティング (Model Routing)</span> 機能が追加されました。API Gateway をマネージドなトラフィック管理レイヤーとして使用し、<span class="highlight">OpenAI 互換のプロンプトリクエスト</span>を受け付け、通信中 (in-flight) にトランスコードして、Vertex AI Model Garden 上の特定の基盤モデル (<strong>Gemini、Anthropic Claude、OpenAI GPT</strong>) にルーティングできます。
+    </p>
+    <p>
+      この機能は、<span class="highlight">LiteLLM のようなクライアントサイドプロキシのマネージドな代替</span>として機能します。ルーティングロジックをネットワークエッジに移動し、Vertex AI Model Garden と統合することで、プロキシサーバーのホスティング・スケーリング・保守が不要になり、運用オーバーヘッドとインフラコストを削減できます。
+    </p>
+    <div class="note-box">
+      <strong>🎯 主な対象ユーザー:</strong> マルチモデル構成の AI アプリケーションを運用するプラットフォームエンジニア、AI 開発者、ガバナンス管理者
+    </div>
+
+    <div class="before-after">
+      <div class="before-box">
+        <h3>❌ Before: クライアント側でモデル振り分け</h3>
+        <ul>
+          <li>LiteLLM などのスタンドアロンプロキシを<strong>自前でホスト・スケーリング・保守</strong>する必要があった</li>
+          <li>モデルごとに API スキーマが異なる (Gemini は <code>:generateContent</code>、Claude は <code>:rawPredict</code>) ため、クライアント側で変換ロジックを実装する必要があった</li>
+          <li>ルーティング設定がクライアントごとに分散し、<strong>一元的なポリシー適用や監視が困難</strong>だった</li>
+        </ul>
+      </div>
+      <div class="after-box">
+        <h3>✅ After: ゲートウェイで一元管理</h3>
+        <ul>
+          <li>API Gateway が<strong>単一のマネージドゲートウェイ</strong>として AI トラフィックをネットワークエッジで一元化。プロキシのホスティングが不要に</li>
+          <li>クライアントは <strong>OpenAI 互換 REST インターフェースに標準化</strong>。ゲートウェイが in-flight トランスコーディングで各モデルのスキーマに動的変換</li>
+          <li>OpenAPI 3.x 拡張 <code>x-google-api-management.ai.models.routing</code> と <code>x-google-model-router</code> で<strong>宣言的に定義</strong>可能</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- アーキテクチャ図 -->
+  <div class="section">
+    <h2>🏗️ アーキテクチャ図</h2>
+    <div class="mermaid-container">
+      <pre class="mermaid">
+sequenceDiagram
+    participant Client as 🧑‍💻 クライアントアプリ<br>(OpenAI 互換)
+    participant GW as 🚪 API Gateway<br>(モデルルーター)
+    participant Gemini as ✨ Gemini<br>(:generateContent)
+    participant Claude as 🤖 Anthropic Claude<br>(:rawPredict)
+    participant GPT as 🧠 OpenAI GPT<br>(/chat/completions)
+
+    Client->>GW: POST /v1/chat/... <br>{"model": "claude-opus-4-7", "messages": [...]}
+    Note over GW: 1. リクエストのインターセプト<br>2. ペイロードの model 属性を検査<br>3. ルーティングルールを評価
+    alt ルールに一致 (例: claude-opus-4-7)
+        GW->>Claude: in-flight トランスコード後にディスパッチ
+        Claude-->>GW: モデルレスポンス
+    else 一致なし (フォールバック)
+        GW->>Gemini: defaultModel にディスパッチ
+        Gemini-->>GW: モデルレスポンス
+    else 明示ルール (例: gpt-oss-120b-maas)
+        GW->>GPT: OpenAI 互換のまま転送
+        GPT-->>GW: モデルレスポンス
+    end
+    GW-->>Client: OpenAI 互換レスポンスを返却
+      </pre>
+    </div>
+    <p style="font-size: 14px;">
+      クライアントは OpenAI 互換の単一インターフェースにリクエストを送信し、API Gateway が JSON ペイロード内の <code>model</code> 属性に基づきルーティングルールを評価、Vertex AI Model Garden 上の各モデルのスキーマにトランスコードしてディスパッチします。
+    </p>
+  </div>
+
+  <!-- 主要機能 -->
+  <div class="section">
+    <h2>⚙️ 主要機能</h2>
+
+    <div class="card">
+      <h3>🎛️ 1. 集中型トラフィック管理</h3>
+      <ul class="plain">
+        <li>AI トラフィックのルーティングとライフサイクル管理を<strong>ネットワークエッジの単一マネージドゲートウェイに集約</strong></li>
+        <li>LiteLLM などのスタンドアロンなクライアントサイドプロキシのホスティングが不要になり、断片化したクライアント側ルーティング設定を置き換え</li>
+        <li>認証やクォータなどの<strong>集中型アクセスポリシーの適用</strong>と、組織全体の AI トラフィック量の監視が可能</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>🔄 2. In-flight トランスコーディング</h3>
+      <ul class="plain">
+        <li>クライアントアプリケーションを <strong>OpenAI 互換の REST インターフェースに標準化</strong></li>
+        <li>ゲートウェイが OpenAI 互換リクエストを宛先の Vertex AI 予測スキーマ (Gemini の <code>:generateContent</code>、Claude の <code>:rawPredict</code> など) に<strong>通信中に変換</strong></li>
+        <li>レスポンスも変換され、クライアントには OpenAI 互換の形式で返却される</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>📝 3. OpenAPI 3.x による宣言的な設定</h3>
+      <ul class="plain">
+        <li>新しい <code>x-google-api-management.ai.models.routing</code> 拡張でモデルルーティングテーブル (routers) を定義</li>
+        <li>各ルーターには明示的なルーティングルール (<code>rules</code>) と、どのルールにも一致しない場合のフォールバック先 (<code>defaultModel</code>) を設定</li>
+        <li>操作 (operation) レベルで <code>x-google-model-router</code> 拡張を指定し、API パスにルーターをアタッチ</li>
+      </ul>
+    </div>
+
+    <h3>🔁 リクエスト処理フロー</h3>
+    <div class="flow-diagram">
+      <div class="flow-step">📥 1. リクエストの<br>インターセプト</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">🔍 2. ペイロードの<br><code>model</code> 属性を検査</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">⚖️ 3. ルール評価<br>(不一致は default)</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">🔄 4. In-flight<br>トランスコーディング</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">🚀 5. Vertex AI へ<br>ディスパッチ</div>
+    </div>
+  </div>
+
+  <!-- 技術仕様 -->
+  <div class="section">
+    <h2>🔬 技術仕様</h2>
+
+    <h3>🤖 対応モデルとエンドポイント</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>プロバイダー</th>
+            <th>targetModel の例</th>
+            <th>Vertex AI エンドポイントメソッド</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>✨ Google Gemini</td>
+            <td><code>google/gemini-3.5-flash-lite</code></td>
+            <td><code>:generateContent</code></td>
+          </tr>
+          <tr>
+            <td>🤖 Anthropic Claude</td>
+            <td><code>anthropic/claude-opus-4-7</code></td>
+            <td><code>:rawPredict</code></td>
+          </tr>
+          <tr>
+            <td>🧠 OpenAI</td>
+            <td><code>openai/gpt-oss-120b-maas</code></td>
+            <td><code>/endpoints/openapi/chat/completions</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <ul class="plain">
+      <li><code>targetModel</code> は <code>&lt;provider&gt;/&lt;model-id&gt;</code> 形式で、provider は <code>google</code>、<code>openai</code>、<code>anthropic</code> のいずれか (デプロイ時に検証される)</li>
+      <li>対象モデルは Vertex AI Model Garden の <strong>Model as a Service (MaaS)</strong> としてデプロイ済みのオープンモデルである必要がある</li>
+      <li>1 つのルーターが参照するすべてのモデルは<strong>同一ホスト名</strong> (グローバルエンドポイント <code>aiplatform.googleapis.com</code> または単一のリージョナルエンドポイント) を共有する必要がある</li>
+    </ul>
+
+    <h3>📄 OpenAPI 3.x 設定例</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">YAML</span>
+        <span class="code-title">モデルルーティング設定 (OpenAPI 3.x)</span>
+      </div>
+      <pre><code class="language-yaml">openapi: 3.0.3
+info:
+  title: OpenAPI 3.x spec using Model Routing
+  version: 1.0.0
+
+x-google-api-management:
+  backends:
+    gemini-35-flashlite:
+      address: "https://aiplatform.googleapis.com/v1/projects/YOUR_PROJECT_ID/locations/global/publishers/google/models/gemini-3.5-flash-lite:generateContent"
+      deadline: 60.0
+      pathTranslation: CONSTANT_ADDRESS
+    anthropic-claude-opus-47:
+      address: "https://aiplatform.googleapis.com/v1/projects/YOUR_PROJECT_ID/locations/global/publishers/anthropic/models/claude-opus-4-7:rawPredict"
+      deadline: 60.0
+      pathTranslation: CONSTANT_ADDRESS
+  ai:
+    models:
+      routing:
+        routers:
+          gemini-claude-router:
+            defaultModel:
+              backend: gemini-35-flashlite
+              targetModel: google/gemini-3.5-flash-lite
+            rules:
+              - model: "claude-opus-4-7"
+                backend: anthropic-claude-opus-47
+                targetModel: anthropic/claude-opus-4-7
+
+paths:
+  /v1/chat/gemini-claude:
+    post:
+      operationId: "chatGeminiClaude"
+      x-google-model-router: gemini-claude-router
+      responses:
+        '200':
+          description: "OK"</code></pre>
+    </div>
+
+    <h3>✅ 設定検証の主なルール</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>検証項目</th>
+            <th>ルール</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>拡張の配置</td>
+            <td><code>x-google-model-router</code> は operation レベルのみ指定可能 (path/root レベルは拒否)</td>
+          </tr>
+          <tr>
+            <td>HTTP メソッド</td>
+            <td><code>x-google-model-router</code> は POST メソッドのみに適用可能</td>
+          </tr>
+          <tr>
+            <td>バックエンド</td>
+            <td><code>pathTranslation: CONSTANT_ADDRESS</code> が必須。<code>https</code> スキームを推奨</td>
+          </tr>
+          <tr>
+            <td>ルーター内容</td>
+            <td>各ルーターに <code>defaultModel</code> が必須。<code>rules</code> 内の <code>model</code> 値はルーター内で一意</td>
+          </tr>
+          <tr>
+            <td>混在禁止</td>
+            <td>同一 API 操作で <code>x-google-model-router</code> と <code>x-google-backend</code> の併用は不可</td>
+          </tr>
+          <tr>
+            <td>ホスト整合性</td>
+            <td>1 ルーター内の全バックエンドは同一ホスト名・同一スキームを共有</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 設定方法 -->
+  <div class="section">
+    <h2>🛠️ 設定方法</h2>
+
+    <h3>📌 前提条件</h3>
+    <ul class="plain">
+      <li>API Gateway 管理プレーンと Vertex AI Model Garden へのアクセス権があること。API config とゲートウェイの作成には <strong>API Gateway Admin</strong> (<code>roles/apigateway.admin</code>) ロールが必要</li>
+      <li>ゲートウェイが使用するサービスアカウントに <strong>Vertex AI User</strong> (<code>roles/aiplatform.user</code>) ロールが付与されていること</li>
+      <li>ルーティング対象モデルが Vertex AI Model Garden の MaaS としてデプロイ済みのオープンモデルであり、1 ルーター内の全モデルが同一ホスト名を共有していること</li>
+      <li>対象プロジェクトと API Gateway インスタンスが <strong>VPC Service Controls の境界で制限されていない</strong>こと</li>
+    </ul>
+
+    <h3>🪜 手順</h3>
+    <ol class="step-list">
+      <li><strong>対象モデルの特定</strong> — ルーティング対象の基盤モデルと、対応する Vertex AI エンドポイント URL を特定します。MaaS オープンモデルのホスト名は <code>aiplatform.googleapis.com</code> です。</li>
+      <li><strong>OpenAPI 3.x 仕様の作成</strong> — <code>x-google-api-management.backends</code> にバックエンドを、<code>ai.models.routing.routers</code> にルーターを定義し、各 API パスの POST 操作に <code>x-google-model-router</code> でルーターをアタッチします。</li>
+      <li><strong>API config の作成とデプロイ</strong> — 作成した OpenAPI 3.x 仕様を使って API config を作成し、API Gateway インスタンスにデプロイします。管理プレーンがモデルルーティング設定を処理し、ルーティングレイヤーを有効化します。</li>
+      <li><strong>ルーティング動作のテスト</strong> — ゲートウェイが <code>ACTIVE</code> 状態になるのを待ってから URL を取得し、OpenAI 互換リクエストでテストします。</li>
+    </ol>
+
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Bash</span>
+        <span class="code-title">ゲートウェイ URL の取得とルーティングのテスト</span>
+      </div>
+      <pre><code class="language-bash"># ゲートウェイ URL の取得
+gcloud api-gateway gateways describe GATEWAY_ID \
+  --location=GATEWAY_LOCATION \
+  --project=PROJECT_ID \
+  --format='value(defaultHostname)'
+
+# 明示ルールによるルーティングのテスト (Claude にルーティング)
+curl https://GATEWAY_URL/v1/chat/gemini-claude \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "model": "claude-opus-4-7",
+    "messages": [
+      {"role": "user", "content": "Explain recursion in one sentence."}
+    ]
+  }'</code></pre>
+    </div>
+    <div class="note-box">
+      <strong>💡 ポイント:</strong> ペイロード内の <code>"model": "claude-opus-4-7"</code> がルーターの明示ルールに一致し、Claude バックエンドにルーティングされます。一致しないモデル名を指定した場合は <code>defaultModel</code> にフォールバックします。
+    </div>
+  </div>
+
+  <!-- メリット -->
+  <div class="section">
+    <h2>💡 メリット</h2>
+    <div class="before-after">
+      <div class="after-box" style="background: var(--gc-blue-tint); border-color: var(--gc-blue-100);">
+        <h3 style="color: var(--gc-blue-900);">💼 ビジネス面</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>運用コストの削減</strong>: スタンドアロンプロキシのホスティング・スケーリング・保守が不要になり、インフラコストと運用負荷を削減</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>ガバナンスの強化</strong>: 認証・クォータなどのアクセスポリシーを一元的に適用し、組織全体の AI トラフィック量を監視可能</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>ベンダーロックインの緩和</strong>: クライアントコードを変更せずに、ルーティング設定の変更だけで Gemini、Claude、GPT 間のモデル切り替えが可能</span></div>
+      </div>
+      <div class="after-box">
+        <h3>🔧 技術面</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>クライアントの標準化</strong>: すべてのクライアントが OpenAI 互換の単一 REST インターフェースで実装でき、モデルごとのスキーマ差異をゲートウェイが吸収</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>エッジ最適化されたパフォーマンス</strong>: ネットワークエッジでプロンプトを検査してルーティングし、Vertex AI Model Garden との直接統合 (same-host 最適化) を活用</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>宣言的な構成管理</strong>: ルーティングテーブルを OpenAPI 3.x 仕様としてコード管理でき、デプロイ時に管理プレーンが構成を検証</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- デメリット・制約事項 -->
+  <div class="section">
+    <h2>⚠️ デメリット・制約事項</h2>
+
+    <h3>🚧 制限事項</h3>
+    <div class="check-item"><span class="cross-icon">✗</span><span><strong>Public Preview</strong>: ルーティングは JSON ペイロード内の <code>model</code> タグ/名前のみに基づく (コンテンツベース・コストベースのルーティングは未対応)</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span><strong>対象モデルの制約</strong>: Vertex AI Model Garden にデプロイ済みの MaaS モデルのみ対応。1 ルーター内の全モデルは同一ホスト名を共有する必要がある</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span><strong>OpenAPI 3.x 必須</strong>: OpenAPI 2.0 (Swagger) 仕様は非対応</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span><strong>ゲートウェイの更新不可</strong>: 既存ゲートウェイへの有効化や、有効化済みゲートウェイからの無効化はできない。切り替えには新しい API config とゲートウェイの作成・デプロイが必要</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span><strong>混在構成の禁止</strong>: 1 つの OpenAPI 仕様内でモデルルーティング操作と非モデルルーティング操作を混在させることはできない</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span><strong>VPC Service Controls 非対応</strong>: モデルルーティングを有効にしたゲートウェイでは VPC Service Controls 境界や Private Service Connect (PSC) エンドポイント構成を使用できない</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span><strong>プロトコル制約</strong>: レスポンスストリーミング (SSE) には対応するが、リクエスト側ストリーミング、gRPC、WebSocket、Gemini Live は非対応</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span><strong>モダリティ</strong>: Public Preview 期間中はテキストベースのプロンプトリクエストのみを想定</span></div>
+
+    <h3>🤔 考慮すべき点</h3>
+    <div class="warning-box">
+      <strong>⚠️ <code>model</code> 属性の必須指定:</strong> Public Preview 期間中、リクエストペイロードに <code>model</code> フィールドがない場合、エラーで拒否されずに誤って処理される。クライアントリクエストには必ず <code>model</code> フィールドを含めること。
+    </div>
+    <ul class="plain">
+      <li><strong>最大タイムアウト</strong>: ゲートウェイはリクエストあたり最大 <strong>3,600 秒 (1 時間)</strong> のタイムアウトを適用 (長時間のストリーミングリクエストにも適用)</li>
+      <li><strong>コールドスタートレイテンシ</strong>: 非アクティブ期間中にゲートウェイインスタンスがゼロにスケールした場合、初回リクエストにコールドスタートレイテンシが発生し、レイテンシに敏感な AI 推論パスに影響する可能性がある</li>
+      <li><strong>モデル別の可観測性が限定的</strong>: Public Preview では、リクエスト単位でどのターゲットモデルが処理したかの帰属情報は利用不可 (構造化されたルーティング決定ログは将来のリリースで追加予定)</li>
+      <li><strong>OpenAI 互換ルートのモデルセレクター</strong>: 宛先が <code>/openapi/chat/completions</code> のルートでは、ルールの <code>model</code> 値がそのまま Vertex AI への送信ペイロードに転送されるため、有効なパブリッシャーモデル識別子 (例: <code>openai/gpt-oss-120b-maas</code>) を指定する必要がある</li>
+    </ul>
+  </div>
+
+  <!-- ユースケース -->
+  <div class="section">
+    <h2>🎯 ユースケース</h2>
+
+    <div class="usecase">
+      <h3>1️⃣ マルチモデル AI アプリケーションの統一エンドポイント</h3>
+      <p style="font-size: 14px;"><strong>シナリオ:</strong> 社内の複数チームが Gemini、Claude、GPT をユースケースに応じて使い分けている。各チームが個別に LiteLLM プロキシを運用しており、認証・監視・ルーティング設定が分散している。</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">YAML</span>
+          <span class="code-title">単一のゲートウェイに複数ルーターを定義</span>
+        </div>
+        <pre><code class="language-yaml">ai:
+  models:
+    routing:
+      routers:
+        multi-model-router:
+          defaultModel:
+            backend: gemini-35-flashlite
+            targetModel: google/gemini-3.5-flash-lite
+          rules:
+            - model: "claude-opus-4-7"
+              backend: anthropic-claude-opus-47
+              targetModel: anthropic/claude-opus-4-7</code></pre>
+      </div>
+      <p style="font-size: 14px; margin-bottom: 0;"><strong>✅ 効果:</strong> 全チームが単一の OpenAI 互換エンドポイントに標準化され、プロキシ運用が不要になる。認証・クォータ・監視をゲートウェイで一元管理できる。</p>
+    </div>
+
+    <div class="usecase">
+      <h3>2️⃣ デフォルトモデルへのフォールバックによる安全なモデル切り替え</h3>
+      <p style="font-size: 14px;"><strong>シナリオ:</strong> クライアントアプリケーションが指定するモデル名が多様で、未知のモデル名によるエラーを避けつつ、コスト効率の良いモデルをデフォルトとして運用したい。</p>
+      <p style="font-size: 14px; margin-bottom: 0;"><strong>✅ 効果:</strong> ルールに一致しないモデル名のリクエストは自動的に <code>defaultModel</code> (例: Gemini Flash-Lite) にフォールバックし、リクエストの失敗を防ぎつつコストを制御できる。</p>
+    </div>
+
+    <div class="usecase">
+      <h3>3️⃣ クライアントコード変更なしのモデル移行・評価</h3>
+      <p style="font-size: 14px;"><strong>シナリオ:</strong> OpenAI SDK ベースの既存アプリケーションを、コード変更なしに Vertex AI Model Garden のモデルへ移行・比較評価したい。</p>
+      <p style="font-size: 14px; margin-bottom: 0;"><strong>✅ 効果:</strong> クライアントは OpenAI 互換インターフェースのまま、ゲートウェイ側のルーティング設定変更のみで異なる基盤モデルへの切り替え・比較が可能になる。</p>
+    </div>
+  </div>
+
+  <!-- 料金 -->
+  <div class="section">
+    <h2>💰 料金</h2>
+    <p>
+      API Gateway は <span class="highlight">Service Control への呼び出し数 (API 呼び出し数)</span> に基づいて課金されます。モデルルーティング固有の追加料金は現時点で発表されていません。<strong>ルーティング先の Vertex AI モデルの推論料金は別途発生</strong>します。
+    </p>
+    <h3>📊 料金例 (API Gateway の呼び出し課金)</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>月間 API 呼び出し数 (請求先アカウントごと)</th>
+            <th>100 万呼び出しあたりの料金</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>0〜200 万回</td>
+            <td><strong style="color: var(--gc-green);">$0.00 (無料枠)</strong></td>
+          </tr>
+          <tr>
+            <td>200 万〜10 億回</td>
+            <td>$3.00</td>
+          </tr>
+          <tr>
+            <td>10 億回超</td>
+            <td>$1.50</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size: 14px;">
+      このほか、Google Cloud 外へのデータ転送 (Premium Tier) の料金が別途適用されます。詳細は <a href="https://cloud.google.com/api-gateway/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">API Gateway 料金ページ</a> を参照してください。
+    </p>
+  </div>
+
+  <!-- 利用可能リージョン -->
+  <div class="section">
+    <h2>🌏 利用可能リージョン</h2>
+    <p>
+      対象モデルは Vertex AI の<strong>グローバルエンドポイント</strong> (<code>aiplatform.googleapis.com</code>) または<strong>単一のリージョナルエンドポイント</strong> (例: <code>us-central1-aiplatform.googleapis.com</code>) を使用できます。1 つのルーター内では同一エンドポイント (ホスト名) に統一する必要があります。ゲートウェイ自体の利用可能リージョンは <a href="https://cloud.google.com/api-gateway/docs" target="_blank" rel="noopener noreferrer" class="gc-link">API Gateway のドキュメント</a> を参照してください。
+    </p>
+  </div>
+
+  <!-- 関連サービス -->
+  <div class="section">
+    <h2>🔗 関連サービス・機能</h2>
+    <div class="related-grid">
+      <div class="related-item">
+        <strong>🤖 Vertex AI Model Garden (MaaS)</strong>
+        ルーティング先となる基盤モデル (Gemini、Anthropic Claude、OpenAI GPT) のホスティング基盤。モデルルーティングは MaaS オープンモデルとの直接統合を前提とする。
+      </div>
+      <div class="related-item">
+        <strong>📋 Cloud Logging</strong>
+        全リクエストが標準の API Gateway リクエストログに記録される。ルーター障害時は <code>responseDetails</code> フィールドに <code>model_router_application_error</code> などのカテゴリが付与され、トラブルシューティングに利用可能。
+      </div>
+      <div class="related-item">
+        <strong>📈 Cloud Monitoring</strong>
+        <code>apigateway.googleapis.com/proxy/request_count</code> メトリクスでトラフィック量とエラー率を監視可能 (ルーター別・モデル別のメトリクスは将来追加予定)。
+      </div>
+      <div class="related-item">
+        <strong>🛡️ Apigee AI Gateway</strong>
+        より高度な AI トラフィックガバナンス (Model Armor、セマンティックキャッシング、トークン制限、Model FinOps など) が必要な場合のエンタープライズ向け選択肢。
+      </div>
+      <div class="related-item">
+        <strong>🔐 IAM</strong>
+        ゲートウェイのサービスアカウントに Vertex AI User ロールを付与してモデルへのアクセスを制御。
+      </div>
+    </div>
+  </div>
+
+  <!-- まとめ -->
+  <div class="section">
+    <h2>📝 まとめ</h2>
+    <div class="success-box">
+      <p style="margin: 0 0 8px 0;">
+        API Gateway のモデルルーティングは、<strong>LiteLLM などのクライアントサイドプロキシを自前運用することなく</strong>、OpenAI 互換の単一インターフェースで Gemini・Claude・GPT へのトラフィックをマネージドに振り分けられる重要なアップデートです。
+      </p>
+      <p style="margin: 0;">
+        マルチモデル構成の AI アプリケーションを運用している組織は、<strong>プロキシ運用の廃止とガバナンスの一元化</strong>を検討する価値があります。Public Preview のため、VPC Service Controls 非対応や <code>model</code> フィールド必須などの制約を確認した上で、<strong>非本番環境での評価から始める</strong>ことを推奨します。
+      </p>
+    </div>
+    <div class="tags">
+      <span class="tag">#APIGateway</span>
+      <span class="tag">#VertexAI</span>
+      <span class="tag">#ModelGarden</span>
+      <span class="tag">#LLM</span>
+      <span class="tag">#ModelRouting</span>
+      <span class="tag">#Gemini</span>
+      <span class="tag">#Claude</span>
+      <span class="tag">#GPT</span>
+      <span class="tag">#OpenAPI</span>
+      <span class="tag">#AIGateway</span>
+      <span class="tag">#Preview</span>
+    </div>
+  </div>
+
+  <footer>
+    <p><strong>📎 出典・参考リンク</strong></p>
+    <ul style="margin: 8px 0; padding-left: 20px;">
+      <li><a href="https://docs.cloud.google.com/release-notes#August_03_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026-08-03)</a></li>
+      <li><a href="https://docs.cloud.google.com/api-gateway/docs/model-routing-overview" target="_blank" rel="noopener noreferrer" class="gc-link">Overview of model routing</a></li>
+      <li><a href="https://docs.cloud.google.com/api-gateway/docs/model-routing-configure" target="_blank" rel="noopener noreferrer" class="gc-link">Configure model routing</a></li>
+      <li><a href="https://docs.cloud.google.com/api-gateway/docs/oasv3-extensions" target="_blank" rel="noopener noreferrer" class="gc-link">OpenAPI 3.x extensions in API Gateway</a></li>
+      <li><a href="https://docs.cloud.google.com/vertex-ai/generative-ai/docs/maas/use-open-models" target="_blank" rel="noopener noreferrer" class="gc-link">Vertex AI Model Garden のオープンモデル (MaaS)</a></li>
+      <li><a href="https://cloud.google.com/api-gateway/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">API Gateway 料金ページ</a></li>
+    </ul>
+    <p>本インフォグラフィックは Google Cloud News レポート (2026-08-03) を基に生成されました。</p>
+  </footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+    mermaid.initialize({
+        startOnLoad: true,
+        theme: 'base',
+        themeVariables: {
+            primaryColor: '#4285F4',
+            primaryTextColor: '#202124',
+            primaryBorderColor: '#4285F4',
+            lineColor: '#4285F4',
+            secondaryColor: '#F1F3F4',
+            tertiaryColor: '#FAFAFA',
+            background: '#FFFFFF',
+            mainBkg: '#E8F0FE',
+            nodeBorder: '#4285F4',
+            clusterBkg: '#E8F0FE',
+            clusterBorder: '#4285F4',
+            edgeLabelBackground: '#FFFFFF',
+            textColor: '#202124'
+        }
+    });
+</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

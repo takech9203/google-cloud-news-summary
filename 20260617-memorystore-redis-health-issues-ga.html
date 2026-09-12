@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Memorystore for Redis: Health Issues Monitoring (GA)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1 {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-green);
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-red);
+    }
+
+    .before-card h3 {
+      color: var(--gc-red);
+      margin-top: 0;
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-green);
+    }
+
+    .after-card h3 {
+      color: var(--gc-green);
+      margin-top: 0;
+    }
+
+    .before-card ul, .after-card ul {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    .before-card li, .after-card li {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .feature-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .feature-card.orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .feature-card.green {
+      border-left-color: var(--gc-green);
+    }
+
+    .feature-card.purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .feature-card h3 {
+      margin-top: 0;
+      font-size: 17px;
+    }
+
+    .feature-card p, .feature-card ul {
+      font-size: 14px;
+      margin: 8px 0;
+    }
+
+    .feature-card ul {
+      padding-left: 20px;
+    }
+
+    .feature-card li {
+      margin: 4px 0;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+    }
+
+    .usecase-card p {
+      font-size: 14px;
+      margin: 8px 0;
+    }
+
+    .usecase-effect {
+      background: var(--gc-green-tint);
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 12px;
+      font-size: 14px;
+      border-left: 3px solid var(--gc-green);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid) {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .region-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .region-group {
+      background: var(--gc-surface);
+      border-radius: 8px;
+      padding: 16px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .region-group h4 {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      color: var(--gc-blue-800);
+    }
+
+    .region-group p {
+      margin: 4px 0;
+      font-size: 13px;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .pricing-note {
+      background: var(--gc-green-tint);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      margin: 16px 0;
+      border: 2px solid var(--gc-green);
+    }
+
+    .pricing-note .price-highlight {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--gc-green);
+    }
+
+    .related-links {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .related-link-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px;
+      background: var(--gc-surface);
+      border-radius: 8px;
+      border: 1px solid var(--gc-outline-variant);
+      text-decoration: none;
+      color: var(--gc-blue-600);
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+
+    .related-link-item:hover {
+      background: var(--gc-blue-50);
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stat-grid { grid-template-columns: 1fr; }
+      .region-grid { grid-template-columns: 1fr; }
+      .related-links { grid-template-columns: 1fr; }
+      .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>🔍 Memorystore for Redis<br>Health Issues Monitoring</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Memorystore for Redis</span>
+          <span class="badge-ga">GA</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-06-17</div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>Memorystore for Redis の <span class="highlight">Health Issues Monitoring</span> が一般提供 (GA) になりました。Redis インスタンスの健全性に関する問題を<strong>自動的に検出</strong>し、<strong>具体的な解決策を提案</strong>するプロアクティブな監視機能です。</p>
+
+      <div class="note-box">
+        <strong>💡 ポイント:</strong> 追加料金なしで全 Memorystore for Redis インスタンスに自動適用。SRE チームやプラットフォームエンジニアの障害予防保全に貢献します。
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">3</div>
+          <div class="stat-label">検出対象の Health Issues 種類</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">$0</div>
+          <div class="stat-label">追加料金</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">全リージョン</div>
+          <div class="stat-label">利用可能範囲</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Before/After Section -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-card">
+          <h3>❌ Before</h3>
+          <ul>
+            <li>Cloud Monitoring メトリクスを個別に手動分析</li>
+            <li>高負荷コマンドの影響を事前に把握する仕組みなし</li>
+            <li>メンテナンスウィンドウの設定漏れ検出が手動</li>
+            <li>リソース問題検出後も解決策が自動提示されない</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h3>✅ After</h3>
+          <ul>
+            <li>Health Issues が自動検出しコンソール上で通知</li>
+            <li>高負荷コマンドを検知し代替コマンドを提案</li>
+            <li>CPU/メモリ高使用率を検出しスケールアップを推奨</li>
+            <li>メンテナンスポリシー未設定を特定し最適時間帯を提案</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>Health Issues Monitoring は Redis インスタンスからメトリクスを収集し、3 種類の問題パターンを検出して、Google Cloud コンソール上で推奨アクションとともに表示します。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TB
+    subgraph "Memorystore for Redis Instance"
+        REDIS[Redis ノード]
+        METRICS[メトリクス収集]
+    end
+
+    subgraph "Health Issues Monitoring"
+        DETECTOR[問題検出エンジン]
+        ANALYZER[分析モジュール]
+
+        subgraph "Health Issues 3種類"
+            HI1[Expensive Commands<br/>高負荷コマンド検出]
+            HI2[High Resource Utilization<br/>高リソース使用率検出]
+            HI3[Maintenance Policy Not Set<br/>メンテナンスポリシー未設定]
+        end
+    end
+
+    subgraph "ユーザーインターフェース"
+        CONSOLE[Google Cloud Console]
+        RECOMMEND[推奨アクション表示]
+    end
+
+    REDIS --> METRICS
+    METRICS --> DETECTOR
+    DETECTOR --> ANALYZER
+    ANALYZER --> HI1
+    ANALYZER --> HI2
+    ANALYZER --> HI3
+    HI1 --> CONSOLE
+    HI2 --> CONSOLE
+    HI3 --> CONSOLE
+    CONSOLE --> RECOMMEND
+        </pre>
+      </div>
+    </div>
+
+    <!-- Main Features Section -->
+    <div class="section">
+      <h2>⚡ 主要機能 (3 種類の Health Issues)</h2>
+
+      <div class="feature-card">
+        <h3>🔥 1. Expensive Commands (高負荷コマンド検出)</h3>
+        <ul>
+          <li>KEYS、LRANGE、HGETALL、ZRANGE、EVAL などのリソース集約型コマンドを検出</li>
+          <li>高レイテンシ、クライアントタイムアウト、メモリ圧迫、レプリケーション遅延の原因を特定</li>
+          <li>代替コマンド (SCAN、HSCAN、SSCAN、UNLINK など) の具体的な提案を提示</li>
+          <li>SLOWLOG と連携してレイテンシの原因となるコマンドを特定</li>
+        </ul>
+      </div>
+
+      <div class="feature-card orange">
+        <h3>📈 2. High Resource Utilization (高リソース使用率検出)</h3>
+        <ul>
+          <li>CPU 使用率: プライマリノードで 0.8 秒、レプリカノードで 0.5 秒超過を検出</li>
+          <li>メモリ使用率が最大容量に近づいている状態を検出</li>
+          <li>スケールアップの推奨や、より高い容量ティアへの移行を提案</li>
+          <li><code>maxmemory-gb</code> パラメータの最適化提案を含む</li>
+        </ul>
+      </div>
+
+      <div class="feature-card purple">
+        <h3>🔧 3. Maintenance Policy Not Set (メンテナンスポリシー未設定検出)</h3>
+        <ul>
+          <li>メンテナンスウィンドウ未設定のインスタンスを特定</li>
+          <li>トラフィックパターンを分析し、最適なメンテナンス時間帯を提案</li>
+          <li>メンテナンス通知の設定を推奨 (7 日前通知)</li>
+          <li>Basic Tier (約 5 分のダウンタイム) / Standard Tier (約 15 秒のフェイルオーバー) を考慮</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>📐 技術仕様</h2>
+
+      <h3>検出対象の高負荷コマンドと推奨代替</h3>
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>カテゴリ</th>
+              <th>高負荷コマンド</th>
+              <th>推奨代替コマンド</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>キースペース全体走査</td><td><code>KEYS</code></td><td><code>SCAN</code></td></tr>
+            <tr><td>可変長キーセット取得</td><td><code>LRANGE</code></td><td>範囲を制限して使用</td></tr>
+            <tr><td>可変長キーセット取得</td><td><code>ZRANGE</code></td><td>範囲を制限して使用</td></tr>
+            <tr><td>ハッシュ全取得</td><td><code>HGETALL</code></td><td><code>HSCAN</code></td></tr>
+            <tr><td>セット全取得</td><td><code>SMEMBERS</code></td><td><code>SSCAN</code></td></tr>
+            <tr><td>スクリプト実行</td><td><code>EVAL / EVALSHA</code></td><td>無限ループ回避を確認</td></tr>
+            <tr><td>キー削除</td><td><code>DELETE</code></td><td><code>UNLINK</code></td></tr>
+            <tr><td>Pub/Sub</td><td><code>PUBLISH / SUBSCRIBE</code></td><td><code>SPUBLISH / SSUBSCRIBE</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>リソース使用率の閾値</h3>
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>項目</th>
+              <th>推奨閾値</th>
+              <th>説明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>プライマリノード CPU</td><td><strong>0.8 秒以下</strong></td><td>Main Thread CPU Seconds メトリクス</td></tr>
+            <tr><td>レプリカノード CPU</td><td><strong>0.5 秒以下</strong></td><td>Read Replica 使用時</td></tr>
+            <tr><td>System Memory Usage Ratio</td><td><strong>80% 以下</strong></td><td>通常運用時の推奨値</td></tr>
+            <tr><td>メンテナンス時メモリ</td><td><strong>50% 以下</strong></td><td>メンテナンス中の推奨値</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>関連メトリクス</h3>
+      <span class="code-label">JSON</span>
+      <pre><code class="language-json">{
+  "cpu_metrics": {
+    "main_thread": "redis.googleapis.com/stats/cpu_utilization_main_thread",
+    "total_cpu": "redis.googleapis.com/stats/cpu_utilization"
+  },
+  "memory_metrics": {
+    "system_memory_usage_ratio": "redis.googleapis.com/stats/memory/system_memory_usage_ratio",
+    "maxmemory": "redis.googleapis.com/stats/memory/maxmemory"
+  },
+  "performance_metrics": {
+    "calls": "redis.googleapis.com/stats/calls",
+    "connected_clients": "redis.googleapis.com/stats/connected_clients"
+  }
+}</code></pre>
+    </div>
+
+    <!-- Setup Guide -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <div class="note-box">
+        <strong>💡 前提条件:</strong> Memorystore for Redis インスタンスが作成済み / Google Cloud コンソールへのアクセス権限 / <code>redis.instances.get</code> 権限を持つ IAM ロール
+      </div>
+
+      <h3>Step 1: Health Issues の確認</h3>
+      <p>Health Issues は Google Cloud コンソールのインスタンス詳細ページに自動的に表示されます。追加の設定は不要です。</p>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># gcloud CLI でインスタンスの状態を確認
+gcloud redis instances describe INSTANCE_NAME \
+  --region=REGION</code></pre>
+
+      <h3>Step 2: メンテナンスウィンドウの設定 (推奨)</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># メンテナンスウィンドウを設定
+gcloud redis instances update INSTANCE_NAME \
+  --region=REGION \
+  --maintenance-window-day=SUNDAY \
+  --maintenance-window-hour=01</code></pre>
+
+      <h3>Step 3: Cloud Monitoring アラートの設定 (推奨)</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># CPU 使用率のアラートポリシーを作成
+gcloud alpha monitoring policies create \
+  --notification-channels=CHANNEL_ID \
+  --display-name="Memorystore Redis CPU Alert" \
+  --condition-display-name="High CPU Utilization" \
+  --condition-filter='resource.type="redis_instance" AND metric.type="redis.googleapis.com/stats/cpu_utilization_main_thread"' \
+  --condition-threshold-value=0.8 \
+  --condition-threshold-comparison=COMPARISON_GT</code></pre>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💼 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h3>🛒 E コマースサイトのセッションストア</h3>
+        <p><strong>シナリオ:</strong> 大規模 E コマースサイトで Redis をセッションストアとして使用。セール期間中に KEYS コマンドを使用した管理スクリプトが実行され、レイテンシが増加。</p>
+        <span class="code-label">Python</span>
+        <pre><code class="language-python"># Before: 高負荷コマンド (Health Issues が検出)
+keys = redis_client.keys("session:*")
+
+# After: 推奨される代替コマンド
+cursor = 0
+keys = []
+while True:
+    cursor, partial_keys = redis_client.scan(cursor, match="session:*", count=100)
+    keys.extend(partial_keys)
+    if cursor == 0:
+        break</code></pre>
+        <div class="usecase-effect">
+          <strong>✅ 効果:</strong> Health Issues が KEYS コマンドの使用を検出し、SCAN への移行を推奨。切り替え後、P99 レイテンシが 50% 以上改善。
+        </div>
+      </div>
+
+      <div class="usecase-card">
+        <h3>📊 リアルタイム分析基盤のキャッシュ</h3>
+        <p><strong>シナリオ:</strong> リアルタイムダッシュボードのキャッシュとして Redis を使用。メモリ使用率が 90% を超え、キーの eviction が頻発していたが気付かなかった。</p>
+        <div class="usecase-effect">
+          <strong>✅ 効果:</strong> High resource utilization の Health Issue により問題を早期発見。容量ティアのスケールアップを実施し、eviction の発生をゼロに抑制。
+        </div>
+      </div>
+
+      <div class="usecase-card">
+        <h3>🔗 マイクロサービス間の Pub/Sub</h3>
+        <p><strong>シナリオ:</strong> マイクロサービスアーキテクチャで Redis Pub/Sub を活用。メンテナンスウィンドウを設定しておらず、ピーク時間帯にメンテナンスが実行され一時的にサービス中断。</p>
+        <div class="usecase-effect">
+          <strong>✅ 効果:</strong> Maintenance policy not set の Health Issue により、メンテナンスポリシーの設定を促される。日曜日の早朝にウィンドウを設定し、計画外のダウンタイムを解消。
+        </div>
+      </div>
+    </div>
+
+    <!-- Benefits and Limitations -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div>
+          <h3>ビジネス面</h3>
+          <div class="card">
+            <p><strong>📉 ダウンタイム削減</strong><br>パフォーマンス問題を早期検出し、サービス障害を未然に防止。SLA 維持に貢献。</p>
+          </div>
+          <div class="card">
+            <p><strong>💰 運用コスト削減</strong><br>手動の監視・分析作業が不要に。問題の原因特定時間を大幅に短縮。</p>
+          </div>
+          <div class="card">
+            <p><strong>📅 計画的メンテナンス</strong><br>トラフィックの少ない時間帯にメンテナンスを集約し、ユーザー影響を最小化。</p>
+          </div>
+        </div>
+        <div>
+          <h3>技術面</h3>
+          <div class="card">
+            <p><strong>🔍 プロアクティブ検出</strong><br>問題が顕在化する前に予兆を検出し、具体的な解決策を提示。</p>
+          </div>
+          <div class="card">
+            <p><strong>📖 ベストプラクティス自動適用</strong><br>Google Cloud の推奨事項に基づく最適化提案を自動的に受け取れる。</p>
+          </div>
+          <div class="card">
+            <p><strong>⚙️ 追加設定不要</strong><br>既存インスタンスに対して自動有効化。追加のエージェントやソフトウェアのインストール不要。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <div class="warning-box">
+        <strong>制限事項:</strong>
+        <ul style="margin: 8px 0; padding-left: 20px;">
+          <li>対応する Health Issues は現時点で 3 種類のみ</li>
+          <li>通知はコンソール表示が中心。プログラマティックな取得には Cloud Monitoring との連携が必要</li>
+          <li>Memorystore for Redis Cluster (別製品) には直接適用されない場合がある</li>
+        </ul>
+      </div>
+
+      <div class="warning-box">
+        <strong>考慮すべき点:</strong>
+        <ul style="margin: 8px 0; padding-left: 20px;">
+          <li>問題の検出と提案は行うが、自動修復は行わない (手動対処が必要)</li>
+          <li>高負荷コマンドの代替に切り替える場合、アプリケーションコードの変更が必要になる場合がある</li>
+          <li>メンテナンスウィンドウを設定しても、一部のメンテナンスはウィンドウを超過する可能性がある</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金情報</h2>
+
+      <div class="pricing-note">
+        <div class="price-highlight">追加料金なし</div>
+        <p style="margin: 8px 0;">Health Issues Monitoring 機能は全 Memorystore for Redis インスタンスで無料利用可能</p>
+      </div>
+
+      <h3>Memorystore for Redis 基本料金 (参考)</h3>
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>容量ティア</th>
+              <th>オンデマンド</th>
+              <th>1 年 CUD (20% 割引)</th>
+              <th>3 年 CUD (40% 割引)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>M1 (1-4 GB)</td><td>リージョンにより異なる</td><td>対象外</td><td>対象外</td></tr>
+            <tr><td>M2 (5-10 GB)</td><td>約 $0.049/GB/時</td><td>約 $0.039/GB/時</td><td>約 $0.029/GB/時</td></tr>
+            <tr><td>M3 (11-35 GB)</td><td>約 $0.049/GB/時</td><td>約 $0.039/GB/時</td><td>約 $0.029/GB/時</td></tr>
+            <tr><td>M4 (36-100 GB)</td><td>約 $0.035/GB/時</td><td>約 $0.028/GB/時</td><td>約 $0.021/GB/時</td></tr>
+            <tr><td>M5 (101-300 GB)</td><td>約 $0.024/GB/時</td><td>約 $0.019/GB/時</td><td>約 $0.014/GB/時</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size: 13px; color: var(--gc-outline);">※ 料金はリージョンにより異なります。最新の料金は公式料金ページをご確認ください。</p>
+    </div>
+
+    <!-- Available Regions -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <p>Health Issues Monitoring は Memorystore for Redis が利用可能な<strong>すべてのリージョン</strong>で利用できます。</p>
+
+      <div class="region-grid">
+        <div class="region-group">
+          <h4>🌏 アジア太平洋</h4>
+          <p>東京 (asia-northeast1)、大阪 (asia-northeast2)、ソウル (asia-northeast3)、シンガポール (asia-southeast1)、ジャカルタ (asia-southeast2)、ムンバイ (asia-south1)、デリー (asia-south2)、香港 (asia-east2)、台湾 (asia-east1)、シドニー (australia-southeast1)、メルボルン (australia-southeast2)</p>
+        </div>
+        <div class="region-group">
+          <h4>🌎 北米</h4>
+          <p>アイオワ (us-central1)、サウスカロライナ (us-east1)、北バージニア (us-east4)、オレゴン (us-west1)、ロサンゼルス (us-west2)、ソルトレイクシティ (us-west3)、ラスベガス (us-west4)、モントリオール (northamerica-northeast1)、トロント (northamerica-northeast2)</p>
+        </div>
+        <div class="region-group">
+          <h4>🌍 ヨーロッパ</h4>
+          <p>ベルギー (europe-west1)、ロンドン (europe-west2)、フランクフルト (europe-west3)、オランダ (europe-west4)、フィンランド (europe-north1)、チューリッヒ (europe-west6)、ワルシャワ (europe-central2)、ミラノ (europe-west8)、パリ (europe-west9)、マドリード (europe-southwest1)、トリノ (europe-west12)</p>
+        </div>
+        <div class="region-group">
+          <h4>🌐 中東・南米</h4>
+          <p>ドーハ (me-central1)、ダンマーム (me-central2)、テルアビブ (me-west1)、サンパウロ (southamerica-east1)、サンティアゴ (southamerica-west1)</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="related-links">
+        <a href="https://cloud.google.com/monitoring/docs" target="_blank" rel="noopener noreferrer" class="related-link-item">📊 Cloud Monitoring - メトリクスアラート設定</a>
+        <a href="https://cloud.google.com/logging/docs" target="_blank" rel="noopener noreferrer" class="related-link-item">📝 Cloud Logging - アクティビティログ分析</a>
+        <a href="https://cloud.google.com/recommender/docs" target="_blank" rel="noopener noreferrer" class="related-link-item">💡 Recommender API - 最適化提案フレームワーク</a>
+        <a href="https://cloud.google.com/memorystore/docs/cluster" target="_blank" rel="noopener noreferrer" class="related-link-item">🔄 Memorystore for Redis Cluster</a>
+        <a href="https://cloud.google.com/products/operations" target="_blank" rel="noopener noreferrer" class="related-link-item">🔭 Cloud Operations Suite</a>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="success-box">
+        <p><strong>Memorystore for Redis の Health Issues Monitoring (GA)</strong> は、Redis インスタンスの健全性を自動的に監視し、パフォーマンス問題の予防保全を実現する重要な機能です。</p>
+        <ul style="margin: 12px 0; padding-left: 20px;">
+          <li><strong>高負荷コマンドの検出</strong> - 代替コマンドの具体的な提案</li>
+          <li><strong>リソース使用率の監視</strong> - スケールアップの推奨</li>
+          <li><strong>メンテナンスポリシーの確認</strong> - 最適な時間帯の提案</li>
+        </ul>
+        <p>追加コストなしで利用できるため、Memorystore for Redis を利用しているすべてのユーザーは、Google Cloud コンソールで Health Issues を確認し、推奨されるアクションを実施することを強く推奨します。</p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>参考リンク:</strong></p>
+      <p>📎 <a href="https://cloud.google.com/release-notes#June_17_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></p>
+      <p>📎 <a href="https://cloud.google.com/memorystore/docs/redis" target="_blank" rel="noopener noreferrer">Memorystore for Redis ドキュメント</a></p>
+      <p>📎 <a href="https://cloud.google.com/memorystore/docs/redis/general-best-practices" target="_blank" rel="noopener noreferrer">一般的なベストプラクティス</a></p>
+      <p>📎 <a href="https://cloud.google.com/memorystore/docs/redis/about-maintenance" target="_blank" rel="noopener noreferrer">メンテナンスについて</a></p>
+      <p>📎 <a href="https://cloud.google.com/memorystore/docs/redis/troubleshoot-issues" target="_blank" rel="noopener noreferrer">トラブルシューティング</a></p>
+      <p>📎 <a href="https://cloud.google.com/memorystore/docs/redis/monitor-instances" target="_blank" rel="noopener noreferrer">インスタンスのモニタリング</a></p>
+      <p>📎 <a href="https://cloud.google.com/memorystore/pricing" target="_blank" rel="noopener noreferrer">料金ページ</a></p>
+      <hr style="border: none; border-top: 1px solid var(--gc-outline-variant); margin: 12px 0;">
+      <p style="color: var(--gc-outline);">Generated: 2026-06-17 | Source: Google Cloud Release Notes</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

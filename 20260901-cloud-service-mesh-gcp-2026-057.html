@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cloud Service Mesh: Gateway API 向けプロキシ更新 (GCP-2026-057 脆弱性修正)</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+:root {
+  --gc-blue: #4285F4;
+  --gc-red: #EA4335;
+  --gc-yellow: #FBBC04;
+  --gc-green: #34A853;
+  --gc-blue-900: #174EA6;
+  --gc-blue-800: #185ABC;
+  --gc-blue-700: #1967D2;
+  --gc-blue-600: #1A73E8;
+  --gc-blue-500: #4285F4;
+  --gc-blue-300: #669DF6;
+  --gc-blue-200: #8AB4F8;
+  --gc-blue-100: #AECBFA;
+  --gc-blue-50: #E8F0FE;
+  --gc-on-surface: #202124;
+  --gc-on-surface-variant: #5F6368;
+  --gc-outline: #80868B;
+  --gc-surface: #FFFFFF;
+  --gc-surface-container-lowest: #F8F9FA;
+  --gc-surface-container-low: #F1F3F4;
+  --gc-surface-container: #E8EAED;
+  --gc-outline-variant: #DADCE0;
+  --gc-blue-tint: #E8F0FE;
+  --gc-green-tint: #E6F4EA;
+  --gc-red-tint: #FCE8E6;
+  --gc-yellow-tint: #FEF7E0;
+  --gc-purple-tint: #F3E8FD;
+  --gc-teal-tint: #E0F7FA;
+  --gc-purple: #A142F4;
+  --gc-teal: #00BCD4;
+  --gc-orange: #FF6D00;
+}
+
+body {
+  background-color: var(--gc-surface);
+  font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+  color: var(--gc-on-surface-variant);
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 20px;
+  margin: 0;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 16px;
+  border-bottom: 3px solid var(--gc-blue-600);
+}
+
+h1, .title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--gc-on-surface);
+  margin: 0;
+  line-height: 1.4;
+}
+
+h2, .section-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin-top: 0;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 20px 0 8px;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: var(--gc-outline);
+}
+
+.section {
+  background: var(--gc-surface-container-low);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid var(--gc-outline-variant);
+}
+
+.highlight {
+  background-color: var(--gc-blue-50);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--gc-blue-800);
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+.card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border-left: 4px solid var(--gc-blue-600);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+}
+
+.card h3 {
+  margin-top: 0;
+}
+
+.icon-text {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+  color: var(--gc-on-surface-variant);
+}
+
+.arrow {
+  color: var(--gc-blue-600);
+  font-size: 20px;
+}
+
+.gc-link {
+  color: var(--gc-blue-600);
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.gc-link:hover {
+  color: var(--gc-blue-800);
+  text-decoration: underline;
+}
+
+.badge,
+.badge-ga,
+.badge-preview,
+.badge-deprecated,
+.badge-security {
+  display: inline-block;
+  color: #FFFFFF;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+  margin: 4px 8px 4px 0;
+}
+
+.badge { background: var(--gc-blue-600); }
+.badge-ga { background: var(--gc-green); }
+.badge-preview { background: var(--gc-orange); }
+.badge-deprecated { background: var(--gc-red); }
+.badge-security { background: var(--gc-red); }
+
+/* Before/After 比較 */
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.before-box, .after-box {
+  border-radius: 12px;
+  padding: 16px 20px;
+}
+
+.before-box {
+  background: var(--gc-red-tint);
+  border: 1px solid rgba(234, 67, 53, 0.35);
+}
+
+.after-box {
+  background: var(--gc-green-tint);
+  border: 1px solid rgba(52, 168, 83, 0.35);
+}
+
+.before-box h3, .after-box h3 {
+  margin-top: 0;
+  font-size: 16px;
+}
+
+.before-box h3 { color: #C5221F; }
+.after-box h3 { color: #188038; }
+
+.before-box ul, .after-box ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  font-size: 14px;
+}
+
+.before-box li, .after-box li {
+  margin-bottom: 8px;
+}
+
+@media (max-width: 700px) {
+  .before-after { grid-template-columns: 1fr; }
+  .stat-grid { grid-template-columns: 1fr 1fr !important; }
+  h1 { font-size: 26px; }
+}
+
+/* 統計カード */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.stat-card {
+  background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+  color: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px 12px;
+  text-align: center;
+}
+
+.stat-card.red {
+  background: linear-gradient(135deg, #D93025, #A50E0E);
+}
+
+.stat-card.green {
+  background: linear-gradient(135deg, #188038, #0D652D);
+}
+
+.stat-card.orange {
+  background: linear-gradient(135deg, #E8710A, #B06000);
+}
+
+.stat-value {
+  font-size: 34px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  line-height: 1.2;
+}
+
+.stat-label {
+  font-size: 13px;
+  opacity: 0.95;
+}
+
+/* テーブル */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--gc-outline-variant);
+  background: var(--gc-surface);
+}
+
+th {
+  background: var(--gc-blue-50);
+  color: var(--gc-blue-900);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 2px solid var(--gc-blue-200);
+}
+
+td {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--gc-outline-variant);
+  font-size: 14px;
+  vertical-align: top;
+}
+
+tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+tr:hover { background: var(--gc-blue-50); }
+
+.sev-high, .sev-moderate {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #FFFFFF;
+  white-space: nowrap;
+}
+
+.sev-high { background: var(--gc-red); }
+.sev-moderate { background: var(--gc-orange); }
+
+/* 注意・警告ボックス */
+.note-box {
+  background: var(--gc-blue-tint);
+  border-left: 4px solid var(--gc-blue-600);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.warning-box {
+  background: var(--gc-yellow-tint);
+  border-left: 4px solid var(--gc-yellow);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.error-box {
+  background: var(--gc-red-tint);
+  border-left: 4px solid var(--gc-red);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.success-box {
+  background: var(--gc-green-tint);
+  border-left: 4px solid var(--gc-green);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+/* チェックリスト */
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.check-icon { color: var(--gc-green); font-size: 18px; }
+.cross-icon { color: var(--gc-red); font-size: 18px; }
+
+/* フロー図 */
+.flow-diagram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 24px 0;
+}
+
+.flow-step {
+  background: var(--gc-surface);
+  border: 2px solid var(--gc-blue-600);
+  border-radius: 12px;
+  padding: 12px 20px;
+  text-align: center;
+  min-width: 100px;
+  color: var(--gc-on-surface);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+  font-size: 14px;
+}
+
+.flow-arrow {
+  color: var(--gc-blue-600);
+  font-size: 24px;
+  font-weight: bold;
+}
+
+/* コードブロック (Mermaid の pre は除外) */
+.code-block,
+pre:not(.mermaid) {
+  background: #1E1E1E;
+  border-radius: 8px;
+  padding: 16px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 15px;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: #E8E8E8;
+  margin: 16px 0;
+}
+
+pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
+}
+
+.code-label {
+  display: inline-block;
+  background: #2D2D2D;
+  color: #9CDCFE;
+  padding: 4px 12px;
+  border-radius: 8px 8px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.code-label + pre:not(.mermaid),
+.code-label + .code-block {
+  border-top-left-radius: 0;
+  margin-top: 0;
+}
+
+code:not(pre code) {
+  background: var(--gc-surface-container-low);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 0.9em;
+  color: var(--gc-blue-900);
+}
+
+/* Mermaid コンテナ */
+.mermaid-container {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 20px 0;
+  border: 2px solid rgba(66, 133, 244, 0.3);
+  overflow-x: auto;
+}
+
+.mermaid {
+  display: flex;
+  justify-content: center;
+}
+
+/* ユースケース */
+.usecase {
+  background: var(--gc-blue-tint);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border: 1px solid var(--gc-blue-100);
+}
+
+.usecase h3 {
+  margin-top: 0;
+  color: var(--gc-blue-900);
+}
+
+/* ステップ */
+.step-list {
+  counter-reset: step;
+  margin: 16px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step-list > li {
+  position: relative;
+  padding: 14px 16px 14px 56px;
+  background: var(--gc-surface);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 12px;
+  margin-bottom: 12px;
+  counter-increment: step;
+}
+
+.step-list > li::before {
+  content: counter(step);
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--gc-blue-600);
+  color: #FFFFFF;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.step-list strong { color: var(--gc-on-surface); }
+
+ul { padding-left: 22px; }
+li { margin-bottom: 6px; }
+
+footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gc-outline-variant);
+  font-size: 12px;
+  color: var(--gc-outline);
+}
+
+footer ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+footer li { margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ヘッダー -->
+  <div class="header">
+    <div>
+      <span class="badge">☁️ Cloud Service Mesh</span>
+      <span class="badge-security badge">🔒 Security</span>
+      <span class="badge" style="background: var(--gc-blue-800);">GKE Gateway API</span>
+      <h1>🛡️ Gateway API 向けプロキシ更新<br>GCP-2026-057 脆弱性修正のロールアウト</h1>
+    </div>
+    <div class="subtitle">リリース日: 2026-09-01</div>
+  </div>
+
+  <!-- 概要 -->
+  <div class="section">
+    <h2>📋 概要</h2>
+    <p>
+      マネージド Cloud Service Mesh が、GKE クラスタ上の Gateway API 向けに新プロキシバージョン
+      <span class="highlight">csm_mesh_proxy.20260819_RC00</span> の使用を開始。
+      <strong>Envoy 1.37</strong> に最も近いバージョンに対応し、セキュリティ情報
+      <span class="highlight">GCP-2026-057</span> に記載された脆弱性の修正が含まれます。
+      すべてのリリースチャネル (rapid / regular / stable) にロールアウト中です。
+    </p>
+    <p>
+      GCP-2026-057 (公開日: 2026-08-26) は、Envoy ベースのプロキシに存在する
+      <strong>13 件の CVE</strong> (High 7 件 / Moderate 6 件) をまとめたセキュリティ情報。
+      HTTP/2 のストリーム状態破壊による異常終了、RBAC ポリシーのフェイルオープン (認可バイパス)、
+      QUIC/HTTP3 での use-after-free、パス正規化不備による認可ポリシーバイパスなどが修正されます。
+    </p>
+
+    <div class="stat-grid">
+      <div class="stat-card red">
+        <div class="stat-value">13</div>
+        <div class="stat-label">修正された CVE 件数</div>
+      </div>
+      <div class="stat-card orange">
+        <div class="stat-value">7 / 6</div>
+        <div class="stat-label">High / Moderate 件数</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">1.37</div>
+        <div class="stat-label">対応する Envoy バージョン</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-value">3</div>
+        <div class="stat-label">対象チャネル (rapid / regular / stable)</div>
+      </div>
+    </div>
+
+    <div class="note-box">
+      <strong>💡 ポイント:</strong> 8/27 にサイドカー用イメージのロールアウトが先行して発表済み。
+      今回は <strong>Gateway API で使用されるプロキシ</strong>に対する修正のロールアウトです。
+      マネージド版は自動更新のため追加アクション不要、<strong>クラスタ内 (in-cluster) 版は手動アップグレードが必要</strong>です。
+    </div>
+
+    <div class="before-after">
+      <div class="before-box">
+        <h3>❌ Before (アップデート前の課題)</h3>
+        <ul>
+          <li>Gateway API で使用されるマネージド Cloud Service Mesh のプロキシに、GCP-2026-057 記載の 13 件の CVE (High 7 / Moderate 6) が存在</li>
+          <li>非 UTF-8 の HTTP ヘッダーバイトやパスパラメータを含む URL の正規化不備により、RBAC / 認可ポリシーがバイパスされる (フェイルオープン) 可能性 (CVE-2026-73552、CVE-2026-48521、CVE-2026-73550 など)</li>
+          <li>不正な HTTP/2 / HTTP/3 / QUIC トラフィックにより、プロキシプロセスが異常終了 (DoS) する可能性 (CVE-2026-73513、CVE-2026-73512 など)</li>
+        </ul>
+      </div>
+      <div class="after-box">
+        <h3>✅ After (アップデート後の改善)</h3>
+        <ul>
+          <li>Gateway API 向けプロキシが csm_mesh_proxy.20260819_RC00 (Envoy 1.37 相当) に更新され、GCP-2026-057 記載の全 CVE の修正が適用</li>
+          <li>全リリースチャネルに自動ロールアウトされ、マネージド版ユーザーは手動対応なしで保護される</li>
+          <li>RBAC / 認可ポリシーのパスマッチングとルーティングのパスパラメータ処理が一貫化され、認可バイパスのリスクが解消</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- アーキテクチャ図 -->
+  <div class="section">
+    <h2>🗺️ アーキテクチャ図</h2>
+    <div class="mermaid-container">
+      <pre class="mermaid">
+flowchart TD
+    subgraph Bulletin["🚨 GCP-2026-057 (2026-08-26 公開)"]
+        CVE["🐛 13 件の CVE<br/>High 7 件 / Moderate 6 件<br/>認可バイパス・DoS・UAF など"]
+    end
+
+    CVE --> Managed
+    CVE --> InCluster
+
+    subgraph Managed["☁️ マネージド Cloud Service Mesh (自動更新)"]
+        SC["📦 8/27: サイドカーイメージ<br/>rapid 1.21.6-asm.71<br/>regular 1.20.8-asm.119<br/>stable 1.19.10-asm.109"]
+        GW["🌐 9/1: Gateway API プロキシ<br/>csm_mesh_proxy.20260819_RC00<br/>(Envoy 1.37 相当)"]
+        SC --> Auto(["✅ 全リリースチャネルへ<br/>自動ロールアウト"])
+        GW --> Auto
+    end
+
+    subgraph InCluster["🔧 クラスタ内 Cloud Service Mesh (手動対応)"]
+        Patch["⬆️ パッチ版へアップグレード<br/>1.29.7-asm.2 / 1.28.10-asm.24<br/>1.27.9-asm.34"]
+        EOL{"v1.26 以前?"}
+        EOL -- はい --> Upgrade["⚠️ EOL: 修正はバックポートされない<br/>v1.27 以降へアップグレード必須"]
+        EOL -- いいえ --> Patch
+    end
+      </pre>
+    </div>
+    <p>
+      GCP-2026-057 の脆弱性修正は、<strong>マネージド Cloud Service Mesh では自動ロールアウト</strong>
+      (サイドカーイメージと Gateway API プロキシの 2 経路)、
+      <strong>クラスタ内 Cloud Service Mesh ではパッチ版への手動アップグレード</strong>で適用されます。
+    </p>
+  </div>
+
+  <!-- 主要機能 -->
+  <div class="section">
+    <h2>⚡ 主要機能</h2>
+
+    <div class="card">
+      <h3>🌐 1. Gateway API 向け新プロキシバージョンのロールアウト</h3>
+      <div class="icon-text"><span class="arrow">→</span><span>GKE クラスタ上の Gateway API 向けに <code>csm_mesh_proxy.20260819_RC00</code> の使用を開始</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>Envoy バージョン 1.37 に最も近いバージョンに対応</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>すべてのリリースチャネル (rapid / regular / stable) が対象</span></div>
+    </div>
+
+    <div class="card" style="border-left-color: var(--gc-red);">
+      <h3>🐛 2. GCP-2026-057 に記載された 13 件の CVE の修正</h3>
+      <div class="icon-text"><span class="arrow">→</span><span>重要度 High: 7 件、Moderate: 6 件</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>すべての Cloud Service Mesh バージョンが影響を受ける</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>認可バイパス、プロセス異常終了 (DoS)、use-after-free、レスポンスポイズニング、XSS などを修正</span></div>
+    </div>
+
+    <div class="card" style="border-left-color: var(--gc-green);">
+      <h3>🔄 3. マネージド版は自動更新、クラスタ内版は手動アップグレード</h3>
+      <div class="icon-text"><span class="arrow">→</span><span>マネージド Cloud Service Mesh: 数週間かけてシステムが自動的に更新 (すべてのバージョンがサポート対象)</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>クラスタ内 Cloud Service Mesh: <code>1.29.7-asm.2</code> / <code>1.28.10-asm.24</code> / <code>1.27.9-asm.34</code> へのアップグレードが必要</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>v1.26 以前は EOL のため修正はバックポートされず、v1.27 以降へのアップグレードが必須</span></div>
+    </div>
+  </div>
+
+  <!-- 技術仕様 -->
+  <div class="section">
+    <h2>🔬 技術仕様</h2>
+
+    <h3>🐛 GCP-2026-057 で修正される CVE 一覧</h3>
+    <table>
+      <thead>
+        <tr><th>CVE</th><th>重要度</th><th>内容</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>CVE-2026-73513</code></td><td><span class="sev-high">High</span></td><td>信頼できないアップストリームが END_STREAM フラグなしの HTTP/2 レスポンストレーラーを oghttp2 インスタンスに送信すると、ストリーム状態が破壊されプロセスが異常終了する問題を修正</td></tr>
+        <tr><td><code>CVE-2026-73552</code></td><td><span class="sev-high">High</span></td><td>safe_regex マッチングが非 UTF-8 の HTTP ヘッダーバイトを通常の不一致として扱い、否定マッチングロジックを使用する RBAC ポリシーがフェイルオープンする問題を修正</td></tr>
+        <tr><td><code>CVE-2026-73512</code></td><td><span class="sev-high">High</span></td><td>Capsule Protocol を使用するリクエストで、遅延した HTTP/3 データグラムが破棄済みのストリームデコーダーを参照する QUIC HTTP データグラムハンドラの use-after-free を修正</td></tr>
+        <tr><td><code>CVE-2026-73547</code></td><td><span class="sev-high">High</span></td><td>:path 疑似ヘッダーのない CONNECT リクエスト処理時の ext_authz フィルタでのプロセス異常終了を修正</td></tr>
+        <tr><td><code>CVE-2026-73549</code></td><td><span class="sev-moderate">Moderate</span></td><td>HTTP/3 リクエストにおける original DST クラスタでのスコープ付き IPv6 アドレス処理中のプロセス異常終了を修正</td></tr>
+        <tr><td><code>CVE-2026-50572</code></td><td><span class="sev-moderate">Moderate</span></td><td>ローカル拒否応答で認可リクエストを完了する際の ext_authz raw HTTP クライアントでの use-after-free を修正</td></tr>
+        <tr><td><code>CVE-2026-73546</code></td><td><span class="sev-moderate">Moderate</span></td><td>HTML 統計インターフェース (/stats?format=html) の格納型クロスサイトスクリプティング (XSS) を修正</td></tr>
+        <tr><td><code>CVE-2026-48521</code></td><td><span class="sev-moderate">Moderate</span></td><td>null のトランスポートソケットオプション参照に起因する、ALPN ベースの HTTP/3 コネクションプール選択時のプロセス異常終了を修正</td></tr>
+        <tr><td><code>CVE-2026-73551</code></td><td><span class="sev-moderate">Moderate</span></td><td>パラメータを含むドット / ドットドットパスセグメントの URL 正規化不備による、パスベースの認可ポリシーバイパスを修正</td></tr>
+        <tr><td><code>CVE-2026-73511</code></td><td><span class="sev-moderate">Moderate</span></td><td>セグメント単位のマトリックスパラメータを含むパスに対し、パラメータ除去を全セグメントで一貫適用するようパスマッチングを修正</td></tr>
+        <tr><td><code>CVE-2026-73548</code></td><td><span class="sev-high">High</span></td><td>WebSocket 以外の汎用 HTTP アップグレードにおけるユーザー間レスポンスポイズニングを、アップグレード受理までペイロードを一時停止することで修正</td></tr>
+        <tr><td><code>CVE-2026-73550</code></td><td><span class="sev-high">High</span></td><td>破棄された重複 Host ヘッダーがリクエストヘッダー制限に含まれない HTTP/2 メモリ枯渇問題を修正し、プロキシ停止の可能性を防止</td></tr>
+        <tr><td><code>CVE-2026-73553</code></td><td><span class="sev-high">High</span></td><td>ignore_path_parameters_in_path_matching 有効時に、RBAC パスマッチャーがルーティングと同一のパスパラメータ処理を適用するよう修正し、認可バイパスを解消</td></tr>
+      </tbody>
+    </table>
+
+    <h3>📦 ロールアウト対象バージョン</h3>
+    <table>
+      <thead>
+        <tr><th>項目</th><th>詳細</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>セキュリティ情報</td><td>GCP-2026-057 (公開日: 2026-08-26)</td></tr>
+        <tr><td>影響範囲</td><td>すべての Cloud Service Mesh バージョン</td></tr>
+        <tr><td>Gateway API プロキシ (マネージド)</td><td><code>csm_mesh_proxy.20260819_RC00</code> (Envoy 1.37 相当)、全リリースチャネル</td></tr>
+        <tr><td>サイドカー (マネージド、8/27 発表)</td><td>rapid: <code>1.21.6-asm.71</code> / regular: <code>1.20.8-asm.119</code> / stable: <code>1.19.10-asm.109</code></td></tr>
+        <tr><td>クラスタ内版のパッチバージョン</td><td><code>1.29.7-asm.2</code> / <code>1.28.10-asm.24</code> / <code>1.27.9-asm.34</code></td></tr>
+        <tr><td>クラスタ内版 v1.26 以前</td><td>EOL のため修正なし。v1.27 以降へのアップグレードが必須</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 設定方法 -->
+  <div class="section">
+    <h2>🔧 設定方法</h2>
+
+    <h3>✅ 前提条件</h3>
+    <div class="check-item"><span class="check-icon">✓</span><span>GKE クラスタで Cloud Service Mesh を使用していること (マネージド版またはクラスタ内版)</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span>自身の環境がマネージド版かクラスタ内版か、および使用中のバージョン / リリースチャネルを把握していること</span></div>
+
+    <h3>📝 手順</h3>
+    <ol class="step-list">
+      <li>
+        <strong>マネージド Cloud Service Mesh の場合 — 対応不要 (自動更新)</strong><br>
+        すべてのバージョンがサポート対象であり、今後数週間かけてシステムが自動的に更新されます。管理者による手動アップグレードは不要です。
+      </li>
+      <li>
+        <strong>クラスタ内 Cloud Service Mesh の場合 — パッチ版へアップグレード</strong><br>
+        以下のいずれかのパッチ適用済みバージョンへクラスタをアップグレードします。
+        <ul style="margin-top: 8px;">
+          <li><code>1.29.7-asm.2</code></li>
+          <li><code>1.28.10-asm.24</code></li>
+          <li><code>1.27.9-asm.34</code></li>
+        </ul>
+        アップグレード手順は <a href="https://docs.cloud.google.com/service-mesh/docs/upgrade/upgrade" target="_blank" rel="noopener noreferrer" class="gc-link">Upgrade Cloud Service Mesh</a> を参照してください。
+      </li>
+      <li>
+        <strong>v1.26 以前を使用している場合 — メジャーアップグレード</strong><br>
+        Cloud Service Mesh v1.26 以前はサポート終了 (EOL) となっており、本 CVE の修正はバックポートされません。<strong>v1.27 以降へのアップグレードが必須</strong>です。
+      </li>
+    </ol>
+
+    <div class="flow-diagram">
+      <div class="flow-step">🔍 環境の確認<br>(マネージド / クラスタ内)</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">☁️ マネージド版<br>✅ 自動更新を待つ</div>
+      <span class="flow-arrow">/</span>
+      <div class="flow-step">🔧 クラスタ内版<br>⬆️ パッチ版へ手動更新</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">🛡️ 全 CVE 修正適用</div>
+    </div>
+  </div>
+
+  <!-- メリット -->
+  <div class="section">
+    <h2>💎 メリット</h2>
+
+    <h3>💼 ビジネス面</h3>
+    <div class="success-box">
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>セキュリティリスクの低減</strong>: 認可バイパスや DoS につながる 13 件の CVE (High 7 件を含む) が修正され、サービスメッシュを経由するトラフィックの安全性が向上</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>運用負荷ゼロでの脆弱性対応 (マネージド版)</strong>: 全リリースチャネルに自動ロールアウトされるため、パッチ適用のための計画・作業コストが発生しない</span></div>
+    </div>
+
+    <h3>⚙️ 技術面</h3>
+    <div class="success-box">
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>認可ポリシーの堅牢化</strong>: 非 UTF-8 ヘッダーやパスパラメータを悪用した RBAC / 認可ポリシーのバイパス (フェイルオープン) が解消</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>データプレーンの安定性向上</strong>: HTTP/2、HTTP/3 / QUIC の不正トラフィックに起因するプロキシの異常終了 (use-after-free、null 参照、メモリ枯渇) が修正</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>Envoy 1.37 相当への追随</strong>: Gateway API 向けプロキシが最新の Envoy 1.37 に最も近いバージョンに保たれる</span></div>
+    </div>
+  </div>
+
+  <!-- デメリット・制約事項 -->
+  <div class="section">
+    <h2>⚠️ デメリット・制約事項</h2>
+
+    <h3>🚧 制限事項</h3>
+    <div class="error-box">
+      <div class="check-item"><span class="cross-icon">✗</span><span>クラスタ内 Cloud Service Mesh v1.26 以前には修正がバックポートされない (EOL のため)</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>マネージド版の自動更新は数週間かけて段階的に行われるため、即時に全クラスタへ適用されるわけではない</span></div>
+    </div>
+
+    <h3>🤔 考慮すべき点</h3>
+    <div class="warning-box">
+      <div class="check-item"><span class="arrow">→</span><span>クラスタ内 Cloud Service Mesh のユーザーは自動更新されないため、パッチ適用済みバージョンへの計画的なアップグレードが必要</span></div>
+      <div class="check-item"><span class="arrow">→</span><span>すべての Cloud Service Mesh バージョンが本 CVE 群の影響を受けるため、対応の要否ではなく対応方法 (自動 / 手動) を確認する必要がある</span></div>
+      <div class="check-item"><span class="arrow">→</span><span>プロキシバージョンの更新に伴う動作変更の有無を、rapid チャネルなど先行環境で確認することが望ましい</span></div>
+    </div>
+  </div>
+
+  <!-- ユースケース -->
+  <div class="section">
+    <h2>🎯 ユースケース</h2>
+
+    <div class="usecase">
+      <h3>💡 ユースケース 1: マネージド Cloud Service Mesh + Gateway API 利用環境の確認</h3>
+      <p><strong>シナリオ</strong>: GKE 上でマネージド Cloud Service Mesh と Gateway API を使用してトラフィック管理を行っている。GCP-2026-057 への対応状況を確認したい。</p>
+      <p><strong>効果</strong>: 本ロールアウトにより csm_mesh_proxy.20260819_RC00 が自動適用されるため、手動対応は不要。数週間の自動ロールアウト期間中であることを認識し、完了を待てばよい。</p>
+    </div>
+
+    <div class="usecase">
+      <h3>💡 ユースケース 2: クラスタ内 Cloud Service Mesh の計画的アップグレード</h3>
+      <p><strong>シナリオ</strong>: クラスタ内 Cloud Service Mesh 1.28 系を運用しており、セキュリティポリシー上、High 重要度の CVE には速やかなパッチ適用が求められている。</p>
+      <div class="code-label">実装例</div>
+      <pre><code class="language-plaintext">1. 現在のバージョンを確認 (例: 1.28.x)
+2. パッチ適用済みバージョン 1.28.10-asm.24 へのアップグレードを計画
+3. 公式アップグレードガイドに従い、検証環境 → 本番環境の順に適用</code></pre>
+      <p><strong>効果</strong>: RBAC フェイルオープンやプロキシ異常終了などの脆弱性を解消し、コンプライアンス要件を満たせる。</p>
+    </div>
+  </div>
+
+  <!-- 料金・リージョン -->
+  <div class="section">
+    <h2>💰 料金 / 🌏 利用可能リージョン</h2>
+    <div class="note-box">
+      <strong>💰 料金:</strong> このアップデートはセキュリティ修正のロールアウトであり、<strong>追加料金は発生しません</strong>。Cloud Service Mesh の料金については
+      <a href="https://cloud.google.com/service-mesh/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">公式の料金ページ</a> を参照してください。
+    </div>
+    <div class="note-box">
+      <strong>🌏 利用可能リージョン:</strong> すべてのリリースチャネル (rapid / regular / stable) のマネージド Cloud Service Mesh (GKE クラスタ上の Gateway API) にロールアウトされます。リージョン固有の制限は Release Notes に記載されていません。
+    </div>
+  </div>
+
+  <!-- 関連サービス -->
+  <div class="section">
+    <h2>🔗 関連サービス・機能</h2>
+    <div class="card">
+      <h3>⚓ Google Kubernetes Engine (GKE)</h3>
+      <p>本プロキシ更新の対象となる Gateway API が動作するプラットフォーム。GKE のリリースチャネルと合わせた運用管理が重要。</p>
+    </div>
+    <div class="card" style="border-left-color: var(--gc-teal);">
+      <h3>🌐 GKE Gateway API</h3>
+      <p>今回更新されるプロキシ (csm_mesh_proxy) が処理する Ingress / トラフィック管理の仕組み。</p>
+    </div>
+    <div class="card" style="border-left-color: var(--gc-purple);">
+      <h3>🛰️ Envoy</h3>
+      <p>Cloud Service Mesh のデータプレーンを構成するプロキシ。今回のバージョンは Envoy 1.37 相当で、修正された CVE は Envoy 由来。</p>
+    </div>
+    <div class="card" style="border-left-color: var(--gc-orange);">
+      <h3>⛵ Istio</h3>
+      <p>クラスタ内 Cloud Service Mesh のベースとなる OSS。パッチバージョン (1.29.7-asm.2 など) は Istio ベースのリリース。</p>
+    </div>
+  </div>
+
+  <!-- まとめ -->
+  <div class="section">
+    <h2>📌 まとめ</h2>
+    <div class="success-box">
+      <p style="margin: 0;">
+        GCP-2026-057 は <strong>High 7 件を含む 13 件の CVE</strong> をまとめた重要なセキュリティ情報であり、
+        <strong>すべての Cloud Service Mesh バージョンが影響</strong>を受けます。
+        マネージド Cloud Service Mesh のユーザーは自動更新されるため対応不要ですが、
+        クラスタ内 Cloud Service Mesh のユーザーは <code>1.29.7-asm.2</code> / <code>1.28.10-asm.24</code> / <code>1.27.9-asm.34</code>
+        への速やかなアップグレードを計画してください。
+        特に <strong>v1.26 以前は EOL で修正が提供されない</strong>ため、v1.27 以降への移行が必須です。
+      </p>
+    </div>
+    <p>
+      <span class="badge">#CloudServiceMesh</span>
+      <span class="badge">#Security</span>
+      <span class="badge">#GCP-2026-057</span>
+      <span class="badge">#Envoy</span>
+      <span class="badge">#GatewayAPI</span>
+      <span class="badge">#GKE</span>
+      <span class="badge">#CVE</span>
+    </p>
+  </div>
+
+  <!-- フッター -->
+  <footer>
+    <p>📎 出典:</p>
+    <ul>
+      <li>📰 <a href="https://docs.cloud.google.com/release-notes#September_01_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026-09-01)</a></li>
+      <li>🚨 <a href="https://docs.cloud.google.com/service-mesh/docs/security-bulletins#gcp-2026-057" target="_blank" rel="noopener noreferrer" class="gc-link">セキュリティ情報 GCP-2026-057</a></li>
+      <li>📄 <a href="https://docs.cloud.google.com/service-mesh/docs/release-notes" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud Service Mesh リリースノート</a></li>
+      <li>⬆️ <a href="https://docs.cloud.google.com/service-mesh/docs/upgrade/upgrade" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud Service Mesh のアップグレード</a></li>
+      <li>💰 <a href="https://cloud.google.com/service-mesh/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud Service Mesh の料金</a></li>
+    </ul>
+    <p>このインフォグラフィックは Google Cloud Release Notes (2026-09-01) を基に作成されました。</p>
+  </footer>
+
+</div>
+
+<!-- Mermaid.js -->
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#4285F4',
+      primaryTextColor: '#202124',
+      primaryBorderColor: '#4285F4',
+      lineColor: '#4285F4',
+      secondaryColor: '#F1F3F4',
+      tertiaryColor: '#FAFAFA',
+      background: '#FFFFFF',
+      mainBkg: '#E8F0FE',
+      nodeBorder: '#4285F4',
+      clusterBkg: '#E8F0FE',
+      clusterBorder: '#4285F4',
+      edgeLabelBackground: '#FFFFFF',
+      textColor: '#202124'
+    }
+  });
+</script>
+
+<!-- highlight.js -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

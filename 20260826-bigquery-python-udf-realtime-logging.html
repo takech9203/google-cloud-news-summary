@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BigQuery: Python UDF のリアルタイムログを Cloud Logging で表示可能に (GA)</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      margin-bottom: 32px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 12px 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 12px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h4 {
+      margin: 0 0 8px 0;
+      color: var(--gc-on-surface);
+      font-size: 16px;
+    }
+
+    .card p {
+      margin: 0;
+      font-size: 14px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 768px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .before-col {
+      background: var(--gc-red-tint);
+      border: 1px solid rgba(234, 67, 53, 0.3);
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .after-col {
+      background: var(--gc-green-tint);
+      border: 1px solid rgba(52, 168, 83, 0.3);
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .before-col h3, .after-col h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-col h3 { color: #C5221F; }
+    .after-col h3 { color: #188038; }
+
+    .before-col ul, .after-col ul {
+      margin: 0;
+      padding-left: 4px;
+      list-style: none;
+      font-size: 14px;
+    }
+
+    .before-col li, .after-col li {
+      margin: 8px 0;
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* コードブロック */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      border-radius: 0;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+      font-size: 14px;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+      font-size: 14px;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+      font-size: 14px;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+      font-size: 14px;
+    }
+
+    /* ステップ表示 */
+    .step-item {
+      display: flex;
+      gap: 16px;
+      margin: 20px 0;
+      align-items: flex-start;
+    }
+
+    .step-number {
+      background: var(--gc-blue-600);
+      color: #FFFFFF;
+      width: 32px;
+      height: 32px;
+      min-width: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 16px;
+      margin-top: 2px;
+    }
+
+    .step-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .step-content h4 {
+      margin: 4px 0 8px 0;
+      color: var(--gc-on-surface);
+      font-size: 16px;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border: 1px solid var(--gc-blue-100);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+      font-size: 17px;
+    }
+
+    .usecase p {
+      font-size: 14px;
+      margin: 8px 0;
+    }
+
+    /* メリットグリッド */
+    .merit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 768px) {
+      .merit-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .merit-col {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 16px 20px;
+      border-top: 4px solid var(--gc-green);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .merit-col h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .merit-col ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .merit-col li {
+      margin: 8px 0;
+    }
+
+    /* 関連サービスグリッド */
+    .related-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    @media (max-width: 768px) {
+      .related-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .related-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 16px;
+      border-left: 4px solid var(--gc-teal);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+      font-size: 14px;
+    }
+
+    .related-card h4 {
+      margin: 0 0 6px 0;
+      color: var(--gc-on-surface);
+      font-size: 15px;
+    }
+
+    .related-card p {
+      margin: 0;
+    }
+
+    ul.link-list {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    ul.link-list li {
+      margin: 8px 0;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      word-break: break-all;
+    }
+
+    .tag-list {
+      margin-top: 8px;
+    }
+
+    .tag {
+      display: inline-block;
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      color: var(--gc-on-surface-variant);
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      margin: 2px 4px 2px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div class="header-top">
+        <div>
+          <span class="badge">📊 BigQuery</span>
+          <span class="badge badge-ga">GA (一般提供)</span>
+        </div>
+        <div class="subtitle">リリース日: 2026-08-26</div>
+      </div>
+      <h1>🐍 BigQuery Python UDF のリアルタイムログを<br>Cloud Logging で表示可能に</h1>
+      <div class="subtitle">Python 標準の logging ライブラリで UDF 内部のデバッグ情報をリアルタイムに確認</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📌 概要</h2>
+      <p>
+        BigQuery の <span class="highlight">Python UDF (ユーザー定義関数)</span> が生成するログを、<span class="highlight">Cloud Logging でリアルタイムに表示</span>できる機能が一般提供 (GA) になりました。ロギングを有効化すると、Python の標準 <code>logging</code> ライブラリ (<code>logging.info</code>、<code>logging.error</code> など) を使って UDF 内部から出力したログが Cloud Logging に書き込まれ、コードの問題の特定と解決に活用できます。
+      </p>
+      <p>
+        Python UDF は BigQuery マネージドリソース上のコンテナで実行されるため、これまで内部の実行状況を把握しづらいという課題がありました。今回の GA により、データエンジニアやアナリティクスエンジニアは、<strong>本番クエリを失敗させずに不正データの特定やエラーのデバッグ</strong>を行えるようになります。
+      </p>
+      <div class="note-box">
+        <strong>💡 ポイント:</strong> 意図しないデータ持ち出し (data exfiltration) を防ぐため、Python UDF のロギングは<strong>デフォルトで無効</strong>になっており、セッション単位で明示的に有効化する設計です。
+      </div>
+
+      <div class="before-after">
+        <div class="before-col">
+          <h3>❌ Before: アップデート前の課題</h3>
+          <ul>
+            <li><span class="cross-icon">✗</span><span>UDF はマネージドコンテナで実行されるため、関数内部の実行時情報を確認する手段が限られ、問題の特定・解決が難しかった</span></li>
+            <li><span class="cross-icon">✗</span><span>UDF 内で未処理の例外が発生するとクエリ全体が失敗するが、どの入力データが原因かを特定する仕組みがなかった</span></li>
+            <li><span class="cross-icon">✗</span><span>Cloud Monitoring のメトリクス (CPU / メモリ) ではリソース状況は把握できても、コードレベルのデバッグ情報は得られなかった</span></li>
+          </ul>
+        </div>
+        <div class="after-col">
+          <h3>✅ After: アップデート後の改善</h3>
+          <ul>
+            <li><span class="check-icon">✓</span><span>Python 標準 <code>logging</code> ライブラリのログを Cloud Logging でリアルタイムに確認可能に</span></li>
+            <li><span class="check-icon">✓</span><span><code>query_job_id</code> や <code>routine_id</code> などのラベルで、特定ジョブ・特定 UDF に絞り込んだフィルタリングが可能に</span></li>
+            <li><span class="check-icon">✓</span><span>BigQuery コンソールのジョブ情報タブからワンクリックで Logs Explorer を開ける</span></li>
+            <li><span class="check-icon">✓</span><span>GA として本番環境のデバッグワークフローに組み込み可能に</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    U([👤 ユーザー / アナリスト]) -->|"1\. SET @@udf.properties<br/>(ロギング有効化)"| BQ[🔍 BigQuery<br/>クエリジョブ]
+    BQ -->|2\. UDF 呼び出し| UDF[🐍 Python UDF<br/>マネージドコンテナ]
+    UDF -->|"3\. logging.info /<br/>logging.error"| CL[📋 Cloud Logging<br/>ManagedRoutineInvocation]
+    CL -->|4\. リアルタイム表示| LE[🔎 Logs Explorer]
+    BQ -.->|ジョブ情報タブの<br/>ログリンク| LE
+    U -->|5\. ログ確認・デバッグ| LE
+        </pre>
+      </div>
+      <p style="font-size: 14px;">
+        セッションでロギングを有効化してクエリを実行すると、Python UDF 内の <code>logging</code> 呼び出しが Cloud Logging の <code>bigquery.googleapis.com/ManagedRoutineInvocation</code> リソースに書き込まれ、Logs Explorer でリアルタイムに確認できます。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="card">
+        <h4>📋 1. リアルタイムログの Cloud Logging への出力 (GA)</h4>
+        <p>ロギングを有効化すると、Python UDF が生成するログを Cloud Logging でリアルタイムに表示できます。Python 標準の <code>logging</code> ライブラリ (<code>logging.info</code>、<code>logging.error</code> など) を使用します。<strong><code>print()</code> 関数はサポートされません。</strong></p>
+      </div>
+      <div class="card">
+        <h4>🔐 2. セッション単位のオプトイン方式</h4>
+        <p>意図しないデータ持ち出しを防ぐため、ロギングはデフォルトで無効です。クエリ実行前に <code>SET @@udf.properties = JSON '{"enableDebugOutput": true}';</code> を実行して有効化します。</p>
+      </div>
+      <div class="card">
+        <h4>🏷️ 3. ラベルによる柔軟なフィルタリング</h4>
+        <p>ログは <code>bigquery.googleapis.com/ManagedRoutineInvocation</code> リソースに書き込まれ、プロジェクト、ロケーション、クエリジョブ ID、ルーティン ID などのラベルで絞り込めます。</p>
+      </div>
+      <div class="card">
+        <h4>🖱️ 4. BigQuery コンソールからのシームレスな遷移</h4>
+        <p>クエリ結果ペインの「ジョブ情報」タブのログリンクから、該当 Python UDF 呼び出しのログを表示するクエリが事前入力された状態で Logs Explorer が開きます。</p>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+      <h3>📑 ロギングリソースとラベル</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ログリソースタイプ</td>
+            <td><code>bigquery.googleapis.com/ManagedRoutineInvocation</code></td>
+          </tr>
+          <tr>
+            <td><code>resource_container</code></td>
+            <td>クエリジョブが実行されたプロジェクトの ID</td>
+          </tr>
+          <tr>
+            <td><code>location</code></td>
+            <td>クエリジョブが実行されたロケーション</td>
+          </tr>
+          <tr>
+            <td><code>query_job_id</code></td>
+            <td>Python UDF を呼び出したクエリジョブの ID</td>
+          </tr>
+          <tr>
+            <td><code>routine_project_id</code></td>
+            <td>呼び出されたルーティンが保存されているプロジェクト ID</td>
+          </tr>
+          <tr>
+            <td><code>routine_dataset_id</code></td>
+            <td>呼び出されたルーティンが保存されているデータセット ID</td>
+          </tr>
+          <tr>
+            <td><code>routine_id</code></td>
+            <td>呼び出されたルーティンの ID</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>🔓 ロギングの有効化</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">セッションでロギングを有効化</span>
+        </div>
+        <pre><code class="language-sql">SET @@udf.properties = JSON '{"enableDebugOutput": true}';</code></pre>
+      </div>
+      <p style="font-size: 14px;">クエリを実行する前に上記のステートメントをセッションで実行します。</p>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>✅ 前提条件</h3>
+      <ul style="font-size: 14px; padding-left: 20px;">
+        <li>Python UDF が作成済みであること (ランタイムは <code>python-3.11</code> のみサポート)</li>
+        <li>UDF 作成者には <code>roles/bigquery.dataEditor</code> (データセット)、<code>roles/bigquery.jobUser</code> (プロジェクト) などの IAM ロールが必要</li>
+        <li>ログの参照には Cloud Logging のログ閲覧権限が必要</li>
+      </ul>
+
+      <div class="step-item">
+        <div class="step-number">1</div>
+        <div class="step-content">
+          <h4>ロギングを組み込んだ Python UDF を作成する</h4>
+          <div class="code-block">
+            <div class="code-header">
+              <span class="code-lang">SQL</span>
+              <span class="code-title">例外を捕捉して logging で記録する UDF</span>
+            </div>
+            <pre><code class="language-sql">CREATE OR REPLACE FUNCTION `PROJECT_ID.DATASET_ID`.extract_user_email(payload STRING)
+RETURNS STRING
+LANGUAGE python
+OPTIONS (entry_point='parse_email', runtime_version='python-3.11')
+AS r"""
+import json
+import logging
+
+def parse_email(payload):
+  try:
+    data = json.loads(payload)
+    return data.get('email')
+  except Exception as e:
+    # 問題のあるデータとエラーを Cloud Logging に記録
+    logging.info(f"Failed to parse payload: '{payload}'. Error: {e}")
+    # None (BigQuery では NULL) を返してクエリの失敗を防ぐ
+    return None
+""";</code></pre>
+          </div>
+          <p style="font-size: 14px;">UDF 内で例外を捕捉して <code>logging</code> で記録することで、クエリを失敗させずに不正な入力データを特定できます。</p>
+        </div>
+      </div>
+
+      <div class="step-item">
+        <div class="step-number">2</div>
+        <div class="step-content">
+          <h4>ロギングを有効化してクエリを実行する</h4>
+          <div class="code-block">
+            <div class="code-header">
+              <span class="code-lang">SQL</span>
+              <span class="code-title">ロギング有効化 + UDF 呼び出し</span>
+            </div>
+            <pre><code class="language-sql">SET @@udf.properties = JSON '{"enableDebugOutput": true}';
+
+SELECT `PROJECT_ID.DATASET_ID`.extract_user_email(raw_data) AS email
+FROM UNNEST([
+  '{"email": "cloudysanfrancisco@gmail.com", "event": "click"}',
+  'corrupted_payload_string',
+  '{"email": "baklavainthebalkans@gmail.com", "event": "view"}'
+]) AS raw_data;</code></pre>
+          </div>
+          <p style="font-size: 14px;">不正な行に対しては NULL が返され、クエリは正常に完了します。不正データの内容はログとして Cloud Logging に送信されます。</p>
+        </div>
+      </div>
+
+      <div class="step-item">
+        <div class="step-number">3</div>
+        <div class="step-content">
+          <h4>Logs Explorer でログを確認する</h4>
+          <div class="flow-diagram" style="display: flex; align-items: center; justify-content: flex-start; gap: 12px; flex-wrap: wrap; margin: 12px 0;">
+            <div style="background: var(--gc-surface); border: 2px solid var(--gc-blue-600); border-radius: 12px; padding: 10px 16px; text-align: center; font-size: 13px; color: var(--gc-on-surface);">📊 「ジョブ情報」<br>タブをクリック</div>
+            <span style="color: var(--gc-blue-600); font-size: 22px; font-weight: bold;">→</span>
+            <div style="background: var(--gc-surface); border: 2px solid var(--gc-blue-600); border-radius: 12px; padding: 10px 16px; text-align: center; font-size: 13px; color: var(--gc-on-surface);">🔗 「ログ」フィールドの<br>リンクをクリック</div>
+            <span style="color: var(--gc-blue-600); font-size: 22px; font-weight: bold;">→</span>
+            <div style="background: var(--gc-surface); border: 2px solid var(--gc-blue-600); border-radius: 12px; padding: 10px 16px; text-align: center; font-size: 13px; color: var(--gc-on-surface);">🔎 クエリ事前入力済みの<br>Logs Explorer が開く</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>👍 メリット</h2>
+      <div class="merit-grid">
+        <div class="merit-col">
+          <h3>💼 ビジネス面</h3>
+          <ul>
+            <li><strong>データ品質問題の迅速な解決</strong>: パースに失敗した不正データをログから特定でき、上流データソースの品質改善サイクルを短縮</li>
+            <li><strong>本番パイプラインの安定運用</strong>: 例外処理とロギングの組み合わせで、クエリを失敗させずに問題を記録・監視でき、パイプラインの信頼性が向上</li>
+          </ul>
+        </div>
+        <div class="merit-col">
+          <h3>⚙️ 技術面</h3>
+          <ul>
+            <li><strong>標準的なデバッグ体験</strong>: Python 標準の <code>logging</code> ライブラリをそのまま使え、既存の Python 開発の知見を活用可能</li>
+            <li><strong>ジョブ・ルーティン単位のトレーサビリティ</strong>: <code>query_job_id</code> や <code>routine_id</code> ラベルで特定のクエリ実行に紐づくログだけを正確に抽出</li>
+            <li><strong>観測性の統合</strong>: Cloud Monitoring のメトリクス (CPU / メモリ使用率、同時リクエスト数) とログを組み合わせた総合的なトラブルシューティング</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <h3>🚫 制限事項</h3>
+      <div class="error-box">
+        <ul style="margin: 0; padding-left: 20px;">
+          <li>ロギングは<strong>デフォルトで無効</strong>。セッションごとに <code>SET @@udf.properties</code> で有効化が必要</li>
+          <li><strong><code>print()</code> 関数はサポートされない</strong> (<code>logging</code> ライブラリの関数を使用する)</li>
+          <li>Python UDF 自体の制限が適用される: サポートされるランタイムは <code>python-3.11</code> のみ、一時 UDF の作成不可、マテリアライズドビューでの使用不可、<code>JSON</code> / <code>RANGE</code> / <code>INTERVAL</code> / <code>GEOGRAPHY</code> 型は非サポートなど</li>
+        </ul>
+      </div>
+      <h3>🤔 考慮すべき点</h3>
+      <div class="warning-box">
+        <strong>🔒 機密データのロギングに注意:</strong> ログの閲覧権限を持つユーザーは、BigQuery の元データへのアクセス権がなくてもログに記録されたデータをすべて閲覧できます。機密情報の出力は避けてください。
+      </div>
+      <div class="warning-box">
+        <strong>💰 コスト管理:</strong> ログは Cloud Logging に保存され、Google Cloud Observability の料金が適用されます。ベストプラクティスとして、ロギングは例外・データ異常・特定のデバッグ期間に限定することが推奨されています。
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+      <div class="usecase">
+        <h3>🧹 ユースケース 1: 不正データの特定とクエリ失敗の防止</h3>
+        <p><strong>シナリオ:</strong> JSON 文字列のカラムから特定フィールドを抽出する Python UDF を大規模テーブルに適用しているが、一部の行に破損したデータが含まれており、クエリ全体が失敗してしまう。</p>
+        <p><strong>実装例:</strong> UDF 内で例外を捕捉して <code>logging.info</code> で問題のペイロードを記録し、<code>None</code> を返す (上記「設定方法」のコード例を参照)。</p>
+        <p><strong>効果:</strong> クエリは NULL を返しつつ正常に完了し、破損データの内容は Cloud Logging から特定できる。パイプラインを止めずにデータ品質の問題を追跡できる。</p>
+      </div>
+      <div class="usecase">
+        <h3>🌐 ユースケース 2: 外部 API 連携 UDF のデバッグ</h3>
+        <p><strong>シナリオ:</strong> Cloud リソース接続を使って外部サービスにアクセスする Python UDF で、断続的なエラーが発生している。どのリクエストで問題が起きているかを特定したい。</p>
+        <p><strong>効果:</strong> <code>logging.error</code> でエラー詳細を記録し、<code>query_job_id</code> ラベルで該当ジョブのログのみを抽出することで、リソースメトリクスだけでは分からないコードレベルの原因を特定できる。</p>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p style="font-size: 14px;">Python UDF から Cloud Logging に記録されたログデータには <a href="https://cloud.google.com/products/observability/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Google Cloud Observability の料金</a> が適用されます。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>料金</th>
+            <th>無料枠 (月あたり)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Logging ストレージ (取り込み)</td>
+            <td>$0.50/GiB (30 日間の保存を含む)</td>
+            <td>プロジェクトあたり 50 GiB</td>
+          </tr>
+          <tr>
+            <td>Logging 保持 (30 日超)</td>
+            <td>$0.01/GiB/月</td>
+            <td>デフォルト保持期間内は無料</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="success-box">
+        <strong>💡 コスト抑制のヒント:</strong> ロギングを例外や特定のデバッグ期間に限定することで、コストを抑制できます。
+      </div>
+    </div>
+
+    <!-- 関連サービス・機能 -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="related-grid">
+        <div class="related-card">
+          <h4>📋 Cloud Logging / Logs Explorer</h4>
+          <p>本機能のログ出力先。ラベルフィルタリングとリアルタイム表示に対応。</p>
+        </div>
+        <div class="related-card">
+          <h4>📈 Cloud Monitoring</h4>
+          <p>Python UDF は <code>ManagedRoutineInvocation</code> リソースにメトリクス (CPU 使用率、メモリ使用率、最大同時リクエスト数) をエクスポート。「BigQuery Managed Routine Query Monitoring」ダッシュボードも利用可能。</p>
+        </div>
+        <div class="related-card">
+          <h4>🔌 BigQuery Cloud リソース接続</h4>
+          <p>Python UDF から外部サービスにアクセスする際に使用。外部連携 UDF のデバッグに本機能が有効。</p>
+        </div>
+        <div class="related-card">
+          <h4>📜 BigQuery SQL / JavaScript UDF</h4>
+          <p>Python UDF の代替となる UDF 実装方式。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="success-box">
+        <p style="margin: 0 0 8px 0;">BigQuery Python UDF のリアルタイムロギングが <strong>GA</strong> となり、これまでブラックボックスになりがちだった UDF 内部の挙動を <span class="highlight">Cloud Logging で直接確認</span>できるようになりました。</p>
+        <p style="margin: 0 0 8px 0;">例外処理とロギングを組み合わせることで、<strong>クエリを失敗させずに不正データを特定する堅牢なパイプライン設計</strong>が可能になります。</p>
+        <p style="margin: 0;">Python UDF を本番運用しているチームは、機密データをログに出力しないよう注意しつつ、デバッグワークフローへの組み込みを検討することをおすすめします。</p>
+      </div>
+      <div class="tag-list">
+        <span class="tag">#BigQuery</span>
+        <span class="tag">#Python UDF</span>
+        <span class="tag">#Cloud Logging</span>
+        <span class="tag">#デバッグ</span>
+        <span class="tag">#オブザーバビリティ</span>
+        <span class="tag">#GA</span>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p><strong>📎 出典:</strong></p>
+      <ul class="link-list" style="font-size: 12px;">
+        <li><a href="https://docs.cloud.google.com/release-notes#August_26_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026-08-26)</a></li>
+        <li><a href="https://docs.cloud.google.com/bigquery/docs/user-defined-functions-python" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: Python でユーザー定義関数を操作する</a></li>
+        <li><a href="https://cloud.google.com/products/observability/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">料金ページ (Google Cloud Observability)</a></li>
+      </ul>
+      <p>本インフォグラフィックは Google Cloud News レポート (2026-08-26) を基に生成されました。</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

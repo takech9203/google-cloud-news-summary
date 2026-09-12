@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GKE: Cloud Storage FUSE CSI ドライバーのマウント遅延バグ修正</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--gc-outline);
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-fixed {
+      background: var(--gc-green);
+      color: #FFFFFF;
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-red {
+      border-left-color: var(--gc-red);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 600px) {
+      .before-after { grid-template-columns: 1fr; }
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .before-box strong, .after-box strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .before-box strong { color: var(--gc-red); }
+    .after-box strong { color: var(--gc-green); }
+
+    .before-box ul, .after-box ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 6px 0;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.green {
+      background: linear-gradient(135deg, var(--gc-green), #1B7A3D);
+    }
+
+    .stat-card.red {
+      background: linear-gradient(135deg, var(--gc-red), #C62828);
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 13px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-800);
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .usecase-card p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre:not(.mermaid) code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid) {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .related-services {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .related-service-card {
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 8px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .related-service-card .service-icon {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+
+    .related-service-card .service-name {
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+
+    .related-service-card .service-desc {
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    footer ul {
+      list-style: none;
+      padding: 0;
+      margin: 8px 0;
+    }
+
+    footer li {
+      margin: 4px 0;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .header { flex-direction: column; }
+      .subtitle { text-align: left; margin-top: 8px; }
+      .stat-grid { grid-template-columns: 1fr; }
+      .related-services { grid-template-columns: 1fr; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>&#9881;&#65039; GKE: Cloud Storage FUSE CSI ドライバーのマウント遅延バグ修正</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Google Kubernetes Engine</span>
+          <span class="badge">Cloud Storage FUSE</span>
+          <span class="badge-fixed">Fixed</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-04-29</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>&#128203; 概要</h2>
+      <p>GKE の Cloud Storage FUSE CSI ドライバーにおいて、Cloud Storage バケットのマウント時に<span class="highlight">数時間規模の大幅な遅延</span>が発生する重大なバグが修正されました。この問題は、数百万の空フォルダを含むバケットをマウントする際に顕著に発生し、<code>CreateContainer</code> エラー ("failed to reserve container name") として表面化していました。</p>
+
+      <div class="note-box">
+        <strong>&#128161; 修正の要点:</strong> CSI ドライバーサイドカーのバケットアクセスチェックで使用される API メソッドを <code>ListObjects</code> から <code>GetStorageLayout</code> に置き換えることで、チェック処理をほぼ瞬時に完了させるようになりました。
+      </div>
+
+      <!-- Stats -->
+      <div class="stat-grid">
+        <div class="stat-card red">
+          <div class="stat-value">&#8987; 数時間</div>
+          <div class="stat-label">修正前のマウント遅延</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-value">&#9889; 瞬時</div>
+          <div class="stat-label">修正後のチェック完了時間</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">2分</div>
+          <div class="stat-label">kubelet タイムアウト閾値</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>&#128260; Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <strong>&#10060; Before (修正前)</strong>
+          <ul>
+            <li><code>ListObjects</code> API でバケットアクセスチェック</li>
+            <li>数百万の空フォルダで完了まで数時間</li>
+            <li>kubelet の 2 分タイムアウト超過</li>
+            <li>「failed to reserve container name」エラー頻発</li>
+            <li>ワークロード起動の大幅な遅延</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <strong>&#9989; After (修正後)</strong>
+          <ul>
+            <li><code>GetStorageLayout</code> API に置き換え</li>
+            <li>バケットサイズに依存せずほぼ瞬時に完了</li>
+            <li>kubelet タイムアウト内に確実完了</li>
+            <li>CreateContainer エラーが発生しない</li>
+            <li>ワークロードが即座に起動</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>&#128209; アーキテクチャ図</h2>
+      <p>修正前後の処理フローの比較。修正前は <code>ListObjects</code> が大規模バケットで長時間ブロックされ、修正後は <code>GetStorageLayout</code> により即座にバケットアクセスが検証されます。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+sequenceDiagram
+    participant Pod as Pod
+    participant Kubelet as Kubelet
+    participant CSI as CSI Driver Sidecar
+    participant GCS as Cloud Storage API
+
+    Note over Pod, GCS: 修正前 (ListObjects)
+    Pod->>Kubelet: コンテナ作成要求
+    Kubelet->>CSI: マウント要求
+    CSI->>GCS: ListObjects (バケットアクセスチェック)
+    Note right of GCS: 数百万の空フォルダ - 数時間かかる場合あり
+    Kubelet--xCSI: 2分タイムアウト超過
+    Kubelet->>Kubelet: キャンセル and リトライ
+    Note over Kubelet: failed to reserve container name エラー
+
+    Note over Pod, GCS: 修正後 (GetStorageLayout)
+    Pod->>Kubelet: コンテナ作成要求
+    Kubelet->>CSI: マウント要求
+    CSI->>GCS: GetStorageLayout (バケットアクセスチェック)
+    GCS-->>CSI: 即座にレスポンス
+    CSI-->>Kubelet: マウント完了
+    Kubelet-->>Pod: コンテナ起動成功
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>&#128273; 主要機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h3>&#128295; バケットアクセスチェックの API 変更</h3>
+          <p>CSI ドライバーサイドカーが実行するバケットアクセスチェックのバックエンド API を <code>ListObjects</code> から <code>GetStorageLayout</code> に変更。<code>GetStorageLayout</code> はバケットのメタデータのみを返すため、バケット内のオブジェクト数に関係なくほぼ一定時間で完了します。バケットへの読み取りアクセス権の検証という本来の目的は維持されています。</p>
+        </div>
+        <div class="card card-green">
+          <h3>&#9989; 自己修復動作の解消</h3>
+          <p><strong>修正前:</strong> エラーは「自己修復」するが、根本原因であるマウント操作完了まで待機が必要でした。<br><strong>修正後:</strong> タイムアウトに達する前にマウントが完了するため、エラー自体が発生しなくなりました。</p>
+        </div>
+        <div class="card card-orange">
+          <h3>&#128736;&#65039; GKE 1.33 向け緩和策の提供</h3>
+          <p>バージョン 1.33.5-gke.2435000 以降では、<code>skipCSIBucketAccessCheck: 'true'</code> ボリューム属性を設定することでチェック自体をバイパス可能。これは修正パッチが提供されない 1.33 系向けの暫定的な緩和策です。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specs -->
+    <div class="section">
+      <h2>&#128202; 技術仕様</h2>
+
+      <h3>影響を受けるバージョンと修正バージョン</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>GKE バージョン系列</th>
+            <th>影響を受けるバージョン</th>
+            <th>修正・緩和バージョン</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>1.35</strong></td>
+            <td>1.35.2-gke.1691000 より前</td>
+            <td>1.35.2-gke.1691000 以降</td>
+          </tr>
+          <tr>
+            <td><strong>1.34</strong></td>
+            <td>1.34.6-gke.1154000 より前</td>
+            <td>1.34.6-gke.1154000 以降</td>
+          </tr>
+          <tr>
+            <td><strong>1.33</strong></td>
+            <td>全バージョン (修正なし)</td>
+            <td>1.33.5-gke.2435000 以降で緩和策あり</td>
+          </tr>
+          <tr>
+            <td><strong>1.33 (旧)</strong></td>
+            <td>1.33.5-gke.2435000 より前</td>
+            <td>修正・緩和策なし</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>根本原因の技術詳細</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>問題の API</strong></td>
+            <td><code>ListObjects</code> - バケット内の全オブジェクトを列挙</td>
+          </tr>
+          <tr>
+            <td><strong>修正後の API</strong></td>
+            <td><code>GetStorageLayout</code> - バケットメタデータのみ取得</td>
+          </tr>
+          <tr>
+            <td><strong>kubelet タイムアウト</strong></td>
+            <td>2 分 (コンテナ作成リクエスト)</td>
+          </tr>
+          <tr>
+            <td><strong>影響条件</strong></td>
+            <td>数百万の空フォルダを含むバケット</td>
+          </tr>
+          <tr>
+            <td><strong>エラーメッセージ</strong></td>
+            <td><code>CreateContainer</code> - "failed to reserve container name"</td>
+          </tr>
+          <tr>
+            <td><strong>エラーの性質</strong></td>
+            <td>自己修復型 (マウント完了後に解消)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Configuration -->
+    <div class="section">
+      <h2>&#128736;&#65039; 設定方法</h2>
+
+      <h3>ステップ 1: 現在のクラスタバージョンの確認</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud container clusters describe CLUSTER_NAME \
+  --location=LOCATION \
+  --format="value(currentMasterVersion)"</code></pre>
+
+      <h3>ステップ 2: クラスタのアップグレード</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># コントロールプレーンのアップグレード
+gcloud container clusters upgrade CLUSTER_NAME \
+  --location=LOCATION \
+  --master \
+  --cluster-version=1.34.6-gke.1154000
+
+# ノードプールのアップグレード
+gcloud container clusters upgrade CLUSTER_NAME \
+  --location=LOCATION \
+  --node-pool=NODE_POOL_NAME</code></pre>
+
+      <h3>ステップ 3: GKE 1.33 の場合の緩和策適用</h3>
+      <span class="code-label">YAML</span>
+      <pre><code class="language-yaml"># エフェメラルボリュームの場合
+apiVersion: v1
+kind: Pod
+metadata:
+  name: example-pod
+  annotations:
+    gke-gcsfuse/volumes: "true"
+spec:
+  containers:
+  - name: app
+    image: your-image
+    volumeMounts:
+    - name: gcs-volume
+      mountPath: /data
+  volumes:
+  - name: gcs-volume
+    csi:
+      driver: gcsfuse.csi.storage.gke.io
+      volumeAttributes:
+        bucketName: "your-bucket-name"
+        skipCSIBucketAccessCheck: "true"</code></pre>
+
+      <div class="warning-box">
+        <strong>&#9888;&#65039; 注意:</strong> <code>skipCSIBucketAccessCheck: "true"</code> を使用すると、CSI レベルでのアクセス権事前検証がスキップされます。Cloud Storage FUSE プロセスがバケットアクセス制御を直接処理します。
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>&#9989; メリット</h2>
+      <div class="before-after">
+        <div style="background: var(--gc-blue-tint); border-radius: 12px; padding: 20px; border: 1px solid var(--gc-blue-200);">
+          <h3 style="color: var(--gc-blue-800); margin-top: 0;">&#128188; ビジネス面</h3>
+          <div class="icon-text"><span>&#8594;</span><span><strong>ワークロード起動時間の大幅改善</strong>: 大規模バケットを使用するアプリケーションのデプロイ時間が数時間から数秒に短縮</span></div>
+          <div class="icon-text"><span>&#8594;</span><span><strong>サービス信頼性の向上</strong>: マウント遅延に起因するコンテナ起動失敗とリトライループが解消され、SLA 遵守が容易に</span></div>
+        </div>
+        <div style="background: var(--gc-green-tint); border-radius: 12px; padding: 20px; border: 1px solid #A8DAB5;">
+          <h3 style="color: #1B7A3D; margin-top: 0;">&#9881;&#65039; 技術面</h3>
+          <div class="icon-text"><span>&#8594;</span><span><strong>API 効率の改善</strong>: <code>GetStorageLayout</code> はバケットサイズに依存しない一定時間の応答を保証し、スケーラビリティの問題を根本的に解決</span></div>
+          <div class="icon-text"><span>&#8594;</span><span><strong>kubelet タイムアウト競合の解消</strong>: マウント処理が 2 分のタイムアウト内に確実に完了するため、コンテナランタイムの名前予約競合が発生しなくなる</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>&#9888;&#65039; デメリット・制約事項</h2>
+
+      <div class="error-box">
+        <strong>&#128683; 制限事項</strong>
+        <ul style="margin: 8px 0 0; padding-left: 20px; font-size: 14px;">
+          <li>GKE 1.33.5-gke.2435000 より前のバージョンには修正も緩和策も提供されない</li>
+          <li>GKE 1.33 系の場合は完全な修正ではなく、バケットアクセスチェックのバイパスによる緩和策のみ</li>
+          <li><code>skipCSIBucketAccessCheck: "true"</code> を使用すると、CSI レベルでのアクセス権事前検証がスキップされる</li>
+        </ul>
+      </div>
+
+      <div class="warning-box">
+        <strong>&#128161; 考慮すべき点</strong>
+        <ul style="margin: 8px 0 0; padding-left: 20px; font-size: 14px;">
+          <li>アップグレードにはメンテナンスウィンドウの確保が必要</li>
+          <li><code>skipCSIBucketAccessCheck</code> による緩和策は、問題発生時のエラーメッセージが変わる可能性がある (CSI レベルではなく FUSE レベルでのエラーになる)</li>
+          <li>ノードプールの段階的アップグレード中は一部ノードで問題が継続する可能性がある</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>&#127919; ユースケース</h2>
+      <div class="usecase-card">
+        <h4>&#129302; ML/AI トレーニングデータの大規模バケット</h4>
+        <p><strong>シナリオ:</strong> 機械学習トレーニングパイプラインで、数百万のデータファイルとディレクトリ構造を持つ Cloud Storage バケットを GKE 上のトレーニング Pod にマウントしている環境。</p>
+        <p><strong>効果:</strong> 修正前はトレーニングジョブの起動に数時間の遅延が発生していたが、修正後は即座にマウントが完了し、GPU/TPU リソースの無駄な占有を防止できる。</p>
+      </div>
+      <div class="usecase-card">
+        <h4>&#128202; データレイクのバッチ処理</h4>
+        <p><strong>シナリオ:</strong> 日次バッチ処理で大量の空フォルダ (パーティションキー構造など) を含むデータレイクバケットを複数の Pod からマウントする環境。</p>
+        <p><strong>効果:</strong> バッチジョブのスケジュール通りの実行が保証され、下流のパイプラインへの影響が解消される。</p>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#128279; 関連サービス</h2>
+      <div class="related-services">
+        <div class="related-service-card">
+          <div class="service-icon">&#128194;</div>
+          <div class="service-name">Cloud Storage FUSE</div>
+          <div class="service-desc">GKE Pod から Cloud Storage バケットをローカルファイルシステムとしてマウント</div>
+        </div>
+        <div class="related-service-card">
+          <div class="service-icon">&#128268;</div>
+          <div class="service-name">CSI ドライバー</div>
+          <div class="service-desc">Kubernetes CSI を通じて Cloud Storage FUSE を GKE に統合</div>
+        </div>
+        <div class="related-service-card">
+          <div class="service-icon">&#128272;</div>
+          <div class="service-name">Workload Identity Federation</div>
+          <div class="service-desc">CSI ドライバーのバケットアクセス認証に使用する ID 連携</div>
+        </div>
+        <div class="related-service-card">
+          <div class="service-icon">&#128738;&#65039;</div>
+          <div class="service-name">Cloud Storage</div>
+          <div class="service-desc">マウント対象のオブジェクトストレージサービス</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>&#128206; 出典・参考リンク:</strong></p>
+      <ul>
+        <li>&#128214; <a href="https://docs.cloud.google.com/release-notes#April_29_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li>&#128214; <a href="https://docs.cloud.google.com/kubernetes-engine/docs/concepts/cloud-storage-fuse-csi-driver" target="_blank" rel="noopener noreferrer">Cloud Storage FUSE CSI ドライバー概要</a></li>
+        <li>&#128214; <a href="https://docs.cloud.google.com/kubernetes-engine/docs/how-to/cloud-storage-fuse-csi-driver-setup" target="_blank" rel="noopener noreferrer">Cloud Storage FUSE CSI ドライバーのセットアップ</a></li>
+        <li>&#128214; <a href="https://docs.cloud.google.com/kubernetes-engine/docs/reference/cloud-storage-fuse-csi-driver/volume-attr" target="_blank" rel="noopener noreferrer">ボリューム属性リファレンス</a></li>
+        <li>&#128214; <a href="https://docs.cloud.google.com/kubernetes-engine/docs/how-to/cloud-storage-fuse-csi-driver-sidecar" target="_blank" rel="noopener noreferrer">CSI ドライバーサイドカーの構成</a></li>
+        <li>&#128736;&#65039; <a href="https://github.com/GoogleCloudPlatform/gcs-fuse-csi-driver/blob/main/docs/troubleshooting.md" target="_blank" rel="noopener noreferrer">トラブルシューティングガイド (GitHub)</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline); font-size: 11px;">Generated: 2026-04-29 | Google Kubernetes Engine - Cloud Storage FUSE CSI Driver Bug Fix</p>
+    </footer>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

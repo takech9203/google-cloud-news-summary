@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Memorystore for Valkey: セルフマネージド Redis/Valkey からのワークロード移行が GA</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+:root {
+  --gc-blue: #4285F4;
+  --gc-red: #EA4335;
+  --gc-yellow: #FBBC04;
+  --gc-green: #34A853;
+  --gc-blue-900: #174EA6;
+  --gc-blue-800: #185ABC;
+  --gc-blue-700: #1967D2;
+  --gc-blue-600: #1A73E8;
+  --gc-blue-500: #4285F4;
+  --gc-blue-300: #669DF6;
+  --gc-blue-200: #8AB4F8;
+  --gc-blue-100: #AECBFA;
+  --gc-blue-50: #E8F0FE;
+  --gc-on-surface: #202124;
+  --gc-on-surface-variant: #5F6368;
+  --gc-outline: #80868B;
+  --gc-surface: #FFFFFF;
+  --gc-surface-container-lowest: #F8F9FA;
+  --gc-surface-container-low: #F1F3F4;
+  --gc-surface-container: #E8EAED;
+  --gc-outline-variant: #DADCE0;
+  --gc-blue-tint: #E8F0FE;
+  --gc-green-tint: #E6F4EA;
+  --gc-red-tint: #FCE8E6;
+  --gc-yellow-tint: #FEF7E0;
+  --gc-purple-tint: #F3E8FD;
+  --gc-teal-tint: #E0F7FA;
+  --gc-purple: #A142F4;
+  --gc-teal: #00BCD4;
+  --gc-orange: #FF6D00;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background-color: var(--gc-surface);
+  font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+  color: var(--gc-on-surface-variant);
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 20px;
+  margin: 0;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 16px;
+  border-bottom: 3px solid var(--gc-blue-600);
+}
+
+h1, .title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--gc-on-surface);
+  margin: 0;
+  line-height: 1.4;
+}
+
+h2, .section-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 20px 0 8px 0;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: var(--gc-outline);
+}
+
+.section {
+  background: var(--gc-surface-container-low);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid var(--gc-outline-variant);
+}
+
+.highlight {
+  background-color: var(--gc-blue-50);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--gc-blue-800);
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+.card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border-left: 4px solid var(--gc-blue-600);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+}
+
+.card h3 { margin-top: 0; }
+
+.icon-text {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+  color: var(--gc-on-surface-variant);
+}
+
+.arrow { color: var(--gc-blue-600); font-size: 20px; }
+
+.gc-link { color: var(--gc-blue-600); text-decoration: none; }
+.gc-link:hover { color: var(--gc-blue-800); text-decoration: underline; }
+
+.badge,
+.badge-ga,
+.badge-preview,
+.badge-deprecated {
+  display: inline-block;
+  color: #FFFFFF;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+  margin: 4px 8px 4px 0;
+}
+.badge { background: var(--gc-blue-600); }
+.badge-ga { background: var(--gc-green); color: #FFFFFF; }
+.badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+.badge-deprecated { background: var(--gc-red); color: #FFFFFF; }
+
+.flow-diagram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 24px 0;
+}
+
+.flow-step {
+  background: var(--gc-surface);
+  border: 2px solid var(--gc-blue-600);
+  border-radius: 12px;
+  padding: 12px 20px;
+  text-align: center;
+  min-width: 100px;
+  color: var(--gc-on-surface);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+  font-size: 14px;
+}
+
+.flow-arrow {
+  color: var(--gc-blue-600);
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+}
+.check-icon { color: var(--gc-green); font-size: 18px; }
+.cross-icon { color: var(--gc-red); font-size: 18px; }
+
+/* コードブロック (Mermaid の pre を除外) */
+.code-block,
+pre:not(.mermaid) {
+  background: #1E1E1E;
+  border-radius: 8px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: #E8E8E8;
+  margin: 16px 0;
+}
+
+.code-block { padding: 0; overflow: hidden; }
+.code-block pre { margin: 0; padding: 0; overflow-x: auto; }
+.code-block code {
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 16px !important;
+  display: block;
+}
+
+.code-header {
+  background: #2D2D2D;
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+.code-lang { color: #9CDCFE; font-weight: bold; }
+.code-title { color: #AAAAAA; }
+
+pre code { background: none; border: none; font-size: inherit; color: inherit; }
+
+code:not(pre code) {
+  background: var(--gc-surface-container-low);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 0.9em;
+  color: var(--gc-blue-900);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--gc-outline-variant);
+  background: var(--gc-surface);
+}
+
+th {
+  background: var(--gc-blue-50);
+  color: var(--gc-blue-900);
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 2px solid var(--gc-blue-200);
+}
+
+td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--gc-outline-variant);
+  font-size: 14px;
+}
+
+tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+tr:hover { background: var(--gc-blue-50); }
+
+.table-wrap { overflow-x: auto; }
+
+.note-box {
+  background: var(--gc-blue-tint);
+  border-left: 4px solid var(--gc-blue-600);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.warning-box {
+  background: var(--gc-yellow-tint);
+  border-left: 4px solid var(--gc-yellow);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.error-box {
+  background: var(--gc-red-tint);
+  border-left: 4px solid var(--gc-red);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.ai-box {
+  background: var(--gc-purple-tint);
+  border-left: 4px solid var(--gc-purple);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.success-box {
+  background: var(--gc-green-tint);
+  border-left: 4px solid var(--gc-green);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+/* Before/After 比較 */
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+@media (max-width: 768px) {
+  .before-after { grid-template-columns: 1fr; }
+}
+
+.before-panel, .after-panel {
+  border-radius: 12px;
+  padding: 20px;
+}
+.before-panel {
+  background: var(--gc-red-tint);
+  border: 1px solid rgba(234, 67, 53, 0.3);
+}
+.after-panel {
+  background: var(--gc-green-tint);
+  border: 1px solid rgba(52, 168, 83, 0.3);
+}
+.before-panel h3, .after-panel h3 { margin-top: 0; }
+.before-panel h3 { color: var(--gc-red); }
+.after-panel h3 { color: var(--gc-green); }
+.before-panel ul, .after-panel ul { margin: 0; padding-left: 4px; list-style: none; }
+.before-panel li, .after-panel li {
+  margin: 8px 0;
+  font-size: 14px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+/* 統計カード */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin: 16px 0;
+}
+.stat-card {
+  background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+  color: var(--gc-surface);
+  border-radius: 12px;
+  padding: 24px 16px;
+  text-align: center;
+}
+.stat-value { font-size: 32px; font-weight: 700; margin-bottom: 4px; }
+.stat-label { font-size: 13px; opacity: 0.9; }
+
+/* Mermaid コンテナ */
+.mermaid-container {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 20px 0;
+  border: 2px solid rgba(66, 133, 244, 0.3);
+  overflow-x: auto;
+}
+.mermaid { display: flex; justify-content: center; }
+
+/* ユースケース */
+.usecase {
+  background: var(--gc-blue-tint);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border: 1px solid var(--gc-blue-100);
+}
+.usecase h3 { margin-top: 0; color: var(--gc-blue-800); }
+
+/* ステップリスト */
+.step-list { counter-reset: step; list-style: none; padding: 0; margin: 16px 0; }
+.step-list li {
+  counter-increment: step;
+  position: relative;
+  padding: 8px 0 8px 44px;
+  margin: 4px 0;
+}
+.step-list li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 8px;
+  width: 28px;
+  height: 28px;
+  background: var(--gc-blue-600);
+  color: #FFFFFF;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+ul { padding-left: 22px; }
+li { margin: 6px 0; }
+
+.link-list { list-style: none; padding: 0; }
+.link-list li { margin: 8px 0; word-break: break-all; }
+
+footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gc-outline-variant);
+  font-size: 12px;
+  color: var(--gc-outline);
+}
+footer a { word-break: break-all; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ヘッダー -->
+  <div class="header">
+    <div>
+      <div style="margin-bottom: 8px;">
+        <span class="badge">Memorystore for Valkey</span>
+        <span class="badge badge-ga">GA (一般提供)</span>
+      </div>
+      <h1>🗄️ セルフマネージド Redis / Valkey からの<br>ワークロード移行が GA</h1>
+    </div>
+    <div class="subtitle">📅 リリース日: 2026-08-13</div>
+  </div>
+
+  <!-- 概要 -->
+  <div class="section">
+    <h2>📋 概要</h2>
+    <p>
+      Google Cloud 上で自己管理している <span class="highlight">Redis / Valkey インスタンス</span>から、フルマネージドの
+      <span class="highlight">Memorystore for Valkey</span> へワークロードを移行する機能が
+      <span class="highlight">GA (一般提供)</span> になりました。2026 年 4 月 16 日の Preview 提供開始を経て、
+      本番環境の移行プロジェクトに正式なサポートと SLA のもとで適用できます。
+    </p>
+    <p>
+      Private Service Connect の<strong>ネットワークアタッチメント</strong>を介してターゲットの Memorystore for Valkey インスタンスがソースへ接続し、
+      ターゲットを<strong>リードレプリカ</strong>として動作させることでデータを継続的にレプリケーション。
+      カットオーバーのタイミングを利用者が制御できるため、<strong>ダウンタイムを最小限</strong>に抑えた移行が可能です。
+    </p>
+
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-value">99.99%</div>
+        <div class="stat-label">移行後に適用される SLA</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">250</div>
+        <div class="stat-label">最大シャード数 (無停止スケール)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">ニアゼロ</div>
+        <div class="stat-label">レプリケーション方式によるダウンタイム</div>
+      </div>
+    </div>
+
+    <div class="before-after">
+      <div class="before-panel">
+        <h3>❌ Before (アップデート前の課題)</h3>
+        <ul>
+          <li><span class="cross-icon">✗</span><span>移行機能は Preview 段階 (Pre-GA Offerings Terms 適用) で、本番移行に採用しづらい</span></li>
+          <li><span class="cross-icon">✗</span><span>OS パッチ適用・監視・バックアップスクリプト・レプリケーション管理を自社で運用</span></li>
+          <li><span class="cross-icon">✗</span><span>複雑なネットワークルールを手動構成、IAM ベースの粒度の細かいアクセス制御が使えない</span></li>
+          <li><span class="cross-icon">✗</span><span>サイロ化したインスタンスの統合や古いバージョンのアップグレードは個別作業が必要</span></li>
+        </ul>
+      </div>
+      <div class="after-panel">
+        <h3>✅ After (アップデート後の改善)</h3>
+        <ul>
+          <li><span class="check-icon">✓</span><span>自動移行が GA となり、本番ワークロードの移行に正式に利用可能</span></li>
+          <li><span class="check-icon">✓</span><span>レプリケーションベースの移行でカットオーバー時のダウンタイムを最小化</span></li>
+          <li><span class="check-icon">✓</span><span>移行と同時に Valkey 7.2 / 8.0 / 9.0 / 9.1 (Preview) へアップグレード可能</span></li>
+          <li><span class="check-icon">✓</span><span>99.99% SLA、自動フェイルオーバー、組み込みバックアップ、VPC ネイティブセキュリティ、最大 250 シャード</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- アーキテクチャ図 -->
+  <div class="section">
+    <h2>🏗️ アーキテクチャ図</h2>
+    <div class="mermaid-container">
+      <pre class="mermaid">
+flowchart LR
+    subgraph Consumer["🏠 コンシューマー VPC (お客様環境)"]
+        Src[("🗄️ セルフマネージド<br/>Redis / Valkey<br/>(ソース)")]
+        Subnet["🔌 サブネット<br/>(N+1 IP 必要)"]
+        NA["🔗 ネットワーク<br/>アタッチメント"]
+        Subnet --- NA
+    end
+
+    subgraph Producer["☁️ プロデューサー VPC (Google 管理)"]
+        Tgt[("🗄️ Memorystore for Valkey<br/>(ターゲット)")]
+    end
+
+    App(["📱 アプリケーション"])
+
+    Tgt -->|"① 接続開始<br/>(PSYNC)"| NA
+    NA -->|"② source-ip:port"| Src
+    Src -.->|"③ 継続レプリケーション"| Tgt
+
+    App -->|"④ カットオーバー前"| Src
+    App -->|"⑤ finish-migration 後"| Tgt
+
+    Mon["📊 Cloud Monitoring<br/>Node migration status"] -.->|HEALTHY 監視| Tgt
+      </pre>
+    </div>
+    <p>
+      ターゲットの Memorystore for Valkey インスタンスがネットワークアタッチメント経由でソースインスタンスへ接続し、
+      リードレプリカとしてデータを継続的に取り込みます。<code>Node migration status</code> メトリクスが
+      <code>HEALTHY</code> であることを確認した上で移行を完了 (finish) し、アプリケーションのトラフィックをターゲットへ切り替えます。
+    </p>
+  </div>
+
+  <!-- 主要機能 -->
+  <div class="section">
+    <h2>⚡ 主要機能</h2>
+
+    <div class="card">
+      <h3>🔄 1. レプリケーションベースの自動データ移行</h3>
+      <p>移行を開始すると、ターゲットがソースとのレプリケーションを確立し、ソースへの書き込みが自動的に複製されます。ターゲットはソースの<strong>リードレプリカ</strong>として動作 (移行中は書き込み不可)。ソースの IP アドレスとポートを指定すると、トポロジ内の他のノードを<strong>自動検出</strong>します。</p>
+    </div>
+
+    <div class="card">
+      <h3>🔗 2. ネットワークアタッチメントによる VPC 間接続</h3>
+      <p>プロデューサー VPC 上のターゲットから、コンシューマー VPC 上のソースへの接続をネットワークアタッチメントで確立。ターゲットノードからの接続は、アタッチメントに紐づく<strong>サブネットの IP アドレス</strong>から発信されます。</p>
+    </div>
+
+    <div class="card">
+      <h3>🎛️ 3. カットオーバーの制御と自動ロールバック</h3>
+      <p>移行完了 (finish) のタイミングを利用者が制御でき、完了後にターゲットが読み書き可能になります。完了方法は <code>Standard</code> (全データ複製を保証) と <code>Force (Skip-sync)</code> (即時カットオーバー) の 2 種類。レプリケーションが確立できない場合は移行が失敗し、ターゲットは移行開始前の状態 (<code>ACTIVE</code> / 読み書き可能) に<strong>自動ロールバック</strong>されます。</p>
+    </div>
+
+    <div class="card">
+      <h3>📊 4. Cloud Monitoring による移行状況の可視化</h3>
+      <p>各プライマリノードの <code>Node migration status</code> メトリクスで健全性を確認。ソース側では client output buffer の使用量が低いことを確認し、レプリケーション遅延が小さいことを判断できます。</p>
+    </div>
+
+    <div class="card">
+      <h3>⬆️ 5. 移行と同時のバージョンアップグレードとインスタンス統合</h3>
+      <p>移行の一環として、古い Redis / Valkey バージョンから最新のサポート対象リリースへ自動アップグレード。サイロ化した複数のセルフマネージドインスタンスを 1 つの高性能なデプロイメントへ<strong>統合</strong>できます。</p>
+    </div>
+  </div>
+
+  <!-- 技術仕様 -->
+  <div class="section">
+    <h2>🔧 技術仕様</h2>
+
+    <h3>📌 サポートされるバージョン</h3>
+    <div class="table-wrap">
+      <table>
+        <tr><th>ソースの種類</th><th>ソースのバージョン</th><th>移行先 (ターゲット) のバージョン</th></tr>
+        <tr><td>Redis</td><td>3.2.x - 7.2.x</td><td>Valkey 7.2、8.0、9.0、9.1 (Preview)</td></tr>
+        <tr><td>Valkey</td><td>7.x、8.x、9.x</td><td>Valkey 7.2、8.0、9.0、9.1 (Preview)</td></tr>
+      </table>
+    </div>
+    <div class="note-box">
+      <strong>💡 ポイント:</strong> ターゲットのバージョンはソースと同じか、それ以降が必須。<strong>ダウングレードは不可</strong>です。
+    </div>
+
+    <h3>🎯 ターゲットインスタンスの要件</h3>
+    <div class="table-wrap">
+      <table>
+        <tr><th>項目</th><th>要件</th></tr>
+        <tr><td>プロジェクト / リージョン</td><td>ソースインスタンスと<strong>同一のプロジェクトかつ同一リージョン</strong></td></tr>
+        <tr><td>クラスタモード</td><td>ソースのクラスタモードと一致 (Cluster Mode Disabled / Enabled)</td></tr>
+        <tr><td>論理データベース数</td><td>Cluster Mode Disabled の場合、ソースと同じか、それ以上</td></tr>
+        <tr><td>シャード数</td><td>Cluster Mode Enabled の場合、ソースと<strong>完全に一致</strong> (レプリカ数は異なってよい)</td></tr>
+        <tr><td>メンテナンスバージョン</td><td><code>MEMORYSTORE_20260313_01_00</code> 以降</td></tr>
+        <tr><td>ノードタイプ</td><td>ソースから受け取るデータを保持できる十分なキースペース容量</td></tr>
+        <tr><td>除外条件</td><td>クロスリージョンレプリケーションのインスタンスはターゲット不可</td></tr>
+      </table>
+    </div>
+
+    <h3>🔗 ネットワークアタッチメントの要件</h3>
+    <div class="table-wrap">
+      <table>
+        <tr><th>項目</th><th>要件</th></tr>
+        <tr><td>配置</td><td>ターゲットインスタンスと同一のプロジェクトかつ同一リージョン</td></tr>
+        <tr><td>サブネット</td><td>ソースインスタンスと同一の VPC ネットワーク内</td></tr>
+        <tr><td>IP CIDR 範囲</td><td>最低 <strong>N+1 個</strong>の使用可能な IP アドレス (N = ターゲットのノード数)</td></tr>
+        <tr><td>予約範囲との重複</td><td><code>10.0.0.0/23</code> と重複不可 (Memorystore for Valkey の予約範囲)</td></tr>
+      </table>
+    </div>
+    <div class="note-box">
+      <strong>💡 例:</strong> ターゲットが 3 シャード + レプリカ 1 の場合、ノード数は 6 (プライマリ 3 + レプリカ 3) となるため、少なくとも <strong>7 個の IP アドレス</strong>が必要です。
+    </div>
+
+    <h3>💾 ノードタイプのキースペース容量 (ターゲットのサイジング参考)</h3>
+    <div class="table-wrap">
+      <table>
+        <tr><th>ノードタイプ</th><th>書き込み可能キースペース容量</th><th>ノード総容量</th><th>vCPU</th></tr>
+        <tr><td>shared-core-nano</td><td>1.12 GB</td><td>1.4 GB</td><td>0.5 (SLA 対象外)</td></tr>
+        <tr><td>custom-pico</td><td>1.08 GB</td><td>1.25 GB</td><td>2</td></tr>
+        <tr><td>custom-micro</td><td>2 GB</td><td>2.5 GB</td><td>2</td></tr>
+        <tr><td>custom-mini</td><td>3 GB</td><td>3.75 GB</td><td>2</td></tr>
+        <tr><td>standard-small</td><td>5.2 GB</td><td>6.5 GB</td><td>2</td></tr>
+        <tr><td>highmem-medium</td><td>10.4 GB</td><td>13 GB</td><td>2</td></tr>
+        <tr><td>highcpu-medium</td><td>10.4 GB</td><td>13 GB</td><td>8</td></tr>
+        <tr><td>standard-large</td><td>20.8 GB</td><td>26 GB</td><td>8</td></tr>
+        <tr><td>highmem-xlarge</td><td>46.4 GB</td><td>58 GB</td><td>8</td></tr>
+        <tr><td>highmem-2xlarge</td><td>88 GB</td><td>110 GB</td><td>16</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- 設定方法 -->
+  <div class="section">
+    <h2>🛠️ 設定方法</h2>
+
+    <h3>✅ 前提条件</h3>
+    <ul>
+      <li><span class="check-icon">✓</span> Google Cloud プロジェクトで課金が有効</li>
+      <li><span class="check-icon">✓</span> gcloud CLI <strong>バージョン 489.0.0 以上</strong>がインストール・初期化済み</li>
+      <li><span class="check-icon">✓</span> API の有効化: Memorystore for Valkey API / Network Connectivity API / Service Consumer Management API / Compute Engine API</li>
+      <li><span class="check-icon">✓</span> IAM ロール: <code>roles/memorystore.admin</code> (移行操作全般)、<code>roles/compute.networkAdmin</code> (ネットワークアタッチメントの作成と参照)</li>
+    </ul>
+
+    <h3>🗺️ 移行ワークフローの全体像</h3>
+    <div class="flow-diagram">
+      <div class="flow-step">🗄️ ①<br>ソースの準備</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">📐 ②③<br>ターゲット要件確定<br>・作成</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">🔗 ④<br>ネットワーク<br>アタッチメント構成</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">🚀 ⑤<br>移行の開始</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">📊 ⑥<br>HEALTHY を監視</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">✅ ⑦<br>移行の完了<br>(カットオーバー)</div>
+    </div>
+
+    <h3>🗄️ ステップ 1: ソースインスタンスの準備</h3>
+    <p><strong>接続を許可する設定:</strong></p>
+    <ul>
+      <li>ソースノードで <code>protected-mode</code> が有効な場合は無効化する</li>
+      <li>明示的な <code>bind</code> ディレクティブがある場合、ターゲットノード (ネットワークアタッチメントのサブネット IP) からの受信接続を許可するよう更新する</li>
+      <li>ターゲットノードからの受信接続をブロックするファイアウォールルールを更新する</li>
+      <li>ソースノードで認証および TLS が有効な場合は無効化する</li>
+    </ul>
+    <p><strong>レプリケーションを確立する設定:</strong></p>
+    <ul>
+      <li>データ変更・レプリケーション用コマンド (<code>PING</code>、<code>PSYNC</code>、<code>HSET</code> など) をリネームしない</li>
+      <li>ACL 使用時は <code>default</code> ユーザーに <code>REPLCONF</code>、<code>SYNC</code>、<code>PSYNC</code>、<code>PING</code>、<code>INFO</code>、<code>CLUSTER|NODES</code> を許可する</li>
+      <li>レプリケーション負荷を処理できる十分なメモリと CPU 容量をソースが備えていることを確認する</li>
+    </ul>
+    <div class="warning-box">
+      <strong>⚠️ 重要:</strong> ソースインスタンスの IP アドレスとポート番号を記録しておくこと。移行プロセス中、Memorystore for Valkey はこの IP アドレスとポートに常に通信できる必要があります。
+    </div>
+
+    <h3>🚀 ステップ 2: 移行の開始</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Bash</span>
+        <span class="code-title">移行の開始</span>
+      </div>
+      <pre><code class="language-bash">gcloud beta memorystore instances start-migration INSTANCE_ID \
+    --project=PROJECT_ID \
+    --location=REGION \
+    --source-ip=SOURCE_IP_ADDRESS \
+    --source-port=SOURCE_PORT \
+    --network-attachment=projects/NETWORK_ATTACHMENT_PROJECT_ID/locations/NETWORK_ATTACHMENT_REGION/networkAttachments/NETWORK_ATTACHMENT_ID</code></pre>
+    </div>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Bash</span>
+        <span class="code-title">ステータス確認 (state が MIGRATING なら開始成功)</span>
+      </div>
+      <pre><code class="language-bash">gcloud memorystore instances describe INSTANCE_ID \
+    --project=PROJECT_ID \
+    --location=REGION_ID</code></pre>
+    </div>
+    <p>コンソールの場合は、ターゲットインスタンスの「Instance at a glance」ページで <strong>Start migration</strong> をクリックし、Prepare → Connect (ソースの IP / ポートとネットワークアタッチメントを指定) → Review の順に進めます。</p>
+    <div class="warning-box">
+      <strong>⚠️ 注意:</strong> 移行を開始した後、移行を完了するまでソースインスタンスで<strong>スロット移行 (slot migration) 操作を実施しない</strong>でください。
+    </div>
+
+    <h3>📊 ステップ 3: 移行の監視</h3>
+    <p>Metrics Explorer で <code>Memorystore Instance Node &gt; Instance &gt; Node migration status</code> を選択し、以下のフィルタを追加します。</p>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Text</span>
+        <span class="code-title">Metrics Explorer のフィルタ</span>
+      </div>
+      <pre><code class="language-text">instance_id = INSTANCE_ID
+role        = primary
+status     != HEALTHY</code></pre>
+    </div>
+    <p>このフィルタで何も表示されなければ、<strong>すべてのノードが健全</strong>であり移行を完了できる状態です。ソース側では client output buffer の使用量が低く保たれていることを確認します。</p>
+
+    <h3>✅ ステップ 4: 移行の完了 (カットオーバー)</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Bash</span>
+        <span class="code-title">移行の完了 (state が MIGRATED になれば完了)</span>
+      </div>
+      <pre><code class="language-bash">gcloud beta memorystore instances finish-migration INSTANCE_ID \
+    --project=PROJECT_ID \
+    --location=REGION</code></pre>
+    </div>
+    <div class="error-box">
+      <strong>🛑 データ損失を避けるには:</strong> データの完全な整合性とデータ損失ゼロを求める場合は、<strong>移行を完了する前にソースへのすべての書き込み操作を停止</strong>してください。完了後にソースへ書き込まれたデータはレプリケーションされない可能性があります。即時カットオーバーが必要な場合は <code>--force</code> (Force / Skip-sync) を使用できますが、全データ複製は保証されません。
+    </div>
+    <p>移行完了後は、アプリケーションの構成ファイルを更新し、すべてのトラフィックをターゲットインスタンスへ向けます。</p>
+  </div>
+
+  <!-- メリット -->
+  <div class="section">
+    <h2>💡 メリット</h2>
+
+    <h3>💼 ビジネス面</h3>
+    <div class="check-item"><span class="check-icon">✓</span><span><strong>運用負荷の解消</strong>: OS パッチ適用・監視・バックアップスクリプト・レプリケーション管理を Google Cloud にオフロードし、アプリケーション開発に注力できる</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span><strong>本番採用の判断が可能</strong>: GA により Pre-GA Offerings Terms の制約がなくなり、正式サポートのもとで本番移行を計画できる</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span><strong>インスタンスの統合</strong>: サイロ化した複数インスタンスを 1 つの高性能デプロイメントに統合し、管理対象を削減</span></div>
+
+    <h3>⚙️ 技術面</h3>
+    <div class="check-item"><span class="check-icon">✓</span><span><strong>エンタープライズグレードの高可用性</strong>: 99.99% SLA、自動フェイルオーバー、組み込みバックアップ/リストアでノード障害保護と迅速な災害復旧</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span><strong>ニアゼロダウンタイムでのスケール</strong>: トラフィックスパイクに合わせて動的にスケールし、最大 250 シャードまで無停止で拡張</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span><strong>セキュリティの強化</strong>: 手動構成のネットワークルールを VPC ネイティブ接続と IAM ベースのアクセス制御に置き換え</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span><strong>バージョンアップグレードの同時実施</strong>: 移行の一環として最新サポート対象リリースへ自動アップグレード</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span><strong>高度な機能の利用</strong>: マイクロ秒レイテンシのキャッシュ/セッション管理、生成 AI 向け Vector Search などを即座に利用可能</span></div>
+  </div>
+
+  <!-- デメリット・制約事項 -->
+  <div class="section">
+    <h2>⚠️ デメリット・制約事項</h2>
+
+    <h3>🚧 制限事項</h3>
+    <div class="check-item"><span class="cross-icon">✗</span><span>ソースとターゲットは<strong>同一プロジェクト・同一リージョン</strong>が必須 (リージョン間移行は非対応)</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span>ターゲットのバージョンはソースと同じか以降 (<strong>ダウングレード不可</strong>)</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span>Cluster Mode Enabled ではターゲットのシャード数をソースと<strong>完全一致</strong>させる必要がある</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span>ターゲットのメンテナンスバージョンは <code>MEMORYSTORE_20260313_01_00</code> 以降が必要</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span>クロスリージョンレプリケーションのインスタンスはターゲット不可</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span>ネットワークアタッチメントのサブネット範囲は <code>10.0.0.0/23</code> と重複不可</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span>ソースで<strong>認証と TLS を無効化</strong>する必要がある (移行期間中のセキュリティ設計に配慮)</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span>データ変更・レプリケーション関連コマンドをリネームしている場合は移行不可</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span>移行開始後、完了までソースでスロット移行操作を実施できない</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span>移行中のターゲットはリードレプリカのため<strong>書き込み不可</strong></span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span><code>start-migration</code> / <code>finish-migration</code> コマンドは <code>beta</code> トラックで提供</span></div>
+
+    <h3>🤔 考慮すべき点</h3>
+    <div class="warning-box">
+      <ul style="margin: 0;">
+        <li><strong>ソースの容量</strong>: レプリケーション負荷が追加されるため、ソースに十分なメモリと CPU の余裕が必要</li>
+        <li><strong>ブロックされたコマンドの確認</strong>: Memorystore for Valkey がブロックするコマンドをソースで使用していないか事前検証</li>
+        <li><strong>完了方式の選択</strong>: データ損失を避けたい場合は「書き込み停止 + <code>Standard</code>」を選択 (<code>Force (Skip-sync)</code> は全データ複製が保証されない)</li>
+        <li><strong>アプリケーション設定の更新</strong>: 移行完了は自動トラフィック切り替えを行わないため、接続先エンドポイントの更新を別途計画</li>
+        <li><strong>移行期間中のコスト</strong>: ソース (セルフマネージド VM / GKE) とターゲットが並行稼働するため、両方のコストが発生</li>
+        <li><strong>TLS 無効化のリスク</strong>: 移行期間中は VPC 内の通信経路とファイアウォールによる保護設計を検討</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ユースケース -->
+  <div class="section">
+    <h2>🎯 ユースケース</h2>
+
+    <div class="usecase">
+      <h3>🖥️ ユースケース 1: Compute Engine 上のセルフマネージド Redis クラスタのモダナイゼーション</h3>
+      <p><strong>シナリオ:</strong> 3 シャード構成の Redis 6.2 クラスタを Compute Engine VM 上で運用しており、OS パッチ適用とレプリカ管理を運用チームが手作業で実施。バックアップは cron によるカスタムスクリプトで取得している。</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">実装例</span>
+        </div>
+        <pre><code class="language-bash"># 1. 同一プロジェクト・同一リージョンにターゲットを作成 (Cluster Mode Enabled、シャード数 3 を一致させる)
+#    ノードタイプは必要なキースペース容量に応じて選択 (例: highmem-medium = 10.4 GB/ノード)
+
+# 2. ソース VPC のサブネットにネットワークアタッチメントを作成 (N+1 個の IP を確保)
+
+# 3. 移行を開始
+gcloud beta memorystore instances start-migration my-valkey-target \
+    --project=my-project \
+    --location=us-central1 \
+    --source-ip=10.128.0.15 \
+    --source-port=6379 \
+    --network-attachment=projects/my-project/locations/us-central1/networkAttachments/valkey-migration-na
+
+# 4. Node migration status が HEALTHY になったら、ソースへの書き込みを停止して完了
+gcloud beta memorystore instances finish-migration my-valkey-target \
+    --project=my-project \
+    --location=us-central1</code></pre>
+      </div>
+      <p><strong>効果:</strong> OS パッチ適用・バックアップスクリプト・レプリケーション管理の運用タスクが不要になり、Redis 6.2 から Valkey の最新サポートバージョンへのアップグレードも移行と同時に完了。99.99% SLA と自動フェイルオーバーが適用される。</p>
+    </div>
+
+    <div class="usecase">
+      <h3>🤖 ユースケース 2: サイロ化した複数インスタンスの統合と生成 AI 基盤への転換</h3>
+      <p><strong>シナリオ:</strong> 部門ごとに個別の VM 上で小規模な Redis / Valkey インスタンスを運用しており、バージョンもまちまちで管理が煩雑。同時に、生成 AI アプリケーション向けのベクトル検索基盤を新規に用意したい。</p>
+      <p><strong>効果:</strong> 各インスタンスを Memorystore for Valkey へ順次移行することで、管理対象を集約しつつバージョンを統一。移行後は <span class="highlight">Vector Search</span> などのマネージド機能をそのまま利用できるため、ベクトル検索基盤を別途構築する必要がなくなる。</p>
+    </div>
+  </div>
+
+  <!-- 料金 -->
+  <div class="section">
+    <h2>💰 料金</h2>
+    <p>
+      移行機能自体の追加料金は公表されていません。コストは移行先の Memorystore for Valkey インスタンスの料金として発生します。
+      料金は <strong>ノードタイプ</strong>、<strong>プロビジョニング容量</strong> (ノード数ベース)、<strong>AOF 永続化設定</strong>、
+      <strong>リージョン</strong>、<strong>レプリカ数</strong>で構成されます。
+    </p>
+    <div class="note-box">
+      <strong>💡 課金の仕組み:</strong> 課金は 1 秒単位で、プロビジョニング容量 (ノード数) に基づきます。インスタンス作成時点から、実際の使用有無に関わらず課金が始まります。
+    </div>
+
+    <h3>💵 ノード単価 (us-central1 / Iowa、1 時間あたり)</h3>
+    <div class="table-wrap">
+      <table>
+        <tr><th>ノードタイプ</th><th>ノード容量</th><th>オンデマンド (USD)</th><th>1 年 CUD (USD)</th><th>3 年 CUD (USD)</th></tr>
+        <tr><td>shared-core-nano</td><td>1.4 GB</td><td>$0.0318</td><td>$0.02544</td><td>$0.01908</td></tr>
+        <tr><td>custom-pico</td><td>1.25 GB</td><td>$0.0308</td><td>-</td><td>-</td></tr>
+        <tr><td>custom-micro</td><td>2.5 GB</td><td>$0.0616</td><td>-</td><td>-</td></tr>
+        <tr><td>custom-mini</td><td>3.75 GB</td><td>$0.0924</td><td>-</td><td>-</td></tr>
+        <tr><td>standard-small</td><td>6.5 GB</td><td>$0.1425</td><td>$0.114</td><td>$0.0855</td></tr>
+        <tr><td>highmem-medium</td><td>13 GB</td><td>$0.1923</td><td>$0.15384</td><td>$0.11538</td></tr>
+        <tr><td>highcpu-medium</td><td>13 GB</td><td>$0.4986</td><td>$0.39888</td><td>$0.29916</td></tr>
+        <tr><td>standard-large</td><td>26 GB</td><td>$0.5698</td><td>$0.45584</td><td>$0.34188</td></tr>
+        <tr><td>highmem-xlarge</td><td>58 GB</td><td>$0.8581</td><td>$0.68648</td><td>$0.51486</td></tr>
+        <tr><td>highmem-2xlarge</td><td>110 GB</td><td>$1.6274</td><td>$1.30192</td><td>$0.97644</td></tr>
+      </table>
+    </div>
+    <p>
+      バックアップストレージは $0.00011111 / GB 時間 (us-central1、オンデマンド)。各バックアップには最低 24 時間分の課金が発生し、インスタンスを削除してもバックアップは自動削除されません。AOF 永続化を使用する場合は、インスタンスの総容量 (GB) に応じた追加料金がかかります。
+    </p>
+    <div class="success-box">
+      <strong>✅ CUD (確約利用割引):</strong> 1 年契約で <strong>20%</strong>、3 年契約で <strong>40%</strong> の削減が可能。ただし <code>custom-pico</code> / <code>custom-micro</code> / <code>custom-mini</code> には CUD が適用されません。
+    </div>
+
+    <h3>🧮 料金例 (us-central1、オンデマンド、730 時間/月)</h3>
+    <div class="table-wrap">
+      <table>
+        <tr><th>構成</th><th>月額料金 (概算)</th></tr>
+        <tr><td>highmem-medium × 3 シャード (レプリカなし = 3 ノード)</td><td>約 $421</td></tr>
+        <tr><td>highmem-medium × 3 シャード + レプリカ 1 (= 6 ノード)</td><td>約 $842</td></tr>
+        <tr><td>standard-large × 5 シャード + レプリカ 1 (= 10 ノード)</td><td>約 $4,160</td></tr>
+      </table>
+    </div>
+    <p>上記はインスタンス料金のみの概算です。移行期間中はソース (セルフマネージド VM / GKE) の費用も並行して発生します。</p>
+  </div>
+
+  <!-- 利用可能リージョン -->
+  <div class="section">
+    <h2>🌍 利用可能リージョン</h2>
+    <p>
+      ソースインスタンスとターゲットインスタンスは<strong>同一プロジェクト・同一リージョン</strong>に配置する必要があります。
+      Memorystore for Valkey がサポートするリージョンは
+      <a href="https://docs.cloud.google.com/memorystore/docs/valkey/locations" target="_blank" rel="noopener noreferrer" class="gc-link">ロケーションのドキュメント</a>
+      を参照してください。
+    </p>
+  </div>
+
+  <!-- 関連サービス -->
+  <div class="section">
+    <h2>🔗 関連サービス・機能</h2>
+    <div class="card">
+      <div class="icon-text"><span class="arrow">→</span><span><strong>Private Service Connect / ネットワークアタッチメント</strong>: ターゲット (プロデューサー VPC) からソース (コンシューマー VPC) への接続経路を提供する必須コンポーネント</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span><strong>Cloud Monitoring</strong>: <code>Node migration status</code> メトリクスによる移行の健全性監視。Metrics Explorer でプライマリノードの状態を確認</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span><strong>Compute Engine / GKE</strong>: セルフマネージド Redis / Valkey の一般的なホスト環境であり、移行元となる</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span><strong>Certificate Authority Service</strong>: 移行完了後、Customer-managed CA モードによる転送中暗号化で利用可能</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span><strong>Memorystore for Valkey バックアップ</strong>: 移行完了後、組み込みのバックアップ/リストア機能でデータ保護を自動化</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span><strong>Vector Search (Memorystore for Valkey)</strong>: 移行後に利用可能となる生成 AI 向け機能</span></div>
+    </div>
+  </div>
+
+  <!-- まとめ -->
+  <div class="section">
+    <h2>📝 まとめ</h2>
+    <div class="success-box">
+      <p style="margin-top: 0;">
+        セルフマネージド Redis / Valkey から Memorystore for Valkey へのワークロード移行が GA となり、
+        <strong>レプリケーションベースのニアゼロダウンタイム移行</strong>を本番環境で正式に採用できるようになりました。
+      </p>
+      <p style="margin-bottom: 0;">
+        Compute Engine や GKE で自己運用している組織は、まずソースの前提条件 (protected-mode / bind / ファイアウォール / 認証・TLS の無効化、ACL でのレプリケーションコマンド許可、ブロック対象コマンドの使用有無) を棚卸しし、
+        シャード数とクラスタモードを一致させたターゲットとネットワークアタッチメントを準備することから着手するのが実践的です。
+        データ損失を避けるには、<code>Node migration status</code> が <code>HEALTHY</code> になったことを確認した上でソースへの書き込みを停止し、
+        <strong><code>Standard</code> 方式で移行を完了</strong>させてください。
+      </p>
+    </div>
+  </div>
+
+  <!-- フッター -->
+  <footer>
+    <p><strong>📎 出典・参考リンク</strong></p>
+    <ul class="link-list">
+      <li>📄 <a href="https://docs.cloud.google.com/release-notes#August_13_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026-08-13)</a></li>
+      <li>📖 <a href="https://docs.cloud.google.com/memorystore/docs/valkey/migrate-workloads" target="_blank" rel="noopener noreferrer" class="gc-link">セルフマネージド Redis / Valkey ワークロードの移行 (ドキュメント)</a></li>
+      <li>📖 <a href="https://docs.cloud.google.com/memorystore/docs/valkey/instance-node-specification" target="_blank" rel="noopener noreferrer" class="gc-link">インスタンスとノードの仕様</a></li>
+      <li>📖 <a href="https://docs.cloud.google.com/vpc/docs/about-network-attachments" target="_blank" rel="noopener noreferrer" class="gc-link">ネットワークアタッチメントについて</a></li>
+      <li>⌨️ <a href="https://docs.cloud.google.com/sdk/gcloud/reference/beta/memorystore/instances/start-migration" target="_blank" rel="noopener noreferrer" class="gc-link">gcloud beta memorystore instances start-migration</a></li>
+      <li>⌨️ <a href="https://docs.cloud.google.com/sdk/gcloud/reference/beta/memorystore/instances/finish-migration" target="_blank" rel="noopener noreferrer" class="gc-link">gcloud beta memorystore instances finish-migration</a></li>
+      <li>📖 <a href="https://docs.cloud.google.com/memorystore/docs/valkey/quotas" target="_blank" rel="noopener noreferrer" class="gc-link">Memorystore for Valkey の割り当てと上限</a></li>
+      <li>💰 <a href="https://cloud.google.com/memorystore/valkey/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">料金ページ</a></li>
+      <li>💰 <a href="https://docs.cloud.google.com/memorystore/docs/valkey/cuds" target="_blank" rel="noopener noreferrer" class="gc-link">確約利用割引 (CUD)</a></li>
+    </ul>
+    <p>🏷️ タグ: Memorystore for Valkey / Valkey / Redis / マイグレーション / GA / ネットワークアタッチメント / Private Service Connect / レプリケーション / Cloud Monitoring / データベースモダナイゼーション</p>
+    <p>本インフォグラフィックは Google Cloud News レポート (2026-08-13) をもとに生成されました。</p>
+  </footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+    mermaid.initialize({
+        startOnLoad: true,
+        theme: 'base',
+        themeVariables: {
+            primaryColor: '#4285F4',
+            primaryTextColor: '#202124',
+            primaryBorderColor: '#4285F4',
+            lineColor: '#4285F4',
+            secondaryColor: '#F1F3F4',
+            tertiaryColor: '#FAFAFA',
+            background: '#FFFFFF',
+            mainBkg: '#E8F0FE',
+            nodeBorder: '#4285F4',
+            clusterBkg: '#E8F0FE',
+            clusterBorder: '#4285F4',
+            edgeLabelBackground: '#FFFFFF',
+            textColor: '#202124'
+        }
+    });
+</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

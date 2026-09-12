@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gemini Enterprise: 新規データストア追加とエージェント個別オブザーバビリティ</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.3;
+    }
+
+    h2, .section-title {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--gc-outline);
+      text-align: right;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .card-teal {
+      border-left-color: var(--gc-teal);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h3, .after-box h3 {
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .before-box ul, .after-box ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin-bottom: 6px;
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .ai-box {
+      background: var(--gc-purple-tint);
+      border-left: 4px solid var(--gc-purple);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.green {
+      background: linear-gradient(135deg, var(--gc-green), #1B8A3A);
+    }
+
+    .stat-card.purple {
+      background: linear-gradient(135deg, var(--gc-purple), #7B1FA2);
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre:not(.mermaid) code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid) {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h3 {
+      color: var(--gc-blue-800);
+      margin-top: 0;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .tag-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    .tag {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-800);
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 12px;
+      font-weight: 500;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .region-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .region-item {
+      background: var(--gc-green-tint);
+      border: 1px solid var(--gc-green);
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+      font-weight: 500;
+      color: var(--gc-on-surface);
+    }
+
+    footer {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    footer ul {
+      list-style: none;
+      padding: 0;
+      margin: 8px 0;
+    }
+
+    footer li {
+      margin: 4px 0;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .header { flex-direction: column; align-items: flex-start; }
+      .subtitle { text-align: left; margin-top: 8px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stat-cards { grid-template-columns: 1fr; }
+      .region-grid { grid-template-columns: 1fr; }
+      .flow-diagram { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>&#x2728; Gemini Enterprise: 新規データストア追加とエージェント個別オブザーバビリティ</h1>
+      <div class="subtitle">
+        <span class="badge badge-preview">Public Preview</span><br>
+        2026-06-15 | Gemini Enterprise
+      </div>
+    </div>
+
+    <!-- Statistics -->
+    <div class="stat-cards">
+      <div class="stat-card">
+        <div class="stat-value">9</div>
+        <div class="stat-label">新規データストアコネクタ</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-value">3</div>
+        <div class="stat-label">新規アクション追加サービス</div>
+      </div>
+      <div class="stat-card purple">
+        <div class="stat-value">1</div>
+        <div class="stat-label">エージェント個別オブザーバビリティ</div>
+      </div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>&#x1F4CB; 概要</h2>
+      <p>Gemini Enterprise に 2 つの重要なアップデートが同時にリリースされました。</p>
+      <div class="card">
+        <div class="icon-text">
+          <span>&#x1F517;</span>
+          <span><strong>新規データストアコネクタ</strong>: AirOps、Airtable、Calendly、Dynamics 365、Freshservice、Google Stitch、Intercom、MailerLite、Zoho CRM の 9 つのサードパーティデータストアが Public Preview で追加。さらに Smartsheet、Wrike、Zoho Projects に書き込みアクションを追加。</span>
+        </div>
+      </div>
+      <div class="card card-purple">
+        <div class="icon-text">
+          <span>&#x1F50D;</span>
+          <span><strong>エージェント個別オブザーバビリティ</strong>: Agent Designer で作成した従業員製エージェントに対して個別にオブザーバビリティ設定を構成可能に。Metrics Explorer / Trace Explorer でエージェント単位のモニタリングが実現。</span>
+        </div>
+      </div>
+
+      <!-- Before/After -->
+      <div class="before-after">
+        <div class="before-box">
+          <h3>&#x274C; Before</h3>
+          <ul>
+            <li>AirOps、Airtable、Calendly 等の SaaS データを直接検索不可</li>
+            <li>Smartsheet/Wrike/Zoho Projects は検索のみでアクション不可</li>
+            <li>オブザーバビリティはアプリレベル (Core Assistant) のみ</li>
+            <li>複数エージェント環境で問題切り分けが困難</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>&#x2705; After</h3>
+          <ul>
+            <li>9 つの新しいコネクタで幅広い SaaS ツールと連携可能</li>
+            <li>Smartsheet/Wrike/Zoho Projects でタスク作成・更新が可能</li>
+            <li>Agent Designer エージェントごとに個別オブザーバビリティ設定</li>
+            <li>特定エージェントの問題特定・パフォーマンス最適化が容易</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>&#x1F3D7;&#xFE0F; アーキテクチャ図</h2>
+      <p>Gemini Enterprise アプリ内のエージェントが新規データストアとアクションに接続し、個別のオブザーバビリティ設定により Google Cloud Observability にテレメトリデータを送信する全体構成です。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TB
+    subgraph "Gemini Enterprise App"
+        CA[Core Assistant Agent]
+        AD1[Agent Designer Agent 1]
+        AD2[Agent Designer Agent 2]
+    end
+
+    subgraph "新規データストア Public Preview"
+        DS1[AirOps]
+        DS2[Airtable]
+        DS3[Calendly]
+        DS4[Dynamics 365]
+        DS5[Freshservice]
+        DS6[Google Stitch]
+        DS7[Intercom]
+        DS8[MailerLite]
+        DS9[Zoho CRM]
+    end
+
+    subgraph "新規アクション対応"
+        ACT1[Smartsheet Actions]
+        ACT2[Wrike Actions]
+        ACT3[Zoho Projects Actions]
+    end
+
+    subgraph "Google Cloud Observability"
+        ME[Metrics Explorer]
+        TE[Trace Explorer]
+        CL[Cloud Logging]
+    end
+
+    CA --> DS1 & DS2 & DS3 & DS4 & DS5
+    CA --> DS6 & DS7 & DS8 & DS9
+    CA --> ACT1 & ACT2 & ACT3
+
+    CA -->|"App-level Observability"| ME
+    AD1 -->|"Agent-level Observability NEW"| ME
+    AD2 -->|"Agent-level Observability NEW"| ME
+    AD1 --> TE
+    AD2 --> TE
+    ME --> CL
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>&#x2B50; 主要機能</h2>
+
+      <div class="card">
+        <h3>&#x1F517; 1. 新規データストアコネクタ (Public Preview)</h3>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>9 つの新しいサードパーティデータソースを Gemini Enterprise に接続可能</span></div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>自然言語による検索とデータ取得をサポート</span></div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>フェデレーテッド検索 &#x2014; データを Gemini Enterprise にコピーせずリアルタイム検索</span></div>
+      </div>
+
+      <div class="card card-green">
+        <h3>&#x26A1; 2. 新規アクション追加 (Smartsheet / Wrike / Zoho Projects)</h3>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>既存データストアに対する書き込み操作 (アクション) を追加</span></div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>会話インターフェースから直接タスクやプロジェクトを作成・更新</span></div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>ユーザーの承認フローを経た上でアクションが実行</span></div>
+      </div>
+
+      <div class="card card-purple">
+        <h3>&#x1F50D; 3. エージェント個別オブザーバビリティ (Preview)</h3>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>Agent Designer エージェントごとにオブザーバビリティを個別設定</span></div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>OpenTelemetry 形式のトレースとログを収集</span></div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>Metrics Explorer でセッション数、レイテンシ、エラー率を監視</span></div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>Trace Explorer でリクエストの実行フローを詳細に確認</span></div>
+      </div>
+    </div>
+
+    <!-- Technical Specs -->
+    <div class="section">
+      <h2>&#x1F4D0; 技術仕様</h2>
+
+      <h3>&#x1F4E6; 新規データストア一覧</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>データストア</th>
+            <th>主なエンティティ</th>
+            <th>ステータス</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>AirOps</td><td>Workspaces</td><td><span class="badge badge-preview">Public Preview</span></td></tr>
+          <tr><td>Airtable</td><td>Workspaces, Bases</td><td><span class="badge badge-preview">Public Preview</span></td></tr>
+          <tr><td>Calendly</td><td>Events, Scheduled Events</td><td><span class="badge badge-preview">Public Preview</span></td></tr>
+          <tr><td>Dynamics 365</td><td>-</td><td><span class="badge badge-preview">Public Preview</span></td></tr>
+          <tr><td>Freshservice</td><td>Tickets</td><td><span class="badge badge-preview">Public Preview</span></td></tr>
+          <tr><td>Google Stitch</td><td>-</td><td><span class="badge badge-preview">Public Preview</span></td></tr>
+          <tr><td>Intercom</td><td>Articles</td><td><span class="badge badge-preview">Public Preview</span></td></tr>
+          <tr><td>MailerLite</td><td>Subscribers</td><td><span class="badge badge-preview">Public Preview</span></td></tr>
+          <tr><td>Zoho CRM</td><td>Accounts</td><td><span class="badge badge-preview">Public Preview</span></td></tr>
+        </tbody>
+      </table>
+
+      <h3>&#x1F527; 新規アクション一覧</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>データストア</th>
+            <th>主なアクション</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Smartsheet</td><td>タスク作成・更新、シート操作</td></tr>
+          <tr><td>Wrike</td><td>フォルダ/プロジェクト作成・更新、タスク作成・更新</td></tr>
+          <tr><td>Zoho Projects</td><td>プロジェクト作成・更新、タスク作成・更新、フェーズ作成・更新、Issue 作成・更新</td></tr>
+        </tbody>
+      </table>
+
+      <h3>&#x2699;&#xFE0F; オブザーバビリティ設定項目</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>設定項目</th>
+            <th>説明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Enable instrumentation of OpenTelemetry traces and logs</td><td>トレース、スパン、スパンログ、メトリクスを Cloud Logging で確認可能</td></tr>
+          <tr><td>Enable logging of prompt inputs and response outputs</td><td>プロンプト入力とレスポンス出力を Cloud Logging に記録 (PII 含む可能性あり)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup -->
+    <div class="section">
+      <h2>&#x1F6E0;&#xFE0F; 設定方法</h2>
+
+      <div class="note-box">
+        <strong>&#x1F4CB; 前提条件:</strong>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>Gemini Enterprise Admin ロール (<code>roles/discoveryengine.agentspaceAdmin</code>) が付与済み</span></div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>既存の Gemini Enterprise ウェブアプリが作成済み</span></div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>オブザーバビリティ機能には Monitoring Viewer ロール (<code>roles/monitoring.viewer</code>) が必要</span></div>
+      </div>
+
+      <h3>&#x1F4C2; ステップ 1: データストアの作成</h3>
+      <div class="flow-diagram">
+        <div class="flow-step">&#x2601;&#xFE0F; コンソール<br>Gemini Enterprise</div>
+        <span class="flow-arrow">&#x2192;</span>
+        <div class="flow-step">&#x1F4BE; Data stores<br>Create</div>
+        <span class="flow-arrow">&#x2192;</span>
+        <div class="flow-step">&#x1F50C; Source<br>コネクタ選択</div>
+        <span class="flow-arrow">&#x2192;</span>
+        <div class="flow-step">&#x2705; アプリに<br>接続</div>
+      </div>
+
+      <h3>&#x1F50D; ステップ 2: エージェント個別オブザーバビリティの有効化 (コンソール)</h3>
+      <div class="flow-diagram">
+        <div class="flow-step">&#x1F4F1; アプリ<br>選択</div>
+        <span class="flow-arrow">&#x2192;</span>
+        <div class="flow-step">&#x1F916; Agents<br>エージェント選択</div>
+        <span class="flow-arrow">&#x2192;</span>
+        <div class="flow-step">&#x1F4CA; Observability<br>タブ</div>
+        <span class="flow-arrow">&#x2192;</span>
+        <div class="flow-step">&#x2705; 有効化</div>
+      </div>
+
+      <h3>&#x1F4BB; ステップ 3: REST API による有効化</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">curl -X PATCH -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Content-Type: application/json" \
+  -H "X-Goog-User-Project: PROJECT_ID" \
+  "https://ENDPOINT_LOCATION-discoveryengine.googleapis.com/v1alpha/projects/PROJECT_ID/locations/LOCATION/collections/default_collection/engines/APP_ID/assistants/default_assistant/agents/AGENT_ID?updateMask=observabilityConfig" \
+  -d '{
+    "observabilityConfig": {
+      "observabilityEnabled": true,
+      "sensitiveLoggingEnabled": false
+    }
+  }'</code></pre>
+      <div class="warning-box">
+        <strong>&#x26A0;&#xFE0F; 注意:</strong> <code>PROJECT_ID</code>、<code>LOCATION</code> (global / us / eu)、<code>APP_ID</code>、<code>AGENT_ID</code> を環境に合わせて置き換えてください。
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>&#x1F4C8; メリット</h2>
+
+      <h3>&#x1F4BC; ビジネス面</h3>
+      <div class="card card-green">
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span><strong>業務ツールとの統合範囲拡大</strong>: CRM、プロジェクト管理、カスタマーサポート、マーケティング等の幅広いツールのデータを一元検索</span></div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span><strong>生産性向上</strong>: 会話インターフェースから直接タスク作成・プロジェクト更新が可能。ツール間の切り替えコストを削減</span></div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span><strong>エージェント品質の可視化</strong>: Agent Designer エージェントのパフォーマンスを個別に監視し、ユーザー体験の継続的改善が可能</span></div>
+      </div>
+
+      <h3>&#x1F4BB; 技術面</h3>
+      <div class="card card-teal">
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span><strong>きめ細かな監視</strong>: エージェント単位でのメトリクス収集。特定エージェントの問題を迅速に特定・解決</span></div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span><strong>OpenTelemetry 標準準拠</strong>: ベンダー非依存な標準テレメトリ形式で、既存監視エコシステムとの統合が容易</span></div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span><strong>フェデレーテッド検索</strong>: データをコピーせず検索可能。データガバナンスとセキュリティを維持</span></div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>&#x26A0;&#xFE0F; デメリット・制約事項</h2>
+
+      <h3>&#x1F6AB; 制限事項</h3>
+      <div class="check-item"><span class="cross-icon">&#x2717;</span><span>新規データストアは全て Public Preview (Pre-GA Offerings Terms 適用)</span></div>
+      <div class="check-item"><span class="cross-icon">&#x2717;</span><span>データストアは global、us、eu の 3 リージョンのみでサポート</span></div>
+      <div class="check-item"><span class="cross-icon">&#x2717;</span><span>1 つのアプリに対して同一コネクタタイプのデータストアは 1 つのみ推奨</span></div>
+      <div class="check-item"><span class="cross-icon">&#x2717;</span><span>エージェントオブザーバビリティは Agent Designer で作成した従業員製エージェントのみ対象 (カスタム/サードパーティエージェントは非対応)</span></div>
+      <div class="check-item"><span class="cross-icon">&#x2717;</span><span>VPC Service Controls のパーミッター適用は既存データストアでは非対応 (再作成が必要)</span></div>
+
+      <h3>&#x1F4A1; 考慮すべき点</h3>
+      <div class="warning-box">
+        <ul style="margin: 0; padding-left: 20px;">
+          <li>"Enable logging of prompt inputs and response outputs" 有効時は PII データがログに記録されるため、アクセス制御を適切に設定</li>
+          <li>フェデレーテッド検索ではクエリがサードパーティ API に送信 &#x2014; 各サービスの利用規約・プライバシーポリシーが適用</li>
+          <li>メトリクスデータは Cloud Monitoring に保存され、デフォルトで 6 週間保持</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>&#x1F4A1; ユースケース</h2>
+
+      <div class="usecase-card">
+        <h3>&#x1F3E2; IT ヘルプデスクエージェントの構築と監視</h3>
+        <p><strong>シナリオ:</strong> 社内 IT 部門が Agent Designer で作成したヘルプデスクエージェントに Freshservice を接続し、チケット検索と回答を自動化。オブザーバビリティ設定により応答品質を継続的にモニタリング。</p>
+        <p><strong>効果:</strong> ヘルプデスク対応時間の短縮とエージェントのパフォーマンス最適化。レイテンシ閾値超過時のアラート設定や、エラー率の時系列分析によるプロアクティブな問題対応を実現。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>&#x1F4BC; 営業チーム向け CRM 連携エージェント</h3>
+        <p><strong>シナリオ:</strong> 営業部門が Zoho CRM データストアを接続し、顧客情報や商談状況を自然言語で検索。Wrike や Zoho Projects のアクションで商談のフォローアップタスクを直接作成。</p>
+        <p><strong>効果:</strong> CRM データへのアクセス効率化とアクションによるワークフロー自動化。営業担当者がツール間の切り替えなく業務を遂行可能。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>&#x1F4E7; マーケティングオートメーション連携</h3>
+        <p><strong>シナリオ:</strong> マーケティングチームが MailerLite と Airtable のデータストアを接続し、キャンペーンの配信状況や購読者リストを Gemini Enterprise から一元検索。</p>
+        <p><strong>効果:</strong> 複数のマーケティングツールにまたがるデータを単一の会話インターフェースから確認でき、レポーティングやキャンペーン分析の効率が向上。</p>
+      </div>
+    </div>
+
+    <!-- Regions -->
+    <div class="section">
+      <h2>&#x1F30D; 利用可能リージョン</h2>
+      <p>データストアおよびオブザーバビリティ機能は以下のリージョンで利用可能です。</p>
+      <div class="region-grid">
+        <div class="region-item">&#x1F30F; Global</div>
+        <div class="region-item">&#x1F1FA;&#x1F1F8; US</div>
+        <div class="region-item">&#x1F1EA;&#x1F1FA; EU</div>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#x1F517; 関連サービス・機能</h2>
+      <div class="card">
+        <div class="icon-text"><span>&#x2601;&#xFE0F;</span><span><strong>Gemini Enterprise Agent Platform</strong>: エージェントのデプロイとガバナンス。より高度なオブザーバビリティ (トポロジービュー、MCP サーバー監視) を提供</span></div>
+      </div>
+      <div class="card card-purple">
+        <div class="icon-text"><span>&#x1F4CA;</span><span><strong>Cloud Monitoring / Metrics Explorer</strong>: メトリクスデータの可視化とアラート設定に使用</span></div>
+      </div>
+      <div class="card card-teal">
+        <div class="icon-text"><span>&#x1F50E;</span><span><strong>Cloud Trace / Trace Explorer</strong>: 分散トレーシングによるリクエストフローの分析に使用</span></div>
+      </div>
+      <div class="card card-green">
+        <div class="icon-text"><span>&#x1F916;</span><span><strong>Agent Designer</strong>: ノーコード/ローコードでエージェントを作成するツール。今回のオブザーバビリティ機能の主な対象</span></div>
+      </div>
+      <div class="card card-orange">
+        <div class="icon-text"><span>&#x1F6E1;&#xFE0F;</span><span><strong>Model Armor</strong>: プロンプトとレスポンスのセキュリティスクリーニング。OpenTelemetry テレメトリを自動発行</span></div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>&#x1F4DD; まとめ</h2>
+      <div class="ai-box">
+        <p>今回のアップデートにより、Gemini Enterprise のサードパーティツール連携がさらに強化されました。<span class="highlight">9 つの新しいデータストア</span>と<span class="highlight">3 つのサービスへの新規アクション追加</span>により業務ツールとの統合範囲が大幅に拡大。加えて、<span class="highlight">エージェント個別のオブザーバビリティ設定</span>により品質管理とトラブルシューティングが容易になります。</p>
+        <p><strong>推奨アクション:</strong></p>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>新規データストアの接続を検討し、業務ツールとの統合を拡大</span></div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>Agent Designer エージェントを運用している場合はオブザーバビリティ設定を有効化</span></div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>モニタリング体制を構築し、プロアクティブな問題対応を実現</span></div>
+      </div>
+
+      <div class="tag-list">
+        <span class="tag">#GeminiEnterprise</span>
+        <span class="tag">#DataStores</span>
+        <span class="tag">#AgentDesigner</span>
+        <span class="tag">#Observability</span>
+        <span class="tag">#OpenTelemetry</span>
+        <span class="tag">#CloudMonitoring</span>
+        <span class="tag">#CloudTrace</span>
+        <span class="tag">#PublicPreview</span>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>&#x1F4CE; 出典:</strong></p>
+      <ul>
+        <li><a href="https://docs.cloud.google.com/gemini/enterprise/docs/release-notes#June_15_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li><a href="https://docs.cloud.google.com/gemini/enterprise/docs/manage-observability-settings" target="_blank" rel="noopener noreferrer">オブザーバビリティ設定の管理</a></li>
+        <li><a href="https://docs.cloud.google.com/gemini/enterprise/docs/connectors/connect-third-party-data-source" target="_blank" rel="noopener noreferrer">サードパーティデータソースの接続</a></li>
+        <li><a href="https://docs.cloud.google.com/gemini/enterprise/docs/access-metrics" target="_blank" rel="noopener noreferrer">Metrics Explorer でのメトリクス確認</a></li>
+        <li><a href="https://docs.cloud.google.com/gemini/enterprise/docs/access-traces-and-spans" target="_blank" rel="noopener noreferrer">Trace Explorer でのトレース確認</a></li>
+        <li><a href="https://docs.cloud.google.com/gemini/enterprise/docs/agent-designer" target="_blank" rel="noopener noreferrer">Agent Designer 概要</a></li>
+      </ul>
+      <p style="margin-top: 12px; font-size: 11px; color: #9E9E9E;">Generated on 2026-06-16 | Google Cloud News Summary</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

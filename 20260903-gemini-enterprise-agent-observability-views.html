@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gemini Enterprise: エージェントのレイテンシ・エラー率ビュー (Observability タブ)</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 30px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 15px;
+      color: var(--gc-outline);
+      text-align: right;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 { margin-top: 0; }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); color: #FFFFFF; }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box, .after-box {
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid rgba(234, 67, 53, 0.3);
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid rgba(52, 168, 83, 0.3);
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-box h3 { color: #C5221F; }
+    .after-box h3 { color: #188038; }
+
+    .before-box ul, .after-box ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li { margin-bottom: 8px; }
+
+    @media (max-width: 700px) {
+      .before-after { grid-template-columns: 1fr; }
+      .stat-grid { grid-template-columns: 1fr 1fr !important; }
+      h1 { font-size: 24px; }
+    }
+
+    /* 統計カード */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px 12px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 30px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.92;
+      line-height: 1.4;
+    }
+
+    /* メトリクスカード (TTFT/TTFA/TTLT) */
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 700px) {
+      .metric-grid { grid-template-columns: 1fr; }
+    }
+
+    .metric-card {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-300);
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .metric-card .metric-name {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--gc-blue-800);
+      margin-bottom: 4px;
+    }
+
+    .metric-card .metric-full {
+      font-size: 12px;
+      color: var(--gc-outline);
+      margin-bottom: 8px;
+    }
+
+    .metric-card p {
+      font-size: 13px;
+      margin: 0;
+    }
+
+    /* レスポンスクラスのチップ */
+    .response-classes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 16px 0;
+    }
+
+    .response-chip {
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      text-align: center;
+      flex: 1;
+      min-width: 140px;
+    }
+
+    .chip-ok { background: var(--gc-green-tint); color: #188038; border: 2px solid var(--gc-green); }
+    .chip-client { background: var(--gc-yellow-tint); color: #B06000; border: 2px solid var(--gc-yellow); }
+    .chip-server { background: var(--gc-red-tint); color: #C5221F; border: 2px solid var(--gc-red); }
+    .chip-cancel { background: var(--gc-surface-container-low); color: var(--gc-on-surface-variant); border: 2px solid var(--gc-outline); }
+
+    .response-chip .chip-sub {
+      display: block;
+      font-size: 12px;
+      font-weight: 400;
+      margin-top: 2px;
+    }
+
+    /* 機能フィルタのタグ */
+    .feature-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    .feature-tag {
+      background: var(--gc-blue-50);
+      border: 1px solid var(--gc-blue-200);
+      color: var(--gc-blue-900);
+      border-radius: 16px;
+      padding: 4px 14px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    /* チェックリスト */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon { color: var(--gc-green); font-size: 18px; flex-shrink: 0; }
+    .cross-icon { color: var(--gc-red); font-size: 18px; flex-shrink: 0; }
+
+    /* フロー図 */
+    .flow-diagram {
+      display: flex;
+      align-items: stretch;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 20px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 110px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+      align-self: center;
+    }
+
+    /* コードブロック */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block { overflow: hidden; }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+      font-family: 'Roboto Mono', monospace;
+    }
+
+    .code-title { color: #AAAAAA; }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code { background: none; border: none; }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.88em;
+      color: var(--gc-blue-900);
+    }
+
+    /* テーブル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .ai-box {
+      background: var(--gc-purple-tint);
+      border-left: 4px solid var(--gc-purple);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-100);
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+      font-size: 16px;
+    }
+
+    .usecase p { font-size: 14px; margin: 8px 0; }
+    .usecase ol { font-size: 14px; margin: 8px 0; padding-left: 22px; }
+    .usecase li { margin-bottom: 4px; }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    ul.compact { margin: 8px 0; padding-left: 22px; }
+    ul.compact li { margin-bottom: 6px; font-size: 14.5px; }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 13px;
+      color: var(--gc-outline);
+    }
+
+    footer ul { margin: 8px 0; padding-left: 20px; }
+    footer li { margin-bottom: 4px; }
+
+    .tags {
+      margin-top: 12px;
+      font-size: 13px;
+      color: var(--gc-blue-700);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <h1>🖥️ Gemini Enterprise<br>エージェントのレイテンシ・エラー率ビュー</h1>
+        <div style="margin-top: 12px;">
+          <span class="badge">Gemini Enterprise</span>
+          <span class="badge badge-ga">GA (一般提供)</span>
+          <span class="badge" style="background: var(--gc-purple);">Observability</span>
+        </div>
+      </div>
+      <div class="subtitle">
+        リリース日<br><strong style="font-size: 20px; color: var(--gc-on-surface);">2026-09-03</strong>
+      </div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📌 概要</h2>
+      <p>
+        Gemini Enterprise のエージェント向け Observability タブに、<span class="highlight">Latency (レイテンシ)</span> と
+        <span class="highlight">Error rate (エラー率)</span> の 2 つの新しいビューが追加され、GA (一般提供) となりました。
+        既存の Overview / Tools と合わせて <strong>4 つのビュー</strong>でエージェントの運用テレメトリをコンソール上で直接確認できます。
+      </p>
+
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">2</div>
+          <div class="stat-label">新規ビュー<br>Latency / Error rate</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">3</div>
+          <div class="stat-label">レイテンシ指標<br>TTFT / TTFA / TTLT</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">p50/p95</div>
+          <div class="stat-label">パーセンタイル<br>サマリー + 時系列</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">6 週間</div>
+          <div class="stat-label">メトリクス保持期間<br>(Cloud Monitoring)</div>
+        </div>
+      </div>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>😰 Before: アップデート前の課題</h3>
+          <ul>
+            <li>Observability タブは Overview と Tools が中心で、応答レイテンシの内訳 (思考開始・回答開始・回答完了) をパーセンタイル別に分析する専用ビューがなかった</li>
+            <li>Web 検索やメディア生成など、遅い機能が全体のレイテンシ統計を歪めても、機能別に切り分ける手段がコンソール上になかった</li>
+            <li>エラー傾向の把握には Metrics Explorer での個別照会が必要で、レスポンスクラスやエラーコード別の集計をすぐに確認できなかった</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>😊 After: アップデート後の改善</h3>
+          <ul>
+            <li>TTFT / TTFA / TTLT の 3 指標を p50 / p95 のサマリーカードと時系列チャートで確認し、「思考開始」「回答開始」「回答完了」を分離して分析可能に</li>
+            <li>Filter by feature により Parametric、Media generation、Web search only などの機能別にレイテンシを比較し、遅いインタラクション種別を特定可能に</li>
+            <li>OK (2xx) / Client errors (4xx) / Server errors (5xx) / Canceled のレスポンスクラス別に追跡し、<code>INVALID_ARGUMENT</code> や <code>INTERNAL</code> などの gRPC エラーコード単位でスパイク原因を特定可能に</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    U([👤 ユーザー]) -->|質問・依頼| A["🤖 Gemini Enterprise エージェント<br>(Core Assistant / Workflow Builder / Deep Research)"]
+    A -->|OpenTelemetry トレース・ログ<br>計装を有効化| T["📡 テレメトリ収集<br>(discoveryengine.googleapis.com/ メトリクス)"]
+    T --> M[("📈 Cloud Monitoring<br>保持期間 6 週間")]
+    M --> OB["🖥️ Observability タブ"]
+    OB --> V1["📊 Overview<br>セッション / 呼び出し / トラフィック"]
+    OB --> V2["🔧 Tools<br>ツール別レイテンシ・エラー率"]
+    OB --> V3["⏱️ Latency (新規・GA)<br>TTFT / TTFA / TTLT の p50・p95<br>機能別フィルタ"]
+    OB --> V4["🚨 Error rate (新規・GA)<br>OK / 4xx / 5xx / Canceled<br>エラーコード別集計"]
+
+    style V3 fill:#e8f0fe,stroke:#1a73e8
+    style V4 fill:#fce8e6,stroke:#d93025
+        </pre>
+      </div>
+      <p style="font-size: 14px;">
+        エージェントとのやり取りが OpenTelemetry ベースで計装され、Cloud Monitoring に蓄積されたメトリクスを
+        Observability タブの 4 つのビューで可視化します。今回追加されたのは <strong>Latency</strong> と <strong>Error rate</strong> の 2 ビューです。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+
+      <div class="card">
+        <h3>⏱️ 1. Latency ビュー: 3 つのレイテンシ指標の p50 / p95 表示</h3>
+        <div class="metric-grid">
+          <div class="metric-card">
+            <div class="metric-name">TTFT</div>
+            <div class="metric-full">Time to First Token</div>
+            <p>リクエスト受信から<strong>最初のトークン</strong>をストリーミングするまでのレイテンシ。モデルの思考 (thinking) プロセスのトークンも含む。</p>
+          </div>
+          <div class="metric-card">
+            <div class="metric-name">TTFA</div>
+            <div class="metric-full">Time to First Answer</div>
+            <p><strong>回答本文の最初のトークン</strong> (思考の一部ではない) までのレイテンシ。回答開始後にツール呼び出しが発生すると計測がリスタートし、「ユーザーが読む回答」の開始時点を反映。</p>
+          </div>
+          <div class="metric-card">
+            <div class="metric-name">TTLT</div>
+            <div class="metric-full">Time to Last Token</div>
+            <p>リクエスト受信から<strong>最後のトークン (レスポンス完了)</strong> までのレイテンシ。</p>
+          </div>
+        </div>
+        <p style="font-size: 14px;">→ 各指標は選択した時間範囲の <span class="highlight">p50 / p95 サマリーカード</span>と、トレンドを示す<span class="highlight">時系列チャート</span>で表示。</p>
+      </div>
+
+      <div class="card">
+        <h3>🔍 2. 機能 (feature) 別のレイテンシフィルタと比較テーブル</h3>
+        <p style="font-size: 14px;">
+          「Filter by feature」でインタラクション種別ごとにレイテンシを絞り込み可能。遅い 1 つの機能が全体のレイテンシを歪めることを防げます。
+          Features テレメトリテーブルでは、機能ごとに <strong>Share of traffic (トラフィック比率)</strong> と TTFT / TTFA / TTLT の p50・p95 を一覧比較できます。
+        </p>
+        <div class="feature-tags">
+          <span class="feature-tag">📝 Parametric (テキスト出力のみ)</span>
+          <span class="feature-tag">🎨 Media generation</span>
+          <span class="feature-tag">🌐 Web search only</span>
+          <span class="feature-tag">📄 Uploaded file analysis</span>
+          <span class="feature-tag">🔌 Connector</span>
+          <span class="feature-tag">🖼️ Canvas</span>
+          <span class="feature-tag">🛠️ Skill</span>
+          <span class="feature-tag">❓ Other</span>
+        </div>
+      </div>
+
+      <div class="card" style="border-left-color: var(--gc-red);">
+        <h3>🚨 3. Error rate ビュー: レスポンスクラス別のリクエスト解決状況</h3>
+        <div class="response-classes">
+          <div class="response-chip chip-ok">✅ OK<span class="chip-sub">2xx</span></div>
+          <div class="response-chip chip-client">⚠️ Client errors<span class="chip-sub">4xx (INVALID_ARGUMENT など)</span></div>
+          <div class="response-chip chip-server">❌ Server errors<span class="chip-sub">5xx (INTERNAL など)</span></div>
+          <div class="response-chip chip-cancel">🚫 Canceled<span class="chip-sub">キャンセル</span></div>
+        </div>
+        <ul class="compact">
+          <li><strong>Request volume by response class</strong>: レスポンスクラス別に積み上げた時系列のインバウンドリクエスト数</li>
+          <li><strong>Error rate by response class</strong>: レスポンスクラス別の失敗リクエスト率の推移</li>
+          <li><strong>Client / Server error codes</strong>: gRPC 正規レスポンスコード別の推移でスパイクの原因を特定</li>
+          <li><strong>Totals</strong>: 時間範囲内の各結果のリクエスト数・全体比率と、エラーコードのランキングテーブル</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3>📋 Observability タブの構成</h3>
+      <table>
+        <tr><th style="width: 32%;">項目</th><th>詳細</th></tr>
+        <tr><td>対象エージェント</td><td>Core Assistant エージェント、Workflow Builder エージェント、Deep Research エージェント</td></tr>
+        <tr><td>ビュー構成</td><td>Overview / Tools / <strong>Latency (新規)</strong> / <strong>Error rate (新規)</strong> の 4 ビュー</td></tr>
+        <tr><td>レイテンシ指標</td><td>TTFT、TTFA、TTLT (各 p50 / p95)</td></tr>
+        <tr><td>レスポンスクラス</td><td>OK (2xx)、Client errors (4xx)、Server errors (5xx)、Canceled</td></tr>
+        <tr><td>メトリクスの種類</td><td>エージェントスコープメトリクス (Gemini Enterprise Agent リソースタイプ)、アプリスコープメトリクス (Gemini Enterprise Engine リソースタイプ)</td></tr>
+        <tr><td>メトリクスの保存先</td><td>Cloud Monitoring (<code>discoveryengine.googleapis.com/</code> プレフィックス)</td></tr>
+        <tr><td>データ保持期間</td><td>デフォルト 6 週間 (Cloud Monitoring の「その他の Google Cloud メトリクス」ティアに準拠)</td></tr>
+      </table>
+
+      <h3>🔑 必要なロール・設定</h3>
+      <table>
+        <tr><th style="width: 32%;">要件</th><th>詳細</th></tr>
+        <tr><td>ロール</td><td>Gemini Enterprise Admin ロール、または Google Cloud コンソールの Gemini Enterprise User ロール</td></tr>
+        <tr><td>Metrics Explorer 利用時</td><td>Monitoring Viewer ロール (<code>roles/monitoring.viewer</code>)</td></tr>
+        <tr><td>前提設定</td><td>「Enable instrumentation of OpenTelemetry traces and logs」設定の有効化 (エージェントスコープメトリクスに必須。アプリスコープメトリクスは設定なしでも収集)</td></tr>
+      </table>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>✅ 前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>Gemini Enterprise Admin ロールまたは Google Cloud コンソールの Gemini Enterprise User ロールを保有していること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>既存の Gemini Enterprise Web アプリがあること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>OpenTelemetry トレース・ログの計装設定が有効であること (Core Assistant はアプリレベル設定、Workflow Builder / Deep Research エージェントは各エージェントの Configuration タブで有効化)</span></div>
+
+      <div class="flow-diagram">
+        <div class="flow-step">🔛 ステップ 1<br>Observability<br>設定の有効化</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🖥️ ステップ 2<br>Latency / Error rate<br>ビューへアクセス</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🔍 ステップ 3<br>機能別レイテンシの<br>フィルタリング</div>
+      </div>
+
+      <h3>ステップ 1: Observability 設定の有効化</h3>
+      <p style="font-size: 14px;">Google Cloud コンソールで Gemini Enterprise ページに移動し、対象アプリを開きます。</p>
+      <ul class="compact">
+        <li><strong>Core Assistant エージェント</strong>: [Configurations] → [Observability] タブで「Enable instrumentation of OpenTelemetry traces and logs」を有効化</li>
+        <li><strong>その他のエージェント (Workflow Builder / Deep Research)</strong>: [Agents] → 対象エージェント → [Configuration] タブで有効化</li>
+      </ul>
+      <p style="font-size: 14px;">REST API で既存アプリに対して有効化する場合の例:</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">REST API で Observability を有効化</span>
+        </div>
+        <pre><code class="language-bash">curl -X PATCH -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Content-Type: application/json" \
+  -H "X-Goog-User-Project: PROJECT_ID" \
+  "https://ENDPOINT_LOCATION-discoveryengine.googleapis.com/v1alpha/projects/PROJECT_ID/locations/LOCATION/collections/default_collection/engines/APP_ID?updateMask=observabilityConfig" \
+  -d '{
+    "observabilityConfig": {
+      "observabilityEnabled": true
+    }
+  }'</code></pre>
+      </div>
+
+      <h3>ステップ 2: Latency / Error rate ビューへのアクセス</h3>
+      <ol style="font-size: 14.5px;">
+        <li>Google Cloud コンソールで対象アプリに移動し、[Agents] をクリック</li>
+        <li>確認したいエージェントを選択し、[Observability] タブをクリック</li>
+        <li>[Latency] ビューまたは [Error rate] ビューを選択</li>
+      </ol>
+
+      <h3>ステップ 3: 機能別レイテンシのフィルタリング</h3>
+      <ol style="font-size: 14.5px;">
+        <li>Observability タブの [Latency] ビューを開く</li>
+        <li>[Filter by feature] をクリック</li>
+        <li>確認したい機能 (Web search only、Media generation など) を選択</li>
+      </ol>
+      <div class="note-box" style="font-size: 14px;">
+        <strong>💡 ヒント:</strong> サマリーカードと時系列チャートが、選択した機能のターンのみに絞り込まれます。全機能を一括比較するには Features テレメトリテーブルを使用します。
+      </div>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>💪 メリット</h2>
+      <h3>💼 ビジネス面</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>ユーザー体験の定量把握</strong>: TTFA により「ユーザーが実際に回答を読み始められるまでの時間」を計測でき、思考時間込みの TTFT と区別してエンドユーザー体感の品質を管理できる</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>組織展開時の信頼性向上</strong>: 全社展開時にエラー率とレイテンシの傾向をコンソールで直接監視でき、問題の早期発見と説明責任の遂行が容易になる</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>追加ツール不要</strong>: 外部 APM やカスタムダッシュボードを構築しなくても、Gemini Enterprise のコンソール内で運用テレメトリを確認できる</span></div>
+
+      <h3>⚙️ 技術面</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>p50 / p95 によるテールレイテンシ分析</strong>: 平均値では見えない遅いリクエスト (p95) の傾向を把握し、パフォーマンス劣化の兆候を検知できる</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>機能別の切り分け</strong>: メディア生成のような本質的に遅い機能を分離して分析でき、1 つの遅い機能が全体統計を歪めるのを防げる</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>エラーコードレベルの根本原因分析</strong>: <code>INVALID_ARGUMENT</code> (クライアント側) と <code>INTERNAL</code> (サーバー側) を区別でき、エラースパイク発生時の切り分けが迅速になる</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>Cloud Monitoring との統合</strong>: メトリクスは Cloud Monitoring に保存されるため、カスタムダッシュボードの作成やしきい値アラートの設定に発展させられる</span></div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <h3>🚧 制限事項</h3>
+      <div class="check-item"><span class="cross-icon">✗</span><span>Observability タブは Core Assistant エージェント、Workflow Builder エージェント、Deep Research エージェントでのみ利用可能</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>エージェントスコープメトリクスの収集には「Enable instrumentation of OpenTelemetry traces and logs」設定の有効化が必要 (有効化前のデータは収集されない)</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>メトリクスの保持期間はデフォルト 6 週間 (Cloud Monitoring の保持ポリシーに準拠)。それより古いデータは自動削除される</span></div>
+
+      <h3>🤔 考慮すべき点</h3>
+      <div class="warning-box" style="font-size: 14px;">
+        <strong>⚠️ PII への注意:</strong> プロンプト入力・レスポンス出力のログ記録 (「Enable logging of prompt inputs and response outputs」) を併せて有効化する場合、PII を含む機密データがログに記録されるため、ログへのアクセスを認可された担当者に限定する必要があります。
+      </div>
+      <ul class="compact">
+        <li>「Other」機能カテゴリには複数機能にまたがるターンや未分類のターンが含まれるため、機能別分析の際は解釈に注意が必要</li>
+        <li>TTFA は回答開始後にツール呼び出しが発生すると計測がリスタートする仕様のため、ツールを多用するエージェントでは TTFA の解釈に留意する</li>
+      </ul>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>📉 ユースケース 1: 全社展開したアシスタントの応答性能の継続監視</h3>
+        <p><strong>シナリオ</strong>: Gemini Enterprise を全社導入した企業の管理者が、Core Assistant の応答が「遅くなった」というユーザーからの声を受け、実態を確認したい。</p>
+        <p><strong>実装例</strong>:</p>
+        <ol>
+          <li>アプリの Observability 設定で OpenTelemetry 計装を有効化</li>
+          <li>[Agents] → Core Assistant → [Observability] → [Latency] ビューを開く</li>
+          <li>TTFA の p95 の時系列チャートで劣化開始時期を特定</li>
+          <li>[Filter by feature] で Web search only / Media generation などを切り替え、劣化している機能を特定</li>
+        </ol>
+        <p><strong>効果</strong>: 体感の遅さを p95 TTFA という定量指標で裏付け、遅延の原因となっている機能種別を特定して改善アクション (利用ガイダンスやエスカレーション) につなげられる。</p>
+      </div>
+
+      <div class="usecase">
+        <h3>🚨 ユースケース 2: Workflow Builder エージェントのエラースパイクの切り分け</h3>
+        <p><strong>シナリオ</strong>: 業務部門が作成した Workflow Builder エージェントで、特定の時間帯にエラーが多発しているとの報告があり、クライアント側とサーバー側のどちらに問題があるかを切り分けたい。</p>
+        <p><strong>効果</strong>: Error rate ビューの「Error rate by response class」でスパイクが 4xx か 5xx かを即座に判別できる。<code>INVALID_ARGUMENT</code> が支配的であればリクエスト内容や設定の問題、<code>INTERNAL</code> が支配的であればサービス側の問題としてサポートへのエスカレーション判断ができる。エラーコードのランキングテーブルにより、最も影響の大きいエラーから優先的に対処できる。</p>
+      </div>
+
+      <div class="usecase">
+        <h3>🔔 ユースケース 3: Cloud Monitoring アラートによるプロアクティブな運用</h3>
+        <p><strong>シナリオ</strong>: SRE チームが、エージェントのエラー率やレイテンシがしきい値を超えた際に自動通知を受けたい。</p>
+        <p><strong>効果</strong>: メトリクスは <code>discoveryengine.googleapis.com/</code> プレフィックスで Cloud Monitoring に保存されるため、メトリクスしきい値アラートポリシーを作成し、ダッシュボードでの目視監視に頼らないプロアクティブな運用体制を構築できる。</p>
+      </div>
+    </div>
+
+    <!-- 料金・リージョン -->
+    <div class="section">
+      <h2>💰 料金・利用可能リージョン</h2>
+      <div class="note-box" style="font-size: 14px;">
+        <strong>💵 料金:</strong> Observability の Latency / Error rate ビュー自体の追加料金に関する記載はリリースノートにはありません。メトリクスは Cloud Monitoring に保存され、Gemini Enterprise の利用にはエディション (Business / Standard / Plus / Pay-as-you-go / Frontline) に応じたサブスクリプションが必要です。
+      </div>
+      <ul class="compact">
+        <li>📖 <a href="https://docs.cloud.google.com/gemini/enterprise/docs/editions" target="_blank" rel="noopener noreferrer" class="gc-link">Gemini Enterprise エディション比較</a></li>
+        <li>📖 <a href="https://cloud.google.com/gemini-enterprise/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Gemini Enterprise の料金</a></li>
+      </ul>
+      <div class="note-box" style="font-size: 14px;">
+        <strong>🌏 リージョン:</strong> リリースノートにリージョン固有の記載はありません。Gemini Enterprise アプリはマルチリージョン (<code>global</code> / <code>us</code> / <code>eu</code>) で構成されます。詳細は
+        <a href="https://docs.cloud.google.com/gemini/enterprise/docs/locations" target="_blank" rel="noopener noreferrer" class="gc-link">Gemini Enterprise のロケーション</a>を参照してください。
+      </div>
+    </div>
+
+    <!-- 関連サービス -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card"><strong>📈 Cloud Monitoring</strong><br><span style="font-size: 14px;">メトリクスの保存先。Metrics Explorer での照会、カスタムダッシュボード作成、しきい値アラート設定が可能。</span></div>
+      <div class="card"><strong>📜 Cloud Logging / Cloud Trace</strong><br><span style="font-size: 14px;">OpenTelemetry 計装を有効化すると、トレース、スパン、スパンログを Trace Explorer / Cloud Logging で確認できる。</span></div>
+      <div class="card"><strong>🧩 Workflow Builder (旧 Agent Designer)</strong><br><span style="font-size: 14px;">同日に GA となったマルチステップワークフロー構築機能。作成したエージェントは本 Observability タブの監視対象。</span></div>
+      <div class="card"><strong>🔬 Deep Research エージェント</strong><br><span style="font-size: 14px;">Google 製の調査エージェント。Observability タブでの監視対象に含まれる。</span></div>
+      <div class="card"><strong>📡 OpenTelemetry</strong><br><span style="font-size: 14px;">エージェントのテレメトリ計装の基盤。生成 AI 向けセマンティック規約に準拠。</span></div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="success-box">
+        <p style="margin: 0 0 8px 0;">
+          Gemini Enterprise の Observability タブに <strong>Latency / Error rate ビューが GA で追加</strong>され、
+          TTFT / TTFA / TTLT の p50・p95 分析、機能別レイテンシ比較、レスポンスクラス・エラーコード別のエラー分析がコンソール上で完結するようになりました。
+        </p>
+        <p style="margin: 0;">
+          エージェントを本番運用している組織は、まず <span class="highlight">OpenTelemetry 計装設定を有効化</span>してメトリクス収集を開始し、
+          <span class="highlight">p95 TTFA とエラー率をベースライン</span>として把握した上で、Cloud Monitoring のアラートポリシーと組み合わせた継続的な監視体制の構築を推奨します。
+        </p>
+      </div>
+      <div class="tags">
+        #GeminiEnterprise #Observability #Latency #ErrorRate #CloudMonitoring #OpenTelemetry #AIAgent #GA
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p><strong>📎 出典・参考リンク</strong></p>
+      <ul>
+        <li>公式リリースノート: <a href="https://docs.cloud.google.com/release-notes#September_03_2026" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/release-notes#September_03_2026</a></li>
+        <li>ドキュメント: Access metrics: <a href="https://docs.cloud.google.com/gemini/enterprise/docs/access-metrics" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/gemini/enterprise/docs/access-metrics</a></li>
+        <li>ドキュメント: Manage observability settings: <a href="https://docs.cloud.google.com/gemini/enterprise/docs/manage-observability-settings" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/gemini/enterprise/docs/manage-observability-settings</a></li>
+        <li>ドキュメント: Gemini Enterprise エディション: <a href="https://docs.cloud.google.com/gemini/enterprise/docs/editions" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/gemini/enterprise/docs/editions</a></li>
+      </ul>
+      <p>本インフォグラフィックは Google Cloud News レポート (2026-09-03) を基に生成されました。</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

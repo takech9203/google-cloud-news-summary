@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GKE: Cloud Storage FUSE CSI ドライバーが Google Cloud Dedicated に対応</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .before-card h3, .after-card h3 {
+      margin: 0 0 12px 0;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .before-card h3 { color: var(--gc-red); }
+    .after-card h3 { color: var(--gc-green); }
+
+    .before-card ul, .after-card ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .before-card li, .after-card li {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h3 {
+      color: var(--gc-blue-800);
+      margin: 0 0 8px 0;
+      font-size: 18px;
+    }
+
+    .usecase-card p {
+      margin: 0;
+      font-size: 14px;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .feature-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .feature-card h3 {
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .feature-card p {
+      margin: 0;
+      font-size: 14px;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .merit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 768px) {
+      .before-after, .merit-grid, .stats-grid {
+        grid-template-columns: 1fr;
+      }
+      h1 { font-size: 28px; }
+      .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>&#9729;&#65039; GKE: Cloud Storage FUSE CSI ドライバーが Dedicated に対応</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Google Kubernetes Engine</span>
+          <span class="badge badge-ga">GA</span>
+          <span class="badge" style="background: var(--gc-blue-300);">Cloud Storage FUSE</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-05-26</div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>&#128203; 概要</h2>
+      <p>
+        GKE の <span class="highlight">Cloud Storage FUSE CSI ドライバー</span>が、
+        <span class="highlight">Google Cloud Dedicated</span> クラスタおよびノードプールで GA として利用可能になりました。
+        規制要件やデータ主権要件を満たすために専用インフラストラクチャを使用している組織が、
+        Cloud Storage バケットをファイルシステムとして GKE Pod に直接マウントできるようになります。
+      </p>
+
+      <div class="note-box">
+        <strong>&#128161; ポイント:</strong> GKE バージョン <code>1.36.0-gke.1266000</code> 以上が必要。Dedicated 環境固有のエンドポイントに接続するために <code>custom-endpoint</code> マウントオプションの指定が必須です。
+      </div>
+    </div>
+
+    <!-- Before/After Section -->
+    <div class="section">
+      <h2>&#128260; Before / After</h2>
+      <div class="before-after">
+        <div class="before-card">
+          <h3>&#10060; Before (アップデート前)</h3>
+          <ul>
+            <li>Dedicated クラスタでは Cloud Storage FUSE CSI ドライバーが利用不可</li>
+            <li>オブジェクトストレージへのファイルシステムライクなアクセスが困難</li>
+            <li>アプリケーション側で独自の SDK 統合が必要</li>
+            <li>ML ワークロードのデータアクセスパターンが複雑</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h3>&#9989; After (アップデート後)</h3>
+          <ul>
+            <li>Dedicated クラスタの Pod から Cloud Storage バケットを直接マウント可能</li>
+            <li><code>custom-endpoint</code> で専用エンドポイントに安全に接続</li>
+            <li>ファイルキャッシュ、メタデータプリフェッチ、書き込みバッファリングを活用可能</li>
+            <li>標準 GKE と同等の FUSE 機能を Dedicated で利用可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>&#127959;&#65039; アーキテクチャ図</h2>
+      <p>GKE Dedicated クラスタ内の Pod にサイドカーコンテナが自動注入され、CSI ドライバーを介して custom-endpoint 経由で Cloud Storage バケットに接続します。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+architecture-beta
+    group dedicated[Google Cloud Dedicated]
+    group gke[GKE Cluster v1.36.0+] in dedicated
+    group pod[Pod] in gke
+
+    service app(server)[Application Container] in pod
+    service sidecar(server)[FUSE Sidecar Container] in pod
+    service csi(disk)[CSI Driver] in gke
+    service endpoint(cloud)[Custom Endpoint] in dedicated
+    service gcs(database)[Cloud Storage Bucket]
+
+    app:R --> L:sidecar
+    sidecar:B --> T:csi
+    csi:R --> L:endpoint
+    endpoint:R --> L:gcs
+        </pre>
+      </div>
+      <p style="font-size: 14px; color: var(--gc-outline); text-align: center;">Dedicated 環境の分離されたネットワーク内で、専用エンドポイントを通じてストレージにアクセスする構成</p>
+    </div>
+
+    <!-- Key Features Section -->
+    <div class="section">
+      <h2>&#9889; 主要機能</h2>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <h3>&#128737;&#65039; Dedicated クラスタ対応</h3>
+          <p>Google Cloud Dedicated のクラスタとノードプールで Cloud Storage FUSE CSI ドライバーが GA として利用可能。シングルテナントの分離されたインフラストラクチャ上で動作し、ephemeral volume と PersistentVolume の両方をサポートします。</p>
+        </div>
+        <div class="feature-card" style="border-left-color: var(--gc-green);">
+          <h3>&#128279; custom-endpoint マウントオプション</h3>
+          <p>Dedicated 環境の専用ストレージエンドポイントへの接続に必須のオプション。gcsfuse CLI の <code>--custom-endpoint</code> オプションまたは設定ファイル形式で指定可能。標準の <code>storage.googleapis.com</code> の代わりに Dedicated 固有のエンドポイントを使用します。</p>
+        </div>
+        <div class="feature-card" style="border-left-color: var(--gc-purple);">
+          <h3>&#129504; サイドカーコンテナモデル</h3>
+          <p><code>gke-gcsfuse-sidecar</code> コンテナが Pod に自動注入され、Cloud Storage FUSE のマウント処理とライフサイクル管理を担当。ワークロードコンテナ終了時にサイドカーも自動終了します。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>&#128295; 技術仕様</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>最小 GKE バージョン</td>
+            <td><code>1.36.0-gke.1266000</code></td>
+          </tr>
+          <tr>
+            <td>クラスタタイプ</td>
+            <td>Google Cloud Dedicated</td>
+          </tr>
+          <tr>
+            <td>ドライバー有効化</td>
+            <td><code>GcsFuseCsiDriver</code> アドオン</td>
+          </tr>
+          <tr>
+            <td>認証方式</td>
+            <td>Workload Identity Federation for GKE</td>
+          </tr>
+          <tr>
+            <td>サイドカーリソース (デフォルト)</td>
+            <td>250m CPU / 256 MiB メモリ</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top: 24px; font-size: 18px; color: var(--gc-on-surface);">&#9881;&#65039; custom-endpoint の設定方法</h3>
+
+      <p><strong>方法 1: gcsfuse CLI オプション</strong></p>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcsfuse --custom-endpoint=DEDICATED_STORAGE_ENDPOINT BUCKET_NAME /mount/path</code></pre>
+
+      <p><strong>方法 2: 設定ファイル形式 (gcsfuse.yaml)</strong></p>
+      <span class="code-label">YAML</span>
+      <pre><code class="language-yaml">storage:
+  custom-endpoint: "https://DEDICATED_STORAGE_ENDPOINT"</code></pre>
+    </div>
+
+    <!-- Setup Steps -->
+    <div class="section">
+      <h2>&#128736;&#65039; 設定方法</h2>
+
+      <h3 style="font-size: 16px; color: var(--gc-on-surface); margin-bottom: 12px;">前提条件</h3>
+      <div class="card" style="border-left-color: var(--gc-yellow);">
+        <div class="check-item"><span class="check-icon">&#10003;</span><span>Google Cloud Dedicated 環境がプロビジョニング済み</span></div>
+        <div class="check-item"><span class="check-icon">&#10003;</span><span>GKE クラスタがバージョン 1.36.0-gke.1266000 以上</span></div>
+        <div class="check-item"><span class="check-icon">&#10003;</span><span>Cloud Storage FUSE CSI ドライバーアドオンが有効</span></div>
+        <div class="check-item"><span class="check-icon">&#10003;</span><span>Workload Identity Federation for GKE が構成済み</span></div>
+        <div class="check-item"><span class="check-icon">&#10003;</span><span>Dedicated 環境の custom-endpoint URL を把握</span></div>
+      </div>
+
+      <h3 style="font-size: 16px; color: var(--gc-on-surface); margin-top: 24px;">Step 1: CSI ドライバーの有効化</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud container clusters update CLUSTER_NAME \
+  --update-addons GcsFuseCsiDriver=ENABLED \
+  --location=LOCATION</code></pre>
+
+      <h3 style="font-size: 16px; color: var(--gc-on-surface); margin-top: 24px;">Step 2: Cloud Storage バケットへのアクセス権限の設定</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># Kubernetes サービスアカウントに Cloud Storage へのアクセス権限を付与
+gcloud storage buckets add-iam-policy-binding gs://BUCKET_NAME \
+  --member="principal://iam.googleapis.com/projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/PROJECT_ID.svc.id.goog/subject/ns/NAMESPACE/sa/KSA_NAME" \
+  --role="roles/storage.objectUser"</code></pre>
+
+      <h3 style="font-size: 16px; color: var(--gc-on-surface); margin-top: 24px;">Step 3: custom-endpoint を指定した Pod のデプロイ</h3>
+      <span class="code-label">YAML</span>
+      <pre><code class="language-yaml">apiVersion: v1
+kind: Pod
+metadata:
+  name: dedicated-app
+  annotations:
+    gke-gcsfuse/volumes: "true"
+spec:
+  serviceAccountName: my-ksa
+  containers:
+  - name: app
+    image: my-app:latest
+    volumeMounts:
+    - name: gcs-volume
+      mountPath: /data
+  volumes:
+  - name: gcs-volume
+    csi:
+      driver: gcsfuse.csi.storage.gke.io
+      volumeAttributes:
+        bucketName: my-bucket
+        mountOptions: "custom-endpoint=DEDICATED_STORAGE_ENDPOINT,implicit-dirs"</code></pre>
+    </div>
+
+    <!-- Benefits Section -->
+    <div class="section">
+      <h2>&#127919; メリット</h2>
+      <div class="merit-grid">
+        <div>
+          <h3 style="font-size: 18px; color: var(--gc-on-surface); margin-bottom: 12px;">&#128188; ビジネス面</h3>
+          <div class="card" style="border-left-color: var(--gc-green);">
+            <div class="check-item"><span class="check-icon">&#10003;</span><span><strong>コンプライアンス対応:</strong> 規制要件 (データ主権、SecNumCloud 等) を満たしながら Cloud Storage の利便性を活用可能</span></div>
+            <div class="check-item"><span class="check-icon">&#10003;</span><span><strong>運用統合:</strong> 標準 GKE と同じワークフローでストレージアクセスを実現し、運用負荷を軽減</span></div>
+            <div class="check-item"><span class="check-icon">&#10003;</span><span><strong>パートナーエコシステム:</strong> ローカル運用パートナー (Thales/S3NS 等) が管理する環境でも活用可能</span></div>
+          </div>
+        </div>
+        <div>
+          <h3 style="font-size: 18px; color: var(--gc-on-surface); margin-bottom: 12px;">&#9881;&#65039; 技術面</h3>
+          <div class="card" style="border-left-color: var(--gc-blue-600);">
+            <div class="check-item"><span class="check-icon">&#10003;</span><span><strong>透過的なファイルアクセス:</strong> アプリケーションコードの変更なしに Cloud Storage をファイルシステムとして利用</span></div>
+            <div class="check-item"><span class="check-icon">&#10003;</span><span><strong>パフォーマンス最適化:</strong> ファイルキャッシュ、メタデータプリフェッチ、書き込みバッファリング</span></div>
+            <div class="check-item"><span class="check-icon">&#10003;</span><span><strong>ライフサイクル管理:</strong> サイドカーがワークロードに連動して自動管理</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations Section -->
+    <div class="section">
+      <h2>&#9888;&#65039; 制約事項・注意点</h2>
+      <div class="warning-box">
+        <strong>&#128679; 制限事項:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>GKE バージョン <code>1.36.0-gke.1266000</code> 以上が必須 (それ以前は利用不可)</li>
+          <li><code>custom-endpoint</code> マウントオプションの指定が必須 (既存マニフェストの修正が必要)</li>
+          <li>Dedicated 環境固有のエンドポイント情報を事前に取得・管理する必要あり</li>
+        </ul>
+      </div>
+      <div class="card" style="border-left-color: var(--gc-yellow);">
+        <strong>&#128161; 考慮すべき点:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px; font-size: 14px;">
+          <li>Cloud Storage FUSE は POSIX 完全互換ではない (rename 操作のアトミック性など)</li>
+          <li>高頻度のランダム書き込みワークロードには Persistent Disk の方が適している場合あり</li>
+          <li>Dedicated 環境のネットワーク構成により、スループットが標準環境と異なる可能性あり</li>
+          <li>サイドカーコンテナのリソース消費 (デフォルト: 250m CPU, 256 MiB メモリ) を考慮</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases Section -->
+    <div class="section">
+      <h2>&#128640; ユースケース</h2>
+      <div class="usecase-card">
+        <h3>&#129302; ユースケース 1: 規制対象の ML/AI トレーニング</h3>
+        <p>金融機関や政府機関が、規制要件に準拠した Dedicated 環境上で機械学習モデルのトレーニングを実行。大量のトレーニングデータを Cloud Storage に格納し、GKE 上の ML ワークロードから効率的にアクセスします。ファイルキャッシュにより繰り返しアクセスのパフォーマンスを向上。</p>
+      </div>
+      <span class="code-label">YAML</span>
+      <pre><code class="language-yaml">apiVersion: v1
+kind: Pod
+metadata:
+  name: ml-training
+  annotations:
+    gke-gcsfuse/volumes: "true"
+    gke-gcsfuse/memory-limit: "8Gi"
+    gke-gcsfuse/cpu-limit: "4"
+spec:
+  serviceAccountName: ml-training-sa
+  containers:
+  - name: trainer
+    image: ml-training:latest
+    volumeMounts:
+    - name: training-data
+      mountPath: /data/training
+      readOnly: true
+    - name: model-output
+      mountPath: /data/models
+  volumes:
+  - name: training-data
+    csi:
+      driver: gcsfuse.csi.storage.gke.io
+      volumeAttributes:
+        bucketName: regulated-training-data
+        mountOptions: "custom-endpoint=DEDICATED_ENDPOINT,implicit-dirs,file-cache:max-size-mb:-1"
+  - name: model-output
+    csi:
+      driver: gcsfuse.csi.storage.gke.io
+      volumeAttributes:
+        bucketName: regulated-model-output
+        mountOptions: "custom-endpoint=DEDICATED_ENDPOINT,implicit-dirs"</code></pre>
+
+      <div class="usecase-card" style="margin-top: 20px;">
+        <h3>&#128202; ユースケース 2: データ分析パイプライン</h3>
+        <p>欧州の規制に準拠した Dedicated 環境で、複数のバッチ処理ジョブが共有データセットにアクセスするデータ分析パイプラインを構築。ReadWriteMany アクセスモードにより、複数の Pod から同一バケットへの同時アクセスが可能。Dedicated 環境内でデータを保持しながら、スケーラブルな並列処理を実現します。</p>
+      </div>
+    </div>
+
+    <!-- Pricing Section -->
+    <div class="section">
+      <h2>&#128176; 料金情報</h2>
+      <div class="success-box">
+        <strong>&#127881; Cloud Storage FUSE CSI ドライバー自体の追加料金は発生しません。</strong>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>使用量</th>
+            <th>月額料金 (概算)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Cloud Storage Standard (100 GB)</td>
+            <td>約 $2.30/月</td>
+          </tr>
+          <tr>
+            <td>Cloud Storage Standard (1 TB)</td>
+            <td>約 $23.00/月</td>
+          </tr>
+          <tr>
+            <td>Class A オペレーション (10,000 回)</td>
+            <td>約 $0.05</td>
+          </tr>
+          <tr>
+            <td>Class B オペレーション (100,000 回)</td>
+            <td>約 $0.04</td>
+          </tr>
+          <tr>
+            <td>GKE Dedicated クラスタ</td>
+            <td>Dedicated 契約に準拠</td>
+          </tr>
+        </tbody>
+      </table>
+      <p style="font-size: 13px; color: var(--gc-outline);">※ Google Cloud Dedicated の利用料金は個別契約。Cloud Storage の料金は標準料金に基づきますが、Dedicated 環境では契約形態により異なる場合があります。</p>
+    </div>
+
+    <!-- Region Information -->
+    <div class="section">
+      <h2>&#127758; 利用可能リージョン</h2>
+      <p>Google Cloud Dedicated がデプロイされているリージョンで利用可能です。</p>
+      <div class="card">
+        <div class="check-item"><span class="check-icon">&#10003;</span><span><strong>欧州 (フランス):</strong> Thales/S3NS パートナーシップによる SecNumCloud 対応</span></div>
+        <div class="check-item"><span class="check-icon">&#10003;</span><span><strong>その他:</strong> Dedicated 契約が締結されている地域</span></div>
+      </div>
+      <p style="font-size: 13px; color: var(--gc-outline);">具体的な利用可能リージョンは Google Cloud Dedicated の契約内容に依存します。</p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#128279; 関連サービス</h2>
+      <div class="feature-grid">
+        <div class="feature-card" style="border-left-color: var(--gc-blue-300);">
+          <h3>&#128274; Google Cloud Dedicated</h3>
+          <p>規制対象ワークロード向けの分離型シングルテナントインフラストラクチャ。本アップデートの基盤環境。</p>
+        </div>
+        <div class="feature-card" style="border-left-color: var(--gc-green);">
+          <h3>&#128451;&#65039; Cloud Storage</h3>
+          <p>スケーラブルなオブジェクトストレージ。FUSE を通じてファイルシステムとしてアクセス可能。</p>
+        </div>
+        <div class="feature-card" style="border-left-color: var(--gc-purple);">
+          <h3>&#128272; Workload Identity Federation for GKE</h3>
+          <p>GKE Pod への IAM 権限付与メカニズム。Cloud Storage アクセスの認証に使用。</p>
+        </div>
+        <div class="feature-card" style="border-left-color: var(--gc-orange);">
+          <h3>&#128737;&#65039; Assured Workloads</h3>
+          <p>コンプライアンス要件を満たすためのワークロード管理サービス。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>&#128221; まとめ</h2>
+      <div class="note-box">
+        <p style="margin: 0; font-size: 15px;">
+          Cloud Storage FUSE CSI ドライバーの Google Cloud Dedicated 対応は、<strong>規制環境で GKE を利用する組織にとって重要なアップデート</strong>です。
+          データ主権やコンプライアンス要件を維持しながら、Cloud Storage の柔軟性とスケーラビリティを活用できるようになりました。
+        </p>
+      </div>
+      <div class="flow-diagram">
+        <div class="flow-step">&#128200; クラスタ v1.36.0+<br/>にアップグレード</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">&#9881;&#65039; CSI ドライバー<br/>有効化</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">&#128279; custom-endpoint<br/>設定</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">&#127881; Cloud Storage<br/>マウント完了</div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>&#128206; 出典:</p>
+      <ul style="list-style: none; padding: 0; margin: 4px 0;">
+        <li style="margin: 4px 0;"><a href="https://docs.cloud.google.com/release-notes#May_26_2026" target="_blank" rel="noopener noreferrer">Google Cloud Release Notes (May 26, 2026)</a></li>
+        <li style="margin: 4px 0;"><a href="https://docs.cloud.google.com/kubernetes-engine/docs/concepts/cloud-storage-fuse-csi-driver" target="_blank" rel="noopener noreferrer">Cloud Storage FUSE CSI driver for GKE</a></li>
+        <li style="margin: 4px 0;"><a href="https://docs.cloud.google.com/kubernetes-engine/docs/how-to/cloud-storage-fuse-csi-driver-setup" target="_blank" rel="noopener noreferrer">Cloud Storage FUSE CSI driver Setup Guide</a></li>
+        <li style="margin: 4px 0;"><a href="https://docs.cloud.google.com/storage/docs/cloud-storage-fuse/cli-options" target="_blank" rel="noopener noreferrer">Cloud Storage FUSE CLI Options</a></li>
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/sovereign-cloud" target="_blank" rel="noopener noreferrer">Google Cloud Sovereign Cloud</a></li>
+      </ul>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

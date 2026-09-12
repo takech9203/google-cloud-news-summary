@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Spanner: エディション機能モニタリング、インスタンスダウングレード、クエリオブザーバビリティ改善</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; min-width: 280px; }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge-service { background: #F4B400; }
+    .badge-feature { background: var(--gc-blue-600); }
+    .badge-status { background: var(--gc-green); }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-yellow { border-left-color: var(--gc-yellow); }
+    .card-green { border-left-color: var(--gc-green); }
+    .card-red { border-left-color: var(--gc-red); }
+    .card-purple { border-left-color: var(--gc-purple); }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow { color: var(--gc-blue-600); font-size: 20px; }
+
+    /* Before / After */
+    .before-after { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+    .before-box h3, .after-box h3 { margin-top: 0; }
+
+    /* Stats */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin: 16px 0; }
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+    .stat-value { font-size: 36px; font-weight: 700; margin-bottom: 4px; }
+    .stat-label { font-size: 14px; opacity: 0.9; }
+
+    /* Tables */
+    table { width: 100%; border-collapse: collapse; margin: 16px 0; border-radius: 8px; overflow: hidden; border: 1px solid var(--gc-outline-variant); }
+    th { background: var(--gc-blue-50); color: var(--gc-blue-900); padding: 12px 16px; text-align: left; font-weight: 600; font-size: 14px; border-bottom: 2px solid var(--gc-blue-200); }
+    td { padding: 12px 16px; border-bottom: 1px solid var(--gc-outline-variant); font-size: 14px; }
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* Use case */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+    .usecase-card h3 { color: var(--gc-blue-900); margin-top: 0; }
+
+    /* Note / Warning boxes */
+    .note-box { background: var(--gc-blue-tint); border-left: 4px solid var(--gc-blue-600); padding: 16px 20px; border-radius: 0 12px 12px 0; margin: 16px 0; }
+    .warning-box { background: var(--gc-yellow-tint); border-left: 4px solid var(--gc-yellow); padding: 16px 20px; border-radius: 0 12px 12px 0; margin: 16px 0; }
+    .error-box { background: var(--gc-red-tint); border-left: 4px solid var(--gc-red); padding: 16px 20px; border-radius: 0 12px 12px 0; margin: 16px 0; }
+
+    /* Flow diagram */
+    .flow-diagram { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; margin: 24px 0; }
+    .flow-step { background: var(--gc-surface); border: 2px solid var(--gc-blue-600); border-radius: 12px; padding: 12px 20px; text-align: center; min-width: 100px; color: var(--gc-on-surface); box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12); }
+    .flow-arrow { color: var(--gc-blue-600); font-size: 24px; font-weight: bold; }
+
+    /* Mermaid */
+    .mermaid-container { background: #FFFFFF; border-radius: 12px; padding: 24px; margin: 20px 0; border: 2px solid rgba(66, 133, 244, 0.3); overflow-x: auto; }
+    .mermaid { display: flex; justify-content: center; }
+
+    /* Code blocks */
+    .code-block { background: #1E1E1E; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+    .code-header { background: #2D2D2D; padding: 8px 16px; display: flex; justify-content: space-between; font-size: 12px; }
+    .code-lang { color: #9CDCFE; font-weight: bold; }
+    .code-title { color: #AAAAAA; }
+    .code-block pre { margin: 0; padding: 0; overflow-x: auto; background: #1E1E1E; border-radius: 0; }
+    .code-block code { font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace; font-size: 15px; line-height: 1.6; padding: 16px !important; }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+    pre code { background: none; border: none; padding: 0; font-size: inherit; color: inherit; }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .gc-link { color: var(--gc-blue-600); text-decoration: none; }
+    .gc-link:hover { color: var(--gc-blue-800); text-decoration: underline; }
+
+    /* Feature grid */
+    .feature-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+
+    /* Downgrade flow */
+    .downgrade-flow { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; margin: 20px 0; }
+    .edition-box { border-radius: 12px; padding: 16px 24px; text-align: center; font-weight: 600; color: #FFFFFF; min-width: 140px; }
+    .edition-ep { background: linear-gradient(135deg, #174EA6, #1967D2); }
+    .edition-e { background: linear-gradient(135deg, #1A73E8, #4285F4); }
+    .edition-s { background: linear-gradient(135deg, #669DF6, #8AB4F8); color: var(--gc-on-surface); }
+    .downgrade-arrow { font-size: 28px; color: var(--gc-blue-600); }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; }
+      .subtitle { text-align: left; margin-top: 8px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr; }
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+    footer a { color: var(--gc-blue-600); text-decoration: none; word-break: break-all; }
+    footer a:hover { text-decoration: underline; }
+    footer ul { list-style: none; padding: 0; margin: 8px 0; }
+    footer li { margin: 4px 0; }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>Cloud Spanner: エディション機能モニタリング、インスタンスダウングレード、クエリオブザーバビリティ改善</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge badge-service">Cloud Spanner</span>
+          <span class="badge badge-feature">Feature</span>
+          <span class="badge badge-status">Edition Management</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-02-25</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>&#x1F4CB; 概要</h2>
+      <p>Cloud Spanner において、<span class="highlight">エディション機能の使用状況モニタリング</span>、<span class="highlight">インスタンスのエディションダウングレード</span>、および<span class="highlight">クエリオブザーバビリティの改善</span>が発表された。これらの機能は、Spanner のエディションベース料金モデル (Standard / Enterprise / Enterprise Plus) を利用するユーザーが、コスト最適化と運用効率の向上を実現するための重要なアップデートである。</p>
+
+      <p>エディション機能モニタリングにより、Enterprise および Enterprise Plus エディション固有の機能がインスタンス内でどの程度使用されているかを Cloud Monitoring のメトリクスで可視化できるようになった。これにより、上位エディションの機能を使用していない場合にダウングレードの判断材料を得ることができる。また、Enterprise Plus から Enterprise へのダウングレードが、上位エディション機能を使用していないインスタンスに対してサポートされた。</p>
+
+      <p>さらに、クエリオブザーバビリティとモニタリング機能が強化され、クエリパフォーマンスの分析やトラブルシューティングがより効率的に行えるようになった。</p>
+    </div>
+
+    <!-- Before / After -->
+    <div class="section">
+      <h2>&#x1F504; Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h3>&#x274C; アップデート前の課題</h3>
+          <div class="icon-text"><span>&#x2022;</span><span>Enterprise Plus エディションの機能を実際にどの程度使用しているかを定量的に把握する手段が限定的であり、エディション選択の妥当性を評価しにくかった</span></div>
+          <div class="icon-text"><span>&#x2022;</span><span>Enterprise Plus から Enterprise へのダウングレードパスが明確でなく、コスト最適化の選択肢が制限されていた</span></div>
+          <div class="icon-text"><span>&#x2022;</span><span>クエリのパフォーマンス問題の特定と根本原因分析に追加のツールや手動調査が必要だった</span></div>
+        </div>
+        <div class="after-box">
+          <h3>&#x2705; アップデート後の改善</h3>
+          <div class="icon-text"><span>&#x2022;</span><span><code>instance/edition/feature_usage</code> メトリクスにより、エディション固有機能の使用状況を Cloud Monitoring で 60 秒間隔でモニタリング可能に</span></div>
+          <div class="icon-text"><span>&#x2022;</span><span>Enterprise Plus の機能を使用していないインスタンスを Enterprise にダウングレードでき、約 10 分でゼロダウンタイムの切り替えが可能に</span></div>
+          <div class="icon-text"><span>&#x2022;</span><span>Query Insights ダッシュボードでのパフォーマンス問題の検出・診断がより効率的に</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="section">
+      <h2>&#x1F4CA; 数字で見るアップデート</h2>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value">60秒</div>
+          <div class="stat-label">Feature Usage メトリクスの<br>サンプリング間隔</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">~10分</div>
+          <div class="stat-label">エディションダウングレード<br>完了時間</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">0</div>
+          <div class="stat-label">ダウンタイム<br>(ゼロダウンタイム切り替え)</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-green), #2E7D32);">
+          <div class="stat-value">無料</div>
+          <div class="stat-label">Query Insights &<br>Feature Usage モニタリング</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>&#x1F3D7;&#xFE0F; アーキテクチャ図</h2>
+      <p>Spanner インスタンスのエディション機能使用状況が Cloud Monitoring の Feature Usage メトリクスで追跡され、Enterprise Plus 固有機能が未使用の場合にダウングレード判断が可能となるフローを示している。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Spanner["Cloud Spanner Instance"]
+        EP["Enterprise Plus Edition"]
+        E["Enterprise Edition"]
+    end
+
+    subgraph Monitoring["Cloud Monitoring"]
+        FU["Feature Usage Metric\n(instance/edition/feature_usage)"]
+        ME["Metrics Explorer"]
+    end
+
+    subgraph Features["Enterprise / Enterprise Plus Features"]
+        F1["Spanner Graph"]
+        F2["Full-text Search"]
+        F3["Vector Search"]
+        F4["Managed Autoscaler"]
+        F5["Geo-partitioning"]
+        F6["Columnar Engine"]
+    end
+
+    subgraph QueryObs["Query Observability"]
+        QI["Query Insights"]
+        AQ["Active Queries"]
+        QS["Query Statistics"]
+    end
+
+    EP -->|feature usage sampling\nevery 60s| FU
+    FU --> ME
+    ME -->|usage = 0| DG{{"Downgrade\nDecision"}}
+    DG -->|"No EP features used"| E
+    Spanner --> QueryObs
+
+    Features -.->|tracked by| FU
+        </pre>
+      </div>
+    </div>
+
+    <!-- Edition Downgrade Flow -->
+    <div class="section">
+      <h2>&#x2B07;&#xFE0F; エディションダウングレードフロー</h2>
+      <div class="downgrade-flow">
+        <div class="edition-box edition-ep">Enterprise Plus<br><small>マルチリージョン, Geo-partitioning</small></div>
+        <div class="downgrade-arrow">&#x27A1;&#xFE0F;</div>
+        <div class="edition-box edition-e">Enterprise<br><small>Graph, Search, Vector</small></div>
+        <div class="downgrade-arrow">&#x27A1;&#xFE0F;</div>
+        <div class="edition-box edition-s">Standard<br><small>リージョナル構成</small></div>
+      </div>
+      <div class="note-box">
+        <strong>&#x1F4A1; ポイント:</strong> ダウングレードはゼロダウンタイム (約 10 分) で完了し、データ移行は不要 (設定変更のみ)。ただし、上位エディション固有の機能を事前に停止する必要がある。
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>&#x2B50; 主要機能</h2>
+      <div class="feature-grid">
+
+        <div class="card card-yellow">
+          <h3>&#x1F4C8; 1. エディション機能使用状況モニタリング</h3>
+          <p><code>instance/edition/feature_usage</code> メトリクスにより、Enterprise および Enterprise Plus エディション固有の機能使用状況を Cloud Monitoring で可視化。60 秒間隔でサンプリングされ、最大 120 秒で表示に反映される。</p>
+          <p><strong>追跡対象の機能:</strong></p>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;">
+            <span class="badge badge-feature">Asymmetric autoscaling</span>
+            <span class="badge badge-feature">Columnar engine</span>
+            <span class="badge badge-feature">Full-text search</span>
+            <span class="badge badge-feature">Geo-partitioning</span>
+            <span class="badge badge-feature">Incremental backups</span>
+            <span class="badge badge-feature">KNN vector search</span>
+            <span class="badge badge-feature">Managed autoscaler</span>
+            <span class="badge badge-feature">Scheduled backups</span>
+            <span class="badge badge-feature">Spanner Graph</span>
+            <span class="badge badge-feature">Tiered storage</span>
+            <span class="badge badge-feature">Vector search</span>
+          </div>
+        </div>
+
+        <div class="card card-green">
+          <h3>&#x2B07;&#xFE0F; 2. インスタンスエディションのダウングレード</h3>
+          <ul>
+            <li>Enterprise Plus から Enterprise へのダウングレードをサポート</li>
+            <li>Enterprise から Standard へのダウングレードも可能</li>
+            <li>ダウングレードは約 10 分で完了し、<span class="highlight">ゼロダウンタイム</span>で実施可能</li>
+            <li>データ移行は不要 (設定変更のみ)</li>
+            <li>上位エディション固有の機能を停止してからダウングレードする必要がある</li>
+          </ul>
+        </div>
+
+        <div class="card card-purple">
+          <h3>&#x1F50D; 3. クエリオブザーバビリティとモニタリングの改善</h3>
+          <ul>
+            <li>Query Insights ダッシュボードの機能強化</li>
+            <li><strong>アクティブクエリのモニタリング:</strong> 実行中の長時間クエリを特定し、インスタンスのレイテンシや CPU 使用率の原因を調査可能</li>
+            <li><strong>クエリ統計テーブル</strong> (<code>SPANNER_SYS.QUERY_STATS_TOP_*</code>) による詳細分析</li>
+            <li><span class="highlight">追加コストなし</span>で利用可能</li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Technical Specs: Edition Feature Table -->
+    <div class="section">
+      <h2>&#x1F4DD; 技術仕様: エディション機能の対応表</h2>
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>機能</th>
+              <th>Standard</th>
+              <th>Enterprise</th>
+              <th>Enterprise Plus</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Availability SLA</td><td>99.99%</td><td>99.99%</td><td>最大 99.999%</td></tr>
+            <tr><td>インスタンス構成</td><td>リージョナル</td><td>リージョナル + カスタムリードオンリーレプリカ</td><td>リージョナル、デュアルリージョン、マルチリージョン</td></tr>
+            <tr><td>Spanner Graph</td><td>--</td><td>&#x2705; 対応</td><td>&#x2705; 対応</td></tr>
+            <tr><td>Full-text Search</td><td>--</td><td>&#x2705; 対応</td><td>&#x2705; 対応</td></tr>
+            <tr><td>Vector Search (KNN/ANN)</td><td>--</td><td>&#x2705; 対応</td><td>&#x2705; 対応</td></tr>
+            <tr><td>Managed Autoscaler</td><td>--</td><td>&#x2705; 対応</td><td>&#x2705; 対応</td></tr>
+            <tr><td>Geo-partitioning</td><td>--</td><td>--</td><td>&#x2705; 対応</td></tr>
+            <tr><td>Columnar Engine</td><td>--</td><td>&#x2705; 対応</td><td>&#x2705; 対応</td></tr>
+            <tr><td>Incremental Backups</td><td>--</td><td>&#x2705; 対応</td><td>&#x2705; 対応</td></tr>
+            <tr><td>Tiered Storage</td><td>--</td><td>&#x2705; 対応</td><td>&#x2705; 対応</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Downgrade Prerequisites -->
+    <div class="section">
+      <h2>&#x26A0;&#xFE0F; ダウングレード前に必要な操作</h2>
+      <p>ダウングレードを実行する前に、上位エディション固有の機能を停止する必要がある。</p>
+
+      <h3>Enterprise / Enterprise Plus 共通の機能停止手順</h3>
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr><th>機能</th><th>必要な操作</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Custom read-only replicas</td><td>リージョナル構成に移行するか、インスタンスを削除</td></tr>
+            <tr><td>Spanner Graph</td><td>全プロパティグラフスキーマを削除</td></tr>
+            <tr><td>Full-text search</td><td>全検索インデックスを削除</td></tr>
+            <tr><td>Vector search</td><td>全 KNN/ANN 距離関数の使用を停止し、全ベクトルインデックスを削除</td></tr>
+            <tr><td>Managed autoscaler</td><td>手動スケーリングに変更</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Enterprise Plus 固有の機能停止手順</h3>
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr><th>機能</th><th>必要な操作</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>デュアル/マルチリージョン構成</td><td>リージョナル構成に移行するか、インスタンスを削除</td></tr>
+            <tr><td>Geo-partitioning</td><td>全パーティションを削除</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="warning-box">
+        <strong>&#x26A0;&#xFE0F; 注意:</strong> これらの操作には Spanner Graph のスキーマ削除やベクトルインデックスの削除など、<strong>破壊的な操作</strong>が含まれる。事前に十分な検証を行うこと。
+      </div>
+    </div>
+
+    <!-- Setup -->
+    <div class="section">
+      <h2>&#x1F527; 設定方法</h2>
+
+      <h3>前提条件</h3>
+      <div class="card">
+        <div class="icon-text"><span class="arrow">&#x2192;</span><span>Google Cloud プロジェクトで Spanner API が有効化されていること</span></div>
+        <div class="icon-text"><span class="arrow">&#x2192;</span><span>対象インスタンスの管理権限 (<code>spanner.instances.update</code>) を持つ IAM ロールが付与されていること</span></div>
+        <div class="icon-text"><span class="arrow">&#x2192;</span><span>Query Insights の閲覧には <code>roles/spanner.viewer</code> および <code>roles/spanner.databaseReader</code> ロールが必要</span></div>
+      </div>
+
+      <h3>ステップ 1: エディション機能使用状況の確認</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">Cloud Monitoring Metrics Explorer で確認</span>
+        </div>
+        <pre><code class="language-bash"># Cloud Monitoring の Metrics Explorer で確認
+# Google Cloud Console > Monitoring > Metrics Explorer
+# メトリクス: Cloud Spanner Instance > Instance > Feature usage
+# 集約: Unaggregated
+# 表示タイプ: Table または Both</code></pre>
+      </div>
+      <p>Metrics Explorer でフィルタリングし、インスタンスごとの機能使用状況を表形式で確認する。<code>instance_id</code>、<code>instance_config</code>、<code>database</code>、<code>feature</code> カラムで使用中の機能を特定できる。</p>
+
+      <h3>ステップ 2: インスタンスのダウングレード (Console)</h3>
+      <div class="card">
+        <div class="icon-text"><span class="arrow">1.</span><span>Google Cloud Console > Spanner > Instances に移動</span></div>
+        <div class="icon-text"><span class="arrow">2.</span><span>対象インスタンス名をクリック</span></div>
+        <div class="icon-text"><span class="arrow">3.</span><span>Instance overview ページで "Edit instance" をクリック</span></div>
+        <div class="icon-text"><span class="arrow">4.</span><span>"Choose a Spanner edition" で下位エディションを選択</span></div>
+        <div class="icon-text"><span class="arrow">5.</span><span>"Update instance" をクリック</span></div>
+      </div>
+
+      <h3>ステップ 3: インスタンスのダウングレード (gcloud CLI)</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">gcloud CLI によるダウングレード</span>
+        </div>
+        <pre><code class="language-bash"># Enterprise Plus から Enterprise にダウングレード
+gcloud spanner instances update my-instance --edition=ENTERPRISE
+
+# Enterprise から Standard にダウングレード
+gcloud spanner instances update my-instance --edition=STANDARD
+
+# インスタンスのエディションをダウングレード (汎用コマンド)
+gcloud spanner instances update INSTANCE_ID --edition=EDITION
+# EDITION: STANDARD, ENTERPRISE, ENTERPRISE_PLUS</code></pre>
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>&#x1F4AA; メリット</h2>
+
+      <h3>&#x1F4BC; ビジネス面</h3>
+      <div class="card card-green">
+        <div class="icon-text"><span>&#x1F4B0;</span><span><strong>コスト最適化:</strong> Enterprise Plus の機能を使用していないインスタンスを Enterprise にダウングレードすることで、不要なコストを削減できる</span></div>
+        <div class="icon-text"><span>&#x1F4CA;</span><span><strong>透明性の向上:</strong> エディション機能の使用状況が定量的に可視化されるため、エディション選択の妥当性を経営層にも説明しやすくなる</span></div>
+        <div class="icon-text"><span>&#x1F504;</span><span><strong>柔軟なエディション管理:</strong> ワークロードの変化に応じてエディションを変更でき、ビジネス要件に合わせたコスト構造を実現できる</span></div>
+      </div>
+
+      <h3>&#x2699;&#xFE0F; 技術面</h3>
+      <div class="card">
+        <div class="icon-text"><span>&#x26A1;</span><span><strong>ゼロダウンタイムでのエディション変更:</strong> ダウングレードは約 10 分で完了し、データ移行も不要であるため、運用への影響を最小限に抑えられる</span></div>
+        <div class="icon-text"><span>&#x1F50D;</span><span><strong>クエリパフォーマンスの可視化:</strong> Query Insights とアクティブクエリモニタリングにより、パフォーマンス問題の迅速な特定と解決が可能になる</span></div>
+        <div class="icon-text"><span>&#x1F6A8;</span><span><strong>プロアクティブな運用:</strong> Feature Usage メトリクスに基づくアラート設定により、想定外の機能使用を検知できる</span></div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>&#x26A0;&#xFE0F; デメリット・制約事項</h2>
+
+      <h3>制限事項</h3>
+      <div class="error-box">
+        <div class="icon-text"><span>&#x274C;</span><span>ダウングレード前に上位エディション固有の機能を全て停止する必要があり、Spanner Graph のスキーマ削除やベクトルインデックスの削除など、破壊的な操作が含まれる</span></div>
+        <div class="icon-text"><span>&#x274C;</span><span>Feature Usage メトリクスのサンプリング間隔は 60 秒であり、最大 120 秒の表示遅延がある</span></div>
+        <div class="icon-text"><span>&#x274C;</span><span>Standard エディションへのダウングレードは、現時点ではサポートへの問い合わせが必要な場合がある</span></div>
+      </div>
+
+      <h3>考慮すべき点</h3>
+      <div class="warning-box">
+        <div class="icon-text"><span>&#x1F4A1;</span><span>ダウングレード後に上位エディション機能が必要になった場合、再度アップグレードが必要となる (アップグレードもゼロダウンタイムで約 10 分)</span></div>
+        <div class="icon-text"><span>&#x1F4A1;</span><span>マルチリージョン構成を使用している Enterprise Plus インスタンスは、ダウングレードの前にリージョナル構成への移行が必要であり、この移行には追加の計画と実行時間が必要</span></div>
+        <div class="icon-text"><span>&#x1F4A1;</span><span>組織ポリシー制約 (Organization Policy Constraint) を使用して、特定のエディションの作成を防止することが可能</span></div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>&#x1F4A1; ユースケース</h2>
+
+      <div class="usecase-card">
+        <h3>&#x1F3AF; ユースケース 1: コスト最適化のためのエディション見直し</h3>
+        <p><strong>シナリオ:</strong> ある企業が、初期に Enterprise Plus エディションで Spanner インスタンスをプロビジョニングしたが、実際にはマルチリージョン構成や Geo-partitioning を使用しておらず、Enterprise エディションの機能のみを利用している。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">コスト最適化の実装例</span>
+          </div>
+          <pre><code class="language-bash"># 1. Feature Usage メトリクスで Enterprise Plus 固有機能の使用状況を確認
+# Cloud Monitoring > Metrics Explorer で以下を設定
+# メトリクス: Cloud Spanner Instance > Instance > Feature usage
+# フィルタ: instance_id = "my-production-instance"
+
+# 2. Enterprise Plus 固有機能 (Geo-partitioning, multi-region) が
+#    使用されていないことを確認した後、ダウングレードを実行
+gcloud spanner instances update my-production-instance --edition=ENTERPRISE</code></pre>
+        </div>
+        <p><strong>効果:</strong> Enterprise Plus と Enterprise の料金差額分のコスト削減が実現できる。ゼロダウンタイムでの切り替えにより、本番環境への影響なくコスト最適化が可能。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>&#x1F3AF; ユースケース 2: クエリパフォーマンス問題の迅速な診断</h3>
+        <p><strong>シナリオ:</strong> Spanner インスタンスで断続的にレイテンシが上昇し、ユーザーからの応答時間に影響が出ている。Query Insights とアクティブクエリモニタリングを使用して、原因となるクエリを特定する。</p>
+        <p><strong>効果:</strong> Query Insights ダッシュボードにより、CPU 時間やレイテンシが高いクエリを迅速に特定でき、実行計画の分析を通じてボトルネックの根本原因を特定できる。追加コストなしで利用可能。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>&#x1F4B0; 料金</h2>
+      <p>Spanner はエディションごとに異なる料金体系を採用している。エディションのダウングレードにより、上位エディションとの差額分を削減できる。</p>
+
+      <h3>料金例 (us-central1 リージョンの参考値)</h3>
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr><th>項目</th><th>料金 (概算)</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>ノード料金 (オンデマンド)</td><td>$0.90/ノード/時間 (リージョン構成参考値)</td></tr>
+            <tr><td>CUD 割引 (1 年)</td><td>20% 割引</td></tr>
+            <tr><td>CUD 割引 (3 年)</td><td>40% 割引</td></tr>
+            <tr><td>Query Insights</td><td>追加コストなし</td></tr>
+            <tr><td>Feature Usage モニタリング</td><td>追加コストなし (Cloud Monitoring の標準メトリクス)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>詳細な料金情報は <a href="https://cloud.google.com/spanner/pricing" target="_blank" class="gc-link">Spanner 料金ページ</a> を参照。</p>
+    </div>
+
+    <!-- Regions -->
+    <div class="section">
+      <h2>&#x1F30D; 利用可能リージョン</h2>
+      <p>Spanner エディションは全てのリージョナル、デュアルリージョン、マルチリージョン構成で利用可能。ただし、<span class="highlight">マルチリージョン構成は Enterprise Plus エディション限定</span>。</p>
+      <p>リージョンの詳細は <a href="https://cloud.google.com/spanner/docs/instance-configurations" target="_blank" class="gc-link">Spanner インスタンス構成</a> を参照。</p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#x1F517; 関連サービス・機能</h2>
+      <div class="card">
+        <div class="icon-text"><span>&#x1F4CA;</span><span><strong>Cloud Monitoring:</strong> Feature Usage メトリクスの表示、アラート設定、ダッシュボード構築に使用</span></div>
+      </div>
+      <div class="card">
+        <div class="icon-text"><span>&#x1F4DD;</span><span><strong>Cloud Logging:</strong> Spanner の監査ログやデータアクセスログの収集・分析に使用</span></div>
+      </div>
+      <div class="card">
+        <div class="icon-text"><span>&#x1F512;</span><span><strong>Organization Policy Service:</strong> 組織ポリシー制約により特定エディションの作成を制限可能</span></div>
+      </div>
+      <div class="card">
+        <div class="icon-text"><span>&#x1F4E6;</span><span><strong>BigQuery:</strong> Spanner との連携 (Federated Queries, Data Boost, Reverse ETL) はエディションに関わらず利用可能</span></div>
+      </div>
+      <div class="card">
+        <div class="icon-text"><span>&#x1F50D;</span><span><strong>OpenTelemetry:</strong> クライアントサイドのカスタムメトリクスやトレース収集に使用可能</span></div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>&#x1F4CC; まとめ</h2>
+      <div class="note-box">
+        <p>今回のアップデートにより、Spanner のエディション管理とオブザーバビリティが大幅に強化された。Feature Usage メトリクスによるエディション機能の可視化とダウングレード機能の組み合わせは、Enterprise Plus エディションを利用中でありながら上位機能を活用できていないユーザーにとって、直接的なコスト最適化の機会を提供する。</p>
+        <p><strong>推奨アクション:</strong> まずは Cloud Monitoring の Metrics Explorer で自身のインスタンスの Feature Usage メトリクスを確認し、エディション選択の妥当性を評価することを推奨する。</p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>&#x1F4CE; 出典・参考リンク:</strong></p>
+      <ul>
+        <li>&#x2192; <a href="https://cloud.google.com/release-notes#February_25_2026" target="_blank">公式リリースノート (2026-02-25)</a></li>
+        <li>&#x2192; <a href="https://cloud.google.com/spanner/docs/editions-overview" target="_blank">Spanner エディション概要</a></li>
+        <li>&#x2192; <a href="https://cloud.google.com/spanner/docs/create-manage-instances" target="_blank">インスタンスの作成と管理</a></li>
+        <li>&#x2192; <a href="https://cloud.google.com/spanner/docs/using-query-insights" target="_blank">Query Insights の使用</a></li>
+        <li>&#x2192; <a href="https://cloud.google.com/spanner/docs/monitor-active-queries" target="_blank">アクティブクエリのモニタリング</a></li>
+        <li>&#x2192; <a href="https://cloud.google.com/spanner/docs/signal-capture-overview" target="_blank">Spanner オブザーバビリティ概要</a></li>
+        <li>&#x2192; <a href="https://cloud.google.com/spanner/pricing" target="_blank">料金ページ</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline); font-size: 11px;">#CloudSpanner #Spanner #エディション #モニタリング #コスト最適化 #QueryInsights #ダウングレード #Enterprise #EnterprisePlus #オブザーバビリティ</p>
+    </footer>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Load Balancing: 内部パススルー ネットワーク ロードバランサのゾーンアフィニティが GA</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-teal {
+      border-left-color: var(--gc-teal);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card-teal {
+      background: linear-gradient(135deg, var(--gc-teal), #00838F);
+    }
+
+    .stat-card-green {
+      background: linear-gradient(135deg, var(--gc-green), #1B5E20);
+    }
+
+    .stat-card-orange {
+      background: linear-gradient(135deg, var(--gc-orange), #E65100);
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-box h3 {
+      color: var(--gc-red);
+      margin-top: 0;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-box h3 {
+      color: var(--gc-green);
+      margin-top: 0;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h3 {
+      color: var(--gc-blue-800);
+      margin-top: 0;
+    }
+
+    .compatibility-supported {
+      color: var(--gc-green);
+      font-weight: 600;
+    }
+
+    .compatibility-unsupported {
+      color: var(--gc-red);
+      font-weight: 600;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>🌐 内部パススルー ネットワーク ロードバランサ<br>ゾーンアフィニティが GA</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Cloud Load Balancing</span>
+          <span class="badge badge-ga">GA</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-05-21</div>
+    </div>
+
+    <!-- 概要セクション -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>Google Cloud は、<span class="highlight">内部パススルー ネットワーク ロードバランサ (Internal Passthrough Network Load Balancer)</span> のゾーンアフィニティ機能を一般提供 (GA) としてリリースしました。</p>
+      <p>ゾーンアフィニティは、ロードバランサのバックエンドサービスに設定することで、<strong>クロスゾーントラフィックを制限</strong>し、<strong>レイテンシを削減</strong>し、<strong>パフォーマンスを向上</strong>させる機能です。マルチゾーンアーキテクチャの利点を維持しながら、クライアントと同じゾーンにあるバックエンドへの接続を優先的にルーティングします。</p>
+
+      <div class="note-box">
+        <strong>💡 対象ユーザー:</strong> レイテンシに敏感なワークロードを実行している組織、ゾーン間トラフィックのコストを最適化したい組織、内部パススルー ネットワーク ロードバランサでマイクロサービス間の通信を管理しているすべてのユーザー
+      </div>
+    </div>
+
+    <!-- Before/After 比較 -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before (アップデート前)</h3>
+          <div class="check-item"><span class="cross-icon">✗</span><span>新しい接続がすべてのゾーンのバックエンドに均等に分散</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>同一ゾーン内バックエンドの優先方法なし</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>クロスゾーントラフィックによる追加レイテンシ</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>ゾーン間データ転送コスト制御手段が限定的</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>Preview 版は SLA 対象外</span></div>
+        </div>
+        <div class="after-box">
+          <h3>✅ After (アップデート後)</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span>同一ゾーンのバックエンドへ優先ルーティング</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>GA リリースで SLA に基づく安定利用</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>ネットワークレイテンシを大幅に削減</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>スピルオーバー比率で柔軟な制御</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><code>beta</code> フラグなしで設定可能</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 統計カード -->
+    <div class="section">
+      <h2>📊 数字で見る効果</h2>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value">0.0 - 1.0</div>
+          <div class="stat-label">スピルオーバー比率の設定範囲</div>
+        </div>
+        <div class="stat-card stat-card-teal">
+          <div class="stat-value">$0</div>
+          <div class="stat-label">ゾーンアフィニティ機能の追加料金</div>
+        </div>
+        <div class="stat-card stat-card-green">
+          <div class="stat-value">3 モード</div>
+          <div class="stat-label">ゾーンアフィニティの設定オプション</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>ゾーンアフィニティが有効な場合、ロードバランサはクライアントと同じゾーンにあるバックエンドを優先的に選択します。同一ゾーンのバックエンドが不十分な場合、設定されたスピルオーバー比率に基づいて他のゾーンのバックエンドにフォールバックします。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    Client[クライアント VM<br/>Zone A]
+    LB[Internal Passthrough<br/>Network Load Balancer]
+    ZA{ゾーンアフィニティ<br/>判定}
+
+    subgraph ZoneA["Zone A (同一ゾーン - 優先)"]
+        BA1[Backend VM 1]
+        BA2[Backend VM 2]
+    end
+
+    subgraph ZoneB["Zone B (別ゾーン - フォールバック)"]
+        BB1[Backend VM 3]
+        BB2[Backend VM 4]
+    end
+
+    Client -->|リクエスト| LB
+    LB --> ZA
+    ZA -->|ゾーンマッチ: 優先ルーティング| BA1
+    ZA -->|ゾーンマッチ: 優先ルーティング| BA2
+    ZA -.->|スピルオーバー/フォールバック| BB1
+    ZA -.->|スピルオーバー/フォールバック| BB2
+        </pre>
+      </div>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚙️ 主要機能 - 3 つのゾーンアフィニティモード</h2>
+
+      <div class="card card-teal">
+        <h3>1. ZONAL_AFFINITY_STAY_WITHIN_ZONE</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>ゾーンマッチが発生した場合、トラフィックをクライアントのゾーン内に維持</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>同一ゾーン内のバックエンドが正常でなくても、ゾーン内バックエンドを使用</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>推奨:</strong> レイテンシ最適化を最優先するユースケース</span></div>
+      </div>
+
+      <div class="card card-green">
+        <h3>2. ZONAL_AFFINITY_SPILL_CROSS_ZONE</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>スピルオーバー比率に基づいてトラフィックを制御 (0.0 - 1.0)</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>同一ゾーン内の正常バックエンドが比率を下回ると、他ゾーンへスピルオーバー許可</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>推奨:</strong> 可用性とレイテンシのバランスが必要な場合</span></div>
+      </div>
+
+      <div class="card">
+        <h3>3. ZONAL_AFFINITY_DISABLED (デフォルト)</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>ゾーンアフィニティが無効な状態 (従来の動作)</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>すべての正常なバックエンドから均等に選択</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>推奨:</strong> デフォルト動作、均等分散が必要な場合</span></div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 - オプション比較 -->
+    <div class="section">
+      <h2>📐 技術仕様</h2>
+      <h3>ゾーンアフィニティオプション比較</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>オプション</th>
+            <th>動作</th>
+            <th>スピルオーバー比率</th>
+            <th>推奨ユースケース</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>ZONAL_AFFINITY_DISABLED</code></td>
+            <td>ゾーン制限なし</td>
+            <td>N/A</td>
+            <td>デフォルト動作、均等分散が必要な場合</td>
+          </tr>
+          <tr>
+            <td><code>ZONAL_AFFINITY_STAY_WITHIN_ZONE</code></td>
+            <td>同一ゾーン強制</td>
+            <td>N/A</td>
+            <td>レイテンシ最小化が最優先</td>
+          </tr>
+          <tr>
+            <td><code>ZONAL_AFFINITY_SPILL_CROSS_ZONE</code></td>
+            <td>比率ベースで制御</td>
+            <td>0.0 - 1.0</td>
+            <td>可用性とレイテンシのバランスが必要</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>互換性マトリックス</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>機能</th>
+            <th>ゾーンアフィニティとの互換性</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Next hops (静的ルート)</td>
+            <td class="compatibility-supported">✓ サポート</td>
+          </tr>
+          <tr>
+            <td>Next hops (ポリシーベースルート)</td>
+            <td class="compatibility-supported">✓ サポート</td>
+          </tr>
+          <tr>
+            <td>フェイルオーバー</td>
+            <td class="compatibility-supported">✓ サポート</td>
+          </tr>
+          <tr>
+            <td>Private Service Connect</td>
+            <td class="compatibility-supported">✓ サポート</td>
+          </tr>
+          <tr>
+            <td>Backend subsetting</td>
+            <td class="compatibility-unsupported">✗ 非互換</td>
+          </tr>
+          <tr>
+            <td>Packet Mirroring コレクター</td>
+            <td class="compatibility-unsupported">✗ 非互換</td>
+          </tr>
+          <tr>
+            <td>Network Security Integration</td>
+            <td class="compatibility-unsupported">✗ 非互換 (パケットドロップの原因)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🔧 設定方法</h2>
+
+      <div class="note-box">
+        <strong>📝 前提条件:</strong>
+        <div class="check-item"><span class="check-icon">✓</span><span>Google Cloud プロジェクトが作成済み</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>内部パススルー ネットワーク ロードバランサが構成済み</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>バックエンドが複数ゾーンにデプロイ済み</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>Backend subsetting が無効であること</span></div>
+      </div>
+
+      <h3>STAY_WITHIN_ZONE の設定</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud compute backend-services update BACKEND_SERVICE_NAME \
+    --zonal-affinity-spillover=ZONAL_AFFINITY_STAY_WITHIN_ZONE \
+    --region=REGION</code></pre>
+
+      <h3>SPILL_CROSS_ZONE の設定 (スピルオーバー比率付き)</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud compute backend-services update BACKEND_SERVICE_NAME \
+    --zonal-affinity-spillover=ZONAL_AFFINITY_SPILL_CROSS_ZONE \
+    --zonal-affinity-spillover-ratio=0.8 \
+    --region=REGION</code></pre>
+
+      <h3>ゾーンアフィニティの無効化</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud compute backend-services update BACKEND_SERVICE_NAME \
+    --zonal-affinity-spillover=ZONAL_AFFINITY_DISABLED \
+    --region=REGION</code></pre>
+
+      <h3>JSON 設定例</h3>
+      <span class="code-label">JSON</span>
+      <pre><code class="language-json">{
+  "name": "backend-service-example",
+  "loadBalancingScheme": "INTERNAL",
+  "protocol": "TCP",
+  "zonalAffinity": {
+    "zonalAffinitySpillover": "ZONAL_AFFINITY_SPILL_CROSS_ZONE",
+    "zonalAffinitySpilloverRatio": 0.8
+  }
+}</code></pre>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div>
+          <h3>💼 ビジネス面</h3>
+          <div class="card card-green">
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>ネットワークコスト削減</strong>: クロスゾーントラフィック制限でゾーン間データ転送コストを削減</span></div>
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>パフォーマンス向上</strong>: レイテンシ低減でエンドユーザー体験向上、SLA 達成率改善</span></div>
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>運用の簡素化</strong>: ロードバランサ設定変更のみ、アプリコード変更不要</span></div>
+          </div>
+        </div>
+        <div>
+          <h3>🔬 技術面</h3>
+          <div class="card card-teal">
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>レイテンシ削減</strong>: 同一ゾーン内通信でネットワークホップ削減、RTT 短縮</span></div>
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>柔軟な制御</strong>: スピルオーバー比率で可用性とローカリティのトレードオフを制御</span></div>
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>既存接続影響なし</strong>: コネクション追跡テーブルの既存接続は影響を受けない</span></div>
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>フェイルオーバー併用</strong>: 高可用性を維持しながらゾーンアフィニティ活用可能</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <div class="warning-box">
+        <strong>制限事項:</strong>
+        <div class="check-item"><span class="cross-icon">✗</span><span>Backend subsetting との併用は不可</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>Packet Mirroring のコレクター宛先との併用は不可</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>Network Security Integration との併用はパケットドロップの原因</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>Cloud VPN/Cloud Interconnect 経由クライアントでは動作しない</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>クライアント VM が異なるリージョンにある場合は無効</span></div>
+      </div>
+
+      <div class="error-box">
+        <strong>考慮すべき点:</strong>
+        <div class="check-item"><span class="cross-icon">!</span><span>STAY_WITHIN_ZONE 使用時、同一ゾーン内バックエンドが不健全でもゾーン内に留まるため可用性リスクあり</span></div>
+        <div class="check-item"><span class="cross-icon">!</span><span>ステートフルアーキテクチャ (ファイアウォール並列構成) でのネクストホップ使用は非推奨</span></div>
+        <div class="check-item"><span class="cross-icon">!</span><span>スピルオーバー比率はワークロード特性に応じたチューニングが必要</span></div>
+        <div class="check-item"><span class="cross-icon">!</span><span>ゾーン間バックエンド数が不均等な場合、特定ゾーンに負荷集中の可能性</span></div>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h3>🏦 ユースケース 1: レイテンシに敏感なマイクロサービス通信</h3>
+        <p><strong>シナリオ:</strong> 金融取引システムにおいて、注文管理サービスから約定処理サービスへのリクエストを最小レイテンシで処理。両サービスは複数ゾーンにデプロイされているが、同一ゾーン内通信を優先したい。</p>
+        <span class="code-label">Bash</span>
+        <pre><code class="language-bash">gcloud compute backend-services update order-execution-backend \
+    --zonal-affinity-spillover=ZONAL_AFFINITY_SPILL_CROSS_ZONE \
+    --zonal-affinity-spillover-ratio=0.5 \
+    --region=asia-northeast1</code></pre>
+        <p><strong>効果:</strong> 通常時は同一ゾーン内で低レイテンシ通信、バックエンドが 50% 以下になるとクロスゾーンにフォールバックして可用性確保。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>💰 ユースケース 2: データ転送コストの最適化</h3>
+        <p><strong>シナリオ:</strong> 大量データを処理するバッチ処理システムで、ワーカーノードがデータストア (内部 LB 経由) にアクセスする際のゾーン間データ転送コストを削減したい。</p>
+        <span class="code-label">Bash</span>
+        <pre><code class="language-bash">gcloud compute backend-services update data-store-backend \
+    --zonal-affinity-spillover=ZONAL_AFFINITY_STAY_WITHIN_ZONE \
+    --region=us-central1</code></pre>
+        <p><strong>効果:</strong> ワーカーノードと同一ゾーンのデータストアバックエンドにのみ接続され、ゾーン間データ転送料金が発生せず大幅なコスト削減を実現。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>🔗 ユースケース 3: Private Service Connect と組み合わせたサービス提供</h3>
+        <p><strong>シナリオ:</strong> SaaS プロバイダーが Private Service Connect を使用してサービスを公開しており、エンドポイント経由のトラフィックを効率的に処理したい。</p>
+        <p><strong>効果:</strong> Private Service Connect エンドポイントからのトラフィックが、プロデューサー側の同一ゾーンのバックエンドに優先的にルーティングされ、サービス提供のレイテンシが改善。</p>
+      </div>
+    </div>
+
+    <!-- 料金情報 -->
+    <div class="section">
+      <h2>💲 料金情報</h2>
+      <div class="success-box">
+        <strong>ゾーンアフィニティ機能自体には追加料金は発生しません。</strong> 通常の Cloud Load Balancing の料金体系が適用されます。
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>月額料金 (概算)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>転送ルール (最初の 5 個)</td>
+            <td>各 $0.025/時間 (約 $18/月)</td>
+          </tr>
+          <tr>
+            <td>追加の転送ルール</td>
+            <td>各 $0.010/時間 (約 $7.2/月)</td>
+          </tr>
+          <tr>
+            <td>インバウンドデータ処理</td>
+            <td>$0.008 - $0.012/GB (リージョンによる)</td>
+          </tr>
+          <tr>
+            <td>アウトバウンドデータ処理</td>
+            <td>$0.008 - $0.012/GB (リージョンによる)</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="note-box">
+        <strong>💡 コスト削減のポイント:</strong> ゾーンアフィニティを有効にすることで、クロスゾーントラフィックが減少し、ゾーン間のエグレス料金を間接的に削減できる可能性があります。
+      </div>
+    </div>
+
+    <!-- 利用可能リージョン -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <p>ゾーンアフィニティは、内部パススルー ネットワーク ロードバランサが利用可能な<span class="highlight">すべてのリージョン</span>で GA として利用可能です。</p>
+      <div class="note-box">
+        <strong>📝 注意:</strong> ゾーンアフィニティの効果を得るためには、ロードバランサと同じリージョン内の<strong>複数ゾーン</strong>にバックエンドがデプロイされている必要があります。
+      </div>
+    </div>
+
+    <!-- 関連サービス -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Internal Passthrough Network Load Balancer</strong>: ゾーンアフィニティが設定される対象</span></div>
+      </div>
+      <div class="card card-green">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Private Service Connect</strong>: 互換性あり、パブリッシュされたサービスのプロデューサーとして使用可能</span></div>
+      </div>
+      <div class="card card-orange">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Cloud VPN / Cloud Interconnect</strong>: これらを経由するクライアントはゾーンアフィニティの対象外</span></div>
+      </div>
+      <div class="card card-teal">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Connection Tracking Policy</strong>: ゾーンアフィニティと併用して接続管理を最適化可能</span></div>
+      </div>
+      <div class="card card-purple">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Backend Subsetting</strong>: ゾーンアフィニティとは非互換、どちらか一方を選択</span></div>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <p>内部パススルー ネットワーク ロードバランサのゾーンアフィニティが GA になったことで、マルチゾーン環境におけるトラフィック制御の選択肢が大幅に広がりました。</p>
+      <div class="flow-diagram">
+        <div class="flow-step">🎯 レイテンシ<br>削減</div>
+        <span class="flow-arrow">+</span>
+        <div class="flow-step">💰 コスト<br>最適化</div>
+        <span class="flow-arrow">+</span>
+        <div class="flow-step">🚀 パフォーマンス<br>向上</div>
+        <span class="flow-arrow">=</span>
+        <div class="flow-step">✅ マルチゾーン<br>高可用性維持</div>
+      </div>
+      <div class="success-box">
+        <strong>推奨:</strong> 内部ロードバランサを使用している組織は、ワークロードの特性に応じてゾーンアフィニティの導入を検討することを推奨します。
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p><strong>📎 出典:</strong></p>
+      <ul style="list-style: none; padding: 0; margin: 8px 0;">
+        <li style="margin: 4px 0;">- <a href="https://cloud.google.com/release-notes#May_21_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li style="margin: 4px 0;">- <a href="https://cloud.google.com/load-balancing/docs/internal/zonal-affinity" target="_blank" rel="noopener noreferrer">ゾーンアフィニティ ドキュメント</a></li>
+        <li style="margin: 4px 0;">- <a href="https://cloud.google.com/load-balancing/docs/internal/setting-up-internal" target="_blank" rel="noopener noreferrer">内部パススルー ネットワーク ロードバランサの設定</a></li>
+        <li style="margin: 4px 0;">- <a href="https://cloud.google.com/vpc/network-pricing#lb" target="_blank" rel="noopener noreferrer">料金ページ</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline);">Generated: 2026-05-22 | Tags: #CloudLoadBalancing #InternalPassthroughNetworkLoadBalancer #ZonalAffinity #GA #Networking</p>
+    </footer>
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+    hljs.highlightAll();
+  </script>
+</body>
+</html>

@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AlloyDB Columnar Engine HNSW Vector Search Acceleration (Preview)</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; min-width: 280px; }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .header-badges {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-preview {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-orange);
+    }
+
+    .badge-ga {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-green);
+    }
+
+    /* Cards */
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-title {
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 8px;
+      font-size: 17px;
+    }
+
+    .card p { margin: 4px 0; }
+
+    /* Stats grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 20px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.green {
+      background: linear-gradient(135deg, var(--gc-green), #1B8A3E);
+    }
+
+    .stat-card.purple {
+      background: linear-gradient(135deg, var(--gc-purple), #7B1FA2);
+    }
+
+    .stat-card.orange {
+      background: linear-gradient(135deg, var(--gc-orange), #E65100);
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Before/After */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .before-box h4,
+    .after-box h4 {
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+
+    .before-box h4 { color: var(--gc-red); }
+    .after-box h4 { color: var(--gc-green); }
+
+    .before-box ul,
+    .after-box ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .before-box li,
+    .after-box li {
+      padding: 4px 0;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .before-box li::before { content: "- "; color: var(--gc-red); font-weight: bold; }
+    .after-box li::before { content: "+ "; color: var(--gc-green); font-weight: bold; }
+
+    /* Usecase cards */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-900);
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .usecase-card p { font-size: 15px; }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* Note/Warning boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .ai-box {
+      background: var(--gc-purple-tint);
+      border-left: 4px solid var(--gc-purple);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Code blocks */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      background: #1E1E1E;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Mermaid container */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Flow diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Check/Cross items */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon { color: var(--gc-green); font-size: 18px; }
+    .cross-icon { color: var(--gc-red); font-size: 18px; }
+
+    /* Merit/Demerit grid */
+    .merit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .merit-section h3 {
+      margin-top: 0;
+    }
+
+    /* Icon text */
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    /* Link styling */
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* Footer */
+    footer {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    footer ul {
+      list-style: none;
+      padding: 0;
+      margin: 8px 0;
+    }
+
+    footer li {
+      margin: 4px 0;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .before-after { grid-template-columns: 1fr; }
+      .merit-grid { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .stat-value { font-size: 28px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>AlloyDB for PostgreSQL: Columnar Engine による HNSW インデックスのベクトル検索高速化</h1>
+        <div class="subtitle">2026-04-21 | AlloyDB for PostgreSQL</div>
+        <div class="header-badges">
+          <span class="badge">AlloyDB for PostgreSQL</span>
+          <span class="badge-preview">Preview</span>
+          <span class="badge" style="background: var(--gc-purple);">Vector Search</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value">4x</div>
+        <div class="stat-label">ベクトル検索の高速化<br/>(標準 PostgreSQL 比)</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-value">0</div>
+        <div class="stat-label">ディスク I/O<br/>(インメモリキャッシュ時)</div>
+      </div>
+      <div class="stat-card purple">
+        <div class="stat-value">PG 17+</div>
+        <div class="stat-label">必要な PostgreSQL<br/>バージョン</div>
+      </div>
+      <div class="stat-card orange">
+        <div class="stat-value">30%</div>
+        <div class="stat-label">デフォルトメモリ割り当て<br/>(インスタンスの)</div>
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>AlloyDB for PostgreSQL のカラムナーエンジンが、<span class="highlight">HNSW (Hierarchical Navigable Small World) インデックス</span>の読み取り最適化されたインメモリキャッシュとして機能するようになりました。これにより、ベクトル検索ワークロードにおいて処理可能な秒間クエリ数 (QPS) が大幅に向上し、標準 PostgreSQL と比較して<span class="highlight">最大 4 倍高速</span>なベクトル検索クエリを実現します。</p>
+      <p style="margin-top: 12px;">カラムナーエンジンは、AlloyDB が提供するインメモリの列指向データストアであり、従来は分析クエリの高速化やテーブルデータのキャッシュに使用されていました。今回のアップデートにより、HNSW ベクトルインデックスもカラムナーエンジンにキャッシュできるようになり、ディスクからの読み取りを排除してメモリ上で直接クエリを処理することが可能になります。</p>
+
+      <div class="ai-box" style="margin-top: 16px;">
+        <strong>対象ユーザー:</strong> RAG (Retrieval-Augmented Generation)、セマンティック検索、レコメンデーションエンジンなど、高い QPS を要求する AI アプリケーションを運用するユーザー。既に ScaNN インデックスではカラムナーエンジンによる高速化が利用可能でしたが、HNSW への対応により pgvector ベースの標準的なベクトルインデックスを使用しているユーザーにも同様の恩恵が提供されます。
+      </div>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>Before / After</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h4>Before (課題)</h4>
+          <ul>
+            <li>HNSW インデックスのベクトル検索でディスクからの読み取りが発生し、大量の同時クエリ処理時に I/O ボトルネックが発生</li>
+            <li>カラムナーエンジンによるベクトルインデックス高速化は ScaNN のみ対応、pgvector 標準の HNSW では利用不可</li>
+            <li>高い QPS 実現にはインスタンスのスケールアップやリードレプリカ追加が必要でコスト増</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h4>After (改善)</h4>
+          <ul>
+            <li>HNSW インデックスをインメモリキャッシュに格納しディスク I/O を排除、QPS が大幅に向上</li>
+            <li>標準 PostgreSQL 比で最大 4 倍高速なベクトル検索クエリを実現</li>
+            <li>データ更新時もハイブリッドアプローチで精度とパフォーマンスを両立</li>
+            <li>EXPLAIN (ANALYZE, COLUMNAR_ENGINE) によるキャッシュ利用状況の可視化が可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>🏗 アーキテクチャ図</h2>
+      <p>カラムナーエンジンによる HNSW ベクトル検索の処理フローを示しています。カラムナーエンジンが有効な場合、HNSW インデックスはインメモリキャッシュから直接読み取られます。データ変更によりキャッシュが無効化された場合は、有効なキャッシュエントリはメモリから、変更されたデータはディスクから読み取るハイブリッドアプローチが使用されます。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    A[アプリケーション ベクトル検索クエリ] --> B[AlloyDB インスタンス PostgreSQL 17+]
+    B --> C{カラムナーエンジン インデックスキャッシュ有効?}
+    C -->|有効| D[インメモリ HNSW インデックスキャッシュ]
+    C -->|無効| E[ディスク上の HNSW インデックス]
+    D --> F{キャッシュ ヒット?}
+    F -->|全ヒット| G[メモリから ベクトル取得 elements_from_ce]
+    F -->|部分ヒット| H[ハイブリッド読み取り メモリ + ディスク]
+    E --> I[ディスクから ベクトル取得]
+    G --> J[近似最近傍 検索結果]
+    H --> J
+    I --> J
+    J --> K[クエリ結果返却]
+
+    subgraph カラムナーエンジン
+        D
+        F
+        G
+        H
+    end
+
+    subgraph ストレージレイヤー
+        E
+        I
+    end
+
+    L[INSERT / UPDATE / DELETE] --> M[キャッシュエントリ 無効化]
+    M --> H
+    N[google_columnar_engine refresh_index] --> D
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>主要機能</h2>
+
+      <div class="card">
+        <div class="card-title">1. HNSW インデックスのインメモリキャッシュ</div>
+        <p>カラムナーエンジンが HNSW インデックスの読み取り最適化されたインメモリ表現を保持。ディスク I/O を排除し、ベクトル検索の QPS を大幅に向上させます。<code>google_columnar_engine_add_index()</code> SQL 関数でインデックスをキャッシュに追加できます。</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">2. ハイブリッドキャッシュアプローチ</div>
+        <p>INSERT、UPDATE、DELETE によるデータ変更時、キャッシュエントリが自動的に無効化されます。有効なキャッシュエントリはメモリから、変更されたデータはディスクから読み取ることで、キャッシュリフレッシュまでの間もクエリの正確性が維持されます。</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">3. EXPLAIN によるキャッシュ利用状況の可視化</div>
+        <p><code>EXPLAIN (ANALYZE, COLUMNAR_ENGINE)</code> で <code>elements_from_ce</code> と <code>elements_from_disk</code> の比率を確認可能。キャッシュのヒット率やパフォーマンスのモニタリングに活用できます。</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">4. キャッシュライフサイクル管理</div>
+        <p>手動リフレッシュ (<code>google_columnar_engine_refresh_index()</code>)、ステータス確認 (<code>google_columnar_engine_verify()</code>)、キャッシュ削除 (<code>google_columnar_engine_drop_index()</code>)、アクティブインデックス一覧 (<code>g_columnar_indexes</code> ビュー) など、包括的な管理機能を提供します。</p>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>技術仕様</h2>
+
+      <h3>動作要件と制約</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>対応 PostgreSQL バージョン</td><td>PostgreSQL 17 以降 (HNSW の場合)</td></tr>
+          <tr><td>ScaNN のバージョン制約</td><td>なし (全バージョンで利用可能)</td></tr>
+          <tr><td>必要なデータベースフラグ</td><td><code>google_columnar_engine.enabled=on</code><br/><code>google_columnar_engine.enable_index_caching=on</code></td></tr>
+          <tr><td>デフォルトメモリ割り当て</td><td>インスタンスメモリの 30% (最大 50% 推奨、70% まで設定可)</td></tr>
+          <tr><td>メモリ使用量 (リフレッシュ時)</td><td>インデックスサイズの最大 2 倍を一時的に消費</td></tr>
+          <tr><td>ステータス</td><td><span class="badge-preview">Preview</span></td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top: 24px;">HNSW と ScaNN の比較</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>HNSW</th><th>ScaNN</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>適用場面</td><td>高次元データ、メモリ内に収まるデータ</td><td>低次元データ、メモリを超える大規模データ</td></tr>
+          <tr><td>スケール</td><td>1,000 万 - 2,000 万ベクトル</td><td>100 億ベクトルまで</td></tr>
+          <tr><td>カラムナーエンジン高速化</td><td>最大 4 倍高速 (標準 PostgreSQL 比)</td><td>最大 6 倍高速</td></tr>
+          <tr><td>PostgreSQL バージョン要件</td><td>17 以降</td><td>制限なし</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup Guide -->
+    <div class="section">
+      <h2>設定方法</h2>
+
+      <div class="note-box">
+        <strong>前提条件:</strong> AlloyDB for PostgreSQL クラスターが PostgreSQL 17 以降で動作しており、HNSW インデックスが作成済みで、カラムナーエンジンの有効化に十分なインスタンスメモリが確保されていること。
+      </div>
+
+      <h3>Step 1: カラムナーエンジンとインデックスキャッシュの有効化</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">gcloud CLI - カラムナーエンジンの有効化</span>
+        </div>
+        <pre><code class="language-bash">gcloud alloydb instances update my-instance \
+  --database-flags google_columnar_engine.enabled=on,google_columnar_engine.enable_index_caching=on \
+  --region=us-central1 \
+  --cluster=my-cluster \
+  --project=my-project</code></pre>
+      </div>
+      <p style="font-size: 14px; color: var(--gc-outline);">フラグ設定後、インスタンスが自動的に再起動されます。</p>
+
+      <h3>Step 2: HNSW インデックスの作成 (未作成の場合)</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">HNSW インデックスの作成</span>
+        </div>
+        <pre><code class="language-sql">-- pgvector 拡張機能の有効化
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- HNSW インデックスの作成
+CREATE INDEX hnsw_idx ON documents
+USING hnsw (embedding vector_cosine_ops)
+WITH (m = 16, ef_construction = 64);</code></pre>
+      </div>
+
+      <h3>Step 3: インデックスをカラムナーエンジンに追加</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">カラムナーエンジンへの追加</span>
+        </div>
+        <pre><code class="language-sql">SELECT google_columnar_engine_add_index('hnsw_idx');</code></pre>
+      </div>
+      <div class="warning-box">
+        <strong>注意:</strong> インデックスのサイズによっては長時間の処理になる場合があるため、psql クライアントセッションから実行することが推奨されます。
+      </div>
+
+      <h3>Step 4: キャッシュ利用状況の確認</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">キャッシュヒット確認</span>
+        </div>
+        <pre><code class="language-sql">EXPLAIN (ANALYZE, COLUMNAR_ENGINE)
+SELECT * FROM documents
+ORDER BY embedding <=> '[0.1, 0.2, 0.3, 0.4, 0.5]'::vector
+LIMIT 5;</code></pre>
+      </div>
+      <p style="font-size: 14px;">実行計画に <code>elements_from_ce=385 elements_from_disk=0</code> のように表示されれば、カラムナーエンジンによる高速化が有効です。</p>
+
+      <h3>Step 5: キャッシュの管理 (必要に応じて)</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">キャッシュ管理コマンド</span>
+        </div>
+        <pre><code class="language-sql">-- キャッシュの手動リフレッシュ
+SELECT google_columnar_engine_refresh_index('hnsw_idx');
+
+-- インデックスステータスの確認
+SELECT google_columnar_engine_verify('hnsw_idx');
+
+-- アクティブなキャッシュインデックスの一覧
+SELECT * FROM g_columnar_indexes;
+
+-- キャッシュからインデックスを削除
+SELECT google_columnar_engine_drop_index('hnsw_idx');</code></pre>
+      </div>
+    </div>
+
+    <!-- Merits & Demerits -->
+    <div class="section">
+      <h2>メリット / デメリット</h2>
+      <div class="merit-grid">
+        <div class="merit-section">
+          <h3 style="color: var(--gc-green);">メリット</h3>
+          <h4 style="font-size: 15px; margin-top: 12px; color: var(--gc-on-surface);">ビジネス面</h4>
+          <div class="check-item"><span class="check-icon">&#10003;</span><span>RAG やセマンティック検索の QPS 向上でユーザー数増加に対応</span></div>
+          <div class="check-item"><span class="check-icon">&#10003;</span><span>必要なインスタンス数を削減しコスト効率が向上</span></div>
+          <div class="check-item"><span class="check-icon">&#10003;</span><span>AlloyDB 一つでトランザクション処理とベクトル検索の両方を高性能に処理</span></div>
+
+          <h4 style="font-size: 15px; margin-top: 12px; color: var(--gc-on-surface);">技術面</h4>
+          <div class="check-item"><span class="check-icon">&#10003;</span><span>ディスク I/O 排除でレイテンシーを大幅に削減</span></div>
+          <div class="check-item"><span class="check-icon">&#10003;</span><span>ハイブリッドキャッシュで精度を維持しつつパフォーマンス低下を最小限に</span></div>
+          <div class="check-item"><span class="check-icon">&#10003;</span><span>EXPLAIN コマンドでキャッシュヒット率を可視化</span></div>
+          <div class="check-item"><span class="check-icon">&#10003;</span><span>pgvector 互換 - アプリケーションコード変更不要</span></div>
+        </div>
+        <div class="merit-section">
+          <h3 style="color: var(--gc-red);">デメリット / 制約事項</h3>
+          <h4 style="font-size: 15px; margin-top: 12px; color: var(--gc-on-surface);">制限事項</h4>
+          <div class="check-item"><span class="cross-icon">&#10007;</span><span>PostgreSQL 17 以降のクラスターでのみ利用可能</span></div>
+          <div class="check-item"><span class="cross-icon">&#10007;</span><span>Preview 段階 - SLA の対象外となる可能性</span></div>
+          <div class="check-item"><span class="cross-icon">&#10007;</span><span>リフレッシュ時にインデックスサイズの最大 2 倍のメモリを一時消費</span></div>
+
+          <h4 style="font-size: 15px; margin-top: 12px; color: var(--gc-on-surface);">考慮すべき点</h4>
+          <div class="check-item"><span class="cross-icon">&#10007;</span><span>メモリ割り当て増加で他のDB処理用メモリが減少</span></div>
+          <div class="check-item"><span class="cross-icon">&#10007;</span><span>大量の INSERT/UPDATE/DELETE 時にキャッシュ無効化でパフォーマンス一時低下</span></div>
+          <div class="check-item"><span class="cross-icon">&#10007;</span><span>インデックス追加操作は長時間の場合あり (psql 推奨)</span></div>
+          <div class="check-item"><span class="cross-icon">&#10007;</span><span>デフォルト 30% のメモリ割り当てでは不足する場合がある</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>1. RAG アプリケーションの高速化</h4>
+        <p><strong>シナリオ:</strong> 社内ナレッジベースに対して RAG を実装しており、多数のユーザーが同時にセマンティック検索を実行するケース。ピーク時の QPS が高く、レイテンシー要件が厳しい。</p>
+        <div class="code-block" style="margin-top: 12px;">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">RAG のコンテキスト検索クエリ</span>
+          </div>
+          <pre><code class="language-sql">-- カラムナーエンジンの有効化後、既存の HNSW インデックスをキャッシュに追加
+SELECT google_columnar_engine_add_index('knowledge_base_embedding_idx');
+
+-- RAG のコンテキスト検索クエリ
+SELECT doc_id, content,
+       embedding <=> $1::vector AS distance
+FROM knowledge_base
+ORDER BY embedding <=> $1::vector
+LIMIT 10;</code></pre>
+        </div>
+        <p style="font-size: 14px; margin-top: 8px;"><strong>効果:</strong> インメモリキャッシュにより QPS が向上し、同時接続ユーザー数の増加に対応可能。LLM への入力コンテキストの取得レイテンシーが低減し、エンドユーザーの体感速度が改善。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>2. リアルタイムレコメンデーションエンジン</h4>
+        <p><strong>シナリオ:</strong> EC サイトで商品の特徴ベクトルを使用したリアルタイムレコメンデーションを提供。商品ページの表示ごとにベクトル検索が実行され、低レイテンシーが求められる。</p>
+        <div class="code-block" style="margin-top: 12px;">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">商品の類似検索</span>
+          </div>
+          <pre><code class="language-sql">-- 商品の類似検索 (カラムナーエンジンで自動的に高速化)
+SELECT product_id, product_name, category,
+       embedding <=> $1::vector AS similarity
+FROM products
+ORDER BY embedding <=> $1::vector
+LIMIT 20;</code></pre>
+        </div>
+        <p style="font-size: 14px; margin-top: 8px;"><strong>効果:</strong> ディスク I/O のボトルネック解消で商品ページの読み込み時間が短縮。スケールアップなしでトラフィック増加に対応でき、インフラコスト削減。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>3. マルチモーダル検索プラットフォーム</h4>
+        <p><strong>シナリオ:</strong> 画像、テキスト、音声などの複数モダリティのエンベディングを AlloyDB に格納し、横断的な類似検索を提供するプラットフォーム。高次元ベクトル (768 次元以上) の HNSW インデックスを使用。</p>
+        <p style="font-size: 14px; margin-top: 8px;"><strong>効果:</strong> HNSW は高次元データに適しており、カラムナーエンジンによるインメモリ化で検索パフォーマンスが大幅向上。ScaNN への移行なしに既存の HNSW インデックスのパフォーマンスを改善。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>料金</h2>
+      <p>カラムナーエンジンの HNSW インデックスキャッシュ機能自体に<span class="highlight">追加料金は発生しません</span>。ただし、カラムナーエンジンはインスタンスのメモリを使用するため、十分なメモリを持つインスタンスタイプを選択する必要があります。</p>
+
+      <h3 style="margin-top: 16px;">AlloyDB 料金 (us-central1 の例)</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>料金</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>vCPU</td><td>$0.06608 / vCPU / 時間</td></tr>
+          <tr><td>メモリ</td><td>$0.0112 / GB / 時間</td></tr>
+          <tr><td>ストレージ</td><td>使用量に基づく従量課金</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top: 16px;">Committed Use Discounts (CUD)</h3>
+      <table>
+        <thead>
+          <tr><th>コミットメント期間</th><th>割引率</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1 年</td><td>25%</td></tr>
+          <tr><td>3 年</td><td>52%</td></tr>
+        </tbody>
+      </table>
+
+      <div class="warning-box" style="margin-top: 16px;">
+        <strong>注意:</strong> カラムナーエンジンのメモリ要件を満たすためにインスタンスのメモリを増やす場合、インスタンス料金が増加します。パフォーマンス向上と追加コストのバランスを検討してください。
+      </div>
+    </div>
+
+    <!-- Regions -->
+    <div class="section">
+      <h2>利用可能リージョン</h2>
+      <p>AlloyDB for PostgreSQL が利用可能な<span class="highlight">すべてのリージョン</span>で本機能を使用できます。ただし、PostgreSQL 17 以降のクラスターが必要です。</p>
+      <p style="margin-top: 8px;">AlloyDB の利用可能リージョンについては <a href="https://cloud.google.com/alloydb/docs/locations" target="_blank" class="gc-link">AlloyDB locations</a> をご参照ください。</p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>関連サービス</h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px;">
+        <div class="card">
+          <div class="card-title">AlloyDB Columnar Engine</div>
+          <p style="font-size: 14px;">カラムナーエンジンの基盤機能。分析クエリの高速化やテーブルデータのインメモリキャッシュにも使用</p>
+        </div>
+        <div class="card">
+          <div class="card-title">AlloyDB ScaNN Index</div>
+          <p style="font-size: 14px;">Google 独自の Scalable Nearest Neighbors インデックス。大規模データセット向け</p>
+        </div>
+        <div class="card">
+          <div class="card-title">AlloyDB AI</div>
+          <p style="font-size: 14px;">AlloyDB の AI/ML 統合機能群。エンベディング生成、ベクトル検索、モデル呼び出しを統合</p>
+        </div>
+        <div class="card">
+          <div class="card-title">pgvector 拡張機能</div>
+          <p style="font-size: 14px;">PostgreSQL のベクトルデータ型と類似検索をサポートするオープンソース拡張。AlloyDB は pgvector と完全互換</p>
+        </div>
+        <div class="card">
+          <div class="card-title">Vertex AI</div>
+          <p style="font-size: 14px;">エンベディング生成やモデルホスティングを提供する Google Cloud の AI プラットフォーム</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section" style="background: var(--gc-blue-tint); border: 2px solid var(--gc-blue-300);">
+      <h2>まとめ</h2>
+      <p>AlloyDB のカラムナーエンジンによる HNSW インデックス高速化は、pgvector ベースのベクトル検索を使用しているユーザーにとって、<span class="highlight">アプリケーションコードを変更することなく QPS を大幅に向上</span>できる重要なアップデートです。</p>
+      <p style="margin-top: 12px;">特に RAG やセマンティック検索など高い QPS を要求する AI ワークロードを運用している場合、<strong>PostgreSQL 17 への移行とカラムナーエンジンの有効化</strong>を検討することを推奨します。Preview 段階のため、まずは開発・テスト環境で性能評価を行い、GA 後の本番導入を計画するのが望ましいアプローチです。</p>
+
+      <div class="flow-diagram" style="margin-top: 20px;">
+        <div class="flow-step">PG 17 に<br/>アップグレード</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">カラムナーエンジン<br/>有効化</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">HNSW インデックス<br/>キャッシュ追加</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">QPS<br/>大幅向上</div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>出典:</strong></p>
+      <ul>
+        <li><a href="https://cloud.google.com/release-notes#April_21_2026" target="_blank" rel="noopener noreferrer">公式リリースノート (2026-04-21)</a></li>
+        <li><a href="https://cloud.google.com/alloydb/docs/ai/accelerate-with-ce" target="_blank" rel="noopener noreferrer">カラムナーエンジンによるベクトル検索高速化ドキュメント</a></li>
+        <li><a href="https://cloud.google.com/alloydb/docs/ai/create-hnsw-index" target="_blank" rel="noopener noreferrer">HNSW インデックスの作成</a></li>
+        <li><a href="https://cloud.google.com/alloydb/docs/ai/choose-index-strategy" target="_blank" rel="noopener noreferrer">ベクトル検索戦略の選択</a></li>
+        <li><a href="https://cloud.google.com/alloydb/docs/columnar-engine/configure" target="_blank" rel="noopener noreferrer">カラムナーエンジンの設定</a></li>
+        <li><a href="https://cloud.google.com/alloydb/pricing" target="_blank" rel="noopener noreferrer">AlloyDB for PostgreSQL 料金ページ</a></li>
+      </ul>
+      <p style="margin-top: 12px; font-size: 11px; color: #999;">Generated on 2026-04-22 | AlloyDB for PostgreSQL - Columnar Engine HNSW Vector Search Acceleration (Preview)</p>
+    </footer>
+
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+    hljs.highlightAll();
+  </script>
+</body>
+</html>

@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BigQuery: カスタム組織ポリシーによるワークロード管理リソースの制御</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left {
+      flex: 1;
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+      text-align: right;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-preview {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-orange);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .card-red {
+      border-left-color: var(--gc-red);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h4, .after-box h4 {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .before-box h4 { color: var(--gc-red); }
+    .after-box h4 { color: var(--gc-green); }
+
+    .before-box ul, .after-box ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 4px 0;
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      opacity: 0.9;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-900);
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .usecase-card p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre:not(.mermaid) code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      border-radius: 8px 8px 0 0;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-header + pre:not(.mermaid) {
+      border-top-left-radius: 0;
+      border-top-right-radius: 0;
+      margin-top: 0;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .merit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      .before-after,
+      .feature-grid,
+      .merit-grid {
+        grid-template-columns: 1fr;
+      }
+      .stat-cards {
+        grid-template-columns: 1fr 1fr;
+      }
+      h1 {
+        font-size: 24px;
+      }
+      .header {
+        flex-direction: column;
+      }
+      .subtitle {
+        text-align: left;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>📋 BigQuery: カスタム組織ポリシーによるワークロード管理リソースの制御</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">BigQuery</span>
+          <span class="badge-preview">Preview</span>
+          <span class="badge">Governance</span>
+          <span class="badge">Cost Management</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-05-18</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>🎯 概要</h2>
+      <p>BigQuery のワークロード管理リソースに対して、<span class="highlight">カスタム組織ポリシー (Custom Organization Policy)</span> を使用して特定の操作を許可または拒否できるようになりました。</p>
+      <p>対象リソースは <strong>Reservations (予約)</strong>、<strong>Assignments (割り当て)</strong>、<strong>Capacity Commitments (容量コミットメント)</strong>、<strong>BI Reservations (BI 予約)</strong> の 4 種類です。</p>
+      <p>Organization Policy Service の <span class="highlight">CEL (Common Expression Language)</span> 条件を使用して、リソースの作成や更新時に制約を適用し、コスト管理やコンプライアンス要件への対応が可能になります。</p>
+
+      <div class="note-box">
+        <strong>💡 対象ユーザー:</strong> 大規模組織で BigQuery の容量管理を集中制御したい組織管理者やクラウドアーキテクト。特に、複数のプロジェクトやチームが BigQuery のリザベーションを使用する環境向け。
+      </div>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h4>❌ Before (アップデート前)</h4>
+          <ul>
+            <li>ワークロード管理リソースに対する操作を組織レベルで一元制御する手段がなかった</li>
+            <li>IAM 権限のみでは細かい条件付き制約を表現できなかった</li>
+            <li>個々のプロジェクトで独自にスロットを購入することを防ぐのが困難</li>
+            <li>カスタム組織ポリシーは Dataset、Table 等には対応済みだがワークロード管理は未対応</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h4>✅ After (アップデート後)</h4>
+          <ul>
+            <li>Reservation、Assignment、CapacityCommitment、BiReservation に対してカスタム制約を定義可能</li>
+            <li>CEL 条件でスロット数、エディション、リージョン等に基づくポリシーを作成</li>
+            <li>組織/フォルダ/プロジェクトの各レベルで階層的にポリシーを適用可能</li>
+            <li>ドライラン機能で影響範囲を事前にテスト可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Statistics -->
+    <div class="section">
+      <h2>📊 数字で見るアップデート</h2>
+      <div class="stat-cards">
+        <div class="stat-card">
+          <div class="stat-value">4</div>
+          <div class="stat-label">対象リソースタイプ</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">20</div>
+          <div class="stat-label">リソースあたり<br>最大制約数</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-orange), #E65100);">
+          <div class="stat-value">15分</div>
+          <div class="stat-label">ポリシー適用<br>最大ラグ</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-green), #1B5E20);">
+          <div class="stat-value">$0</div>
+          <div class="stat-label">追加料金</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>組織ポリシーが階層的に継承され、BigQuery ワークロード管理リソースの作成・更新操作に対して CEL 条件に基づく許可/拒否が適用される構成:</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph org["Organization"]
+        OrgPolicy["Organization Policy\n(Custom Constraints)"]
+    end
+
+    subgraph folder["Folder"]
+        FolderPolicy["Inherited Policy"]
+    end
+
+    subgraph project["Admin Project"]
+        subgraph resources["BigQuery Workload Management Resources"]
+            Reservation["Reservation\nbigqueryreservation.googleapis.com/Reservation"]
+            Assignment["Assignment\nbigqueryreservation.googleapis.com/Assignment"]
+            Commitment["Capacity Commitment\nbigqueryreservation.googleapis.com/CapacityCommitment"]
+            BiReservation["BI Reservation\nbigqueryreservation.googleapis.com/BiReservation"]
+        end
+    end
+
+    subgraph action["Operation Control"]
+        Create["CREATE"]
+        Update["UPDATE"]
+    end
+
+    OrgPolicy -->|"Inherit"| FolderPolicy
+    FolderPolicy -->|"Apply"| resources
+    action -->|"CEL Condition\nALLOW/DENY"| OrgPolicy
+    Create --> action
+    Update --> action
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+
+      <div class="card">
+        <h3>🎫 対象リソースタイプ</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>リソースタイプ</th>
+              <th>対応メソッド</th>
+              <th>主要フィールド</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>bigqueryreservation.googleapis.com/Reservation</code></td>
+              <td>CREATE, UPDATE</td>
+              <td>slotCapacity, edition, autoscale</td>
+            </tr>
+            <tr>
+              <td><code>bigqueryreservation.googleapis.com/Assignment</code></td>
+              <td>CREATE, UPDATE</td>
+              <td>jobType, assignee</td>
+            </tr>
+            <tr>
+              <td><code>bigqueryreservation.googleapis.com/CapacityCommitment</code></td>
+              <td>CREATE, UPDATE</td>
+              <td>slotCount, plan, edition</td>
+            </tr>
+            <tr>
+              <td><code>bigqueryreservation.googleapis.com/BiReservation</code></td>
+              <td>UPDATE</td>
+              <td>size, preferredTables</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="feature-grid">
+        <div class="card card-green">
+          <h3>🧮 CEL 条件によるきめ細かい制御</h3>
+          <ul>
+            <li>リソースのフィールド値に基づいて条件を記述</li>
+            <li>スロット数の上限、特定エディションの強制、リージョン制限</li>
+            <li>ALLOW / DENY の両方をサポート</li>
+          </ul>
+        </div>
+        <div class="card card-purple">
+          <h3>🏢 階層的なポリシー継承</h3>
+          <ul>
+            <li>組織レベルのポリシーがフォルダ・プロジェクトに自動継承</li>
+            <li>下位レベルで親ポリシーをオーバーライド可能</li>
+            <li>タグベースの条件付きルールに対応</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Configuration -->
+    <div class="section">
+      <h2>🔧 設定方法</h2>
+
+      <div class="note-box">
+        <strong>📋 前提条件:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>Google Cloud 組織が存在すること</li>
+          <li>Organization Policy Administrator (<code>roles/orgpolicy.policyAdmin</code>) IAM ロールが付与されていること</li>
+          <li>BigQuery Reservation API (<code>bigqueryreservation.googleapis.com</code>) が有効化されていること</li>
+        </ul>
+      </div>
+
+      <h3>Step 1: カスタム制約の作成</h3>
+      <div class="code-header">
+        <span class="code-lang">YAML</span>
+        <span class="code-title">constraint-limit-slots.yaml</span>
+      </div>
+      <pre><code class="language-yaml">name: organizations/123456789/customConstraints/custom.limitReservationSlots
+resourceTypes:
+  - bigqueryreservation.googleapis.com/Reservation
+methodTypes:
+  - CREATE
+  - UPDATE
+condition: "resource.slotCapacity > 1000"
+actionType: DENY
+displayName: Limit reservation slot capacity
+description: Deny reservations with more than 1000 slots.</code></pre>
+
+      <div class="code-header">
+        <span class="code-lang">Bash</span>
+        <span class="code-title">制約を組織に適用</span>
+      </div>
+      <pre><code class="language-bash"># 制約を組織に適用
+gcloud org-policies set-custom-constraint constraint-limit-slots.yaml</code></pre>
+
+      <h3>Step 2: 組織ポリシーの作成と適用</h3>
+      <div class="code-header">
+        <span class="code-lang">YAML</span>
+        <span class="code-title">policy-limit-slots.yaml</span>
+      </div>
+      <pre><code class="language-yaml">name: projects/my-project/policies/custom.limitReservationSlots
+spec:
+  rules:
+    - enforce: true</code></pre>
+
+      <div class="code-header">
+        <span class="code-lang">Bash</span>
+        <span class="code-title">ポリシーを適用</span>
+      </div>
+      <pre><code class="language-bash"># ポリシーを適用
+gcloud org-policies set-policy policy-limit-slots.yaml</code></pre>
+
+      <h3>Step 3: ポリシーの検証</h3>
+      <div class="code-header">
+        <span class="code-lang">Bash</span>
+        <span class="code-title">検証コマンド</span>
+      </div>
+      <pre><code class="language-bash"># 制約の確認
+gcloud org-policies list-custom-constraints --organization=123456789
+
+# ポリシーの確認
+gcloud org-policies list --project=my-project
+
+# ドライランモードでテスト
+gcloud org-policies set-policy policy-limit-slots.yaml --update-mask=dryRunSpec</code></pre>
+
+      <div class="warning-box">
+        <strong>⚠️ 注意:</strong> ポリシーが有効になるまで最大 15 分かかる場合があります。ドライランモードでは、実際にはブロックせずにポリシー違反をログに記録します。
+      </div>
+    </div>
+
+    <!-- Setup Flow -->
+    <div class="section">
+      <h2>📐 設定フロー</h2>
+      <div class="flow-diagram">
+        <div class="flow-step">📝 YAML で<br>制約定義</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🏢 組織に<br>制約を登録</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">📋 ポリシー<br>作成・適用</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🧪 ドライラン<br>で検証</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">✅ 本番<br>適用</div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💼 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>🎯 ユースケース 1: スロット購入の上限制御</h4>
+        <p><strong>シナリオ:</strong> 大規模組織で、個々のチームが独自にスロットを大量購入してコストが膨らむことを防ぎたい。</p>
+        <div class="code-header">
+          <span class="code-lang">YAML</span>
+          <span class="code-title">500 スロット以上の購入を拒否</span>
+        </div>
+        <pre><code class="language-yaml">name: organizations/123456789/customConstraints/custom.limitCommitmentSlots
+resourceTypes:
+  - bigqueryreservation.googleapis.com/CapacityCommitment
+methodTypes:
+  - CREATE
+condition: "resource.slotCount > 500"
+actionType: DENY
+displayName: Limit capacity commitment size
+description: Individual teams cannot purchase more than 500 slots.</code></pre>
+        <p><strong>効果:</strong> チームごとのスロット購入を 500 スロット以下に制限し、大規模な容量変更はプラットフォームチームの承認を経る運用を強制。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>🔒 ユースケース 2: Enterprise Plus エディションの強制</h4>
+        <p><strong>シナリオ:</strong> セキュリティ要件として、すべてのリザベーションで Enterprise Plus エディションの使用を義務付けたい。</p>
+        <div class="code-header">
+          <span class="code-lang">YAML</span>
+          <span class="code-title">Enterprise Plus 以外を拒否</span>
+        </div>
+        <pre><code class="language-yaml">name: organizations/123456789/customConstraints/custom.enforceEnterprisePlus
+resourceTypes:
+  - bigqueryreservation.googleapis.com/Reservation
+methodTypes:
+  - CREATE
+  - UPDATE
+condition: "resource.edition != 'ENTERPRISE_PLUS'"
+actionType: DENY
+displayName: Enforce Enterprise Plus edition
+description: All reservations must use Enterprise Plus edition.</code></pre>
+        <p><strong>効果:</strong> CMK、VPC Service Controls 対応など Enterprise Plus の高度なセキュリティ機能を組織全体で確実に利用可能に。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>📊 ユースケース 3: BI 予約容量の制限</h4>
+        <p><strong>シナリオ:</strong> BI Engine の予約容量が過剰に割り当てられることを防ぎ、コストを管理したい。</p>
+        <div class="code-header">
+          <span class="code-lang">YAML</span>
+          <span class="code-title">BI 予約を 10GB 以下に制限</span>
+        </div>
+        <pre><code class="language-yaml">name: organizations/123456789/customConstraints/custom.limitBiReservation
+resourceTypes:
+  - bigqueryreservation.googleapis.com/BiReservation
+methodTypes:
+  - UPDATE
+condition: "resource.size > 10737418240"
+actionType: DENY
+displayName: Limit BI reservation to 10GB
+description: BI reservation cannot exceed 10GB (10737418240 bytes).</code></pre>
+        <p><strong>効果:</strong> BI Engine の予約容量を 10GB 以下に制限し、不要なメモリ確保によるコスト増を防止。</p>
+      </div>
+    </div>
+
+    <!-- Merits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div class="merit-grid">
+        <div class="card card-green">
+          <h3>💼 ビジネス面</h3>
+          <ul>
+            <li><strong>コスト管理の強化:</strong> 不適切なスロット購入や過大な容量コミットメントを組織レベルで防止</li>
+            <li><strong>ガバナンスの一元化:</strong> 複数チーム・プロジェクトにまたがる容量管理ルールを集中管理</li>
+            <li><strong>コンプライアンス対応:</strong> 特定リージョンでのみ容量購入可能にするなど、データ主権要件への対応</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>⚙️ 技術面</h3>
+          <ul>
+            <li><strong>宣言的なポリシー管理:</strong> YAML ベースの制約定義で Infrastructure as Code としてバージョン管理可能</li>
+            <li><strong>CEL による柔軟な条件記述:</strong> リソースの任意フィールドに基づく条件を記述可能</li>
+            <li><strong>ドライランによる安全な検証:</strong> ポリシーの影響を事前にテスト可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ 制限事項・注意点</h2>
+      <div class="card card-red">
+        <h3>制限事項</h3>
+        <ul>
+          <li><strong>Preview ステータス:</strong> SLA の適用対象外であり、本番環境での利用には注意が必要</li>
+          <li><strong>制約数の上限:</strong> リソースタイプあたりのカスタム制約は最大 20 個まで</li>
+          <li><strong>適用ラグ:</strong> ポリシーの適用には最大 15 分のラグが発生する可能性がある</li>
+          <li><strong>CEL 条件の長さ:</strong> 最大 1000 文字まで</li>
+        </ul>
+      </div>
+
+      <div class="warning-box">
+        <strong>⚠️ 考慮すべき点:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>既存のリザベーションがポリシーに違反している場合、UPDATE メソッドの制約を適用すると変更がブロックされる</li>
+          <li>組織ポリシーの階層継承を理解し、意図しないブロックが発生しないよう設計が必要</li>
+          <li>ドライランモードで十分にテストしてから本番適用することを推奨</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金情報</h2>
+      <div class="success-box">
+        <strong>✅ カスタム組織ポリシー自体の利用に追加料金は発生しません。</strong>
+      </div>
+      <p>BigQuery のワークロード管理リソースの料金は、通常の BigQuery 容量ベース料金に従います。</p>
+
+      <h3>BigQuery スロット料金の参考</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>エディション</th>
+            <th>コミットメントタイプ</th>
+            <th>料金 (100 スロット/月、US リージョン)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Enterprise</td>
+            <td>年間コミットメント</td>
+            <td>約 $2,000/月</td>
+          </tr>
+          <tr>
+            <td>Enterprise</td>
+            <td>Pay-As-You-Go (自動スケーリング)</td>
+            <td>約 $4,000/月</td>
+          </tr>
+          <tr>
+            <td>Enterprise Plus</td>
+            <td>年間コミットメント</td>
+            <td>約 $3,200/月</td>
+          </tr>
+          <tr>
+            <td>Enterprise Plus</td>
+            <td>Pay-As-You-Go (自動スケーリング)</td>
+            <td>約 $6,400/月</td>
+          </tr>
+        </tbody>
+      </table>
+      <p style="font-size: 13px; color: var(--gc-outline);">※ 料金は変動する可能性があります。最新の料金は公式料金ページをご確認ください。</p>
+    </div>
+
+    <!-- Region Info -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <div class="note-box">
+        BigQuery のワークロード管理リソースが利用可能な<strong>すべてのリージョンおよびマルチリージョン</strong>で、カスタム組織ポリシーを使用できます。リザベーションはリージョナルリソースであるため、ポリシーもリージョン単位で適用されます。
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <strong>Organization Policy Service</strong>
+          <p style="font-size: 14px; margin: 4px 0;">カスタム制約の基盤。CEL 条件の記述やポリシー階層の管理を提供。</p>
+        </div>
+        <div class="card">
+          <strong>BigQuery Reservations</strong>
+          <p style="font-size: 14px; margin: 4px 0;">スロットプールの作成とワークロードへの容量割り当てを管理。</p>
+        </div>
+        <div class="card card-orange">
+          <strong>BigQuery Capacity Commitments</strong>
+          <p style="font-size: 14px; margin: 4px 0;">スロットの長期割引購入 (年間/3年) を管理。</p>
+        </div>
+        <div class="card card-purple">
+          <strong>Cloud Audit Logs</strong>
+          <p style="font-size: 14px; margin: 4px 0;">ポリシー違反時のエラーログ記録。ガバナンスの監査証跡として活用。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <p>BigQuery のワークロード管理リソースにカスタム組織ポリシーが対応したことで、大規模組織における BigQuery 容量管理のガバナンスが大幅に強化されました。</p>
+      <div class="success-box">
+        <strong>推奨アクション:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>まずはドライランモードで既存環境への影響を確認</li>
+          <li>Preview ステータスのため本番環境では慎重な検証を推奨</li>
+          <li>GA 昇格に備えてポリシー設計を開始</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>📎 出典:</strong></p>
+      <ul style="list-style: none; padding: 0; margin: 4px 0;">
+        <li>- <a href="https://cloud.google.com/release-notes#May_18_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li>- <a href="https://cloud.google.com/bigquery/docs/custom-constraints" target="_blank" rel="noopener noreferrer">BigQuery カスタム組織ポリシー ドキュメント</a></li>
+        <li>- <a href="https://cloud.google.com/bigquery/docs/reservations-workload-management" target="_blank" rel="noopener noreferrer">BigQuery ワークロード管理</a></li>
+        <li>- <a href="https://cloud.google.com/bigquery/docs/reference/reservations/rest" target="_blank" rel="noopener noreferrer">BigQuery Reservation API リファレンス</a></li>
+        <li>- <a href="https://cloud.google.com/bigquery/pricing#capacity_compute_analysis_pricing" target="_blank" rel="noopener noreferrer">BigQuery 料金ページ</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline);">Generated: 2026-05-18 | Google Cloud News Summary</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

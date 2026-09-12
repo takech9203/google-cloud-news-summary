@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spanner: Gemini による SQL クエリエラーの自動修正機能</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1 {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .card-teal {
+      border-left-color: var(--gc-teal);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-preview {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-orange);
+    }
+
+    .badge-service {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: #F4B400;
+    }
+
+    /* Before/After comparison */
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .after {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .comparison-title {
+      font-weight: 700;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    .before .comparison-title {
+      color: var(--gc-red);
+    }
+
+    .after .comparison-title {
+      color: var(--gc-green);
+    }
+
+    .comparison ul {
+      margin: 0;
+      padding-left: 18px;
+      font-size: 14px;
+    }
+
+    .comparison li {
+      margin: 4px 0;
+    }
+
+    /* Flow diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Mermaid */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Code blocks */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Table styles */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    /* Note boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .ai-box {
+      background: var(--gc-purple-tint);
+      border-left: 4px solid var(--gc-purple);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Stat cards */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.purple {
+      background: linear-gradient(135deg, var(--gc-purple), #7B1FA2);
+    }
+
+    .stat-card.green {
+      background: linear-gradient(135deg, var(--gc-green), #1B5E20);
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Use case cards */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-800);
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .usecase-card p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    /* Steps */
+    .steps {
+      counter-reset: step-counter;
+      padding-left: 0;
+      list-style: none;
+    }
+
+    .steps li {
+      counter-increment: step-counter;
+      position: relative;
+      padding-left: 48px;
+      margin-bottom: 16px;
+      min-height: 36px;
+      display: flex;
+      align-items: center;
+    }
+
+    .steps li::before {
+      content: counter(step-counter);
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 32px;
+      height: 32px;
+      background: var(--gc-blue-600);
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      h1 { font-size: 28px; }
+      .comparison { grid-template-columns: 1fr; }
+      .stat-grid { grid-template-columns: 1fr; }
+      .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>🗄️ Spanner: Gemini による SQL クエリエラーの自動修正</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge-service">Cloud Spanner</span>
+          <span class="badge-preview">Preview</span>
+          <span class="badge">Gemini Code Assist</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-07-06</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        Cloud Spanner の統合開発環境 <span class="highlight">Spanner Studio</span> に、Gemini を活用した SQL クエリエラーの自動修正機能が Preview として追加されました。クエリ実行時にエラーが発生した場合、<span class="highlight">「Fix」ボタン</span>をクリックするだけで、AI がエラーの原因を分析し、修正候補を提示します。
+      </p>
+      <p>
+        Gemini Code Assist の一部として提供され、エラーメッセージとスキーマ情報を参照して正確な修正を提案するため、汎用的な LLM よりも的確なサポートが得られます。
+      </p>
+
+      <div class="ai-box">
+        <strong>🤖 AI 支援のポイント:</strong> Spanner Studio 内で完結するため、外部ツールへの切り替えが不要。データベースのスキーマ情報を自動参照し、コンテキストに基づく正確な修正を実現します。
+      </div>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="comparison">
+        <div class="before">
+          <div class="comparison-title">❌ Before (従来)</div>
+          <ul>
+            <li>エラーメッセージを手動で解析して原因を特定</li>
+            <li>正しいテーブル名やカラム名を確認するために別画面に遷移</li>
+            <li>外部 LLM 利用時はスキーマ情報を手動提供 + セキュリティリスク</li>
+          </ul>
+        </div>
+        <div class="after">
+          <div class="comparison-title">✅ After (新機能)</div>
+          <ul>
+            <li>「Fix」ボタンのワンクリックで修正候補が即座に表示</li>
+            <li>差分比較 (Diff エディタ) で変更箇所が一目で把握</li>
+            <li>スキーマ情報を自動参照し、データ外部流出リスクなし</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>ユーザーが SQL クエリを実行してエラーが発生すると、Gemini Code Assist がエラーメッセージとスキーマ情報をコンテキストとして修正候補を生成し、差分エディタで表示します。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+sequenceDiagram
+    participant User as ユーザー
+    participant Editor as Spanner Studio<br/>クエリエディタ
+    participant Spanner as Cloud Spanner
+    participant Gemini as Gemini Code Assist
+
+    User->>Editor: SQL クエリを入力
+    Editor->>Spanner: クエリ実行
+    Spanner-->>Editor: エラーメッセージ返却
+    Editor-->>User: Results タブにエラー表示
+    User->>Editor: Fix ボタンをクリック
+    Editor->>Gemini: エラーメッセージ +<br/>クエリ + スキーマ情報を送信
+    Gemini-->>Editor: 修正候補 + 変更説明を返却
+    Editor-->>User: Diff エディタで<br/>行ごとの比較を表示
+    User->>Editor: 修正内容を確認・編集
+    User->>Editor: Accept and run をクリック
+    Editor->>Spanner: 修正済みクエリ実行
+    Spanner-->>Editor: 実行結果返却
+    Editor-->>User: 結果表示
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+
+      <div class="card">
+        <h3>1. ワンクリック修正提案</h3>
+        <div class="icon-text">
+          <span class="arrow">→</span>
+          <span>クエリ実行後にエラーが発生した場合、「Fix」ボタンが表示される</span>
+        </div>
+        <div class="icon-text">
+          <span class="arrow">→</span>
+          <span>クリックするだけで Gemini が自動的にエラーを分析し修正候補を生成</span>
+        </div>
+      </div>
+
+      <div class="card card-purple">
+        <h3>2. 差分エディタ (Diff Editor) による比較表示</h3>
+        <div class="icon-text">
+          <span class="arrow">→</span>
+          <span>元のクエリと修正候補が行ごとに並べて表示される</span>
+        </div>
+        <div class="icon-text">
+          <span class="arrow">→</span>
+          <span>エラーの原因箇所がハイライトされ、自然言語による説明が併せて表示</span>
+        </div>
+      </div>
+
+      <div class="card card-green">
+        <h3>3. コンテキスト認識型の修正</h3>
+        <div class="icon-text">
+          <span class="arrow">→</span>
+          <span>エラーメッセージを正確に参照</span>
+        </div>
+        <div class="icon-text">
+          <span class="arrow">→</span>
+          <span>データベースのスキーマ情報 (テーブル名、カラム名、データ型) を考慮した修正</span>
+        </div>
+        <div class="icon-text">
+          <span class="arrow">→</span>
+          <span>シンタックスエラー、スキーマエラー、ランタイムエラーに対応</span>
+        </div>
+      </div>
+
+      <div class="card card-orange">
+        <h3>4. 修正の適用と実行</h3>
+        <div class="icon-text">
+          <span class="arrow">→</span>
+          <span>「Accept and run」で即座に修正済みクエリを実行可能</span>
+        </div>
+        <div class="icon-text">
+          <span class="arrow">→</span>
+          <span>修正内容を手動で編集してから実行することも可能</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Flow -->
+    <div class="section">
+      <h2>🔧 操作フロー</h2>
+      <div class="flow-diagram">
+        <div class="flow-step">📝 SQL 入力<br/>&amp; 実行</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">❌ エラー<br/>発生</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🔧 Fix ボタン<br/>クリック</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🤖 Gemini<br/>分析・修正</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">✅ Accept<br/>&amp; Run</div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>📐 技術仕様</h2>
+
+      <h3>必要な権限</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>IAM ロール</td>
+            <td><code>roles/cloudaicompanion.user</code> (Gemini for Google Cloud User)</td>
+          </tr>
+          <tr>
+            <td>API 権限</td>
+            <td><code>cloudaicompanion.googleapis.com/instances.generateCode</code></td>
+          </tr>
+          <tr>
+            <td>Spanner ロール</td>
+            <td>Spanner Studio の利用に必要な標準ロール</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>制限事項</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>利用可能な場所</td>
+            <td>Google Cloud コンソール内の Spanner Studio クエリエディタのみ</td>
+          </tr>
+          <tr>
+            <td>コンテキストウィンドウ</td>
+            <td>Gemini の現行コンテキストウィンドウ制限が適用</td>
+          </tr>
+          <tr>
+            <td>ステータス</td>
+            <td>Preview (Pre-GA)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup -->
+    <div class="section">
+      <h2>⚙️ 設定方法</h2>
+
+      <h3>前提条件</h3>
+      <div class="note-box">
+        <strong>💡 必要な準備:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 18px;">
+          <li>Gemini Code Assist がプロジェクトで有効化されていること</li>
+          <li><code>roles/cloudaicompanion.user</code> IAM ロールが付与されていること</li>
+          <li><code>cloudaicompanion.googleapis.com/instances.generateCode</code> 権限があること</li>
+        </ul>
+      </div>
+
+      <h3>ステップ 1: Gemini 機能の有効化</h3>
+      <ol class="steps">
+        <li>Google Cloud コンソールで Spanner ページに移動</li>
+        <li>インスタンスを選択</li>
+        <li>データベースを選択</li>
+        <li>ナビゲーションメニューから「Spanner Studio」をクリック</li>
+        <li>Gemini Code Assist ボタンをクリックし、機能を有効化</li>
+      </ol>
+
+      <h3>ステップ 2: SQL エラーの修正</h3>
+      <ol class="steps">
+        <li>クエリエディタで SQL クエリを入力して実行</li>
+        <li>エラーが発生した場合、Results タブにエラーメッセージが表示される</li>
+        <li>「Fix」ボタンをクリック</li>
+        <li>Diff エディタで元のクエリと修正候補の比較を確認</li>
+        <li>変更の説明を確認し、必要に応じて編集</li>
+        <li>「Accept and run」をクリックして修正済みクエリを実行</li>
+      </ol>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">1-Click</div>
+          <div class="stat-label">ワンクリックで修正提案</div>
+        </div>
+        <div class="stat-card purple">
+          <div class="stat-value">AI</div>
+          <div class="stat-label">コンテキスト認識型の正確な修正</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-value">Secure</div>
+          <div class="stat-label">データ外部流出リスクなし</div>
+        </div>
+      </div>
+
+      <h3>ビジネス面</h3>
+      <div class="card card-green">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>開発効率の向上</strong>: SQL エラーの修正時間を大幅に短縮し、開発者の生産性を向上</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>学習コストの削減</strong>: Spanner 固有の SQL 方言に不慣れな開発者でも迅速にエラー解決</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>セキュリティの確保</strong>: 外部ツールにデータやスキーマ情報を送信する必要なし</span></div>
+      </div>
+
+      <h3>技術面</h3>
+      <div class="card card-teal">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>コンテキスト認識</strong>: エラーメッセージとスキーマ情報を自動参照、汎用 LLM より正確</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>統合されたワークフロー</strong>: クエリエディタ内で修正が完結、画面遷移不要</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>即座のフィードバック</strong>: 修正候補の適用と実行がワンクリックで可能</span></div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <div class="warning-box">
+        <strong>⚠️ 制限事項:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 18px;">
+          <li>Spanner Studio クエリエディタでのみ利用可能 (gcloud CLI やクライアントライブラリからは利用不可)</li>
+          <li>Gemini のコンテキストウィンドウ制限により、非常に長いクエリでは正確な修正が得られない場合がある</li>
+          <li>Preview 段階のため、サポートが限定的であり、本番環境での利用には注意が必要</li>
+        </ul>
+      </div>
+
+      <div class="warning-box">
+        <strong>📌 考慮すべき点:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 18px;">
+          <li>Pre-GA 機能であるため、今後仕様が変更される可能性がある</li>
+          <li>将来的に Gemini Code Assist Standard edition ライセンスが必要になる可能性</li>
+          <li>AI による修正提案は常に正確とは限らないため、実行前に確認が必要</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>📌 ユースケース 1: スキーマ変更後のクエリ修正</h4>
+        <p><strong>シナリオ:</strong> テーブルのカラム名を変更した後、古いカラム名を参照している既存クエリでエラーが発生する。</p>
+        <p><strong>効果:</strong> Gemini がスキーマ情報を参照し、新しいカラム名を使用した修正クエリを自動提案。手動でのスキーマ確認が不要になる。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>📌 ユースケース 2: 複雑な JOIN クエリのシンタックスエラー修正</h4>
+        <p><strong>シナリオ:</strong> 複数テーブルを結合する複雑なクエリで、JOIN 条件や括弧の対応にエラーがある。</p>
+        <p><strong>効果:</strong> Gemini が行ごとの差分で問題箇所を特定し、正しいシンタックスを提案。変更理由の説明により、同様のエラーの再発防止にも役立つ。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>📌 ユースケース 3: Spanner 固有の SQL 方言への対応</h4>
+        <p><strong>シナリオ:</strong> 他のデータベースから Spanner に移行した開発者が、Spanner 固有の SQL 構文に不慣れでエラーが発生する。</p>
+        <p><strong>効果:</strong> Spanner のスキーマとエラー情報を基に、Spanner に適した正しい SQL を提案。学習曲線を緩やかにする。</p>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Gemini Code Assist</strong> - Spanner Studio 内での AI アシスタンス基盤</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Spanner Studio</strong> - Google Cloud コンソール内の Spanner 用統合クエリエディタ</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Gemini による SQL 生成</strong> - 自然言語コメントから SQL クエリを自動生成する機能</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Gemini による SQL 説明</strong> - 既存の SQL クエリを自然言語で説明する機能</span></div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <p>
+        Spanner Studio に Gemini による SQL エラー自動修正機能が Preview として追加されたことで、データベース開発者のトラブルシューティング体験が大きく改善されます。ワンクリックで差分比較と修正提案が得られるため、特に<span class="highlight">複雑なスキーマを扱うチーム</span>や<span class="highlight">Spanner に移行中の組織</span>にとって有用な機能です。
+      </p>
+      <p>
+        Preview 段階のため本番ワークフローへの組み込みには注意が必要ですが、開発・テスト環境での活用を推奨します。
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="list-style: none; padding-left: 0; margin: 4px 0;">
+        <li><a href="https://cloud.google.com/spanner/docs/release-notes#July_06_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li><a href="https://cloud.google.com/spanner/docs/write-sql-gemini" target="_blank" rel="noopener noreferrer">Spanner での Gemini を使用した SQL 作成ドキュメント</a></li>
+        <li><a href="https://cloud.google.com/gemini/docs/overview" target="_blank" rel="noopener noreferrer">Gemini for Google Cloud 概要</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline);">Generated: 2026-07-07 | #Spanner #GeminiCodeAssist #SpannerStudio #SQL #AI #Preview</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>
