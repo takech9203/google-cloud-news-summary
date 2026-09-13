@@ -11,6 +11,7 @@
 - [2026-09-11 - AlloyDB for PostgreSQL: 監査ログパイプラインのモニタリング](2026/2026-09-11-alloydb-audit-log-pipeline-monitoring.md)
 - [2026-09-11 - Google Kubernetes Engine (GKE): Agent Substrate が評価・非本番利用向けに提供開始](2026/2026-09-11-gke-agent-substrate.md)
 - [2026-09-11 - API Gateway: Model Context Protocol (MCP) サーバー機能](2026/2026-09-11-api-gateway-mcp-server.md)
+- [2026-09-11 - Google Cloud Contact Center as a Service (CCaaS): バージョン 6.12 リリース (新機能まとめ)](2026/2026-09-11-ccaas-6-12-features.md)
 - [2026-09-10 - BigQuery: ML.METRICS 関数と AI.CAUSAL_EFFECT 関数 (Preview)](2026/2026-09-10-bigquery-ml-metrics-ai-causal-effect-preview.md)
 - [2026-09-10 - BigQuery: Data Engineering Agent と BigQuery Graph の統合 (GA)](2026/2026-09-10-bigquery-data-engineering-agent-graph-integration.md)
 - [2026-09-10 - Cloud SQL for MySQL / PostgreSQL: リモート MCP サーバーの sqlcommenter タグ付与が一時的に無効化](2026/2026-09-10-cloud-sql-mcp-sqlcommenter-disabled.md)
