@@ -5,6 +5,15 @@
 
 ## 2026 年
 
+- [2026-09-14 - Vertex AI Search: Agent Search 設定可能な料金向け検索クエリアドオン仕様 (searchAddonSpec) GA](2026/2026-09-14-vertex-ai-search-search-addon-spec-ga.md)
+- [2026-09-14 - Compute Engine: OS イメージからのリージョナルディスク作成 (Preview)](2026/2026-09-14-compute-engine-regional-disks-from-os-images.md)
+- [2026-09-14 - Backup and DR: Filestore インスタンスのリストアジョブモニタリング](2026/2026-09-14-backup-dr-filestore-restore-job-monitoring.md)
+- [2026-09-14 - Network Intelligence Center: Cloud Network Insights が Monitoring Point インストールバンドルをダウンロードする gcloud CLI コマンドの生成に対応](2026/2026-09-14-network-intelligence-center-monitoring-point-cli-bundles.md)
+- [2026-09-14 - BigQuery / Knowledge Catalog: BigQuery Graph メタデータの自動インジェストと検索対応 (Preview)](2026/2026-09-14-bigquery-graph-knowledge-catalog-metadata.md)
+- [2026-09-14 - Cloud SQL for PostgreSQL: pg_textsearch 拡張機能による BM25 全文検索](2026/2026-09-14-cloud-sql-postgresql-pg-textsearch-bm25.md)
+- [2026-09-14 - Cloud SQL for SQL Server: SQL Server 2017 サポート終了 (Deprecation) スケジュール発表](2026/2026-09-14-cloud-sql-sql-server-2017-deprecation.md)
+- [2026-09-14 - Google SecOps: Mandiant レガシー IOC フィード (MANDIANT_ACTIVE_BREACH_IOC / MANDIANT_FUSION_IOC / OPEN_SOURCE_INTEL_IOC) の非推奨化](2026/2026-09-14-google-secops-mandiant-ioc-feeds-deprecation.md)
+- [2026-09-14 - Security Command Center: Data Security Posture Management (DSPM) の非推奨化](2026/2026-09-14-security-command-center-dspm-deprecation.md)
 - [2026-09-11 - Google SecOps / Google SecOps SIEM: chronicle.readonly OAuth スコープからの書き込み権限の廃止](2026/2026-09-11-google-secops-chronicle-readonly-scope-deprecation.md)
 - [2026-09-11 - Google Cloud Contact Center as a Service (CCaaS): 2026 年 9 月バグ修正リリース](2026/2026-09-11-ccaas-bug-fixes-september.md)
 - [2026-09-11 - Cluster Toolkit: Slurm の複数の脆弱性への対応 (セキュリティ情報 GCP-2026-062)](2026/2026-09-11-cluster-toolkit-slurm-security-gcp-2026-062.md)
