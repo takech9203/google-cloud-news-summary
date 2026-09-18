@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gemini Enterprise Agent Platform: Provisioned Throughput でファインチューニング済みモデル推論サポート</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--gc-outline);
+      text-align: right;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge-service {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-red {
+      border-left-color: var(--gc-red);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h4, .after-box h4 {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .before-box h4 { color: var(--gc-red); }
+    .after-box h4 { color: var(--gc-green); }
+
+    .before-box ul, .after-box ul {
+      margin: 0;
+      padding-left: 16px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 4px 0;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .ai-box {
+      background: var(--gc-purple-tint);
+      border-left: 4px solid var(--gc-purple);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-900);
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .usecase-card p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      background: #1E1E1E;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .limitation-list {
+      margin: 8px 0;
+      padding-left: 0;
+      list-style: none;
+    }
+
+    .limitation-list li {
+      padding: 8px 12px;
+      margin: 4px 0;
+      background: var(--gc-surface);
+      border-radius: 8px;
+      border-left: 3px solid var(--gc-orange);
+      font-size: 14px;
+    }
+
+    .links-section a {
+      display: block;
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+      word-break: break-all;
+    }
+
+    .links-section a:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .links-section a:last-child {
+      border-bottom: none;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; }
+      .before-after { grid-template-columns: 1fr; }
+      .stat-cards { grid-template-columns: 1fr; }
+      .flow-diagram { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>🎯 Provisioned Throughput で<br>ファインチューニング済み Gemini 3 モデル推論サポート</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge badge-service">Gemini Enterprise Agent Platform</span>
+          <span class="badge badge-preview">Preview</span>
+        </div>
+      </div>
+      <div class="subtitle">
+        2026-06-22<br>
+        Provisioned Throughput<br>
+        Supervised Fine-tuned Model Support
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        Gemini Enterprise Agent Platform の <span class="highlight">Provisioned Throughput</span> が、教師ありファインチューニング済み Gemini 3 モデルの推論をサポート。ファインチューニング済みモデルのエンドポイントに対しても、ベースモデルと同一の Provisioned Throughput クォータを使用してスループットを確保できるようになりました。
+      </p>
+
+      <div class="ai-box">
+        <strong>🤖 重要な変更点:</strong> Gemini 3 以降では、ファインチューニング済みモデルの推論にはベースモデルと比較して<strong>高いバーンダウンレート</strong>が適用されます。このプレミアムは、ファインチューニング推論の料金プレミアムに比例します。
+      </div>
+
+      <h3>Before / After</h3>
+      <div class="before-after">
+        <div class="before-box">
+          <h4>&#x274C; Before (課題)</h4>
+          <ul>
+            <li>ファインチューニング済みモデルに Provisioned Throughput によるスループット保証ができなかった</li>
+            <li>本番環境では pay-as-you-go に依存する必要があった</li>
+            <li>スループットが他のワークロードの影響を受ける可能性があった</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h4>&#x2705; After (改善)</h4>
+          <ul>
+            <li>ベースモデルとファインチューニング済みモデルの両方に Provisioned Throughput を適用可能</li>
+            <li>同一クォータで一元管理でき、運用が簡素化</li>
+            <li><code>X-Vertex-AI-LLM-Request-Type</code> ヘッダーで柔軟なトラフィック制御が可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>Provisioned Throughput クォータ内でベースモデルとファインチューニング済みモデルの推論が共存する仕組みです。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph PT["Provisioned Throughput クォータ (GSU)"]
+        direction LR
+        BASE["ベースモデル推論\n(標準バーンダウンレート)"]
+        FT["ファインチューニング済み推論\n(高いバーンダウンレート)"]
+    end
+
+    USER["ユーザーリクエスト"] --> HEADER{{"X-Vertex-AI-LLM-Request-Type"}}
+    HEADER -->|dedicated| PT
+    HEADER -->|shared| PAYGO["Pay-as-you-go"]
+    HEADER -->|デフォルト| PT
+
+    PT --> BASE
+    PT --> FT
+
+    BASE -->|"1 input token = 1 token"| QUOTA["クォータ消費"]
+    FT -->|"1 input token = 1.5 token\n(50%プレミアム時)"| QUOTA
+
+    PT -->|超過時| SPILLOVER["スピルオーバー\n(pay-as-you-go へ)"]
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h3>🔗 共有クォータモデル</h3>
+          <p>ファインチューニング済みモデルのエンドポイントと対応するベースモデルが<strong>同一の Provisioned Throughput クォータ</strong>にカウントされます。</p>
+          <p style="font-size: 14px; color: var(--gc-outline);"><strong>例:</strong> <code>gemini-3.1-flash-lite</code> 向けに購入した Provisioned Throughput は、そのプロジェクト内で作成された同モデルのファインチューニング版からのリクエストも優先処理します。</p>
+        </div>
+        <div class="card card-purple">
+          <h3>📊 差別化バーンダウンレート (Gemini 3 以降)</h3>
+          <p>ファインチューニング済み推論のバーンダウンレートがベースモデルより高く設定されます。</p>
+          <p style="font-size: 14px; color: var(--gc-outline);"><strong>例:</strong> ファインチューニング推論がベースモデルの 50% 増の料金の場合、バーンダウンレートも 50% 増 (1 input text token = 1.5 tokens)</p>
+        </div>
+        <div class="card card-green">
+          <h3>🔀 トラフィック制御</h3>
+          <p><code>X-Vertex-AI-LLM-Request-Type</code> HTTP ヘッダーでリクエストごとのトラフィック制御が可能:</p>
+          <ul style="font-size: 14px;">
+            <li><strong>dedicated</strong>: Provisioned Throughput のみ使用 (超過時は 429 エラー)</li>
+            <li><strong>shared</strong>: pay-as-you-go のみ使用 (Provisioned Throughput をバイパス)</li>
+            <li><strong>デフォルト</strong>: 超過分は自動的に pay-as-you-go にスピルオーバー</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+      <h3>バーンダウンレートの変更 (Gemini 3 以降)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>ベースモデル</th>
+            <th>ファインチューニング済みモデル (50%プレミアム例)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1 input text token</td>
+            <td>1 token</td>
+            <td><strong>1.5 tokens</strong></td>
+          </tr>
+          <tr>
+            <td>1 output text token</td>
+            <td>モデル依存 (例: 6 tokens)</td>
+            <td><strong>モデル依存 (例: 9 tokens)</strong></td>
+          </tr>
+          <tr>
+            <td>クォータ消費速度</td>
+            <td>標準</td>
+            <td><strong>高い (プレミアム比例)</strong></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Gemini 3 以前との比較</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>Gemini 3 以前</th>
+            <th>Gemini 3 以降</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>クォータ共有</td>
+            <td>あり</td>
+            <td>あり</td>
+          </tr>
+          <tr>
+            <td>バーンダウンレート</td>
+            <td>ベースモデルと同一</td>
+            <td><strong>ファインチューニング版は高い</strong></td>
+          </tr>
+          <tr>
+            <td>プレミアム計算</td>
+            <td>なし</td>
+            <td><strong>料金プレミアムに比例</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Traffic Control Code Example -->
+    <div class="section">
+      <h2>💻 トラフィック制御の設定例</h2>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Python</span>
+          <span class="code-title">Provisioned Throughput トラフィック制御</span>
+        </div>
+        <pre><code class="language-python">from google import genai
+from google.genai.types import HttpOptions
+
+client = genai.Client(
+    http_options=HttpOptions(
+        api_version="v1",
+        headers={
+            # Provisioned Throughput のみ使用
+            "X-Vertex-AI-LLM-Request-Type": "dedicated"
+        },
+    )
+)
+
+response = client.models.generate_content(
+    model="gemini-3.1-flash-lite",  # ファインチューニング済みモデル ID を指定
+    contents="Your prompt here",
+)</code></pre>
+      </div>
+    </div>
+
+    <!-- Setup Steps -->
+    <div class="section">
+      <h2>🚀 設定方法</h2>
+      <h3>前提条件</h3>
+      <div class="note-box">
+        <ul style="margin: 0; padding-left: 16px; font-size: 14px;">
+          <li>Provisioned Throughput の注文が有効であること (対象モデルに対して GSU を購入済み)</li>
+          <li>ファインチューニング済みモデルが同プロジェクト内で作成されていること</li>
+          <li>IAM ロール: <code>Gemini Enterprise Agent Platform Administrator</code> または <code>Provisioned Throughput Admin</code></li>
+        </ul>
+      </div>
+
+      <h3>導入ステップ</h3>
+      <div class="flow-diagram">
+        <div class="flow-step">🎫 Provisioned<br>Throughput 購入</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">🧮 GSU<br>必要量の計算</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">⚡ リクエスト実行<br>(自動適用)</div>
+      </div>
+
+      <h3>GSU 必要量の計算例</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Text</span>
+          <span class="code-title">GSU 計算 (50% プレミアムの場合)</span>
+        </div>
+        <pre><code class="language-bash"># 計算例 (50% プレミアムの場合)
+base_input_tokens_per_query = 1000
+ft_burndown_adjusted = 1000 * 1.5 = 1500  # ファインチューニング版
+output_tokens_per_query = 300 * 6 * 1.5 = 2700  # 出力も同様にプレミアム適用
+total_per_query = 1500 + 2700 = 4200
+total_per_second = 4200 * QPS
+GSUs_needed = total_per_second / throughput_per_GSU</code></pre>
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div>
+          <h3>💼 ビジネス面</h3>
+          <div class="card card-green">
+            <p style="margin: 0;"><strong>コスト予測性の向上</strong></p>
+            <p style="margin: 4px 0 0 0; font-size: 14px;">ファインチューニング済みモデルの推論コストを固定費として管理できる</p>
+          </div>
+          <div class="card card-green">
+            <p style="margin: 0;"><strong>運用の簡素化</strong></p>
+            <p style="margin: 4px 0 0 0; font-size: 14px;">ベースモデルとファインチューニング版を同一クォータで一元管理</p>
+          </div>
+        </div>
+        <div>
+          <h3>🔧 技術面</h3>
+          <div class="card card-green">
+            <p style="margin: 0;"><strong>スループット保証</strong></p>
+            <p style="margin: 4px 0 0 0; font-size: 14px;">本番環境で応答時間を安定化</p>
+          </div>
+          <div class="card card-green">
+            <p style="margin: 0;"><strong>柔軟なトラフィック制御</strong></p>
+            <p style="margin: 4px 0 0 0; font-size: 14px;">ヘッダーによるリクエストレベルの制御</p>
+          </div>
+          <div class="card card-green">
+            <p style="margin: 0;"><strong>自動スピルオーバー</strong></p>
+            <p style="margin: 4px 0 0 0; font-size: 14px;">超過分は自動的に pay-as-you-go に回され、リクエスト失敗を回避</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ 制約事項・注意点</h2>
+      <div class="warning-box">
+        <strong>重要:</strong> Preview ステータスであり、SLA の対象外です。
+      </div>
+      <ul class="limitation-list">
+        <li>ファインチューニング済みモデルの推論はベースモデルより高いバーンダウンレートが適用され、同じ GSU 数でも実効スループットが低下</li>
+        <li>Provisioned Throughput はモデルエイリアスでは使用不可 - 具体的なモデルバージョン ID を指定する必要あり</li>
+        <li>バッチ予測 (batch prediction) はサポートされない</li>
+        <li>Vertex AI Agents や Agent Search から呼び出されるモデルには適用されない</li>
+        <li>Provisioned Throughput は途中キャンセル不可のコミットメント契約</li>
+        <li>プレミアム率は料金ページで確認し、正確な GSU 必要量を算出する必要あり</li>
+      </ul>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+      <div class="usecase-card">
+        <h4>🏦 ユースケース 1: 金融機関のカスタマイズ済みチャットボット</h4>
+        <p><strong>シナリオ:</strong> 銀行が Gemini 3.1 Flash-Lite をファインチューニングして、社内用語や規制要件に対応したチャットボットを運用。毎秒 50 リクエストの安定スループットが必要。</p>
+        <p><strong>効果:</strong> Provisioned Throughput により応答レイテンシの安定化とコストの固定化を実現。高いバーンダウンレートを考慮した GSU 購入で、ピーク時もスループットを保証。</p>
+      </div>
+      <div class="usecase-card">
+        <h4>🏢 ユースケース 2: SaaS プロバイダーのマルチテナント推論</h4>
+        <p><strong>シナリオ:</strong> SaaS プロバイダーがテナントごとにファインチューニングした Gemini 3 モデルを使用。ベースモデルの汎用リクエストとファインチューニング版の特化リクエストが混在。</p>
+        <p><strong>効果:</strong> 同一 Provisioned Throughput クォータでベースモデルとファインチューニング版を管理でき、リソース効率が向上。ヘッダーによる制御で重要テナントを優先処理。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金情報</h2>
+      <p>Provisioned Throughput は <span class="highlight">GSU 単位の固定費サブスクリプション</span>で提供されます。ファインチューニング済みモデルの推論は、ベースモデルの料金プレミアムに比例した高いバーンダウンレートが適用されます。</p>
+      <div class="stat-cards">
+        <div class="stat-card">
+          <div class="stat-value">GSU</div>
+          <div class="stat-label">固定費サブスクリプション単位</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-purple), #7B1FA2);">
+          <div class="stat-value">+50%</div>
+          <div class="stat-label">バーンダウンレート増加例<br>(料金プレミアムに比例)</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-green), #1B5E20);">
+          <div class="stat-value">1:1</div>
+          <div class="stat-label">ベースモデルと同一クォータで管理</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス</h2>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div class="card">
+          <p style="margin: 0;"><strong>Supervised Fine-tuning</strong></p>
+          <p style="margin: 4px 0 0; font-size: 13px;">Gemini モデルをカスタムデータで教師ありチューニングし、ドメイン固有の性能を向上</p>
+        </div>
+        <div class="card">
+          <p style="margin: 0;"><strong>Standard Pay-as-you-go</strong></p>
+          <p style="margin: 4px 0 0; font-size: 13px;">Provisioned Throughput の代替となる従量課金モデル</p>
+        </div>
+        <div class="card">
+          <p style="margin: 0;"><strong>Cloud Monitoring</strong></p>
+          <p style="margin: 4px 0 0; font-size: 13px;">Provisioned Throughput の使用状況をダッシュボードで監視</p>
+        </div>
+        <div class="card">
+          <p style="margin: 0;"><strong>Gen AI Evaluation Service</strong></p>
+          <p style="margin: 4px 0 0; font-size: 13px;">ファインチューニング済みモデルの品質を評価</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <p>Provisioned Throughput によるファインチューニング済み Gemini 3 モデルの推論サポートにより、エンタープライズユーザーはカスタマイズ済みモデルの本番運用において<strong>安定したスループットとコスト予測性</strong>を確保できるようになりました。</p>
+      <div class="warning-box">
+        <strong>💡 アクション:</strong> GSU の計算時には Gemini 3 以降で導入された高いバーンダウンレートを考慮し、既存の Provisioned Throughput 注文を見直してください。ファインチューニング済みモデルの使用量に応じた追加 GSU の購入を検討すべきです。
+      </div>
+    </div>
+
+    <!-- Reference Links -->
+    <div class="section">
+      <h2>📚 参考リンク</h2>
+      <div class="links-section">
+        <a href="https://docs.cloud.google.com/release-notes#June_22_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a>
+        <a href="https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/provisioned-throughput/supported-models#supervised-fine-tuned-model-support" target="_blank" rel="noopener noreferrer">Provisioned Throughput - Supported Models</a>
+        <a href="https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/provisioned-throughput/use-provisioned-throughput" target="_blank" rel="noopener noreferrer">Provisioned Throughput の使用方法</a>
+        <a href="https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/provisioned-throughput/purchase-provisioned-throughput" target="_blank" rel="noopener noreferrer">Provisioned Throughput の購入</a>
+        <a href="https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/tuning/supervised-tuning" target="_blank" rel="noopener noreferrer">教師ありファインチューニング</a>
+        <a href="https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/provisioned-throughput/measure-provisioned-throughput" target="_blank" rel="noopener noreferrer">GSU とバーンダウンレートの計算</a>
+        <a href="https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing" target="_blank" rel="noopener noreferrer">料金ページ</a>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>📎 出典: <a href="https://docs.cloud.google.com/release-notes#June_22_2026" target="_blank" rel="noopener noreferrer">https://docs.cloud.google.com/release-notes#June_22_2026</a></p>
+      <p style="margin-top: 8px;">タグ: #GeminiEnterpriseAgentPlatform #ProvisionedThroughput #Gemini3 #FineTuning #SupervisedTuning #GSU #Preview</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

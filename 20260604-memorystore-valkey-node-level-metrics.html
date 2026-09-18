@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Memorystore for Valkey: Node-Level Metrics</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1 {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    .header-right {
+      text-align: right;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin: 0 0 8px 0;
+      color: var(--gc-on-surface);
+      font-size: 18px;
+    }
+
+    .card p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge-service {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .before-card h4, .after-card h4 {
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .before-card ul, .after-card ul {
+      margin: 0;
+      padding-left: 16px;
+      font-size: 14px;
+    }
+
+    .before-card li, .after-card li {
+      margin: 4px 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid) {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      margin: 0 0 8px 0;
+      color: var(--gc-blue-900);
+      font-size: 16px;
+    }
+
+    .usecase-card p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    .metric-category {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .metric-card {
+      background: var(--gc-surface);
+      border-radius: 8px;
+      padding: 16px;
+      border: 1px solid var(--gc-outline-variant);
+      box-shadow: 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .metric-card h4 {
+      margin: 0 0 8px 0;
+      font-size: 15px;
+      color: var(--gc-blue-800);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .metric-card ul {
+      margin: 0;
+      padding-left: 16px;
+      font-size: 13px;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .metric-card li {
+      margin: 3px 0;
+    }
+
+    .region-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .region-card {
+      background: var(--gc-surface);
+      border-radius: 8px;
+      padding: 16px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .region-card h4 {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      color: var(--gc-on-surface);
+    }
+
+    .region-card p {
+      margin: 2px 0;
+      font-size: 13px;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 28px; }
+      .header { flex-direction: column; align-items: flex-start; }
+      .header-right { text-align: left; margin-top: 8px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stat-grid { grid-template-columns: 1fr; }
+      .metric-category { grid-template-columns: 1fr; }
+      .region-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>📊 Memorystore for Valkey:<br>ノードレベルメトリクスの追加</h1>
+        <div style="margin-top: 12px;">
+          <span class="badge badge-service">Memorystore for Valkey</span>
+          <span class="badge-preview">Preview</span>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="subtitle">2026-06-04</div>
+        <div class="subtitle">Node-Level Metrics</div>
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>☁️ 概要</h2>
+      <p>Memorystore for Valkey に Cloud Monitoring 向けの<span class="highlight">追加ノードレベルメトリクス</span>が導入されました。インスタンス内の個々のノードの健全性とパフォーマンスに関する詳細なインサイトが得られ、ノードの問題をトラブルシューティングし、パフォーマンスを最適化するために使用できます。</p>
+      <p>マルチシャード構成やレプリカを持つ大規模なインスタンスを運用するチームに特に有用で、<span class="highlight">ホットスポットの特定</span>や<span class="highlight">ノード単位のキャパシティプランニング</span>を実現します。</p>
+    </div>
+
+    <!-- Stats -->
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-value">12</div>
+        <div class="stat-label">メトリクスカテゴリ</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">70+</div>
+        <div class="stat-label">ノードレベルメトリクス数</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">40+</div>
+        <div class="stat-label">対応リージョン</div>
+      </div>
+      <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-green), #2E7D32);">
+        <div class="stat-value">無料</div>
+        <div class="stat-label">メトリクス追加料金</div>
+      </div>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-card">
+          <h4>❌ アップデート前の課題</h4>
+          <ul>
+            <li>インスタンスレベルの集約メトリクスのみ利用可能</li>
+            <li>個々のノードのパフォーマンス問題の特定が困難</li>
+            <li>シャード間のデータ偏りやホットスポット検出に外部ツールが必要</li>
+            <li>特定ノードのメモリ圧迫やレプリケーション遅延の原因特定に時間がかかる</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>✅ アップデート後の改善</h4>
+          <ul>
+            <li>個々のノードの CPU、メモリ、接続数、コマンド統計を直接確認可能</li>
+            <li>ノード間のリソース使用量を比較してホットスポットを即座に特定</li>
+            <li>永続化（RDB/AOF）状態やレプリケーションオフセットをノード単位で監視</li>
+            <li>データ整合性の問題を早期検出</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>各ノードが個別にメトリクスを Cloud Monitoring に送信し、Metrics Explorer やダッシュボード、アラートポリシーを通じてノード単位の詳細なモニタリングが可能になります。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Instance["Memorystore for Valkey インスタンス"]
+        subgraph Shard1["シャード 1"]
+            P1["プライマリノード"]
+            R1["レプリカノード"]
+        end
+        subgraph Shard2["シャード 2"]
+            P2["プライマリノード"]
+            R2["レプリカノード"]
+        end
+        subgraph ShardN["シャード N"]
+            PN["プライマリノード"]
+            RN["レプリカノード"]
+        end
+    end
+
+    P1 -->|ノードレベルメトリクス| CM["Cloud Monitoring"]
+    R1 -->|ノードレベルメトリクス| CM
+    P2 -->|ノードレベルメトリクス| CM
+    R2 -->|ノードレベルメトリクス| CM
+    PN -->|ノードレベルメトリクス| CM
+    RN -->|ノードレベルメトリクス| CM
+
+    CM --> ME["Metrics Explorer"]
+    CM --> DA["ダッシュボード"]
+    CM --> AL["アラートポリシー"]
+
+    ME --> User["運用チーム"]
+    DA --> User
+    AL --> NC["通知チャネル"]
+    NC --> User
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Metrics -->
+    <div class="section">
+      <h2>📈 主要メトリクスカテゴリ</h2>
+      <p>全てのノードレベルメトリクスは <code>instance/node/</code> プレフィックスで統一されています。</p>
+
+      <div class="note-box">
+        <strong>💡 メトリクスプレフィックス:</strong> <code>memorystore.googleapis.com/instance/node/{category}/{metric_name}</code>
+      </div>
+
+      <div class="metric-category">
+        <div class="metric-card">
+          <h4>🔌 クライアント接続</h4>
+          <ul>
+            <li><code>connected_clients</code> - アクティブ接続数</li>
+            <li><code>blocked_clients</code> - ブロック接続数</li>
+            <li><code>tracking_clients</code> - トラッキング登録数</li>
+            <li><code>maxclients</code> - 最大同時接続数</li>
+            <li><code>pubsub_clients</code> - Pub/Sub クライアント数</li>
+          </ul>
+        </div>
+        <div class="metric-card">
+          <h4>⚙️ CPU / メモリ</h4>
+          <ul>
+            <li><code>cpu/utilization</code> - CPU 使用率 (0.0-1.0)</li>
+            <li><code>memory/utilization</code> - メモリ使用率</li>
+            <li><code>memory/usage</code> - 総メモリ使用量</li>
+            <li><code>memory/rss_usage</code> - 物理メモリ割り当て量</li>
+            <li><code>memory/peak_usage</code> - ピークメモリ</li>
+            <li><code>memory/dataset_usage</code> - データセット使用量</li>
+          </ul>
+        </div>
+        <div class="metric-card">
+          <h4>📊 コマンド統計</h4>
+          <ul>
+            <li><code>usec_count</code> - 合計実行時間</li>
+            <li><code>calls_count</code> - 呼び出し回数/分</li>
+            <li><code>rejected_calls_count</code> - 拒否コマンド数</li>
+            <li><code>failed_calls_count</code> - 失敗コマンド数</li>
+          </ul>
+        </div>
+        <div class="metric-card">
+          <h4>💾 永続化</h4>
+          <ul>
+            <li><code>rdb_bgsave_in_progress</code> - BGSAVE 実行状態</li>
+            <li><code>rdb_last_bgsave_status</code> - 最後の BGSAVE 成否</li>
+            <li><code>aof_fsync_lag</code> - AOF fsync 遅延</li>
+            <li><code>aof_last_write_status</code> - AOF 書き込み成否</li>
+          </ul>
+        </div>
+        <div class="metric-card">
+          <h4>🔄 レプリケーション</h4>
+          <ul>
+            <li><code>offset</code> - レプリケーションオフセット</li>
+            <li><code>primary_sync_in_progress</code> - 同期進行状態</li>
+            <li><code>sync_full_count</code> - 完全再同期の回数</li>
+          </ul>
+        </div>
+        <div class="metric-card">
+          <h4>🔑 キースペース / ネットワーク</h4>
+          <ul>
+            <li><code>total_keys</code> - 格納キーの総数</li>
+            <li><code>keyspace_hits_count</code> - 成功キー検索数</li>
+            <li><code>keyspace_misses_count</code> - 失敗キー検索数</li>
+            <li><code>net_input_bytes_count</code> - 受信バイト数</li>
+            <li><code>net_output_bytes_count</code> - 送信バイト数</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specs Table -->
+    <div class="section">
+      <h2>🔧 技術仕様 - メトリクスカテゴリ一覧</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>カテゴリ</th>
+            <th>メトリクス数</th>
+            <th>主な用途</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>クライアント (clients)</td>
+            <td>8</td>
+            <td>接続管理、負荷分散分析</td>
+          </tr>
+          <tr>
+            <td>サーバー (server)</td>
+            <td>2</td>
+            <td>稼働状態の監視</td>
+          </tr>
+          <tr>
+            <td>CPU</td>
+            <td>1</td>
+            <td>処理負荷の監視</td>
+          </tr>
+          <tr>
+            <td>メモリ (memory)</td>
+            <td>14</td>
+            <td>キャパシティプランニング、OOM 防止</td>
+          </tr>
+          <tr>
+            <td>キースペース (keyspace)</td>
+            <td>2</td>
+            <td>データ分散の可視化</td>
+          </tr>
+          <tr>
+            <td>統計 (stats)</td>
+            <td>17+</td>
+            <td>トラフィック分析、エビクション監視</td>
+          </tr>
+          <tr>
+            <td>コマンド統計 (commandstats)</td>
+            <td>4</td>
+            <td>スロークエリ特定、ボトルネック分析</td>
+          </tr>
+          <tr>
+            <td>レプリケーション (replication)</td>
+            <td>5</td>
+            <td>データ整合性の確保</td>
+          </tr>
+          <tr>
+            <td>永続化 (persistence)</td>
+            <td>20+</td>
+            <td>バックアップ・復旧の健全性監視</td>
+          </tr>
+          <tr>
+            <td>Bloom フィルター</td>
+            <td>2</td>
+            <td>Bloom フィルターのリソース監視</td>
+          </tr>
+          <tr>
+            <td>JSON</td>
+            <td>2</td>
+            <td>JSON ドキュメントのリソース監視</td>
+          </tr>
+          <tr>
+            <td>エラー統計 (errorstats)</td>
+            <td>1</td>
+            <td>エラー傾向の分析</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup -->
+    <div class="section">
+      <h2>⚡ 設定方法</h2>
+
+      <div class="note-box">
+        <strong>📋 前提条件:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>Memorystore for Valkey インスタンスが作成済み</li>
+          <li>Cloud Monitoring API が有効化済み</li>
+          <li>適切な IAM 権限（<code>monitoring.viewer</code> ロール以上）が付与済み</li>
+        </ul>
+      </div>
+
+      <h3 style="color: var(--gc-on-surface); margin-top: 20px;">Step 1: インスタンス確認</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># Memorystore for Valkey インスタンスの一覧を確認
+gcloud memorystore instances list --location=us-central1</code></pre>
+
+      <h3 style="color: var(--gc-on-surface); margin-top: 20px;">Step 2: メトリクスディスクリプターの確認</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># ノードレベルメトリクスのディスクリプターを確認
+gcloud monitoring metrics-descriptors list \
+  --filter='metric.type=starts_with("memorystore.googleapis.com/instance/node/")'</code></pre>
+
+      <p style="margin-top: 12px;"><strong>Metrics Explorer での手順:</strong></p>
+      <div class="flow-diagram">
+        <div class="flow-step">📋 リソースタイプ<br><small>Memorystore Instance</small></div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">📂 カテゴリ<br><small>Node</small></div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">📊 メトリクス選択<br><small>CPU Utilization 等</small></div>
+      </div>
+
+      <h3 style="color: var(--gc-on-surface); margin-top: 20px;">Step 3: アラートポリシー作成</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># CPU 使用率 80% 超過アラートの作成例
+gcloud alpha monitoring policies create \
+  --display-name="Valkey Node CPU Alert" \
+  --condition-display-name="Node CPU > 80%" \
+  --condition-filter='metric.type="memorystore.googleapis.com/instance/node/cpu/utilization" AND resource.type="memorystore.googleapis.com/Instance"' \
+  --condition-threshold-value=0.8 \
+  --condition-threshold-comparison=COMPARISON_GT \
+  --condition-threshold-duration=300s \
+  --notification-channels=projects/PROJECT_ID/notificationChannels/CHANNEL_ID</code></pre>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div>
+          <h3 style="color: var(--gc-on-surface); font-size: 18px;">💼 ビジネス面</h3>
+          <div class="card" style="border-left-color: var(--gc-green);">
+            <p><strong>運用コスト削減</strong></p>
+            <p>ノード単位の問題特定が迅速化、MTTR（平均復旧時間）が短縮</p>
+          </div>
+          <div class="card" style="border-left-color: var(--gc-green);">
+            <p><strong>サービス品質向上</strong></p>
+            <p>ホットスポットを早期検出し、ユーザー影響を最小化</p>
+          </div>
+          <div class="card" style="border-left-color: var(--gc-green);">
+            <p><strong>キャパシティプランニング精度向上</strong></p>
+            <p>ノード単位のリソース使用傾向から適切なスケーリング判断が可能</p>
+          </div>
+        </div>
+        <div>
+          <h3 style="color: var(--gc-on-surface); font-size: 18px;">🔧 技術面</h3>
+          <div class="card" style="border-left-color: var(--gc-blue-600);">
+            <p><strong>ホットスポット検出</strong></p>
+            <p>シャード間のデータ偏りやトラフィック集中を定量的に把握</p>
+          </div>
+          <div class="card" style="border-left-color: var(--gc-blue-600);">
+            <p><strong>詳細なトラブルシューティング</strong></p>
+            <p>AOF/RDB 永続化問題やレプリケーション遅延をノード単位で診断可能</p>
+          </div>
+          <div class="card" style="border-left-color: var(--gc-blue-600);">
+            <p><strong>プロアクティブ監視</strong></p>
+            <p>メモリ圧迫やコネクション飽和を事前検知し障害を未然防止</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ 制約事項・考慮点</h2>
+      <div class="warning-box">
+        <strong>制限事項:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>現在 <strong>Preview ステータス</strong> - GA 時に仕様変更の可能性あり</li>
+          <li>Preview 機能には <strong>SLA が適用されない</strong></li>
+          <li>一部メトリクス (<code>pubsub_clients</code>, <code>watching_clients</code>) は <strong>Valkey 8.0 以降</strong> のみ対応</li>
+        </ul>
+      </div>
+      <div class="note-box">
+        <strong>考慮すべき点:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>ノードレベルメトリクスの増加により Cloud Monitoring の取り込み量が増加する可能性（ただし通常無料）</li>
+          <li>大規模インスタンスではダッシュボードのクエリ設計を適切に行う必要あり</li>
+          <li>アラート閾値はノードタイプや用途に応じて個別調整が必要</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>🔥 ユースケース 1: シャード間のホットスポット検出</h4>
+        <p><strong>シナリオ:</strong> 6 シャード構成のインスタンスで、特定キーパターンにアクセスが集中し、一部シャードでレイテンシが増加。</p>
+        <p><strong>方法:</strong> <code>instance/node/cpu/utilization</code> で全ノードの CPU 使用率を比較 + <code>instance/node/keyspace/total_keys</code> でキー分散を確認。</p>
+        <p><strong>効果:</strong> 特定ノードへの負荷集中を即座に把握し、キー設計の見直しやシャード数調整を迅速に判断。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>🔄 ユースケース 2: レプリカ昇格前のデータ整合性確認</h4>
+        <p><strong>シナリオ:</strong> メンテナンスやフェイルオーバーの際、レプリカをプライマリに昇格させる前にデータ同期状態を確認したい。</p>
+        <p><strong>方法:</strong> <code>instance/node/replication/offset</code> でプライマリとレプリカのオフセット差分を確認 + <code>sync_full_count</code> の増加を監視。</p>
+        <p><strong>効果:</strong> レプリカがプライマリと完全同期していることを確認してから昇格を実行、データ損失リスクを排除。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>💾 ユースケース 3: メモリ圧迫の早期検知とエビクション防止</h4>
+        <p><strong>シナリオ:</strong> キャッシュ用インスタンスで特定ノードのメモリ使用率が急増、意図しないキーエビクション発生前にアラートを受けたい。</p>
+        <p><strong>方法:</strong> <code>instance/node/memory/utilization</code> に 75% 閾値アラートを設定 + <code>evicted_keys_count</code> の増加傾向を監視。</p>
+        <p><strong>効果:</strong> 75% 超過時点で通知を受け、シャード追加やデータ整理を事前実行しサービス影響を回避。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金情報</h2>
+      <div class="success-box">
+        <strong>📢 ノードレベルメトリクスの利用自体には追加料金は発生しません。</strong> Google Cloud システムメトリクス (<code>memorystore.googleapis.com/</code> プレフィックス) は Cloud Monitoring の無料枠に含まれます。
+      </div>
+
+      <h3 style="color: var(--gc-on-surface); font-size: 18px; margin-top: 16px;">Cloud Monitoring 料金体系</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>料金</th>
+            <th>無料枠</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Google Cloud システムメトリクス</td>
+            <td><strong>無料</strong>（非課金対象）</td>
+            <td>全量無料</td>
+          </tr>
+          <tr>
+            <td>カスタム/外部メトリクス</td>
+            <td>$0.2580/MiB</td>
+            <td>最初の 150 MiB/請求アカウント</td>
+          </tr>
+          <tr>
+            <td>Monitoring API 読み取り</td>
+            <td>$0.50/100 万タイムシリーズ</td>
+            <td>最初の 100 万タイムシリーズ</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 style="color: var(--gc-on-surface); font-size: 18px; margin-top: 16px;">Memorystore for Valkey インスタンス料金例</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>構成</th>
+            <th>ノード時間単価 (us-central1)</th>
+            <th>月額料金概算</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>3 シャード, レプリカ 1 (6 ノード)</td>
+            <td>$0.15384/ノード/時間</td>
+            <td>約 $674/月</td>
+          </tr>
+          <tr>
+            <td>10 シャード, レプリカ 2 (30 ノード)</td>
+            <td>$0.15384/ノード/時間</td>
+            <td>約 $3,374/月</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Regions -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <p>ノードレベルメトリクスは Memorystore for Valkey が利用可能な<span class="highlight">全 40 以上のリージョン</span>で使用できます。</p>
+      <div class="region-grid">
+        <div class="region-card">
+          <h4>🌏 アジア太平洋</h4>
+          <p>asia-northeast1 (東京)</p>
+          <p>asia-northeast2 (大阪)</p>
+          <p>asia-southeast1 (シンガポール)</p>
+          <p>australia-southeast1 (シドニー)</p>
+        </div>
+        <div class="region-card">
+          <h4>🌎 北米</h4>
+          <p>us-central1 (アイオワ)</p>
+          <p>us-east1 (サウスカロライナ)</p>
+          <p>us-west1 (オレゴン)</p>
+        </div>
+        <div class="region-card">
+          <h4>🌍 ヨーロッパ</h4>
+          <p>europe-west1 (ベルギー)</p>
+          <p>europe-west3 (フランクフルト)</p>
+          <p>europe-west4 (オランダ)</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
+        <div class="card">
+          <p><strong>📊 Cloud Monitoring</strong></p>
+          <p style="font-size: 13px;">メトリクスの収集・可視化・アラート設定の基盤サービス</p>
+        </div>
+        <div class="card">
+          <p><strong>📝 Cloud Logging</strong></p>
+          <p style="font-size: 13px;">ログと組み合わせたトラブルシューティング</p>
+        </div>
+        <div class="card">
+          <p><strong>📈 インスタンスレベルメトリクス</strong></p>
+          <p style="font-size: 13px;">集約メトリクスによる全体概要把握</p>
+        </div>
+        <div class="card">
+          <p><strong>💾 Backup/Persistence</strong></p>
+          <p style="font-size: 13px;">永続化メトリクスと連携したデータ保護監視</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>📎 出典・参考リンク:</strong></p>
+      <ul style="list-style: none; padding: 0; margin: 8px 0;">
+        <li>- <a href="https://cloud.google.com/release-notes#June_04_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li>- <a href="https://cloud.google.com/memorystore/docs/valkey/supported-monitoring-metrics" target="_blank" rel="noopener noreferrer">サポートされるモニタリングメトリクス</a></li>
+        <li>- <a href="https://cloud.google.com/memorystore/docs/valkey/monitor-instances" target="_blank" rel="noopener noreferrer">インスタンスの監視ガイド</a></li>
+        <li>- <a href="https://cloud.google.com/memorystore/valkey/pricing" target="_blank" rel="noopener noreferrer">料金ページ</a></li>
+        <li>- <a href="https://cloud.google.com/products/observability/pricing" target="_blank" rel="noopener noreferrer">Cloud Monitoring 料金</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline);">Generated: 2026-06-05 | Memorystore for Valkey Node-Level Metrics Infographic</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

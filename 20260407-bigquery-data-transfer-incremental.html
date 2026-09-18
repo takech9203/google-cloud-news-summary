@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BigQuery Data Transfer Service 増分データ転送</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1 {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    .header-right {
+      text-align: right;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin: 0 0 8px 0;
+      color: var(--gc-on-surface);
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .card p {
+      margin: 0;
+      font-size: 15px;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-preview {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-orange);
+    }
+
+    /* Before/After */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .before-box h3 {
+      color: var(--gc-red);
+      margin: 0 0 12px 0;
+      font-size: 18px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .after-box h3 {
+      color: var(--gc-green);
+      margin: 0 0 12px 0;
+      font-size: 18px;
+    }
+
+    .before-box ul, .after-box ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    /* Flow diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Stat cards */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Mermaid */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* Code blocks */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Note/warning boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Usecase card */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h3 {
+      margin: 0 0 8px 0;
+      color: var(--gc-blue-900);
+      font-size: 18px;
+    }
+
+    .usecase-card p {
+      margin: 4px 0;
+      font-size: 15px;
+    }
+
+    /* Feature grid */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    /* Data source badges */
+    .datasource-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .datasource-item {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-300);
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .datasource-item .icon {
+      font-size: 28px;
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; align-items: flex-start; }
+      .header-right { text-align: left; margin-top: 8px; }
+      .before-after { grid-template-columns: 1fr; }
+      .feature-grid { grid-template-columns: 1fr; }
+      .datasource-grid { grid-template-columns: 1fr 1fr; }
+      .stat-grid { grid-template-columns: 1fr; }
+      .flow-diagram { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>📊 BigQuery Data Transfer Service<br>増分データ転送</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">BigQuery</span>
+          <span class="badge">Data Transfer Service</span>
+          <span class="badge-preview">Preview</span>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="subtitle">2026-04-07</div>
+        <div class="subtitle">Incremental Data Transfers</div>
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>☁️ 概要</h2>
+      <p>BigQuery Data Transfer Service のデータベースコネクタで<span class="highlight">増分データ転送 (Incremental Data Transfers)</span> が新たにサポートされました。前回の転送以降に変更されたデータのみを BigQuery に転送する機能で、大規模データベースの効率的な同期を実現します。</p>
+
+      <div class="datasource-grid">
+        <div class="datasource-item">
+          <span class="icon">🐬</span>
+          MySQL
+        </div>
+        <div class="datasource-item">
+          <span class="icon">🏛️</span>
+          Oracle
+        </div>
+        <div class="datasource-item">
+          <span class="icon">🐘</span>
+          PostgreSQL
+        </div>
+        <div class="datasource-item">
+          <span class="icon">🔧</span>
+          ServiceNow
+        </div>
+      </div>
+      <p style="text-align: center; font-size: 14px; color: var(--gc-outline);">対応データソース: オンプレミス、Cloud SQL、AWS、Azure でホストされたインスタンスに対応</p>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before (フルデータ転送)</h3>
+          <ul>
+            <li>毎回ソーステーブル全体を転送する必要があった</li>
+            <li>大規模データセットでは転送時間が長く、ネットワーク帯域やリソース消費が大きかった</li>
+            <li>転送頻度を上げると不要なデータの再転送が増え、コスト効率が悪かった</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After (増分データ転送)</h3>
+          <ul>
+            <li>ウォーターマークカラムを利用して変更データのみを転送可能に</li>
+            <li>Append モード (追記) と Upsert モード (更新/挿入) の 2 つの書き込みモードを選択可能に</li>
+            <li>転送時間の短縮とリソース消費の削減により、高頻度なデータ同期が実現可能に</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    subgraph Sources["データソース"]
+        MySQL["MySQL"]
+        Oracle["Oracle"]
+        PostgreSQL["PostgreSQL"]
+        ServiceNow["ServiceNow"]
+    end
+
+    subgraph DTS["BigQuery Data Transfer Service"]
+        WM["ウォーターマーク\nカラム比較"]
+        Filter["変更データ\nフィルタリング"]
+        WM --> Filter
+    end
+
+    subgraph BQ["BigQuery"]
+        Append["Append モード\n(追記)"]
+        Upsert["Upsert モード\n(更新/挿入)"]
+    end
+
+    MySQL --> DTS
+    Oracle --> DTS
+    PostgreSQL --> DTS
+    ServiceNow --> DTS
+
+    Filter --> Append
+    Filter --> Upsert
+        </pre>
+      </div>
+      <p style="font-size: 14px;">BigQuery Data Transfer Service が各データソースからウォーターマークカラムの値を比較し、変更データのみをフィルタリングして BigQuery に転送します。書き込みモードとして <strong>Append</strong> (追記のみ) または <strong>Upsert</strong> (主キーによる更新/挿入) を選択できます。</p>
+    </div>
+
+    <!-- Stats -->
+    <div class="section">
+      <h2>📈 数字で見る改善効果</h2>
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">4</div>
+          <div class="stat-label">対応データソース</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">2</div>
+          <div class="stat-label">書き込みモード</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-green), #2E7D32);">
+          <div class="stat-value" style="font-size: 28px;">大幅削減</div>
+          <div class="stat-label">転送データ量とコスト</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-teal), #00838F);">
+          <div class="stat-value" style="font-size: 28px;">高頻度</div>
+          <div class="stat-label">データ同期が可能に</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+
+      <div class="card">
+        <h3>🔄 増分転送 (Incremental Transfer)</h3>
+        <p>前回の転送成功時刻以降に変更されたデータのみを転送。ウォーターマークカラム (TIMESTAMP 型) を基準に変更を検出。初回転送時はソーステーブル全体を転送し、2 回目以降から増分転送を実施します。</p>
+      </div>
+
+      <div class="feature-grid">
+        <div class="card" style="border-left-color: var(--gc-green);">
+          <h3>➕ Append 書き込みモード</h3>
+          <p>新しいレコードを宛先テーブルに追記。ウォーターマークカラムの指定が必須。既存レコードの重複チェックは行わないため、ソースで更新されたレコードが重複する可能性があります。</p>
+          <p style="margin-top: 8px; font-size: 13px; color: var(--gc-outline);">推奨ウォーターマーク: <code>CREATED_AT</code> 等の作成日時カラム</p>
+        </div>
+        <div class="card" style="border-left-color: var(--gc-blue-800);">
+          <h3>🔀 Upsert 書き込みモード</h3>
+          <p>主キーに基づいてレコードの更新または新規挿入を実施。ウォーターマークカラムと主キーの両方の指定が必須。宛先テーブルとソーステーブルの整合性を保持可能です。</p>
+          <p style="margin-top: 8px; font-size: 13px; color: var(--gc-outline);">推奨ウォーターマーク: <code>UPDATED_AT</code> 等の更新日時カラム</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specs -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3 style="color: var(--gc-on-surface); margin-top: 0;">増分転送の設定パラメータ</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>パラメータ</th>
+            <th>説明</th>
+            <th>必須/任意</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>ingestionType</code></td>
+            <td><code>FULL</code> または <code>INCREMENTAL</code> を指定</td>
+            <td>必須</td>
+          </tr>
+          <tr>
+            <td><code>writeMode</code></td>
+            <td><code>WRITE_MODE_APPEND</code> または <code>WRITE_MODE_UPSERT</code> を指定</td>
+            <td>増分転送時は必須</td>
+          </tr>
+          <tr>
+            <td><code>watermarkColumns</code></td>
+            <td>変更追跡に使用するカラム (TIMESTAMP 型)</td>
+            <td>増分転送時は必須</td>
+          </tr>
+          <tr>
+            <td><code>primaryKeys</code></td>
+            <td>主キーとなるカラム (Upsert モード時)</td>
+            <td>Upsert モード時は必須</td>
+          </tr>
+          <tr>
+            <td><code>assets</code></td>
+            <td>転送対象のテーブルリスト</td>
+            <td>必須</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 style="color: var(--gc-on-surface); margin-top: 24px;">書き込みモードの比較</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>Append モード</th>
+            <th>Upsert モード</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>動作</td>
+            <td>新規行を追記</td>
+            <td>主キーで更新/挿入</td>
+          </tr>
+          <tr>
+            <td>ウォーターマークカラム</td>
+            <td>必須</td>
+            <td>必須</td>
+          </tr>
+          <tr>
+            <td>主キー</td>
+            <td>不要</td>
+            <td>必須</td>
+          </tr>
+          <tr>
+            <td>重複の可能性</td>
+            <td>あり</td>
+            <td>なし</td>
+          </tr>
+          <tr>
+            <td>ソースの削除同期</td>
+            <td>非対応</td>
+            <td>非対応</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup / Code Samples -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3 style="color: var(--gc-on-surface); margin-top: 0;">前提条件</h3>
+      <div class="note-box">
+        <ul style="margin: 0; padding-left: 20px;">
+          <li>BigQuery Data Transfer Service が有効化されていること</li>
+          <li><code>roles/bigquery.admin</code> IAM ロールが付与されていること</li>
+          <li>転送先の BigQuery データセットが作成済みであること</li>
+          <li>ソースデータベースへの接続に必要なネットワークアタッチメントが構成済みであること</li>
+        </ul>
+      </div>
+
+      <h3 style="color: var(--gc-on-surface); margin-top: 24px;">PostgreSQL 増分転送の作成例</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">bq コマンドラインで PostgreSQL 増分転送を作成</span>
+        </div>
+        <pre><code class="language-bash">bq mk --transfer_config \
+  --target_dataset=mydataset \
+  --data_source=postgresql \
+  --display_name='My Incremental Transfer' \
+  --params='{
+    "assets": ["DB1/PUBLIC/DEPARTMENT", "DB1/PUBLIC/EMPLOYEES"],
+    "connector.authentication.username": "User1",
+    "connector.authentication.password": "ABC12345",
+    "connector.database": "DB1",
+    "connector.endpoint.host": "192.168.0.1",
+    "connector.endpoint.port": 5432,
+    "ingestionType": "incremental",
+    "writeMode": "WRITE_MODE_APPEND",
+    "watermarkColumns": ["createdAt", "createdAt"],
+    "primaryKeys": [["dep_id"], ["report_by", "report_title"]],
+    "connector.tls.mode": "ENCRYPT_VERIFY_CA_AND_HOST",
+    "connector.tls.trustedServerCertificate": "PEM-encoded certificate"
+  }'</code></pre>
+      </div>
+
+      <h3 style="color: var(--gc-on-surface); margin-top: 24px;">MySQL 増分転送 (Upsert モード) の作成例</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">bq コマンドラインで MySQL 増分転送を作成</span>
+        </div>
+        <pre><code class="language-bash">bq mk --transfer_config \
+  --target_dataset=mydataset \
+  --data_source=mysql \
+  --display_name='My MySQL Incremental Transfer' \
+  --params='{
+    "assets": ["mydb/mytable"],
+    "connector.authentication.username": "user1",
+    "connector.authentication.password": "password123",
+    "connector.database": "mydb",
+    "connector.endpoint.host": "10.0.0.1",
+    "connector.endpoint.port": 3306,
+    "connector.legacyMapping": false,
+    "ingestionType": "incremental",
+    "writeMode": "WRITE_MODE_UPSERT",
+    "watermarkColumns": ["updated_at"],
+    "primaryKeys": [["id"]]
+  }'</code></pre>
+      </div>
+
+      <div class="warning-box">
+        <strong>⚠️ 注意:</strong> 増分転送を使用する場合、レガシーデータ型マッピングは無効 (<code>connector.legacyMapping: false</code>) にする必要があります。複数のアセットを指定する場合、<code>watermarkColumns</code> と <code>primaryKeys</code> の値は <code>assets</code> フィールドの位置に対応します。
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+
+      <div class="feature-grid">
+        <div>
+          <h3 style="color: var(--gc-on-surface); margin-top: 0;">💼 ビジネス面</h3>
+          <div class="card" style="border-left-color: var(--gc-green);">
+            <h3>💰 コスト削減</h3>
+            <p>転送データ量が大幅に削減され、データ転送コストとストレージコストを抑制可能</p>
+          </div>
+          <div class="card" style="border-left-color: var(--gc-green);">
+            <h3>🕐 データ鮮度の向上</h3>
+            <p>転送時間が短縮されるため、より高頻度のスケジュール設定が可能になり、BigQuery 上のデータ鮮度が向上</p>
+          </div>
+          <div class="card" style="border-left-color: var(--gc-green);">
+            <h3>⚙️ 運用効率の改善</h3>
+            <p>データベースコネクタに増分転送が組み込まれたことで、カスタム ETL パイプラインの構築/保守が不要に</p>
+          </div>
+        </div>
+        <div>
+          <h3 style="color: var(--gc-on-surface); margin-top: 0;">🔧 技術面</h3>
+          <div class="card" style="border-left-color: var(--gc-blue-600);">
+            <h3>🌐 ネットワーク負荷の軽減</h3>
+            <p>変更データのみの転送により、ソースデータベースやネットワークへの負荷が軽減</p>
+          </div>
+          <div class="card" style="border-left-color: var(--gc-blue-600);">
+            <h3>🔗 Upsert による整合性確保</h3>
+            <p>主キーベースの Upsert モードにより、ソースとの整合性を維持した増分同期が可能</p>
+          </div>
+          <div class="card" style="border-left-color: var(--gc-blue-600);">
+            <h3>🛡️ フェイルセーフ設計</h3>
+            <p>転送失敗時もデータの重複や欠損が発生しない設計。次回の成功転送で未転送データを自動的にカバー</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ 制約事項・注意点</h2>
+
+      <div class="warning-box">
+        <strong>⚠️ 制限事項</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>ウォーターマークカラムは TIMESTAMP 型のみサポート (MySQL の場合)</li>
+          <li>ウォーターマークカラムの値は単調増加である必要がある</li>
+          <li>ソーステーブルでの DELETE 操作は増分転送では同期されない</li>
+          <li>1 つの転送構成で増分転送とフル転送を混在させることはできない</li>
+          <li>初回の増分転送実行後にアセットリスト、書き込みモード、ウォーターマークカラム、主キーの変更はできない</li>
+          <li>宛先の BigQuery テーブルは指定された主キーでクラスタリングされるため、クラスタリングテーブルの制限事項が適用される</li>
+        </ul>
+      </div>
+
+      <div class="note-box">
+        <strong>💡 考慮すべき点</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>現在 Preview 段階であるため、SLA の適用対象外</li>
+          <li>ウォーターマークカラムの「最終更新時刻」プロパティを手動で変更すると、ファイルのスキップや重複ロードが発生する可能性あり</li>
+          <li>ウォーターマークカラムにインデックスを作成することを推奨 (パフォーマンス向上のため)</li>
+          <li>フィードバックやサポートは dts-preview-support@google.com に連絡</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h3>🛒 ユースケース 1: EC サイトの注文データのリアルタイム分析</h3>
+        <p><strong>シナリオ:</strong> EC サイトのバックエンドに MySQL を使用しており、注文データを BigQuery で分析したい。注文テーブルは数百万行あり、毎回フルデータ転送すると数時間かかっていた。</p>
+        <div class="code-block" style="margin-top: 12px;">
+          <div class="code-header">
+            <span class="code-lang">JSON</span>
+            <span class="code-title">設定例</span>
+          </div>
+          <pre><code class="language-json">{
+  "assets": ["ecommerce/orders"],
+  "ingestionType": "incremental",
+  "writeMode": "WRITE_MODE_UPSERT",
+  "watermarkColumns": ["updated_at"],
+  "primaryKeys": [["order_id"]]
+}</code></pre>
+        </div>
+        <p><strong>効果:</strong> 増分転送により転送時間が数分に短縮。注文ステータスの更新も Upsert モードで反映され、BigQuery 上のデータが常にソースと一致した状態を維持。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>🔧 ユースケース 2: ServiceNow のインシデント管理データの定期同期</h3>
+        <p><strong>シナリオ:</strong> IT 運用チームが ServiceNow のインシデントデータを BigQuery に同期し、傾向分析やダッシュボードに活用したい。日次のフル転送ではデータの鮮度が不足していた。</p>
+        <p><strong>効果:</strong> 増分転送により転送頻度を上げることで、ダッシュボードのデータ鮮度が向上。チケットのステータス変更もタイムリーに反映される。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>🏛️ ユースケース 3: Oracle データウェアハウスから BigQuery への段階的移行</h3>
+        <p><strong>シナリオ:</strong> オンプレミスの Oracle データウェアハウスから BigQuery への移行を計画しているが、一括移行はリスクが高い。まず増分転送でデータを同期し、並行稼働しながら段階的に移行したい。</p>
+        <p><strong>効果:</strong> 初回転送でフルスナップショットを取得後、増分転送で差分を継続的に同期。BigQuery 側でクエリのパフォーマンスを検証しながら、安全に移行を進められる。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>BigQuery Data Transfer Service の増分データ転送は現在 Preview 段階です。BigQuery にデータが転送された後は、標準の BigQuery ストレージ料金およびクエリ料金が適用されます。詳細は <a href="https://cloud.google.com/bigquery/pricing#data-transfer-service-pricing" target="_blank" class="gc-link">Data Transfer Service の料金ページ</a> を参照してください。</p>
+    </div>
+
+    <!-- Regions -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <p>BigQuery Data Transfer Service はマルチリージョンリソースとして提供されています。転送構成は宛先データセットと同じロケーションに設定されます。BigQuery がサポートする全てのリージョンで利用可能です。詳細は <a href="https://cloud.google.com/bigquery/docs/dts-locations" target="_blank" class="gc-link">データセットのロケーションと転送</a> を参照してください。</p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h3>📊 BigQuery Data Transfer Service</h3>
+          <p>本機能の基盤となるマネージドデータ転送サービス</p>
+        </div>
+        <div class="card">
+          <h3>🪣 Cloud Storage Transfer (増分転送)</h3>
+          <p>Cloud Storage からの既存の増分転送機能。同様の APPEND/MIRROR 書き込みモードをサポート</p>
+        </div>
+        <div class="card">
+          <h3>🗄️ Cloud SQL</h3>
+          <p>MySQL/PostgreSQL のマネージド DB サービス。Cloud SQL 上のインスタンスからも増分転送が可能</p>
+        </div>
+        <div class="card">
+          <h3>🔄 Datastream</h3>
+          <p>CDC ベースのリアルタイムデータレプリケーション。より低レイテンシの要件がある場合の代替手段</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- References -->
+    <div class="section">
+      <h2>📚 参考リンク</h2>
+      <ul>
+        <li><a href="https://docs.cloud.google.com/release-notes#April_07_2026" target="_blank" class="gc-link">公式リリースノート</a></li>
+        <li><a href="https://cloud.google.com/bigquery/docs/dts-introduction" target="_blank" class="gc-link">BigQuery Data Transfer Service の概要</a></li>
+        <li><a href="https://cloud.google.com/bigquery/docs/mysql-transfer" target="_blank" class="gc-link">MySQL 転送の設定</a></li>
+        <li><a href="https://cloud.google.com/bigquery/docs/oracle-transfer" target="_blank" class="gc-link">Oracle 転送の設定</a></li>
+        <li><a href="https://cloud.google.com/bigquery/docs/postgresql-transfer" target="_blank" class="gc-link">PostgreSQL 転送の設定</a></li>
+        <li><a href="https://cloud.google.com/bigquery/docs/servicenow-transfer" target="_blank" class="gc-link">ServiceNow 転送の設定</a></li>
+        <li><a href="https://cloud.google.com/bigquery/pricing#data-transfer-service-pricing" target="_blank" class="gc-link">料金ページ</a></li>
+      </ul>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="list-style: none; padding: 0; margin: 4px 0;">
+        <li><a href="https://docs.cloud.google.com/release-notes#April_07_2026" target="_blank" rel="noopener noreferrer">https://docs.cloud.google.com/release-notes#April_07_2026</a></li>
+        <li><a href="https://cloud.google.com/bigquery/docs/dts-introduction" target="_blank" rel="noopener noreferrer">https://cloud.google.com/bigquery/docs/dts-introduction</a></li>
+      </ul>
+      <p style="margin-top: 8px;">Generated on 2026-04-08</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

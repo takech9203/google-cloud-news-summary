@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BigQuery: Apache Iceberg v3 (バイナリ削除ベクトル) サポート</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; }
+
+    h1, .title {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .card-teal {
+      border-left-color: var(--gc-teal);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .badge-deprecated {
+      background: var(--gc-red);
+      color: #FFFFFF;
+    }
+
+    /* Before/After */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-box ul, .after-box ul {
+      margin: 8px 0 0 0;
+      padding-left: 20px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    /* Stat cards */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.green {
+      background: linear-gradient(135deg, var(--gc-green), #1e8e3e);
+    }
+
+    .stat-card.orange {
+      background: linear-gradient(135deg, var(--gc-orange), #E65100);
+    }
+
+    .stat-card.purple {
+      background: linear-gradient(135deg, var(--gc-purple), #7B1FA2);
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Flow diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Check items */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    /* Code blocks */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      background: #1E1E1E;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* Note / Warning / Info boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Mermaid */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Use case cards */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h3 {
+      color: var(--gc-blue-800);
+      margin-top: 0;
+    }
+
+    /* Feature grid */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    /* Pricing table special */
+    .pricing-info {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    /* Footer */
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer ul {
+      list-style: none;
+      padding: 0;
+      margin: 8px 0;
+    }
+
+    footer li {
+      margin: 4px 0;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      h1, .title { font-size: 24px; }
+      h2, .section-title { font-size: 20px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .header { flex-direction: column; }
+      .flow-diagram { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>&#x2744;&#xFE0F; BigQuery: Apache Iceberg v3 サポート</h1>
+        <p style="margin: 8px 0 4px 0; font-size: 18px; color: var(--gc-on-surface-variant);">
+          バイナリ削除ベクトル対応で削除パフォーマンスが大幅向上
+        </p>
+        <div style="margin-top: 8px;">
+          <span class="badge">BigQuery</span>
+          <span class="badge">Apache Iceberg</span>
+          <span class="badge-preview">Preview</span>
+        </div>
+      </div>
+      <div class="subtitle" style="text-align: right; white-space: nowrap; padding-top: 4px;">
+        &#x1F4C5; 2026-04-15
+      </div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>&#x1F4CB; 概要</h2>
+      <p>
+        BigQuery の Apache Iceberg 外部テーブルが <span class="highlight">Iceberg バージョン 3 (v3)</span> をサポートしました。
+        これにより、<span class="highlight">バイナリ削除ベクトル (binary deletion vectors)</span> を含む Iceberg v3 形式のテーブルを
+        BigQuery から直接クエリできるようになりました。
+      </p>
+      <p>
+        Apache Iceberg はペタバイト規模のデータテーブルをサポートするオープンソーステーブルフォーマットであり、
+        オブジェクトストアに保存された単一のデータコピーに対して複数のクエリエンジンからアクセスできます。
+        BigQuery が Iceberg v3 をサポートすることで、Google Cloud の<strong>オープンレイクハウス戦略</strong>がさらに強化され、
+        Spark、Trino、Flink などの OSS エンジンとの相互運用性が向上します。
+      </p>
+
+      <div class="warning-box">
+        <strong>&#x26A0;&#xFE0F; 注意:</strong> 本機能は現在 <strong>Preview</strong> ステータスです。本番環境での使用には注意が必要であり、SLA の適用外となる可能性があります。
+        フィードバックや質問は <code>biglake-help@google.com</code> まで。
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value">v3</div>
+        <div class="stat-label">Iceberg 最新バージョン<br/>サポート</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-value">&#x2191; &#x2191;</div>
+        <div class="stat-label">削除処理<br/>パフォーマンス向上</div>
+      </div>
+      <div class="stat-card orange">
+        <div class="stat-value">Preview</div>
+        <div class="stat-label">現在のステータス<br/>(GA 待ち)</div>
+      </div>
+      <div class="stat-card purple">
+        <div class="stat-value">Multi</div>
+        <div class="stat-label">マルチエンジン<br/>相互運用性</div>
+      </div>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>&#x1F504; Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h3>&#x274C; アップデート前</h3>
+          <ul>
+            <li>Iceberg v2 までのサポートに限定</li>
+            <li>v3 形式のテーブルにアクセス不可</li>
+            <li>merge-on-read 方式の position delete / equality delete</li>
+            <li>データファイルあたり最大 10,000 削除ファイル</li>
+            <li>大量削除時にクエリパフォーマンスが低下</li>
+            <li>他エンジンの v3 テーブルを BigQuery から読み取り不可</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>&#x2705; アップデート後</h3>
+          <ul>
+            <li>Iceberg v3 形式のテーブルをクエリ可能</li>
+            <li>バイナリ削除ベクトルで効率的な行削除</li>
+            <li>ビットマップベースでコンパクトに削除行を追跡</li>
+            <li>削除ファイル数の制限が大幅に緩和</li>
+            <li>削除行スキップが高速化</li>
+            <li>Spark / Flink / Trino の v3 テーブルをシームレスに共有</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>&#x1F3D7;&#xFE0F; アーキテクチャ図</h2>
+      <p>OSS エンジンが Iceberg v3 のバイナリ削除ベクトルを含むデータを Cloud Storage に書き込み、BigQuery が BigLake Metastore や AWS Glue Data Catalog を経由して Iceberg 外部テーブルとしてそのデータにアクセスする全体構成です。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Writers["データ書き込みエンジン"]
+        S["Apache Spark"]
+        F["Apache Flink"]
+        T["Trino / Presto"]
+    end
+
+    subgraph Storage["Cloud Storage / オブジェクトストア"]
+        DF["Parquet データファイル"]
+        DV["バイナリ削除ベクトル<br/>Iceberg v3"]
+        PD["Position Delete ファイル<br/>Iceberg v2"]
+        ED["Equality Delete ファイル<br/>Iceberg v2"]
+        META["Iceberg メタデータ<br/>JSON / Avro"]
+    end
+
+    subgraph Metastore["メタデータ管理"]
+        BLM["BigLake Metastore"]
+        GLUE["AWS Glue Data Catalog"]
+        JSON["JSON メタデータファイル"]
+    end
+
+    subgraph BQ["BigQuery"]
+        EXT["Iceberg 外部テーブル"]
+        CONN["Cloud リソース接続"]
+        ACL["アクセス制御<br/>行レベル / 列レベル"]
+        QUERY["BigQuery SQL クエリ"]
+    end
+
+    S & F & T -->|"書き込み / 更新 / 削除"| DF & DV & PD & ED
+    DF & DV & PD & ED --> META
+    META --> BLM & GLUE & JSON
+    BLM & GLUE & JSON --> EXT
+    CONN --> EXT
+    EXT --> ACL
+    ACL --> QUERY
+
+    style DV fill:#4285F4,color:#fff,stroke:#1a73e8
+    style EXT fill:#34A853,color:#fff,stroke:#1e8e3e
+        </pre>
+      </div>
+      <div class="note-box">
+        <strong>&#x1F4A1; ポイント:</strong> 青色 = バイナリ削除ベクトル (Iceberg v3 の新機能)、緑色 = BigQuery Iceberg 外部テーブル (今回のアップデート対象)
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>&#x2B50; 主要機能</h2>
+
+      <div class="card">
+        <h3>&#x1F4E6; 1. Iceberg バージョン 3 サポート</h3>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>Iceberg v3 仕様 (Extended Types and Capabilities) に準拠したテーブルの読み取りが可能</span></div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>v3 で導入されたバイナリ削除ベクトルが主要なサポート対象</span></div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>既存の Iceberg v2 テーブル (merge-on-read 対応) も引き続きサポート</span></div>
+      </div>
+
+      <div class="card card-green">
+        <h3>&#x26A1; 2. バイナリ削除ベクトル (Binary Deletion Vectors)</h3>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>Iceberg v3 で新たに導入された削除行追跡メカニズム</span></div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>各データファイルに対してビットマップベースのバイナリベクトルで削除行を記録</span></div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>データファイルの書き換え (rewrite) なしに行レベルの削除を効率的に処理</span></div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>クエリ実行時に削除ベクトルを読み込んで対象行をスキップ、merge-on-read のオーバーヘッドを軽減</span></div>
+      </div>
+
+      <div class="card card-purple">
+        <h3>&#x1F310; 3. マルチエンジン相互運用性の強化</h3>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>BigLake Metastore、AWS Glue Data Catalog、JSON メタデータファイルのいずれ経由でも Iceberg v3 テーブルにアクセス可能</span></div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>Spark、Flink、Trino など OSS エンジンが生成した Iceberg v3 テーブルを BigQuery から直接クエリ可能</span></div>
+        <div class="check-item"><span class="check-icon">&#x2713;</span><span>BigQuery Storage API 経由の Managed Spark / Serverless Spark アクセスでもアクセス制御ポリシーが適用</span></div>
+      </div>
+    </div>
+
+    <!-- Version Comparison Table -->
+    <div class="section">
+      <h2>&#x1F4CA; Iceberg バージョン比較</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>Iceberg v2</th>
+            <th>Iceberg v3</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>行レベル削除方式</strong></td>
+            <td>Position delete / Equality delete (merge-on-read)</td>
+            <td>バイナリ削除ベクトル</td>
+          </tr>
+          <tr>
+            <td><strong>削除ファイルの制限</strong></td>
+            <td>データファイルあたり最大 10,000、等値削除は最大 100,000</td>
+            <td>バイナリベクトルにより制限が大幅に緩和</td>
+          </tr>
+          <tr>
+            <td><strong>削除の効率性</strong></td>
+            <td>削除ファイル増加でクエリ性能低下</td>
+            <td>ビットマップベースで一定のサイズを維持</td>
+          </tr>
+          <tr>
+            <td><strong>拡張データ型</strong></td>
+            <td>-</td>
+            <td>ナノ秒 timestamp(tz)、unknown、variant、geometry、geography</td>
+          </tr>
+          <tr>
+            <td><strong>Initial default values</strong></td>
+            <td>未対応</td>
+            <td>対応 (BigQuery では未サポート)</td>
+          </tr>
+          <tr>
+            <td><strong>テーブル暗号化キー</strong></td>
+            <td>未対応</td>
+            <td>対応 (BigQuery では未サポート)</td>
+          </tr>
+          <tr>
+            <td><strong>BigQuery サポート</strong></td>
+            <td><span class="badge-ga" style="display:inline-block;">GA</span></td>
+            <td><span class="badge-preview" style="display:inline-block;">Preview</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Limitations in BigQuery -->
+    <div class="section">
+      <h2>&#x26A0;&#xFE0F; Iceberg v3 の BigQuery における制限事項</h2>
+      <p>現時点で以下の Iceberg v3 機能は BigQuery でサポートされていません。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>機能</th>
+            <th>ステータス</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>ナノ秒 timestamp / timestamptz</td><td><span class="cross-icon">&#x2717;</span> 未サポート</td></tr>
+          <tr><td>unknown 型</td><td><span class="cross-icon">&#x2717;</span> 未サポート</td></tr>
+          <tr><td>variant 型</td><td><span class="cross-icon">&#x2717;</span> 未サポート</td></tr>
+          <tr><td>geometry 型</td><td><span class="cross-icon">&#x2717;</span> 未サポート</td></tr>
+          <tr><td>geography 型</td><td><span class="cross-icon">&#x2717;</span> 未サポート</td></tr>
+          <tr><td>Initial default values</td><td><span class="cross-icon">&#x2717;</span> 未サポート</td></tr>
+          <tr><td>テーブル暗号化キー</td><td><span class="cross-icon">&#x2717;</span> 未サポート</td></tr>
+          <tr><td>バイナリ削除ベクトル</td><td><span class="check-icon">&#x2713;</span> <strong>サポート (Preview)</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup Guide -->
+    <div class="section">
+      <h2>&#x1F6E0;&#xFE0F; 設定方法</h2>
+
+      <h3>&#x1F4CB; 前提条件</h3>
+      <div class="check-item"><span class="check-icon">&#x2713;</span><span>BigQuery Connection API と BigQuery Reservation API が有効化済み</span></div>
+      <div class="check-item"><span class="check-icon">&#x2713;</span><span>Cloud Storage バケットに Iceberg テーブルのデータ/メタデータが格納済み</span></div>
+      <div class="check-item"><span class="check-icon">&#x2713;</span><span>Cloud リソース接続が作成済みで適切なアクセス権限が設定済み</span></div>
+      <div class="check-item"><span class="check-icon">&#x2713;</span><span>IAM ロール: BigQuery Admin (<code>roles/bigquery.admin</code>) + Storage Object Admin (<code>roles/storage.objectAdmin</code>)</span></div>
+
+      <h3>Step 1: Cloud リソース接続の作成</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">bq コマンドで接続を作成</span>
+        </div>
+        <pre><code class="language-bash"># Cloud リソース接続の作成
+bq mk --connection --connection_type='CLOUD_RESOURCE' \
+  --project_id=PROJECT_ID \
+  --location=REGION \
+  CONNECTION_ID</code></pre>
+      </div>
+
+      <h3>Step 2: Iceberg 外部テーブルの作成 (JSON メタデータファイル方式)</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">JSON メタデータファイル方式</span>
+        </div>
+        <pre><code class="language-sql">CREATE EXTERNAL TABLE PROJECT_ID.DATASET.TABLE_NAME
+  WITH CONNECTION `PROJECT_ID.REGION.CONNECTION_ID`
+  OPTIONS (
+    format = 'ICEBERG',
+    uris = ["gs://BUCKET/PATH/metadata/XXXXX.metadata.json"]
+  );</code></pre>
+      </div>
+
+      <h3>Step 3: Iceberg 外部テーブルの作成 (BigLake Metastore 方式 - 推奨)</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">BigLake Metastore 方式 (推奨)</span>
+        </div>
+        <pre><code class="language-sql">-- BigLake Metastore を使用する場合 (推奨)
+-- メタデータの自動同期により手動更新が不要
+CREATE EXTERNAL TABLE PROJECT_ID.DATASET.TABLE_NAME
+  WITH CONNECTION `PROJECT_ID.REGION.CONNECTION_ID`
+  OPTIONS (
+    format = 'ICEBERG',
+    uris = ["gs://BUCKET/PATH/metadata/iceberg.metadata.json"]
+  );</code></pre>
+      </div>
+
+      <div class="note-box">
+        <strong>&#x1F4A1; 推奨:</strong> BigLake Metastore は統合されたマネージドメタストアであり、メタデータの自動同期を提供するため、手動更新が不要になります。
+      </div>
+
+      <h3>Step 4: クエリの実行</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">Iceberg v3 テーブルへのクエリ例</span>
+        </div>
+        <pre><code class="language-sql">-- バイナリ削除ベクトルが自動的に適用される
+SELECT *
+FROM PROJECT_ID.DATASET.TABLE_NAME
+WHERE partition_column = 'value'
+LIMIT 100;
+
+-- タイムトラベル (過去のスナップショットへのアクセス)
+SELECT *
+FROM PROJECT_ID.DATASET.TABLE_NAME
+FOR SYSTEM_TIME AS OF '2026-04-14 00:00:00 UTC';</code></pre>
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>&#x1F4C8; メリット</h2>
+
+      <h3>&#x1F4BC; ビジネス面</h3>
+      <div class="card card-green">
+        <div class="icon-text"><span class="arrow">&#x2192;</span><span><strong>オープンレイクハウス戦略の加速:</strong> Iceberg v3 という最新のオープンフォーマットをサポートすることで、ベンダーロックインを回避しつつ BigQuery の分析能力を活用可能</span></div>
+        <div class="icon-text"><span class="arrow">&#x2192;</span><span><strong>マルチエンジン環境の統合:</strong> Spark や Flink で書き込んだ Iceberg v3 データを BigQuery で分析可能。データのコピーや ETL パイプライン構築コストを削減</span></div>
+        <div class="icon-text"><span class="arrow">&#x2192;</span><span><strong>将来への投資保護:</strong> Iceberg コミュニティが v3 を主軸に開発を進めており、早期採用で将来の移行コストを抑制</span></div>
+      </div>
+
+      <h3>&#x2699;&#xFE0F; 技術面</h3>
+      <div class="card">
+        <div class="icon-text"><span class="arrow">&#x2192;</span><span><strong>クエリパフォーマンス向上:</strong> バイナリ削除ベクトルにより、従来の merge-on-read と比較して削除行スキップが高速化。大量の行削除が発生するテーブルで特に効果的</span></div>
+        <div class="icon-text"><span class="arrow">&#x2192;</span><span><strong>ストレージ効率改善:</strong> コンパクトなバイナリベクトルにより、メタデータサイズが削減</span></div>
+        <div class="icon-text"><span class="arrow">&#x2192;</span><span><strong>削除ファイル制限の緩和:</strong> v2 のデータファイルあたりの削除ファイル数制限が v3 で大幅に緩和</span></div>
+      </div>
+    </div>
+
+    <!-- Limitations / Considerations -->
+    <div class="section">
+      <h2>&#x26A0;&#xFE0F; デメリット・制約事項</h2>
+
+      <h3>&#x1F6AB; 制限事項</h3>
+      <div class="error-box">
+        <div class="check-item"><span class="cross-icon">&#x2717;</span><span>Preview ステータスのため、SLA 適用外の可能性あり</span></div>
+        <div class="check-item"><span class="cross-icon">&#x2717;</span><span>Iceberg v3 の拡張データ型 (ナノ秒 timestamp、unknown、variant、geometry、geography) は BigQuery で未サポート</span></div>
+        <div class="check-item"><span class="cross-icon">&#x2717;</span><span>Initial default values / テーブル暗号化キーは未サポート</span></div>
+        <div class="check-item"><span class="cross-icon">&#x2717;</span><span>VPC Service Controls 使用クエリはサポート外 (<code>NO_MATCHING_ACCESS_LEVEL</code> エラー)</span></div>
+        <div class="check-item"><span class="cross-icon">&#x2717;</span><span>Iceberg 外部テーブルは読み取り専用 (BigQuery から直接 Iceberg v3 形式での書き込み不可)</span></div>
+      </div>
+
+      <h3>&#x1F4DD; 考慮すべき点</h3>
+      <div class="warning-box">
+        <div class="icon-text"><span>&#x26A0;&#xFE0F;</span><span><strong>merge-on-read のコスト:</strong> オンデマンド課金の場合、削除済み行を含む全論理バイト数 + 削除ベクトルファイルの読み込みバイト数が課金対象</span></div>
+        <div class="icon-text"><span>&#x26A0;&#xFE0F;</span><span><strong>メタデータ管理:</strong> JSON メタデータファイル方式の場合、テーブル更新時に手動で URI 更新が必要 (BigLake Metastore 推奨)</span></div>
+        <div class="icon-text"><span>&#x26A0;&#xFE0F;</span><span><strong>Preview の変更リスク:</strong> API やサポート範囲が GA までに変更される可能性あり</span></div>
+        <div class="icon-text"><span>&#x26A0;&#xFE0F;</span><span><strong>書き込み側の対応:</strong> バイナリ削除ベクトル使用には、書き込み側エンジン (Spark 等) も Iceberg v3 サポートが必要</span></div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>&#x1F3AF; ユースケース</h2>
+
+      <div class="usecase-card">
+        <h3>&#x1F6D2; UC1: マルチエンジンデータレイクでのリアルタイム分析</h3>
+        <p><strong>シナリオ:</strong> 大規模 EC サイトが Apache Spark で注文データを Iceberg v3 テーブルに書き込み、キャンセルや返品をバイナリ削除ベクトルで管理。ビジネスアナリストが BigQuery から同じデータをクエリして売上分析レポートを作成。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">BigQuery から Iceberg v3 テーブルを直接クエリ</span>
+          </div>
+          <pre><code class="language-sql">-- バイナリ削除ベクトルにより、キャンセル済み注文は自動的に除外
+SELECT
+  DATE(order_timestamp) AS order_date,
+  product_category,
+  SUM(order_amount) AS total_sales,
+  COUNT(*) AS order_count
+FROM myproject.datalake.orders_iceberg_v3
+WHERE order_timestamp >= '2026-04-01'
+GROUP BY order_date, product_category
+ORDER BY order_date, total_sales DESC;</code></pre>
+        </div>
+        <p><strong>効果:</strong> データのコピーや ETL パイプラインなしに Spark 管理の Iceberg v3 テーブルを BigQuery から直接分析。大量キャンセル処理がある場合でもクエリパフォーマンスが安定。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>&#x1F512; UC2: GDPR / データプライバシー対応のデータ削除</h3>
+        <p><strong>シナリオ:</strong> GDPR の「忘れられる権利」に対応するため、Spark ジョブで定期的に対象ユーザーの行を Iceberg v3 テーブルから削除。BigQuery からのクエリでも削除が反映されていることを確認。</p>
+        <p><strong>効果:</strong> バイナリ削除ベクトルにより、データファイル全体の書き換えなしに行レベル削除が記録され、BigQuery からのクエリでも削除が即座に反映。プライバシーコンプライアンス要件を満たしつつ、分析ワークロードへの影響を最小限に抑制。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>&#x1F504; UC3: 段階的な Iceberg v2 から v3 への移行</h3>
+        <p><strong>シナリオ:</strong> 既存の Iceberg v2 テーブルで削除ファイルの増加によるクエリパフォーマンス低下が課題。段階的に Iceberg v3 へ移行し、バイナリ削除ベクトルのメリットを享受したい。</p>
+        <p><strong>効果:</strong> BigQuery は v2/v3 の両方をサポートするため、テーブル単位で段階的に v3 へ移行可能。移行後は削除ファイル管理のオーバーヘッドが軽減され、クエリパフォーマンスが向上。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>&#x1F4B0; 料金情報</h2>
+      <p>Iceberg 外部テーブルのクエリ料金は BigQuery の標準的な外部テーブル料金モデルに従います。</p>
+
+      <div class="before-after">
+        <div class="pricing-info" style="border-left: 4px solid var(--gc-blue-600);">
+          <h3 style="margin-top: 0;">&#x1F4B3; オンデマンド料金</h3>
+          <p>クエリで処理されたバイト数に基づいて課金<br/>(1 TiB あたりの料金)</p>
+        </div>
+        <div class="pricing-info" style="border-left: 4px solid var(--gc-green);">
+          <h3 style="margin-top: 0;">&#x1F4B3; キャパシティ料金</h3>
+          <p>スロット消費に基づいて課金<br/>(スロット時間あたりの料金)</p>
+        </div>
+      </div>
+
+      <h3>merge-on-read (削除ベクトル含む) のコスト計算</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>課金対象</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>データファイル読み取り</td><td>全論理バイト数 (削除済み行を含む)</td></tr>
+          <tr><td>削除ベクトルファイル読み取り</td><td>削除行を特定するために読み込む論理バイト数</td></tr>
+          <tr><td>クエリあたり最小課金</td><td>10 MiB</td></tr>
+          <tr><td>テーブルあたり最小課金</td><td>10 MiB</td></tr>
+        </tbody>
+      </table>
+
+      <div class="note-box">
+        <strong>&#x1F4A1; 注意:</strong> Cloud Storage 上のデータストレージ料金 (データ保存、データ取得、ネットワーク転送) が別途発生します。
+      </div>
+    </div>
+
+    <!-- Regions -->
+    <div class="section">
+      <h2>&#x1F30D; 利用可能リージョン</h2>
+      <p>Iceberg 外部テーブルは BigQuery がサポートする<strong>すべてのリージョンおよびマルチリージョン</strong>で利用可能です。メタストアの方式により利用可能リージョンが異なります。</p>
+
+      <div class="card">
+        <div class="icon-text"><span>&#x2601;&#xFE0F;</span><span><strong>BigLake Metastore:</strong> Google Cloud リージョン (推奨)</span></div>
+        <div class="icon-text"><span>&#x1F310;</span><span><strong>AWS Glue Data Catalog:</strong> AWS リージョン</span></div>
+        <div class="icon-text"><span>&#x1F4C4;</span><span><strong>JSON メタデータファイル:</strong> Cloud Storage、Amazon S3、Azure Blob Storage のいずれかに配置可能</span></div>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#x1F517; 関連サービス</h2>
+
+      <div class="card">
+        <div class="icon-text"><span>&#x1F4E6;</span><span><strong>BigLake Metastore</strong> - Iceberg テーブルのメタデータを統合管理するマネージドメタストア。複数エンジンからの同時アクセスに対応</span></div>
+      </div>
+      <div class="card card-green">
+        <div class="icon-text"><span>&#x1F4CA;</span><span><strong>BigLake Iceberg テーブル (BigQuery マネージドテーブル)</strong> - BigQuery が直接管理する Iceberg テーブル。外部テーブルとは異なり直接書き込み可能、Iceberg v2 スナップショットのエクスポートに対応</span></div>
+      </div>
+      <div class="card card-teal">
+        <div class="icon-text"><span>&#x1F4BE;</span><span><strong>Cloud Storage</strong> - Iceberg テーブルのデータファイルおよびメタデータの格納先</span></div>
+      </div>
+      <div class="card card-orange">
+        <div class="icon-text"><span>&#x26A1;</span><span><strong>Managed Service for Apache Spark / Serverless Spark</strong> - BigQuery Storage API 経由で Iceberg 外部テーブルにアクセス可能。アクセス制御ポリシーも適用</span></div>
+      </div>
+      <div class="card card-purple">
+        <div class="icon-text"><span>&#x2699;&#xFE0F;</span><span><strong>Dataproc</strong> - Apache Spark や Flink のクラスタを提供し、Iceberg v3 テーブルの読み書きに使用</span></div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>&#x1F4CE; 出典:</strong></p>
+      <ul>
+        <li>&#x1F4C4; <a href="https://cloud.google.com/release-notes#April_15_2026" target="_blank" rel="noopener noreferrer" class="gc-link">Google Cloud 公式リリースノート (2026-04-15)</a></li>
+        <li>&#x1F4D6; <a href="https://docs.cloud.google.com/bigquery/docs/iceberg-external-tables" target="_blank" rel="noopener noreferrer" class="gc-link">Apache Iceberg 外部テーブル ドキュメント</a></li>
+        <li>&#x1F4D6; <a href="https://docs.cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery" target="_blank" rel="noopener noreferrer" class="gc-link">BigLake Iceberg テーブル ドキュメント</a></li>
+        <li>&#x1F310; <a href="https://iceberg.apache.org/spec/#version-3-extended-types-and-capabilities" target="_blank" rel="noopener noreferrer" class="gc-link">Apache Iceberg v3 仕様</a></li>
+        <li>&#x1F4B0; <a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">BigQuery 料金ページ</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline);">Generated on 2026-04-16 | Google Cloud News Infographic</p>
+    </footer>
+
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

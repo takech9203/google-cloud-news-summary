@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CCaaS: 仮想エージェントの事前録音オーディオ再生、SIP リングタイムアウト設定、バグ修正</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; min-width: 280px; }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .badges { margin-top: 8px; }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-feature { background: var(--gc-green); }
+    .badge-fix { background: var(--gc-orange); }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green { border-left-color: var(--gc-green); }
+    .card-orange { border-left-color: var(--gc-orange); }
+    .card-red { border-left-color: var(--gc-red); }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* Before/After */
+    .before-after { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+    .before-box h3 { color: var(--gc-red); }
+    .after-box h3 { color: var(--gc-green); }
+    .before-after ul { margin: 8px 0 0 20px; font-size: 14px; }
+    .before-after li { margin-bottom: 6px; }
+
+    /* Stats */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin: 16px 0; }
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+    .stat-card.green { background: linear-gradient(135deg, var(--gc-green), #1e7e34); }
+    .stat-card.orange { background: linear-gradient(135deg, var(--gc-orange), #e65100); }
+    .stat-value { font-size: 36px; font-weight: 700; margin-bottom: 4px; }
+    .stat-label { font-size: 14px; opacity: 0.9; }
+
+    /* Flow diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+    .flow-step.new {
+      border-color: var(--gc-green);
+      background: var(--gc-green-tint);
+    }
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Table */
+    table { width: 100%; border-collapse: collapse; margin: 16px 0; border-radius: 8px; overflow: hidden; border: 1px solid var(--gc-outline-variant); }
+    th { background: var(--gc-blue-50); color: var(--gc-blue-900); padding: 12px 16px; text-align: left; font-weight: 600; font-size: 14px; border-bottom: 2px solid var(--gc-blue-200); }
+    td { padding: 12px 16px; border-bottom: 1px solid var(--gc-outline-variant); font-size: 14px; }
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* Usecase */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+    .usecase h3 { color: var(--gc-blue-800); margin-bottom: 8px; }
+    .usecase p { font-size: 14px; }
+
+    /* Mermaid */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+    .mermaid { display: flex; justify-content: center; }
+
+    /* Code block */
+    .code-block, pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+    pre code { background: none; border: none; padding: 0; font-size: inherit; color: inherit; }
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .code-label + pre:not(.mermaid), .code-label + .code-block { border-top-left-radius: 0; margin-top: 0; }
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Note/Warning */
+    .note-box { background: var(--gc-blue-tint); border-left: 4px solid var(--gc-blue-600); padding: 16px 20px; border-radius: 0 12px 12px 0; margin: 16px 0; }
+    .warning-box { background: var(--gc-yellow-tint); border-left: 4px solid var(--gc-yellow); padding: 16px 20px; border-radius: 0 12px 12px 0; margin: 16px 0; }
+
+    /* Features grid */
+    .features-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+
+    /* Pricing table */
+    .pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 16px 0; }
+    .pricing-card {
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+    .pricing-card .pricing-icon { font-size: 28px; margin-bottom: 8px; }
+    .pricing-card .pricing-title { font-weight: 600; color: var(--gc-on-surface); font-size: 14px; margin-bottom: 8px; }
+    .pricing-card .pricing-desc { font-size: 13px; color: var(--gc-on-surface-variant); }
+
+    /* Related services */
+    .related-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin: 16px 0; }
+    .related-card {
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+    .related-card strong { color: var(--gc-on-surface); }
+    .related-card p { font-size: 13px; margin-top: 4px; }
+
+    /* Links list */
+    .links-list { list-style: none; padding: 0; }
+    .links-list li { margin: 8px 0; font-size: 14px; }
+    .links-list li::before { content: ""; }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+    footer a { color: var(--gc-blue-600); text-decoration: underline; word-break: break-all; }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; }
+      .subtitle { text-align: left; margin-top: 8px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>&#x260E;&#xFE0F; CCaaS: 仮想エージェントの事前録音オーディオ再生 / SIP リングタイムアウト / バグ修正</h1>
+        <div class="badges">
+          <span class="badge">CCAI Platform</span>
+          <span class="badge">Dialogflow CX</span>
+          <span class="badge badge-feature">Feature</span>
+          <span class="badge badge-fix">Fixed</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-03-30</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>&#x1F4CB; 概要</h2>
+      <p>Google Cloud Contact Center as a Service (CCaaS) / CCAI Platform に複数のアップデートが提供されました。主要なアップデートとして、Dialogflow を利用した仮想エージェントが<span class="highlight">事前録音されたオーディオファイルを再生</span>できるようになりました。標準的な TTS の代わりに高品質なオーディオファイルを使用して顧客に応答でき、すべての音声チャネル (インバウンド / アウトバウンド) で利用可能です。</p>
+      <p style="margin-top: 12px;">また、Twilio ユーザー向けに <span class="highlight">SIP エンドポイント転送のリングタイムアウト設定</span> が追加され、<code>sip_ring_timeout</code> フィールドで最大 600 秒のリング期間を設定できます。さらに、通話録音とメール割り当てに関する 2 件のバグが修正されました。</p>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value">3</div>
+        <div class="stat-label">主要アップデート数</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-value">600秒</div>
+        <div class="stat-label">SIP リングタイムアウト最大値</div>
+      </div>
+      <div class="stat-card orange">
+        <div class="stat-value">8kHz</div>
+        <div class="stat-label">オーディオサンプリングレート</div>
+      </div>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>&#x1F504; Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h3>&#x274C; Before</h3>
+          <ul>
+            <li>音声応答は標準的な TTS に限定、ブランド独自の録音を使用不可</li>
+            <li>SIP 転送時のリングタイムアウトを制御不可、通話が切断されるケースあり</li>
+            <li>転送後にエージェントが離れても録音が継続される問題</li>
+            <li>エージェントロールを持たないユーザーにメールが自動割り当てされる問題</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>&#x2705; After</h3>
+          <ul>
+            <li>高品質な事前録音オーディオファイルで応答可能、ブランド体験の一貫性が向上</li>
+            <li><code>sip_ring_timeout</code> で最大 600 秒まで柔軟にタイムアウト設定</li>
+            <li>転送後の録音継続問題が修正、設定通りに動作</li>
+            <li>メール割り当てがエージェントロール保持者のみに正しく適用</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid from source) -->
+    <div class="section">
+      <h2>&#x1F3D7;&#xFE0F; アーキテクチャ図</h2>
+      <p>仮想エージェントが事前録音オーディオを再生する新しいフローと、SIP エンドポイントへの転送時にリングタイムアウトを設定できる構成を示しています。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Customer["顧客"]
+        Phone["電話"]
+    end
+
+    subgraph CCaaS["CCAI Platform / CCaaS"]
+        VA["仮想エージェント\n(Dialogflow CX)"]
+        AudioEngine["オーディオエンジン"]
+        SIPGateway["SIP ゲートウェイ"]
+    end
+
+    subgraph AudioSources["オーディオソース"]
+        TTS["TTS\n(テキスト読み上げ)"]
+        PreRecorded["事前録音\nオーディオファイル\n(Cloud Storage)"]
+    end
+
+    subgraph Endpoints["転送先"]
+        SIPEndpoint["SIP エンドポイント\n(内線 / UC)"]
+        ThirdParty["サードパーティ番号"]
+    end
+
+    Phone -->|"インバウンド /\nアウトバウンド"| VA
+    VA --> AudioEngine
+    AudioEngine -->|"従来"| TTS
+    AudioEngine -->|"NEW"| PreRecorded
+    VA -->|"転送"| SIPGateway
+    SIPGateway -->|"sip_ring_timeout\n最大600秒"| SIPEndpoint
+    SIPGateway --> ThirdParty
+
+    classDef newFeature fill:#34A853,color:#fff,stroke:#34A853
+    classDef blueFeature fill:#4285F4,color:#fff,stroke:#4285F4
+    classDef default fill:#E8F0FE,color:#202124,stroke:#4285F4
+    classDef clusterStyle fill:#F8F9FA,color:#202124,stroke:#4285F4
+
+    class PreRecorded newFeature
+    class SIPEndpoint blueFeature
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>&#x2B50; 主要機能</h2>
+      <div class="features-grid">
+        <div class="card card-green">
+          <h3>&#x1F3A4; 仮想エージェント向け事前録音オーディオ再生</h3>
+          <div class="icon-text"><span class="arrow">&#x2192;</span><span>Dialogflow の仮想エージェントが事前録音された高品質オーディオファイルで応答可能</span></div>
+          <div class="icon-text"><span class="arrow">&#x2192;</span><span>すべての音声チャネル (インバウンド / アウトバウンド) で利用可能</span></div>
+          <div class="icon-text"><span class="arrow">&#x2192;</span><span>サポート / タスク / セッション後仮想エージェントのすべてに対応</span></div>
+          <div class="icon-text"><span class="arrow">&#x2192;</span><span>TTS では実現できないブランド固有の音声やプロフェッショナルな録音を使用可能</span></div>
+        </div>
+        <div class="card">
+          <h3>&#x1F4E1; SIP エンドポイント転送のリングタイムアウト設定</h3>
+          <div class="icon-text"><span class="arrow">&#x2192;</span><span>Twilio ユーザー向けの新機能</span></div>
+          <div class="icon-text"><span class="arrow">&#x2192;</span><span>仮想エージェントのカスタムペイロードに <code>sip_ring_timeout</code> フィールドを追加</span></div>
+          <div class="icon-text"><span class="arrow">&#x2192;</span><span>最大 600 秒 (10 分) までのリング期間を設定可能</span></div>
+          <div class="icon-text"><span class="arrow">&#x2192;</span><span>内線や UC (Unified Communications) 宛先への十分な応答時間を確保</span></div>
+        </div>
+        <div class="card card-orange">
+          <h3>&#x1F41B; バグ修正 (2 件)</h3>
+          <div class="icon-text"><span class="arrow">&#x2192;</span><span><strong>通話録音問題</strong>: サードパーティ番号への転送後、エージェントが通話を離れても録音が継続される問題を修正</span></div>
+          <div class="icon-text"><span class="arrow">&#x2192;</span><span><strong>メール割り当て問題</strong>: エージェントロールを持たないユーザーにメールが自動割り当てされる問題を修正</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specs -->
+    <div class="section">
+      <h2>&#x1F527; 技術仕様</h2>
+
+      <h3>事前録音オーディオの要件</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>オーディオ形式</td><td>シングルチャネル (モノラル)</td></tr>
+          <tr><td>エンコーディング</td><td>&#x03BC;-law (mu-law)</td></tr>
+          <tr><td>サンプリングレート</td><td>8kHz</td></tr>
+          <tr><td>ホスティング</td><td>Cloud Storage</td></tr>
+          <tr><td>対応チャネル</td><td>インバウンド通話、アウトバウンド通話</td></tr>
+          <tr><td>対応エージェントタイプ</td><td>サポート、タスク、セッション後</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top: 20px;">SIP リングタイムアウト設定</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>フィールド名</td><td><code>sip_ring_timeout</code></td></tr>
+          <tr><td>設定場所</td><td>仮想エージェントのカスタムペイロード</td></tr>
+          <tr><td>最大値</td><td>600 秒 (10 分)</td></tr>
+          <tr><td>対象</td><td>Twilio ユーザー</td></tr>
+          <tr><td>用途</td><td>SIP エンドポイントへのアウトバウンド転送</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Code Samples -->
+    <div class="section">
+      <h2>&#x1F4BB; 設定方法 / コードサンプル</h2>
+
+      <h3>&#x1F4E6; ステップ 1: オーディオファイルの準備 (Cloud Storage)</h3>
+      <p style="margin-bottom: 8px;">オーディオファイルをシングルチャネル / &#x03BC;-law / 8kHz で準備し、Cloud Storage にアップロードします。</p>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># Cloud Storage バケットの作成
+gcloud storage buckets create gs://my-ccaas-audio --location=us-central1
+
+# オーディオファイルのアップロード
+gcloud storage cp welcome-message.wav gs://my-ccaas-audio/audio/</code></pre>
+
+      <h3>&#x1F3B5; ステップ 2: Dialogflow CX での事前録音オーディオ設定</h3>
+      <p style="margin-bottom: 8px;">Dialogflow CX のフルフィルメントで <code>PlayAudio</code> レスポンスタイプを使用します。</p>
+      <span class="code-label">JSON</span>
+      <pre><code class="language-json">{
+  "audioUri": "gs://your-bucket/audio/welcome-message.wav",
+  "allowPlaybackInterruption": true
+}</code></pre>
+
+      <h3>&#x23F1;&#xFE0F; ステップ 3: SIP リングタイムアウトの設定</h3>
+      <p style="margin-bottom: 8px;">Twilio ユーザーは、仮想エージェントのカスタムペイロードに <code>sip_ring_timeout</code> フィールドを追加します。</p>
+      <span class="code-label">JSON</span>
+      <pre><code class="language-json">{
+  "ujet": {
+    "type": "action",
+    "action": "deflection",
+    "deflection_type": "sip",
+    "sip_uri": "sip:1-999-123-4567@voip-provider.example.net",
+    "sip_ring_timeout": 120
+  }
+}</code></pre>
+
+      <div class="note-box" style="margin-top: 16px;">
+        <strong>&#x1F4A1; 前提条件:</strong>
+        <ul style="margin: 8px 0 0 20px; font-size: 14px;">
+          <li>CCAI Platform インスタンスが作成済みであること</li>
+          <li>Dialogflow CX エージェントが CCAI Platform に統合済みであること</li>
+          <li>(事前録音オーディオ) Cloud Storage バケットにオーディオファイルがアップロード済みであること</li>
+          <li>(SIP リングタイムアウト) Twilio との統合が設定済みであること</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>&#x1F4C8; メリット</h2>
+
+      <h3>ビジネス面</h3>
+      <div class="card card-green">
+        <div class="icon-text"><span>&#x2705;</span><span><strong>ブランド体験の一貫性</strong>: プロフェッショナルに録音されたオーディオメッセージにより、ブランドイメージに合った顧客体験を提供</span></div>
+        <div class="icon-text"><span>&#x2705;</span><span><strong>顧客満足度の向上</strong>: 高品質なオーディオにより、IVR の印象が向上し、顧客エンゲージメントが改善</span></div>
+        <div class="icon-text"><span>&#x2705;</span><span><strong>転送成功率の向上</strong>: SIP リングタイムアウトの柔軟な設定により、内線や UC 宛先への転送が切断前に応答される確率が向上</span></div>
+      </div>
+
+      <h3>技術面</h3>
+      <div class="card">
+        <div class="icon-text"><span>&#x2699;&#xFE0F;</span><span><strong>柔軟なオーディオ管理</strong>: Cloud Storage 上のファイルを差し替えるだけで応答メッセージを更新可能</span></div>
+        <div class="icon-text"><span>&#x2699;&#xFE0F;</span><span><strong>TTS との使い分け</strong>: 動的な応答には TTS、固定メッセージには事前録音オーディオと用途に応じた使い分けが可能</span></div>
+        <div class="icon-text"><span>&#x2699;&#xFE0F;</span><span><strong>SIP 転送の信頼性向上</strong>: リングタイムアウトの細かな制御により、ネットワーク遅延のある環境でも安定した転送を実現</span></div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>&#x26A0;&#xFE0F; デメリット / 制約事項</h2>
+      <div class="warning-box">
+        <strong>制限事項</strong>
+        <ul style="margin: 8px 0 0 20px; font-size: 14px;">
+          <li>事前録音オーディオはシングルチャネル (モノラル)、&#x03BC;-law エンコーディング、8kHz のフォーマットに限定</li>
+          <li>オーディオファイルは Cloud Storage 上にホスティングする必要がある</li>
+          <li>SIP リングタイムアウトの設定は現時点で Twilio ユーザーに限定</li>
+          <li><code>sip_ring_timeout</code> の最大値は 600 秒</li>
+        </ul>
+      </div>
+      <div class="note-box">
+        <strong>&#x1F4DD; 考慮すべき点</strong>
+        <ul style="margin: 8px 0 0 20px; font-size: 14px;">
+          <li>事前録音オーディオの品質は録音時の機材や環境に依存するため、プロフェッショナルな録音環境の確保が望ましい</li>
+          <li>多言語対応の場合、各言語ごとにオーディオファイルを準備する必要がある</li>
+          <li>SIP リングタイムアウトを長く設定すると、顧客の待ち時間が増加する可能性があるため、適切な値の調整が必要</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>&#x1F3AF; ユースケース</h2>
+      <div class="usecase">
+        <h3>&#x1F3E6; ユースケース 1: プロフェッショナルな IVR メッセージ</h3>
+        <p><strong>シナリオ:</strong> 大手金融機関が、ブランドイメージに合った高品質な音声でウェルカムメッセージやメニューガイダンスを提供したい。</p>
+        <span class="code-label" style="margin-top: 12px;">JSON</span>
+        <pre><code class="language-json">{
+  "audioUri": "gs://financial-corp-audio/ivr/welcome-ja.wav",
+  "allowPlaybackInterruption": false
+}</code></pre>
+        <p style="margin-top: 8px;"><strong>効果:</strong> TTS では表現しにくい感情やトーンを含むプロフェッショナルな録音により、信頼感のある顧客体験を実現。</p>
+      </div>
+      <div class="usecase">
+        <h3>&#x1F4DE; ユースケース 2: UC 環境への確実な転送</h3>
+        <p><strong>シナリオ:</strong> 企業の内部 UC システム (Microsoft Teams、Cisco Webex など) にホストされた内線に仮想エージェントが通話を転送する際、応答まで十分な時間を確保したい。</p>
+        <span class="code-label" style="margin-top: 12px;">JSON</span>
+        <pre><code class="language-json">{
+  "ujet": {
+    "type": "action",
+    "action": "deflection",
+    "deflection_type": "sip",
+    "sip_uri": "sip:support-team@uc.example.com",
+    "sip_ring_timeout": 180
+  }
+}</code></pre>
+        <p style="margin-top: 8px;"><strong>効果:</strong> UC 環境特有のルーティング遅延を考慮した十分なリング時間により、転送の成功率が向上。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>&#x1F4B0; 料金</h2>
+      <p>CCAI Platform の料金は以下の課金モデルに基づきます。テレフォニー費用は使用量に応じて別途課金されます。</p>
+      <div class="pricing-grid">
+        <div class="pricing-card">
+          <div class="pricing-icon">&#x1F465;</div>
+          <div class="pricing-title">同時エージェント数</div>
+          <div class="pricing-desc">月間の最大同時ログインエージェント数に基づく</div>
+        </div>
+        <div class="pricing-card">
+          <div class="pricing-icon">&#x1F464;</div>
+          <div class="pricing-title">指名エージェント数</div>
+          <div class="pricing-desc">エージェントロールを持つユーザーの最大数に基づく</div>
+        </div>
+        <div class="pricing-card">
+          <div class="pricing-icon">&#x23F1;&#xFE0F;</div>
+          <div class="pricing-title">使用分数</div>
+          <div class="pricing-desc">エージェントロールのユーザーがログインしている分数に基づく</div>
+        </div>
+      </div>
+      <p style="font-size: 14px; color: var(--gc-outline); margin-top: 8px;">詳細な料金については Google Cloud の営業担当または <a href="https://cloud.google.com/find-a-partner/?specializations=Contact%20Center%20AI%20-%20Services" target="_blank" class="gc-link">Google Cloud パートナー</a> にお問い合わせください。</p>
+    </div>
+
+    <!-- Region -->
+    <div class="section">
+      <h2>&#x1F30D; 利用可能リージョン</h2>
+      <p>CCAI Platform の利用可能なロケーションについては、<a href="https://cloud.google.com/contact-center/ccai-platform/docs/localities" target="_blank" class="gc-link">公式ロケーションページ</a> を参照してください。</p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#x1F517; 関連サービス</h2>
+      <div class="related-grid">
+        <div class="related-card">
+          <strong>&#x1F4AC; Dialogflow CX</strong>
+          <p>仮想エージェントの会話フローを構築する基盤。事前録音オーディオはフルフィルメントの一部として設定。</p>
+        </div>
+        <div class="related-card">
+          <strong>&#x1F4E6; Cloud Storage</strong>
+          <p>事前録音オーディオファイルのホスティング先。</p>
+        </div>
+        <div class="related-card">
+          <strong>&#x2728; Gemini Enterprise for CX</strong>
+          <p>CCAI Platform を含む包括的なコンタクトセンター AI ソリューション。</p>
+        </div>
+        <div class="related-card">
+          <strong>&#x1F91D; Agent Assist</strong>
+          <p>人間のエージェントをリアルタイムで支援。仮想エージェントからのエスカレーション時に連携。</p>
+        </div>
+        <div class="related-card">
+          <strong>&#x1F4CA; Customer Experience Insights</strong>
+          <p>コンタクトセンターのインタラクションを分析し、改善ポイントを特定。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- References -->
+    <div class="section">
+      <h2>&#x1F4CE; 参考リンク</h2>
+      <ul class="links-list">
+        <li>&#x1F4D6; <a href="https://cloud.google.com/release-notes#March_30_2026" target="_blank" class="gc-link">公式リリースノート</a></li>
+        <li>&#x1F4D6; <a href="https://cloud.google.com/contact-center/ccai-platform/docs" target="_blank" class="gc-link">CCAI Platform ドキュメント</a></li>
+        <li>&#x1F3A7; <a href="https://cloud.google.com/dialogflow/cx/docs/concept/integration/phone-gateway#audio" target="_blank" class="gc-link">Dialogflow CX Phone Gateway - 事前録音オーディオ</a></li>
+        <li>&#x2699;&#xFE0F; <a href="https://cloud.google.com/dialogflow/cx/docs/concept/fulfillment" target="_blank" class="gc-link">Dialogflow CX フルフィルメント</a></li>
+        <li>&#x1F4DD; <a href="https://cloud.google.com/contact-center/ccai-platform/docs/va-custom-payload" target="_blank" class="gc-link">仮想エージェントカスタムペイロード</a></li>
+        <li>&#x1F916; <a href="https://cloud.google.com/contact-center/ccai-platform/docs/virtual-agent" target="_blank" class="gc-link">CCAI Platform 仮想エージェント</a></li>
+      </ul>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>&#x1F4CE; 出典: <a href="https://cloud.google.com/release-notes#March_30_2026" target="_blank" rel="noopener noreferrer">https://cloud.google.com/release-notes#March_30_2026</a></p>
+      <p style="margin-top: 4px;">Generated on 2026-03-31 | Google Cloud News Infographic</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Service Mesh: EnvoyFilter API サポート (TRAFFIC_DIRECTOR 実装)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; min-width: 280px; }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-announcement {
+      background: var(--gc-blue-600);
+      color: #FFFFFF;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green { border-left-color: var(--gc-green); }
+    .card-red { border-left-color: var(--gc-red); }
+    .card-yellow { border-left-color: var(--gc-yellow); }
+    .card-teal { border-left-color: var(--gc-teal); }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow { color: var(--gc-blue-600); font-size: 20px; }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* Before/After */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+    .before-box h3 { color: var(--gc-red); }
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+    .after-box h3 { color: var(--gc-green); }
+    .before-box ul, .after-box ul {
+      margin: 8px 0 0 20px;
+      font-size: 14px;
+    }
+    .before-box li, .after-box li { margin-bottom: 6px; }
+
+    /* Feature cards grid */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .feature-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+    .feature-card h3 {
+      font-size: 16px;
+      margin: 0 0 8px 0;
+      color: var(--gc-on-surface);
+    }
+    .feature-card p, .feature-card ul {
+      font-size: 14px;
+      margin: 0;
+    }
+    .feature-card ul {
+      margin-left: 18px;
+      margin-top: 6px;
+    }
+    .feature-card li { margin-bottom: 4px; }
+
+    /* Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+    td {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 13px;
+    }
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* Code blocks */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      border-radius: 8px 8px 0 0;
+    }
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+      font-family: 'Roboto Mono', monospace;
+    }
+    .code-title { color: #AAAAAA; }
+    .code-header + pre:not(.mermaid) {
+      border-top-left-radius: 0;
+      border-top-right-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.85em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Mermaid */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Warning box */
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Stat cards */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Usecase cards */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+    .usecase-card h3 {
+      color: var(--gc-blue-800);
+      margin-bottom: 8px;
+    }
+    .usecase-card p { font-size: 14px; }
+
+    /* Merit/Demerit */
+    .merit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    /* Related services */
+    .related-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+    .related-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 16px;
+      border: 1px solid var(--gc-outline-variant);
+      box-shadow: 0 1px 2px rgba(60,64,67,0.08);
+    }
+    .related-card strong {
+      color: var(--gc-on-surface);
+      font-size: 15px;
+    }
+    .related-card p {
+      font-size: 13px;
+      margin-top: 4px;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; }
+      .subtitle { text-align: left; margin-top: 8px; }
+      .before-after, .merit-grid, .related-grid { grid-template-columns: 1fr; }
+      .stat-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>&#9878;&#65039; Cloud Service Mesh: EnvoyFilter API サポート</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge badge-announcement">Announcement</span>
+          <span class="badge" style="background: var(--gc-teal);">Cloud Service Mesh</span>
+          <span class="badge" style="background: var(--gc-blue-800);">TRAFFIC_DIRECTOR</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-04-02</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>&#128203; 概要</h2>
+      <p>
+        Managed Cloud Service Mesh の <span class="highlight">TRAFFIC_DIRECTOR 実装</span>において、
+        <span class="highlight">EnvoyFilter API</span> の限定的なサポートが追加されました。
+        これにより、他の Istio API では実現できなかったデータプレーンの拡張機能を利用できるようになります。
+      </p>
+      <p style="margin-top: 12px;">
+        EnvoyFilter API は Envoy プロキシの設定を直接カスタマイズするための強力な API であり、
+        HTTP フィルタチェーンへのフィルタ追加などが可能になります。
+        特に<strong>ローカルレートリミット</strong>や <strong>gRPC-Web フィルタ</strong>など、
+        サービスメッシュのトラフィック制御における重要な拡張機能が利用可能となりました。
+      </p>
+
+      <div class="warning-box" style="margin-top: 16px;">
+        <strong>&#9888;&#65039; 注意:</strong> この機能はサポートされるフィールドとエクステンションが限定されています。
+        誤った設定がメッシュの安定性に影響する可能性があるため、他の Istio API で要件を満たせない場合にのみ使用してください。
+      </div>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>&#128260; Before / After</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h3>&#10060; Before</h3>
+          <ul>
+            <li>TRAFFIC_DIRECTOR 実装では EnvoyFilter API によるカスタマイズ不可</li>
+            <li>ローカルレートリミットなどの高度なトラフィック制御が利用不可</li>
+            <li>HTTP フィルタチェーンのカスタマイズ手段がなく拡張性に制限</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>&#9989; After</h3>
+          <ul>
+            <li>EnvoyFilter API でデータプレーンの拡張が可能に</li>
+            <li>ローカルレートリミット (LocalRateLimit) を設定可能</li>
+            <li>gRPC-Web フィルタが利用可能に</li>
+            <li>HTTP フィルタの INSERT_FIRST / INSERT_BEFORE 操作に対応</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid from source) -->
+    <div class="section">
+      <h2>&#128736;&#65039; アーキテクチャ図</h2>
+      <p style="margin-bottom: 12px;">
+        EnvoyFilter CR を適用すると、TRAFFIC_DIRECTOR コントロールプレーンが xDS 経由で各 Envoy サイドカーに設定を配信し、
+        HTTP フィルタチェーンにローカルレートリミットや gRPC-Web などのフィルタが挿入されます。
+      </p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    User["ユーザー"] --> |"kubectl apply"| EF["EnvoyFilter CR"]
+    EF --> |"設定伝播"| CP["TRAFFIC_DIRECTOR\nコントロールプレーン"]
+    CP --> |"xDS 設定配信"| EP1["Envoy Sidecar\n(Pod A)"]
+    CP --> |"xDS 設定配信"| EP2["Envoy Sidecar\n(Pod B)"]
+
+    subgraph HTTPフィルタチェーン
+        direction LR
+        RL["Local Rate Limit\nフィルタ"] --> GW["gRPC-Web\nフィルタ"] --> RT["Router\nフィルタ"]
+    end
+
+    EP1 --> HTTPフィルタチェーン
+    EP2 --> HTTPフィルタチェーン
+
+    style CP fill:#4285F4,color:#fff
+    style EF fill:#34A853,color:#fff
+    style RL fill:#FBBC04,color:#333
+    style GW fill:#FBBC04,color:#333
+    style RT fill:#EA4335,color:#fff
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Stats -->
+    <div class="section">
+      <h2>&#128202; サポート概要</h2>
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">2</div>
+          <div class="stat-label">サポートされるエクステンション</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-green), #1B8A3D);">
+          <div class="stat-value">3</div>
+          <div class="stat-label">対応リリースチャンネル<br>(Rapid / Regular / Stable)</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-teal), #0097A7);">
+          <div class="stat-value">2</div>
+          <div class="stat-label">パッチ操作タイプ<br>(INSERT_FIRST / INSERT_BEFORE)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>&#9889; 主要機能</h2>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <h3>&#128295; EnvoyFilter API の限定サポート</h3>
+          <ul>
+            <li>TRAFFIC_DIRECTOR コントロールプレーン実装でのみ利用可能</li>
+            <li><code>configPatches[].applyTo</code> は <code>HTTP_FILTER</code> のみサポート</li>
+            <li><code>configPatches[].patch.operation</code> は <code>INSERT_FIRST</code> および <code>INSERT_BEFORE</code> (Router フィルタとの組み合わせ) のみサポート</li>
+          </ul>
+        </div>
+        <div class="feature-card" style="border-left-color: var(--gc-yellow);">
+          <h3>&#128678; ローカルレートリミットフィルタ</h3>
+          <ul>
+            <li><code>envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit</code> をサポート</li>
+            <li>トークンバケット、フィルタの有効化/強制化、レスポンスヘッダの追加が設定可能</li>
+            <li>ダウンストリーム接続ごとのレート制限に対応</li>
+            <li>Rapid、Regular、Stable の全リリースチャンネルで利用可能</li>
+          </ul>
+        </div>
+        <div class="feature-card" style="border-left-color: var(--gc-green);">
+          <h3>&#127760; gRPC-Web フィルタ</h3>
+          <ul>
+            <li><code>envoy.extensions.filters.http.grpc_web.v3.GrpcWeb</code> をサポート</li>
+            <li>gRPC-Web クライアントからのリクエストを gRPC バックエンドサービスに中継可能</li>
+            <li>全リリースチャンネルで利用可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>&#128218; 技術仕様</h2>
+
+      <h3>サポートされる API フィールド</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>フィールド</th>
+            <th>サポート状況</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>targetRefs</code></td>
+            <td>&#10060; 非サポート</td>
+          </tr>
+          <tr>
+            <td><code>configPatches[].applyTo</code></td>
+            <td>&#9989; <code>HTTP_FILTER</code> のみ</td>
+          </tr>
+          <tr>
+            <td><code>configPatches[].patch.operation</code></td>
+            <td>&#9989; <code>INSERT_FIRST</code>、<code>INSERT_BEFORE</code> (Router フィルタ使用時)</td>
+          </tr>
+          <tr>
+            <td><code>configPatches[].patch.filterClass</code></td>
+            <td>&#10060; 非サポート</td>
+          </tr>
+          <tr>
+            <td><code>configPatches[].match.proxy</code></td>
+            <td>&#10060; 非サポート</td>
+          </tr>
+          <tr>
+            <td><code>configPatches[].match.routeConfiguration</code></td>
+            <td>&#10060; 非サポート</td>
+          </tr>
+          <tr>
+            <td><code>configPatches[].match.cluster</code></td>
+            <td>&#10060; 非サポート</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top: 20px;">INSERT_BEFORE 操作でサポートされるフィールド</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>フィールド</th>
+            <th>サポート値</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>configPatches[].match.listener</code></td>
+            <td><code>filter</code> のみ</td>
+          </tr>
+          <tr>
+            <td><code>configPatches[].match.listener.filter.name</code></td>
+            <td><code>envoy.filters.network.http_connection_manager</code> のみ</td>
+          </tr>
+          <tr>
+            <td><code>configPatches[].match.listener.filter.subFilter.name</code></td>
+            <td><code>envoy.filters.http.router</code> のみ</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Code Sample: Local Rate Limit -->
+    <div class="section">
+      <h2>&#128187; 設定例: ローカルレートリミット</h2>
+      <p style="margin-bottom: 12px;">以下は、EnvoyFilter を使用してローカルレートリミットを設定する YAML の例です。</p>
+      <div class="code-block" style="padding: 0; overflow: hidden;">
+        <div class="code-header">
+          <span class="code-lang">YAML</span>
+          <span class="code-title">EnvoyFilter - Local Rate Limit</span>
+        </div>
+        <pre style="margin: 0; border-radius: 0;"><code class="language-yaml">apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: local-ratelimit
+  namespace: istio-system
+spec:
+  configPatches:
+  - applyTo: HTTP_FILTER
+    match:
+      listener:
+        filter:
+          name: envoy.filters.network.http_connection_manager
+          subFilter:
+            name: envoy.filters.http.router
+    patch:
+      operation: INSERT_BEFORE
+      value:
+        name: envoy.filters.http.local_ratelimit
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
+          stat_prefix: http_local_rate_limiter
+          token_bucket:
+            max_tokens: 100
+            tokens_per_fill: 100
+            fill_interval: 60s
+          filter_enabled:
+            runtime_key: local_rate_limit_enabled
+            default_value:
+              numerator: 100
+              denominator: HUNDRED
+          filter_enforced:
+            runtime_key: local_rate_limit_enforced
+            default_value:
+              numerator: 100
+              denominator: HUNDRED</code></pre>
+      </div>
+    </div>
+
+    <!-- Setup Steps -->
+    <div class="section">
+      <h2>&#128736; 設定方法</h2>
+
+      <div class="note-box" style="margin-bottom: 16px;">
+        <strong>&#128204; 前提条件:</strong>
+        Cloud Service Mesh が TRAFFIC_DIRECTOR コントロールプレーン実装で有効化されていること。
+        GKE クラスタに Managed Cloud Service Mesh がプロビジョニングされていること。
+      </div>
+
+      <h3>Step 1: コントロールプレーン実装の確認</h3>
+      <div class="code-block" style="padding: 0; overflow: hidden;">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+        </div>
+        <pre style="margin: 0; border-radius: 0;"><code class="language-bash"># コントロールプレーン実装を確認
+kubectl get controlplanerevision -n istio-system -o yaml</code></pre>
+      </div>
+      <p style="font-size: 14px; margin-top: 4px;">TRAFFIC_DIRECTOR 実装であることを確認します。ISTIOD 実装の場合、この機能は利用できません。</p>
+
+      <h3 style="margin-top: 16px;">Step 2: EnvoyFilter の適用</h3>
+      <div class="code-block" style="padding: 0; overflow: hidden;">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+        </div>
+        <pre style="margin: 0; border-radius: 0;"><code class="language-bash"># EnvoyFilter リソースを適用
+kubectl apply -f envoyfilter.yaml</code></pre>
+      </div>
+
+      <h3 style="margin-top: 16px;">Step 3: 設定の検証</h3>
+      <div class="code-block" style="padding: 0; overflow: hidden;">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+        </div>
+        <pre style="margin: 0; border-radius: 0;"><code class="language-bash"># EnvoyFilter CR のステータスを確認
+kubectl get envoyfilter &lt;NAME&gt; -n &lt;NAMESPACE&gt; -o yaml
+
+# Envoy のコンフィグダンプで設定の伝播を確認
+gcloud beta container fleet mesh debug proxy-config \
+  &lt;POD_NAME&gt;.&lt;NAMESPACE&gt; \
+  --type=listener \
+  --membership=&lt;MEMBERSHIP_ID&gt; \
+  --location=&lt;MEMBERSHIP_LOCATION&gt; \
+  --project=&lt;PROJECT_ID&gt; \
+  --output=yaml | grep envoy.filters.http.local_ratelimit -C 5</code></pre>
+      </div>
+    </div>
+
+    <!-- Merits and Demerits -->
+    <div class="section">
+      <h2>&#9878;&#65039; メリット / デメリット</h2>
+      <div class="merit-grid">
+        <div>
+          <h3 style="color: var(--gc-green);">&#9989; メリット</h3>
+          <div class="card card-green" style="margin-top: 8px;">
+            <strong>ビジネス面</strong>
+            <ul style="margin: 8px 0 0 18px; font-size: 14px;">
+              <li>ローカルレートリミットによりサービスの過負荷を防止</li>
+              <li>マネージドサービスでの高度なデータプレーンカスタマイズが可能に</li>
+            </ul>
+          </div>
+          <div class="card card-green" style="margin-top: 8px;">
+            <strong>技術面</strong>
+            <ul style="margin: 8px 0 0 18px; font-size: 14px;">
+              <li>Istio API の範囲を超えた Envoy ネイティブ機能の直接利用</li>
+              <li>外部レートリミットサービス不要でローカルにレート制限実施</li>
+              <li>ブラウザベースの gRPC-Web クライアントをシームレスに処理</li>
+            </ul>
+          </div>
+        </div>
+        <div>
+          <h3 style="color: var(--gc-red);">&#10060; デメリット / 制約事項</h3>
+          <div class="card card-red" style="margin-top: 8px;">
+            <strong>制限事項</strong>
+            <ul style="margin: 8px 0 0 18px; font-size: 14px;">
+              <li>TRAFFIC_DIRECTOR 実装のみ (ISTIOD 非対応)</li>
+              <li><code>applyTo</code> は <code>HTTP_FILTER</code> のみ</li>
+              <li>操作は <code>INSERT_FIRST</code> / <code>INSERT_BEFORE</code> のみ (<code>MERGE</code>, <code>REMOVE</code> 不可)</li>
+              <li>エクステンションはローカルレートリミットと gRPC-Web の 2 種類のみ</li>
+            </ul>
+          </div>
+          <div class="card card-yellow" style="margin-top: 8px;">
+            <strong>考慮すべき点</strong>
+            <ul style="margin: 8px 0 0 18px; font-size: 14px;">
+              <li>誤った設定がメッシュ全体の安定性に影響する可能性</li>
+              <li>標準 Istio API を優先して使用すべき</li>
+              <li>設定反映に時間がかかる場合がある (2 パス設定コミット)</li>
+              <li>Google サポートはエクステンション設定の正確性を対象外としている</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>&#127919; ユースケース</h2>
+      <div class="usecase-card">
+        <h3>&#128176; UC1: マイクロサービスのローカルレートリミット</h3>
+        <p><strong>シナリオ:</strong> 決済サービスへのリクエスト急増時に、サービスの過負荷を防ぐためにレート制限を設定</p>
+        <p style="margin-top: 8px;">
+          <strong>効果:</strong> 外部レートリミットサービスを構築せず、各 Envoy サイドカーレベルで
+          1 分あたり 50 リクエストの制限を適用し、決済サービスの安定性を確保
+        </p>
+        <div class="code-block" style="padding: 0; overflow: hidden; margin-top: 12px;">
+          <div class="code-header">
+            <span class="code-lang">YAML</span>
+            <span class="code-title">決済サービス向けレートリミット</span>
+          </div>
+          <pre style="margin: 0; border-radius: 0;"><code class="language-yaml">apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: payment-service-ratelimit
+  namespace: payment
+spec:
+  configPatches:
+  - applyTo: HTTP_FILTER
+    match:
+      listener:
+        filter:
+          name: envoy.filters.network.http_connection_manager
+          subFilter:
+            name: envoy.filters.http.router
+    patch:
+      operation: INSERT_BEFORE
+      value:
+        name: envoy.filters.http.local_ratelimit
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
+          stat_prefix: payment_rate_limiter
+          token_bucket:
+            max_tokens: 50
+            tokens_per_fill: 50
+            fill_interval: 60s
+          filter_enabled:
+            default_value:
+              numerator: 100
+              denominator: HUNDRED
+          filter_enforced:
+            default_value:
+              numerator: 100
+              denominator: HUNDRED
+          status:
+            code: 429</code></pre>
+        </div>
+      </div>
+
+      <div class="usecase-card">
+        <h3>&#127760; UC2: gRPC-Web クライアントのサポート</h3>
+        <p><strong>シナリオ:</strong> ブラウザベースの gRPC-Web クライアントから gRPC バックエンドサービスへのリクエストを、サービスメッシュ内で透過的に処理</p>
+        <p style="margin-top: 8px;">
+          <strong>効果:</strong> gRPC-Web プロトコル変換が Envoy サイドカーで自動処理され、
+          バックエンドサービスの変更なしに Web クライアントからの gRPC 通信が可能に
+        </p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>&#128176; 料金</h2>
+      <p>
+        Cloud Service Mesh の料金は、マネージドコントロールプレーンの利用に基づきます。
+        <span class="highlight">EnvoyFilter API の利用自体に追加料金は発生しません</span>。
+      </p>
+      <p style="margin-top: 8px;">
+        &#8594; <a href="https://cloud.google.com/service-mesh/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud Service Mesh 料金ページ</a>
+      </p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#128279; 関連サービス</h2>
+      <div class="related-grid">
+        <div class="related-card">
+          <strong>&#128737;&#65039; Cloud Armor</strong>
+          <p>サーバーサイドグローバルレートリミットを提供。EnvoyFilter のローカルレートリミットとは異なり、集中管理型のレート制限を実施可能</p>
+        </div>
+        <div class="related-card">
+          <strong>&#128202; Cloud Monitoring</strong>
+          <p>Envoy エクステンションが出力する統計情報を可視化し、フィルタの動作状態を監視可能</p>
+        </div>
+        <div class="related-card">
+          <strong>&#9881;&#65039; GKE</strong>
+          <p>Cloud Service Mesh のデータプレーンが動作する基盤。マネージドデータプレーンにより Envoy サイドカーの自動アップグレードが可能</p>
+        </div>
+        <div class="related-card">
+          <strong>&#128220; Istio API</strong>
+          <p>VirtualService、DestinationRule など。EnvoyFilter を使用する前に、まず標準 Istio API で要件を満たせないか検討すべき</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>&#128206; 出典:</strong></p>
+      <ul style="list-style: none; padding: 0; margin: 8px 0 0 0;">
+        <li>&#8594; <a href="https://cloud.google.com/release-notes#April_02_2026" target="_blank" rel="noopener noreferrer">Google Cloud Release Notes - April 02, 2026</a></li>
+        <li>&#8594; <a href="https://cloud.google.com/service-mesh/docs/data-plane-extensibility" target="_blank" rel="noopener noreferrer">Data plane extensibility with EnvoyFilter</a></li>
+        <li>&#8594; <a href="https://cloud.google.com/service-mesh/docs/troubleshooting/troubleshoot-data-plane-extensibility" target="_blank" rel="noopener noreferrer">Resolving data plane extensibility issues</a></li>
+        <li>&#8594; <a href="https://cloud.google.com/service-mesh/docs/supported-features-managed" target="_blank" rel="noopener noreferrer">Supported features using Istio APIs (managed control plane)</a></li>
+        <li>&#8594; <a href="https://cloud.google.com/service-mesh/pricing" target="_blank" rel="noopener noreferrer">Cloud Service Mesh 料金ページ</a></li>
+      </ul>
+      <p style="margin-top: 12px; font-size: 11px; color: var(--gc-outline);">
+        Generated on 2026-04-04 | Cloud Service Mesh EnvoyFilter API Infographic
+      </p>
+    </footer>
+
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

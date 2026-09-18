@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Google SecOps: Unroll プロセッサ (イベントブレーキング)</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+:root {
+  --gc-blue: #4285F4;
+  --gc-red: #EA4335;
+  --gc-yellow: #FBBC04;
+  --gc-green: #34A853;
+  --gc-blue-900: #174EA6;
+  --gc-blue-800: #185ABC;
+  --gc-blue-700: #1967D2;
+  --gc-blue-600: #1A73E8;
+  --gc-blue-500: #4285F4;
+  --gc-blue-300: #669DF6;
+  --gc-blue-200: #8AB4F8;
+  --gc-blue-100: #AECBFA;
+  --gc-blue-50: #E8F0FE;
+  --gc-on-surface: #202124;
+  --gc-on-surface-variant: #5F6368;
+  --gc-outline: #80868B;
+  --gc-surface: #FFFFFF;
+  --gc-surface-container-lowest: #F8F9FA;
+  --gc-surface-container-low: #F1F3F4;
+  --gc-surface-container: #E8EAED;
+  --gc-outline-variant: #DADCE0;
+  --gc-blue-tint: #E8F0FE;
+  --gc-green-tint: #E6F4EA;
+  --gc-red-tint: #FCE8E6;
+  --gc-yellow-tint: #FEF7E0;
+  --gc-purple-tint: #F3E8FD;
+  --gc-teal-tint: #E0F7FA;
+  --gc-purple: #A142F4;
+  --gc-teal: #00BCD4;
+  --gc-orange: #FF6D00;
+}
+
+body {
+  background-color: var(--gc-surface);
+  font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+  color: var(--gc-on-surface-variant);
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 20px;
+  margin: 0;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 16px;
+  border-bottom: 3px solid var(--gc-blue-600);
+}
+
+h1, .title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--gc-on-surface);
+  margin: 0;
+  line-height: 1.4;
+}
+
+h2, .section-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin-top: 0;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 20px 0 8px;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: var(--gc-outline);
+}
+
+.section {
+  background: var(--gc-surface-container-low);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid var(--gc-outline-variant);
+}
+
+.highlight {
+  background-color: var(--gc-blue-50);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--gc-blue-800);
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+.card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border-left: 4px solid var(--gc-blue-600);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+}
+
+.card h3 {
+  margin-top: 0;
+}
+
+.icon-text {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  color: var(--gc-on-surface-variant);
+}
+
+.arrow {
+  color: var(--gc-blue-600);
+  font-size: 20px;
+}
+
+.gc-link {
+  color: var(--gc-blue-600);
+  text-decoration: none;
+}
+
+.gc-link:hover {
+  color: var(--gc-blue-800);
+  text-decoration: underline;
+}
+
+.badge,
+.badge-ga,
+.badge-preview,
+.badge-deprecated {
+  display: inline-block;
+  color: #FFFFFF;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+  margin: 4px 8px 4px 0;
+}
+
+.badge { background: var(--gc-blue-600); }
+.badge-ga { background: var(--gc-green); color: #FFFFFF; }
+.badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+.badge-deprecated { background: var(--gc-red); color: #FFFFFF; }
+
+.flow-diagram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 24px 0;
+}
+
+.flow-step {
+  background: var(--gc-surface);
+  border: 2px solid var(--gc-blue-600);
+  border-radius: 12px;
+  padding: 12px 20px;
+  text-align: center;
+  min-width: 100px;
+  color: var(--gc-on-surface);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+}
+
+.flow-arrow {
+  color: var(--gc-blue-600);
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.check-icon { color: var(--gc-green); font-size: 18px; }
+.cross-icon { color: var(--gc-red); font-size: 18px; }
+
+.code-block,
+pre:not(.mermaid) {
+  background: #1E1E1E;
+  border-radius: 8px;
+  padding: 16px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 15px;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: #E8E8E8;
+  margin: 16px 0;
+}
+
+pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
+}
+
+.code-label {
+  display: inline-block;
+  background: #2D2D2D;
+  color: #9CDCFE;
+  padding: 4px 12px;
+  border-radius: 8px 8px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.code-label + pre:not(.mermaid),
+.code-label + .code-block {
+  border-top-left-radius: 0;
+  margin-top: 0;
+}
+
+code:not(pre code) {
+  background: var(--gc-surface-container-low);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 0.9em;
+  color: var(--gc-blue-900);
+}
+
+.section code:not(pre code) {
+  background: var(--gc-surface);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--gc-outline-variant);
+  background: var(--gc-surface);
+}
+
+th {
+  background: var(--gc-blue-50);
+  color: var(--gc-blue-900);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 2px solid var(--gc-blue-200);
+}
+
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--gc-outline-variant);
+  font-size: 14px;
+}
+
+tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+tr:hover { background: var(--gc-blue-50); }
+
+.note-box {
+  background: var(--gc-blue-tint);
+  border-left: 4px solid var(--gc-blue-600);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.warning-box {
+  background: var(--gc-yellow-tint);
+  border-left: 4px solid var(--gc-yellow);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.error-box {
+  background: var(--gc-red-tint);
+  border-left: 4px solid var(--gc-red);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.success-box {
+  background: var(--gc-green-tint);
+  border-left: 4px solid var(--gc-green);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+/* Before/After 比較 */
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+@media (max-width: 720px) {
+  .before-after { grid-template-columns: 1fr; }
+}
+
+.before-col, .after-col {
+  border-radius: 12px;
+  padding: 16px 20px;
+}
+
+.before-col {
+  background: var(--gc-red-tint);
+  border: 1px solid rgba(234, 67, 53, 0.35);
+}
+
+.after-col {
+  background: var(--gc-green-tint);
+  border: 1px solid rgba(52, 168, 83, 0.35);
+}
+
+.before-col h3, .after-col h3 {
+  margin-top: 0;
+  font-size: 16px;
+}
+
+.before-col h3 { color: #C5221F; }
+.after-col h3 { color: #188038; }
+
+.before-col ul, .after-col ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  font-size: 14px;
+}
+
+.before-col li, .after-col li { margin: 6px 0; }
+
+/* Mermaid コンテナ */
+.mermaid-container {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 20px 0;
+  border: 2px solid rgba(66, 133, 244, 0.3);
+  overflow-x: auto;
+}
+
+.mermaid {
+  display: flex;
+  justify-content: center;
+}
+
+/* 手順ステップ */
+.step-list { counter-reset: step; }
+
+.step-item {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin: 12px 0;
+  border: 1px solid var(--gc-outline-variant);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.10);
+}
+
+.step-num {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--gc-blue-600);
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.step-body { flex: 1; min-width: 0; }
+.step-body h3 { margin: 0 0 6px; font-size: 16px; }
+.step-body p { margin: 0; font-size: 14px; }
+
+/* ユースケース */
+.usecase {
+  background: var(--gc-blue-tint);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border: 1px solid var(--gc-blue-100);
+}
+
+.usecase h3 {
+  margin-top: 0;
+  color: var(--gc-blue-900);
+  font-size: 17px;
+}
+
+/* 2 カラムグリッド */
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 720px) {
+  .grid-2 { grid-template-columns: 1fr; }
+}
+
+/* 関連サービス */
+.related-item {
+  background: var(--gc-surface);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 8px 0;
+  border-left: 3px solid var(--gc-teal);
+  font-size: 14px;
+}
+
+ul.link-list { padding-left: 0; list-style: none; margin: 0; }
+ul.link-list li { margin: 8px 0; word-break: break-all; }
+
+footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gc-outline-variant);
+  font-size: 12px;
+  color: var(--gc-outline);
+}
+
+footer a { word-break: break-all; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <div>
+      <div style="margin-bottom: 8px;">
+        <span class="badge">Google SecOps</span>
+        <span class="badge">SecOps SIEM</span>
+        <span class="badge badge-preview">Pre-GA (パイプライン機能)</span>
+      </div>
+      <h1>✂️ Unroll プロセッサ (イベントブレーキング)</h1>
+      <div class="subtitle">データ処理パイプラインでバッチログを個別イベントに自動分割</div>
+    </div>
+    <div class="subtitle">📅 リリース日: 2026-08-24</div>
+  </div>
+
+  <!-- 概要 -->
+  <div class="section">
+    <h2>📌 概要</h2>
+    <p>
+      Google SecOps のデータ処理パイプライン (Data Processing Pipelines) が、新たに
+      <span class="highlight">Unroll プロセッサ (イベントブレーキング)</span> をサポートしました。
+      複数イベントの<strong>配列 (array) やスライス (slice)</strong> を含む 1 件のログエントリを、
+      パース・取り込みの<strong>前段</strong>で複数の個別ログイベントへ自動分割できます。
+    </p>
+    <p>
+      多くの SaaS やセキュリティ製品の API は、複数イベントを 1 つの JSON 配列としてまとめて返します。
+      Unroll プロセッサはこの「イベント分割」を<strong>パイプライン内で完結</strong>させ、
+      外部ツールでの事前分割処理を不要にします。
+    </p>
+
+    <div class="before-after">
+      <div class="before-col">
+        <h3>❌ Before (アップデート前の課題)</h3>
+        <ul>
+          <li>バッチ形式のログを 1 件として取り込むと、パーサーが個々のイベントを正しく分解・UDM 変換できない場合があった</li>
+          <li>イベント分割には外部スクリプトや中間処理基盤が必要だった</li>
+          <li>既存プロセッサ (Filter / Transform / Redaction) にはログを複数イベントに分割する機能がなかった</li>
+        </ul>
+      </div>
+      <div class="after-col">
+        <h3>✅ After (アップデート後の改善)</h3>
+        <ul>
+          <li>Unroll プロセッサでログ配列を個別イベントへ自動展開 (イベントブレーキング)</li>
+          <li>パース・取り込みの前段で分割がパイプライン内に完結し、外部の分割処理が不要に</li>
+          <li>Transform プロセッサ (ParseJSON など) との組み合わせで JSON / XML / CSV / YAML のバッチログにも対応</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="note-box">
+      <strong>💡 プリパース要件:</strong> Unroll プロセッサは構造化データ入力が前提で、生の文字列ペイロードには直接動作しません。
+      生ログはまず Transform プロセッサ (例: <code>set(body, ParseJSON(body))</code>) でパースし、その後段に Unroll を配置します。
+    </div>
+  </div>
+
+  <!-- アーキテクチャ図 -->
+  <div class="section">
+    <h2>🏗️ アーキテクチャ図</h2>
+    <div class="mermaid-container">
+      <pre class="mermaid">
+flowchart LR
+    subgraph Sources["📥 ログソース"]
+        A["🗂️ バッチログ<br>(イベント配列を含む<br>JSON / XML / CSV)"]
+    end
+
+    subgraph Pipeline["⚙️ SecOps データ処理パイプライン"]
+        B["🔄 Transform プロセッサ<br>set(body, ParseJSON(body))<br>生文字列 → 構造化データ"]
+        C["✂️ Unroll プロセッサ<br>配列を個別イベントに分割<br>(Event Breaking)"]
+    end
+
+    subgraph SecOps["🛡️ Google SecOps"]
+        D["🧩 パーサー<br>(UDM 変換)"]
+        E[("🗄️ SIEM<br>取り込み・分析")]
+    end
+
+    A --> B --> C
+    C -- "イベント 1" --> D
+    C -- "イベント 2" --> D
+    C -- "イベント N" --> D
+    D --> E
+      </pre>
+    </div>
+    <p style="font-size: 14px;">
+      イベント配列を含む生ログはまず Transform プロセッサで構造化データにパースされ、その後段の
+      Unroll プロセッサで個別のログイベントに分割されてから、Google SecOps のパーサー (UDM 変換) と取り込みに渡されます。
+    </p>
+  </div>
+
+  <!-- 主要機能 -->
+  <div class="section">
+    <h2>⚡ 主要機能</h2>
+
+    <div class="card">
+      <h3>✂️ 1. イベントブレーキング (Event Breaking)</h3>
+      <div class="icon-text"><span class="arrow">→</span><span>1 件のログエントリに含まれるイベントの配列・スライスを、複数の個別ログイベントへ自動展開</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>分割はパース・取り込みの前段 (プリパース) で実行され、後段のパーサーは <strong>1 イベント = 1 ログ</strong> として処理可能</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>OpenTelemetry Collector の <strong>unrollprocessor</strong> をベースにした標準技術</span></div>
+    </div>
+
+    <div class="card">
+      <h3>🔄 2. Transform プロセッサとの連携 (プリパース要件)</h3>
+      <div class="icon-text"><span class="arrow">→</span><span>生文字列には直接動作せず、パース済み JSON / XML / CSV などの構造化された内部オブジェクト表現が必要</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>生 JSON の場合は前段に OTTL 文 <code>set(body, ParseJSON(body))</code> の Transform プロセッサを配置</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>CSV / XML / YAML 形式も同様のプリパース用 Transform ステップで対応可能</span></div>
+    </div>
+
+    <div class="card">
+      <h3>🧩 3. 既存プロセッサ群への追加</h3>
+      <div class="icon-text"><span class="arrow">→</span><span>Filter (条件・正規表現・重大度)、Redaction (機密データのマスキング)、Transform (フィールド操作・パース) に加え <strong>Unroll</strong> が選択可能に</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>Bindplane コンソールの Edit Processors ウィンドウから追加でき、Input / Output ペインで処理結果を即座にテスト・確認可能</span></div>
+    </div>
+  </div>
+
+  <!-- 技術仕様 -->
+  <div class="section">
+    <h2>🔧 技術仕様</h2>
+    <h3>Unroll プロセッサの要件と仕様</h3>
+    <table>
+      <tr><th>項目</th><th>詳細</th></tr>
+      <tr><td>機能分類</td><td>Event breaking (ログのスライスを複数の個別ログイベントに分割)</td></tr>
+      <tr><td>入力要件</td><td>構造化された内部オブジェクト表現 (パース済み JSON / XML / CSV など)。生文字列には直接動作しない</td></tr>
+      <tr><td>前段の必須構成</td><td>ログペイロードをパースする Transform プロセッサを Unroll プロセッサの前に配置</td></tr>
+      <tr><td>JSON の例</td><td>Transform プロセッサに OTTL 文 <code>set(body, ParseJSON(body))</code> を設定</td></tr>
+      <tr><td>その他の形式</td><td>CSV / XML / YAML も同様のプリパース Transform が必要</td></tr>
+      <tr><td>ベース実装</td><td>OpenTelemetry Collector contrib の unrollprocessor</td></tr>
+      <tr><td>プロセッサ数の上限</td><td>1 パイプラインあたり最大 10 プロセッサ</td></tr>
+      <tr><td>対応エディション</td><td>Google SecOps Enterprise / Enterprise Plus</td></tr>
+      <tr><td>提供ステータス</td><td>データ処理パイプライン機能は Pre-GA Offerings Terms の対象</td></tr>
+    </table>
+
+    <h3>プロセッサの実行順序</h3>
+    <p style="font-size: 14px;">
+      データ処理コンテナのプロセッサノード内では、プロセッサは<strong>記載順に逐次実行</strong>されます。
+      最初のプロセッサが生ストリームデータを処理し、その出力が次のプロセッサの入力になります。
+    </p>
+    <div class="code-block">
+      <pre><code class="language-text">[Stream (生ログ)]
+  → Transform: set(body, ParseJSON(body))   # 生文字列を構造化データにパース
+  → Unroll: イベント配列を個別ログに分割     # Event Breaking
+  → (必要に応じて Filter / Redaction など)
+  → Destination: Google SecOps (パース・取り込み)</code></pre>
+    </div>
+  </div>
+
+  <!-- 設定方法 -->
+  <div class="section">
+    <h2>🛠️ 設定方法</h2>
+
+    <h3>前提条件</h3>
+    <div class="check-item"><span class="check-icon">✓</span><span>Google SecOps Enterprise または Enterprise Plus のライセンス</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span>Bindplane コンソール (バージョン <strong>1.96.4 以降</strong>) のインストールと SecOps インスタンスとの接続設定 (または Data Pipeline API の直接利用)</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span>Chronicle API 管理者ロール (<code>roles/chronicle.admin</code>)、または <code>chronicle.logProcessingPipelines.*</code> 権限を含むカスタムロール</span></div>
+
+    <h3>手順</h3>
+    <div class="step-list">
+      <div class="step-item">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h3>パイプラインとストリームの構成</h3>
+          <p>Bindplane コンソールの <strong>SecOps Pipelines</strong> タブで対象パイプラインを開き (未作成なら <strong>Create SecOps Pipeline</strong>)、Pipeline configuration カードでログタイプと取り込み方法を指定したストリームを追加。</p>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <h3>Transform プロセッサ (プリパース) の追加</h3>
+          <p>Processor ノードから Edit Processors ウィンドウを開き、<strong>Add Processor</strong> で Transform プロセッサを追加。生 JSON の場合は次の OTTL 文を設定。</p>
+          <div class="code-block" style="margin-bottom: 0;">
+            <pre style="margin-bottom: 0;"><code class="language-text">set(body, ParseJSON(body))</code></pre>
+          </div>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <h3>Unroll プロセッサの追加</h3>
+          <p>Transform プロセッサの<strong>後段</strong>に Unroll プロセッサを追加し、分割対象の配列を指定。Input / Output ペインで受信サンプルデータに対する分割結果を即座に確認可能。</p>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <h3>ロールアウト</h3>
+          <p><strong>Start rollout</strong> をクリックしてパイプラインを有効化。成功するとデータ処理コンテナのバージョン番号がインクリメントされ、以降の受信データに Unroll 処理が適用される。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- メリット -->
+  <div class="section">
+    <h2>🎯 メリット</h2>
+    <div class="grid-2">
+      <div class="card" style="border-left-color: var(--gc-green); margin: 0;">
+        <h3>💼 ビジネス面</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>取り込みデータの品質向上</strong>: バッチログが個々のイベントとして正しく UDM 化され、検索・検知ルール・ダッシュボードでのイベント単位の分析精度が向上</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>運用コストの削減</strong>: 取り込み前段の外部分割スクリプトや中間処理基盤が不要になり、構築・保守コストを削減</span></div>
+      </div>
+      <div class="card" style="border-left-color: var(--gc-green); margin: 0;">
+        <h3>⚙️ 技術面</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>パイプライン内で完結</strong>: Transform → Unroll の 2 プロセッサ構成だけでバッチログを個別イベントへ展開</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>標準技術ベース</strong>: OpenTelemetry unrollprocessor がベース。OTTL による柔軟な前処理 (ParseJSON / ParseCSV / ParseXML) と組み合わせ可能</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>即時テスト可能</strong>: Bindplane の Input / Output ペインで分割結果を保存時に即座に検証</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- デメリット・制約事項 -->
+  <div class="section">
+    <h2>⚠️ デメリット・制約事項</h2>
+
+    <h3>制限事項</h3>
+    <div class="check-item"><span class="cross-icon">✗</span><span>生文字列に直接動作しないため、必ず前段に対応する Transform プロセッサ (ParseJSON など) の配置が必要</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span>1 つのパイプラインに定義できるプロセッサは最大 10 個</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span>データ処理パイプライン機能自体が Pre-GA (Pre-GA Offerings Terms 対象) で、サポート限定や後方互換性のない変更の可能性あり</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span>Google SecOps Enterprise / Enterprise Plus ユーザーのみ利用可能</span></div>
+
+    <div class="warning-box">
+      <strong>⚠️ 考慮すべき点</strong>
+      <ul style="margin: 8px 0 0; padding-left: 20px; font-size: 14px;">
+        <li>パーサー到達前に生ログを変更するため、分割・変換が既存パーサーの UDM イベント生成に影響しないか<strong>有効化前の検証が必要</strong></li>
+        <li>イベント分割により取り込みイベント数が増加するため、後段の検知ルールやダッシュボードへの影響 (イベント件数の変化) を考慮</li>
+        <li>Data Processing Manager のフィルタは Chronicle Ingestion API の受信後に適用されるため、Ingestion API のクォータ・上限対策としては機能しない (ソース側でのフィルタリングを推奨)</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ユースケース -->
+  <div class="section">
+    <h2>💡 ユースケース</h2>
+
+    <div class="usecase">
+      <h3>📦 ユースケース 1: SaaS API からのバッチ JSON ログの分割取り込み</h3>
+      <p style="font-size: 14px;">
+        <strong>シナリオ</strong>: SaaS 製品の監査ログ API が複数イベントを 1 つの JSON 配列
+        (例: <code>{"events": [ {...}, {...}, {...} ]}</code>) として返す。
+        フィード経由でそのまま取り込むと 1 件のログとして扱われ、イベント単位の検知・検索ができない。
+      </p>
+      <div class="code-block">
+        <div style="background: #2D2D2D; padding: 8px 16px; display: flex; justify-content: space-between; font-size: 12px; margin: -16px -16px 12px;">
+          <span style="color: #9CDCFE; font-weight: bold;">Text</span>
+          <span style="color: #AAAAAA;">プロセッサ構成 (実行順)</span>
+        </div>
+        <pre style="margin: 0; padding: 0;"><code class="language-text">1. Transform: set(body, ParseJSON(body))   # 生 JSON 文字列を構造化オブジェクトへ
+2. Unroll: events 配列を個別ログイベントに展開</code></pre>
+      </div>
+      <p style="font-size: 14px; margin-bottom: 0;">
+        <strong>✅ 効果</strong>: 配列内の各イベントが個別のログとして SecOps パーサーに渡り、
+        イベント単位で正確に UDM 変換・検知ルール評価が行われる。
+      </p>
+    </div>
+
+    <div class="usecase">
+      <h3>🗂️ ユースケース 2: CSV / XML 形式のエクスポートログのイベント分割</h3>
+      <p style="font-size: 14px;">
+        <strong>シナリオ</strong>: レガシー機器やアプライアンスが複数レコードを 1 つの CSV / XML ペイロードとしてまとめて送信しており、レコード単位での分析が必要。
+      </p>
+      <p style="font-size: 14px; margin-bottom: 0;">
+        <strong>✅ 効果</strong>: Parse CSV / Parse XML の Transform プロセッサでプリパースした後に Unroll プロセッサを適用することで、
+        レコードごとの個別ログイベントとして取り込める。外部での事前分割処理が不要になる。
+      </p>
+    </div>
+  </div>
+
+  <!-- 料金・リージョン -->
+  <div class="section">
+    <h2>💰 料金・利用可能リージョン</h2>
+    <div class="grid-2">
+      <div class="card" style="margin: 0;">
+        <h3>💰 料金</h3>
+        <p style="font-size: 14px; margin: 0;">
+          Unroll プロセッサ自体の追加料金に関する公式情報はありません。データ処理パイプライン機能は
+          <strong>Google SecOps Enterprise / Enterprise Plus パッケージの一部</strong>として提供されます。
+          詳細は <a class="gc-link" href="https://cloud.google.com/security/products/security-operations" target="_blank" rel="noopener noreferrer">Google SecOps の料金・パッケージ</a> を参照。
+        </p>
+      </div>
+      <div class="card" style="margin: 0;">
+        <h3>🌍 利用可能リージョン</h3>
+        <p style="font-size: 14px; margin: 0;">
+          リージョン固有の制約に関する公式情報はリリースノートに記載されていません。
+          データ処理パイプラインは Google SecOps Enterprise / Enterprise Plus のインスタンスで利用できます。
+          詳細は <a class="gc-link" href="https://docs.cloud.google.com/chronicle/docs/ingestion/data-processing-pipeline" target="_blank" rel="noopener noreferrer">公式ドキュメント</a> を参照。
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 関連サービス・機能 -->
+  <div class="section">
+    <h2>🔗 関連サービス・機能</h2>
+    <div class="related-item"><strong>🖥️ Bindplane (コンソール / エージェント)</strong>: データ処理パイプラインの構成・管理 UI。Unroll プロセッサの追加・テスト・ロールアウトに使用 (バージョン 1.96.4 以降が必要)</div>
+    <div class="related-item"><strong>🔌 Google SecOps Data Pipeline API (Chronicle API)</strong>: Bindplane コンソールを使わずにパイプラインをプログラマティックに構成する場合に使用</div>
+    <div class="related-item"><strong>🧩 UDM (Unified Data Model)</strong>: 分割後の個別イベントがパーサーにより変換されるデータモデル。パイプラインによる生ログ変更は UDM 変換結果に影響するため事前検証が必要</div>
+    <div class="related-item"><strong>📡 OpenTelemetry Collector (unrollprocessor / OTTL)</strong>: Unroll プロセッサのベース実装。Transform プロセッサの記述には OTTL を使用</div>
+    <div class="related-item"><strong>🧹 Filter / Redaction プロセッサ</strong>: 同じパイプライン内で組み合わせ可能。ノイズ除去による取り込みコスト削減や機密データのマスキングに使用</div>
+  </div>
+
+  <!-- まとめ -->
+  <div class="section">
+    <h2>📝 まとめ</h2>
+    <div class="success-box" style="margin: 0;">
+      <p style="margin: 0 0 8px;">
+        Unroll プロセッサの追加により、複数イベントを含むバッチ形式のログを
+        <strong>Google SecOps のパイプライン内で個別イベントに分割</strong>してから取り込めるようになり、
+        外部の前処理基盤が不要になりました。
+      </p>
+      <p style="margin: 0;">
+        バッチ JSON を返す SaaS API のログや CSV / XML 形式のエクスポートログを扱っている場合は、
+        <span class="highlight">Transform (ParseJSON など) + Unroll</span> の構成を検証し、
+        UDM 変換への影響を確認した上でパイプラインへの導入を検討することを推奨します。
+      </p>
+    </div>
+  </div>
+
+  <!-- 参考リンク -->
+  <div class="section">
+    <h2>📚 参考リンク</h2>
+    <ul class="link-list">
+      <li>🔗 <a class="gc-link" href="https://docs.cloud.google.com/release-notes#August_24_2026" target="_blank" rel="noopener noreferrer">公式リリースノート (2026-08-24)</a></li>
+      <li>🔗 <a class="gc-link" href="https://docs.cloud.google.com/chronicle/docs/ingestion/data-processing-pipeline#configure-processors" target="_blank" rel="noopener noreferrer">ドキュメント: データ処理パイプラインの設定と管理 (Configure processors)</a></li>
+      <li>🔗 <a class="gc-link" href="https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/unrollprocessor" target="_blank" rel="noopener noreferrer">OpenTelemetry Collector unrollprocessor</a></li>
+      <li>🔗 <a class="gc-link" href="https://cloud.google.com/security/products/security-operations" target="_blank" rel="noopener noreferrer">Google SecOps 製品ページ</a></li>
+    </ul>
+  </div>
+
+  <footer>
+    <p>📎 出典:</p>
+    <ul style="padding-left: 20px; margin: 4px 0;">
+      <li><a href="https://docs.cloud.google.com/release-notes#August_24_2026" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/release-notes#August_24_2026</a></li>
+      <li><a href="https://docs.cloud.google.com/chronicle/docs/ingestion/data-processing-pipeline#configure-processors" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/chronicle/docs/ingestion/data-processing-pipeline#configure-processors</a></li>
+    </ul>
+    <p>本インフォグラフィックは Google Cloud リリースノート (2026-08-24) のレポートを基に作成されました。</p>
+    <p>タグ: #GoogleSecOps #SecOpsSIEM #Chronicle #DataProcessingPipeline #UnrollProcessor #EventBreaking #Bindplane #OpenTelemetry #ログ取り込み #SIEM</p>
+  </footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+    mermaid.initialize({
+        startOnLoad: true,
+        theme: 'base',
+        themeVariables: {
+            primaryColor: '#4285F4',
+            primaryTextColor: '#202124',
+            primaryBorderColor: '#4285F4',
+            lineColor: '#4285F4',
+            secondaryColor: '#F1F3F4',
+            tertiaryColor: '#FAFAFA',
+            background: '#FFFFFF',
+            mainBkg: '#E8F0FE',
+            nodeBorder: '#4285F4',
+            clusterBkg: '#E8F0FE',
+            clusterBorder: '#4285F4',
+            edgeLabelBackground: '#FFFFFF',
+            textColor: '#202124'
+        }
+    });
+</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

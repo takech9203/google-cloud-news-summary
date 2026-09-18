@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Compute Engine: Future Reservation キャンセル & MIG オートヒーリング無効化</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1 {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge-ga {
+      display: inline-block;
+      background: var(--gc-green);
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge-service {
+      display: inline-block;
+      background: var(--gc-blue-600);
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .before-card h4 {
+      color: var(--gc-red);
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .after-card h4 {
+      color: var(--gc-green);
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .before-card ul, .after-card ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-card li, .after-card li {
+      margin: 4px 0;
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid) {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-800);
+      margin: 0 0 8px 0;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 768px) {
+      .feature-grid, .before-after, .stat-grid {
+        grid-template-columns: 1fr;
+      }
+      h1 {
+        font-size: 28px;
+      }
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>Compute Engine: Future Reservation キャンセル & MIG オートヒーリング無効化</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge-service">Compute Engine</span>
+          <span class="badge-ga">GA</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-06-26</div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>Compute Engine に 2 つの機能が GA (一般提供) となった。GPU/TPU を大量に利用する AI/ML ワークロードの運用者や、MIG で独自の修復ロジックを行いたいインフラ管理者にとって、<span class="highlight">柔軟性とコスト管理の向上</span>をもたらす重要なアップデート。</p>
+
+      <div class="feature-grid">
+        <div class="card">
+          <h4 style="margin: 0 0 8px 0; color: var(--gc-blue-800);">1. Future Reservation キャンセル</h4>
+          <p style="margin: 0; font-size: 14px;">カレンダーモードの Future Reservation リクエストをロックタイム前にキャンセルし、不要な課金を回避</p>
+        </div>
+        <div class="card">
+          <h4 style="margin: 0 0 8px 0; color: var(--gc-blue-800);">2. MIG オートヒーリング無効化</h4>
+          <p style="margin: 0; font-size: 14px;">ヘルスチェックによるモニタリングを維持しつつ、自動修復を無効化して独自運用を実現</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Before/After Section -->
+    <div class="section">
+      <h2>🔄 Before / After</h2>
+      <div class="before-after">
+        <div class="before-card">
+          <h4>❌ Before (アップデート前)</h4>
+          <ul>
+            <li>Future Reservation は送信後キャンセル不可、不要でも課金発生</li>
+            <li>ヘルスチェック異常で VM が自動再作成され、障害調査が困難</li>
+            <li>モニタリングのみ (修復なし) の用途に非対応</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>✅ After (アップデート後)</h4>
+          <ul>
+            <li>ロックタイム前にキャンセル可能、不要な課金を回避</li>
+            <li>オートヒーリングを個別無効化、修復なしモニタリング対応</li>
+            <li>障害 VM の保持とトラブルシューティングが容易に</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>今回 GA となった 2 つの機能の動作フローを示す。Future Reservation ではロックタイム前のキャンセルによる課金回避が可能になり、MIG ではオートヒーリングの ON/OFF を制御することでモニタリングのみの運用が実現できる。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph FutureReservation["Future Reservation (カレンダーモード)"]
+        FR1[/"リクエスト作成・送信"/]
+        FR2{{"承認済み?"}}
+        FR3["PROCURING\n(ロックタイム)"]
+        FR4["PROVISIONING"]
+        FR5["FULFILLED\n(課金開始)"]
+        FR_CANCEL["キャンセル\n(課金回避)"]
+
+        FR1 --> FR2
+        FR2 -->|承認| FR3
+        FR2 -->|キャンセル可能| FR_CANCEL
+        FR3 --> FR4
+        FR4 --> FR5
+    end
+
+    subgraph MIGAutohealing["MIG オートヒーリング制御"]
+        HC["ヘルスチェック"]
+        VM_UNHEALTHY["VM: UNHEALTHY"]
+        REPAIR["自動修復\n(再作成)"]
+        NO_REPAIR["修復なし\n(モニタリングのみ)"]
+
+        HC --> VM_UNHEALTHY
+        VM_UNHEALTHY -->|オートヒーリング ON| REPAIR
+        VM_UNHEALTHY -->|オートヒーリング OFF| NO_REPAIR
+    end
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features Section -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+
+      <h3>1. Future Reservation リクエストのキャンセル (カレンダーモード)</h3>
+      <div class="card">
+        <div style="display: flex; flex-direction: column; gap: 8px; font-size: 14px;">
+          <div>→ ロックタイム (PROCURING 状態) 前であれば承認済みリクエストをキャンセル可能</div>
+          <div>→ キャンセルにより Compute Engine によるリソースプロビジョニングと課金を防止</div>
+          <div>→ キャンセル後もリクエストの参照は可能 (新しいリクエスト作成時の参考として保持)</div>
+          <div>→ キャンセルされたリクエストを削除することで、同じプロパティでの新規リクエスト作成制限を解除可能</div>
+        </div>
+      </div>
+
+      <h3>2. MIG オートヒーリングの無効化</h3>
+      <div class="card">
+        <div style="display: flex; flex-direction: column; gap: 8px; font-size: 14px;">
+          <div>→ ヘルスチェックを設定したまま、異常 VM の自動修復を無効化可能</div>
+          <div>→ <code>onFailedHealthCheck</code> を <code>DO_NOTHING</code> に設定でモニタリング継続・修復停止</div>
+          <div>→ 失敗 VM の修復 (<code>defaultActionOnFailure</code>) とオートヒーリング (<code>onFailedHealthCheck</code>) を個別に制御可能</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3>Future Reservation キャンセルの条件</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>キャンセル可能な状態</td>
+            <td>PENDING_APPROVAL、APPROVED (PROCURING 前)</td>
+          </tr>
+          <tr>
+            <td>キャンセル不可の状態</td>
+            <td>PROCURING、PROVISIONING、FULFILLED</td>
+          </tr>
+          <tr>
+            <td>ロックタイム開始</td>
+            <td>開始時刻の 56 日前、または承認直後 (開始時刻が 56 日未満の場合)</td>
+          </tr>
+          <tr>
+            <td>必要な権限</td>
+            <td><code>compute.futureReservations.cancel</code></td>
+          </tr>
+          <tr>
+            <td>必要なロール</td>
+            <td><code>roles/compute.futureReservationAdmin</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>MIG オートヒーリング制御の設定値</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>設定</th>
+            <th>値</th>
+            <th>動作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>defaultActionOnFailure</code></td>
+            <td><code>DO_NOTHING</code></td>
+            <td>失敗 VM を修復しない</td>
+          </tr>
+          <tr>
+            <td><code>defaultActionOnFailure</code></td>
+            <td><code>REPAIR</code></td>
+            <td>失敗 VM を修復する (デフォルト)</td>
+          </tr>
+          <tr>
+            <td><code>onFailedHealthCheck</code></td>
+            <td><code>DO_NOTHING</code></td>
+            <td>ヘルスチェック失敗時に修復しない</td>
+          </tr>
+          <tr>
+            <td><code>onFailedHealthCheck</code></td>
+            <td><code>REPAIR</code></td>
+            <td>ヘルスチェック失敗時に修復する</td>
+          </tr>
+          <tr>
+            <td><code>onFailedHealthCheck</code></td>
+            <td><code>DEFAULT_ACTION</code></td>
+            <td><code>defaultActionOnFailure</code> の設定に従う</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="warning-box">
+        <strong>⚠️ 制限事項:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px; font-size: 14px;">
+          <li>オートスケーリング設定がある MIG では <code>defaultActionOnFailure</code> を <code>DO_NOTHING</code> に設定不可</li>
+          <li>一時停止/停止 VM がある MIG でも同様に設定不可</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Configuration Section -->
+    <div class="section">
+      <h2>⚙️ 設定方法</h2>
+
+      <h3>Future Reservation リクエストのキャンセル</h3>
+      <span class="code-label">gcloud CLI</span>
+      <pre><code class="language-bash">gcloud compute future-reservations cancel FUTURE_RESERVATION_NAME \
+    --zone=ZONE</code></pre>
+
+      <span class="code-label">REST API</span>
+      <pre><code class="language-bash">POST https://compute.googleapis.com/compute/v1/projects/PROJECT_ID/zones/ZONE/futureReservations/FUTURE_RESERVATION_NAME/cancel</code></pre>
+
+      <h3>MIG オートヒーリングの無効化 (オートヒーリングのみ)</h3>
+      <span class="code-label">gcloud CLI</span>
+      <pre><code class="language-bash">gcloud beta compute instance-groups managed update MIG_NAME \
+    --action-on-vm-failed-health-check=do-nothing \
+    --zone=ZONE</code></pre>
+
+      <span class="code-label">REST API</span>
+      <pre><code class="language-json">PATCH https://compute.googleapis.com/compute/beta/projects/PROJECT_ID/zones/ZONE/instanceGroupManagers/MIG_NAME
+
+{
+  "instanceLifecyclePolicy": {
+    "onFailedHealthCheck": "DO_NOTHING"
+  }
+}</code></pre>
+
+      <h3>すべての修復を無効化</h3>
+      <span class="code-label">gcloud CLI</span>
+      <pre><code class="language-bash">gcloud compute instance-groups managed update MIG_NAME \
+    --default-action-on-vm-failure=do-nothing \
+    --zone=ZONE</code></pre>
+    </div>
+
+    <!-- Benefits Section -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div class="feature-grid">
+        <div>
+          <h3>ビジネス面</h3>
+          <div class="card" style="border-left-color: var(--gc-green);">
+            <div style="font-size: 14px;">
+              <p><strong>💰 コスト最適化:</strong> Future Reservation のキャンセルにより、計画変更時の不要な GPU/TPU リソース課金を回避</p>
+              <p><strong>🔧 運用柔軟性:</strong> MIG のオートヒーリングを無効化で独自の運用ポリシーに基づいた障害対応が可能</p>
+            </div>
+          </div>
+        </div>
+        <div>
+          <h3>技術面</h3>
+          <div class="card" style="border-left-color: var(--gc-blue-600);">
+            <div style="font-size: 14px;">
+              <p><strong>🔍 障害調査の効率化:</strong> VM が自動再作成されず、ログ・メトリクス保持のまま原因調査可能</p>
+              <p><strong>🛠️ カスタム修復ロジック:</strong> オートヒーリング無効 + ヘルスチェック結果で独自修復・通知と連携</p>
+              <p><strong>📊 キャパシティプランニング改善:</strong> GPU/TPU 予約をより柔軟に管理</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Constraints Section -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <div class="error-box">
+        <strong>制限事項</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px; font-size: 14px;">
+          <li>Future Reservation はロックタイム (PROCURING 状態) 以降はキャンセル不可。ロックタイムは開始時刻の 56 日前、または承認直後に開始される場合あり</li>
+          <li>キャンセルされた Future Reservation が存在する間は、同じプロパティでの新規リクエスト作成が制限</li>
+          <li>MIG にオートスケーリング設定がある場合、<code>defaultActionOnFailure</code> を <code>DO_NOTHING</code> に設定不可</li>
+          <li>MIG に一時停止/停止状態の VM がある場合も同様</li>
+        </ul>
+      </div>
+      <div class="warning-box">
+        <strong>考慮すべき点</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px; font-size: 14px;">
+          <li>オートヒーリング無効化時は、異常 VM の手動対応または独自修復ロジックの実装が必要</li>
+          <li>Future Reservation キャンセル後は、リクエストを削除して新規リクエスト作成制限を解除すること</li>
+          <li>MIG オートヒーリング無効化と Cloud Monitoring アラートを組み合わせて異常検知通知を設定推奨</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases Section -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>🎯 ユースケース 1: GPU キャパシティ計画の変更</h4>
+        <p style="font-size: 14px; margin: 8px 0;"><strong>シナリオ:</strong> AI モデルのトレーニングスケジュールが変更になり、予約済みの A3 Ultra GPU VM が不要になった場合</p>
+        <span class="code-label">Bash</span>
+        <pre><code class="language-bash"># 承認済みだがロックタイム前のリクエストをキャンセル
+gcloud compute future-reservations cancel my-training-reservation \
+    --zone=us-central1-a
+
+# キャンセル後、リクエストを削除して制限を解除
+gcloud compute future-reservations delete my-training-reservation \
+    --zone=us-central1-a</code></pre>
+        <p style="font-size: 14px; margin: 8px 0;"><strong>効果:</strong> DWS 料金による高額な GPU リソースの不要課金を回避し、新しいスケジュールで再予約が可能に</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>🎯 ユースケース 2: 異常 VM のトラブルシューティング</h4>
+        <p style="font-size: 14px; margin: 8px 0;"><strong>シナリオ:</strong> MIG 上のアプリケーションで間欠的なエラーが発生しているが、VM が自動修復されるため原因調査ができない場合</p>
+        <span class="code-label">Bash</span>
+        <pre><code class="language-bash"># オートヒーリングのみ無効化 (失敗 VM の修復は維持)
+gcloud beta compute instance-groups managed update my-app-mig \
+    --action-on-vm-failed-health-check=do-nothing \
+    --zone=us-east1-b
+
+# ヘルスステータスを確認して異常 VM を特定
+gcloud compute instance-groups managed list-instances my-app-mig \
+    --zone=us-east1-b</code></pre>
+        <p style="font-size: 14px; margin: 8px 0;"><strong>効果:</strong> 異常 VM が保持されるため、SSH でログインしてアプリケーションログやシステム状態を直接調査可能</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>🎯 ユースケース 3: カスタム修復ロジックの実装</h4>
+        <p style="font-size: 14px; margin: 8px 0;"><strong>シナリオ:</strong> ヘルスチェック結果に基づいて、段階的なリカバリ (アプリケーション再起動 → VM リブート → VM 再作成) を実装したい場合</p>
+        <div class="flow-diagram">
+          <div class="flow-step">🔍 ヘルスチェック<br/>失敗検知</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">🔄 アプリ<br/>再起動</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">💻 VM<br/>リブート</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">🆕 VM<br/>再作成</div>
+        </div>
+        <p style="font-size: 14px; margin: 8px 0;"><strong>効果:</strong> Cloud Monitoring と Cloud Functions を組み合わせて、ヘルスチェック結果に基づく段階的な修復パイプラインを構築</p>
+      </div>
+    </div>
+
+    <!-- Pricing Section -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h4 style="margin: 0 0 8px 0; color: var(--gc-blue-800);">Future Reservation (カレンダーモード)</h4>
+          <ul style="font-size: 14px; padding-left: 20px; margin: 0;">
+            <li>リクエストの作成・キャンセル自体に料金は発生しない</li>
+            <li>課金は FULFILLED 状態 (プロビジョニング完了後) から開始</li>
+            <li>キャンセルにより、プロビジョニング前であれば課金を完全に回避可能</li>
+            <li>プロビジョニングされたリソースは DWS 料金に基づいて課金</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4 style="margin: 0 0 8px 0; color: var(--gc-blue-800);">MIG オートヒーリング無効化</h4>
+          <ul style="font-size: 14px; padding-left: 20px; margin: 0;">
+            <li>オートヒーリングの ON/OFF 設定自体に追加料金は発生しない</li>
+            <li>ヘルスチェックの料金は通常通り適用</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Related Services Section -->
+    <div class="section">
+      <h2>🔗 関連サービス</h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
+        <div class="card" style="padding: 16px;">
+          <strong style="font-size: 14px;">Dynamic Workload Scheduler (DWS)</strong>
+          <p style="font-size: 13px; margin: 4px 0 0 0; color: var(--gc-outline);">Future Reservation の料金体系</p>
+        </div>
+        <div class="card" style="padding: 16px;">
+          <strong style="font-size: 14px;">Cloud Monitoring</strong>
+          <p style="font-size: 13px; margin: 4px 0 0 0; color: var(--gc-outline);">MIG ヘルスステータスの監視・アラート</p>
+        </div>
+        <div class="card" style="padding: 16px;">
+          <strong style="font-size: 14px;">Compute Engine Reservations</strong>
+          <p style="font-size: 13px; margin: 4px 0 0 0; color: var(--gc-outline);">予約の自動作成・管理</p>
+        </div>
+        <div class="card" style="padding: 16px;">
+          <strong style="font-size: 14px;">MIG Autoscaler</strong>
+          <p style="font-size: 13px; margin: 4px 0 0 0; color: var(--gc-outline);">オートスケーリングとの連携</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary Section -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="note-box">
+        <p style="margin: 0; font-size: 15px;">今回の GA リリースにより、Compute Engine の Future Reservation と MIG の運用柔軟性が大幅に向上。特に <span class="highlight">GPU/TPU を大量に利用する AI/ML ワークロード</span>では、キャパシティ予約のキャンセル機能が計画変更時のコスト管理に直結する。MIG オートヒーリングの個別制御は、障害調査やカスタム修復ロジックの実装を容易にし、より洗練された運用体制の構築を可能にする。</p>
+      </div>
+      <div style="margin-top: 16px; font-size: 14px;">
+        <strong>推奨アクション:</strong>
+        <ul style="padding-left: 20px;">
+          <li>既存の Future Reservation 運用を見直し、キャンセル機能の活用を検討</li>
+          <li>MIG のヘルスチェック設定を見直し、オートヒーリング無効化の適用検討</li>
+          <li>Cloud Monitoring アラートとの組み合わせで異常検知体制を構築</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="padding-left: 20px; margin: 4px 0;">
+        <li><a href="https://docs.cloud.google.com/release-notes#June_26_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li><a href="https://docs.cloud.google.com/compute/docs/instances/delete-future-reservations-calendar-mode" target="_blank" rel="noopener noreferrer">Future Reservation のキャンセル・削除ドキュメント</a></li>
+        <li><a href="https://docs.cloud.google.com/compute/docs/instance-groups/turn-off-vm-repairs-in-mig" target="_blank" rel="noopener noreferrer">MIG オートヒーリング無効化ドキュメント</a></li>
+        <li><a href="https://docs.cloud.google.com/compute/docs/instances/future-reservations-calendar-mode-overview" target="_blank" rel="noopener noreferrer">Future Reservation (カレンダーモード) 概要</a></li>
+        <li><a href="https://docs.cloud.google.com/compute/docs/instance-groups/autohealing-instances-in-migs" target="_blank" rel="noopener noreferrer">MIG のヘルスチェック設定</a></li>
+      </ul>
+      <p style="margin-top: 12px; font-size: 11px; color: var(--gc-outline);">#ComputeEngine #FutureReservation #MIG #AutoHealing #HealthCheck #GA #コスト最適化 #GPU #TPU</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

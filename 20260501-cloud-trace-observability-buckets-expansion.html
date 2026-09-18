@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Trace: オブザーバビリティバケットの対応リージョン拡大</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-red {
+      border-left-color: var(--gc-red);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .card-teal {
+      border-left-color: var(--gc-teal);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 24px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .before-card h3, .after-card h3 {
+      margin: 0 0 12px 0;
+      font-size: 16px;
+    }
+
+    .region-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .region-category {
+      background: var(--gc-surface);
+      border-radius: 8px;
+      padding: 16px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .region-category h4 {
+      margin: 0 0 8px 0;
+      color: var(--gc-blue-800);
+      font-size: 14px;
+    }
+
+    .region-tag {
+      display: inline-block;
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      margin: 2px;
+      font-family: 'Roboto Mono', 'Source Code Pro', monospace;
+    }
+
+    .region-tag.new {
+      background: var(--gc-green-tint);
+      color: #137333;
+      border: 1px solid var(--gc-green);
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      margin: 0 0 8px 0;
+      color: var(--gc-blue-900);
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1, .title { font-size: 24px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stat-cards { grid-template-columns: 1fr; }
+      .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>Cloud Trace: オブザーバビリティバケットの対応リージョン拡大</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Cloud Trace</span>
+          <span class="badge">Google Cloud Observability</span>
+          <span class="badge-ga">GA</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-05-01</div>
+    </div>
+
+    <!-- Statistics -->
+    <div class="stat-cards">
+      <div class="stat-card">
+        <div class="stat-value">+10</div>
+        <div class="stat-label">新規対応リージョン</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">40+</div>
+        <div class="stat-label">合計利用可能ロケーション</div>
+      </div>
+      <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-green), #1B5E20);">
+        <div class="stat-value">6</div>
+        <div class="stat-label">ヨーロッパ新規リージョン</div>
+      </div>
+      <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-purple), #6A1B9A);">
+        <div class="stat-value">4</div>
+        <div class="stat-label">地域カテゴリ (APAC/EU/ME/NA)</div>
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>Google Cloud Observability は、トレースデータを保存する<span class="highlight">オブザーバビリティバケット</span>の対応ロケーションを新たに <strong>10 リージョン</strong>追加しました。オーストラリア、ヨーロッパ、中東、北米、米国東部にまたがる新リージョンにより、データレジデンシー要件を持つ組織がより柔軟にトレースデータの保存先を選択できるようになりました。</p>
+      <p>特にヨーロッパ地域での選択肢が大幅に増え、GDPR やデータ主権に関する規制に対応しやすくなりました。</p>
+
+      <h3 style="margin-top: 24px; color: var(--gc-on-surface);">Before / After</h3>
+      <div class="before-after">
+        <div class="before-card">
+          <h3>❌ Before</h3>
+          <ul style="margin: 0; padding-left: 20px; font-size: 14px;">
+            <li>ヨーロッパの一部リージョンでバケット配置不可</li>
+            <li>オーストラリア (sydney) でローカルデータ保存不可能</li>
+            <li>中東 (me-central2) 未対応</li>
+            <li>カナダ (モントリオール) 未対応</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h3>✅ After</h3>
+          <ul style="margin: 0; padding-left: 20px; font-size: 14px;">
+            <li>合計 40 以上のロケーションに対応</li>
+            <li>EU データレジデンシー要件への対応強化</li>
+            <li>カナダ・中東でのデータ主権要件に対応</li>
+            <li>ワークロード近隣でのデータ保存が可能に</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>アプリケーションから送信されたトレースデータは、Cloud Trace API または Telemetry API を経由してオブザーバビリティバケットに保存され、指定リージョン内にデータが保持されます。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph NewRegions["今回追加されたリージョン 10"]
+        direction LR
+        subgraph APAC["アジア太平洋"]
+            AU1["australia-southeast1\nSydney"]
+        end
+        subgraph EU["ヨーロッパ"]
+            EC2["europe-central2\nWarsaw"]
+            EN1["europe-north1\nFinland"]
+            ESW1["europe-southwest1\nMadrid"]
+            EW2["europe-west2\nLondon"]
+            EW10["europe-west10\nBerlin"]
+            EW12["europe-west12\nTurin"]
+        end
+        subgraph ME["中東"]
+            MC2["me-central2\nDammam"]
+        end
+        subgraph Americas["アメリカ"]
+            NA1["northamerica-northeast1\nMontreal"]
+            UE4["us-east4\nN. Virginia"]
+        end
+    end
+
+    App["アプリケーション\nトレースデータ送信"] --> API["Cloud Trace API /\nTelemetry API"]
+    API --> Bucket["オブザーバビリティバケット\n_Trace"]
+    Bucket --> NewRegions
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h4 style="margin: 0 0 8px 0; color: var(--gc-on-surface);">🌍 10 リージョン追加</h4>
+          <p style="margin: 0; font-size: 14px;">オーストラリア、ヨーロッパ 6 リージョン、中東、カナダ、米国東部の 10 リージョンが新たに利用可能</p>
+        </div>
+        <div class="card card-green">
+          <h4 style="margin: 0 0 8px 0; color: var(--gc-on-surface);">🏢 デフォルト設定による一括管理</h4>
+          <p style="margin: 0; font-size: 14px;">組織/フォルダ/プロジェクトレベルでデフォルトのストレージロケーションを設定し、リソース階層で自動継承</p>
+        </div>
+        <div class="card card-purple">
+          <h4 style="margin: 0 0 8px 0; color: var(--gc-on-surface);">🔐 CMEK 対応</h4>
+          <p style="margin: 0; font-size: 14px;">各ロケーションに対して顧客管理暗号鍵 (CMEK) を設定可能。暗号化とデータ所在地の両方を制御</p>
+        </div>
+        <div class="card card-teal">
+          <h4 style="margin: 0 0 8px 0; color: var(--gc-on-surface);">📜 データレジデンシー対応</h4>
+          <p style="margin: 0; font-size: 14px;">新リージョンでもデータは指定されたリージョン内に保持。GDPR やデータ主権規制に対応</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- New Regions Table -->
+    <div class="section">
+      <h2>🗺️ 新規対応リージョン一覧</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>リージョン</th>
+            <th>ロケーション</th>
+            <th>地域</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>australia-southeast1</code></td><td>シドニー</td><td>アジア太平洋</td></tr>
+          <tr><td><code>europe-central2</code></td><td>ワルシャワ</td><td>ヨーロッパ</td></tr>
+          <tr><td><code>europe-north1</code></td><td>フィンランド</td><td>ヨーロッパ</td></tr>
+          <tr><td><code>europe-southwest1</code></td><td>マドリード</td><td>ヨーロッパ</td></tr>
+          <tr><td><code>europe-west2</code></td><td>ロンドン</td><td>ヨーロッパ</td></tr>
+          <tr><td><code>europe-west10</code></td><td>ベルリン</td><td>ヨーロッパ</td></tr>
+          <tr><td><code>europe-west12</code></td><td>トリノ</td><td>ヨーロッパ</td></tr>
+          <tr><td><code>me-central2</code></td><td>ダンマーム</td><td>中東</td></tr>
+          <tr><td><code>northamerica-northeast1</code></td><td>モントリオール</td><td>アメリカ</td></tr>
+          <tr><td><code>us-east4</code></td><td>北バージニア</td><td>アメリカ</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+      <h3 style="color: var(--gc-on-surface); margin-top: 0;">オブザーバビリティバケットの仕様</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>バケット名</td><td><code>_Trace</code> (システム自動作成)</td></tr>
+          <tr><td>データセット名</td><td><code>Spans</code></td></tr>
+          <tr><td>ビュー名</td><td><code>_AllSpans</code></td></tr>
+          <tr><td>リソースタイプ</td><td>リージョナル (ゾーン間冗長)</td></tr>
+          <tr><td>暗号化</td><td>Google 管理鍵 (デフォルト) / CMEK (オプション)</td></tr>
+        </tbody>
+      </table>
+
+      <div class="warning-box" style="margin-top: 16px;">
+        <strong>⚠️ 制限事項:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px; font-size: 14px;">
+          <li>オブザーバビリティバケットの変更・削除は不可</li>
+          <li>データセットの作成・削除・変更は不可</li>
+          <li>ビューの作成・削除・変更は不可</li>
+          <li>Google Cloud コンソールからのバケット、データセット、ビュー、リンクの一覧表示は不可</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Configuration -->
+    <div class="section">
+      <h2>⚙️ 設定方法</h2>
+      <p><strong>前提条件:</strong> Cloud Trace API が有効化されていること、デフォルト設定の構成には適切な IAM 権限が必要</p>
+
+      <h3 style="color: var(--gc-on-surface);">ステップ 1: デフォルトストレージロケーションの設定</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># gcloud CLI でデフォルトのストレージロケーションを設定
+# (組織レベルの例)
+gcloud observability default-settings update \
+  --organization=ORGANIZATION_ID \
+  --default-storage-location=europe-west2</code></pre>
+
+      <h3 style="color: var(--gc-on-surface);">ステップ 2: CMEK の設定 (オプション)</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># 特定ロケーションに対して CMEK を設定
+gcloud observability default-settings update \
+  --organization=ORGANIZATION_ID \
+  --location=europe-west2 \
+  --kms-key=projects/PROJECT_ID/locations/europe-west2/keyRings/KEY_RING/cryptoKeys/KEY</code></pre>
+
+      <div class="note-box">
+        <strong>💡 注意:</strong> デフォルト設定は新規に作成されるオブザーバビリティバケットにのみ適用されます。既存のバケットには影響しません。
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div class="feature-grid">
+        <div>
+          <h3 style="color: var(--gc-on-surface); margin-top: 0;">ビジネス面</h3>
+          <div class="check-item">
+            <span class="check-icon">✓</span>
+            <span><strong>データレジデンシー対応強化:</strong> ヨーロッパ、中東、カナダなど厳格なデータ保護規制がある地域でのコンプライアンス要件を満たしやすくなった</span>
+          </div>
+          <div class="check-item">
+            <span class="check-icon">✓</span>
+            <span><strong>グローバル展開の容易化:</strong> 世界各地のワークロードに対して、近隣リージョンでのトレースデータ保存が可能に</span>
+          </div>
+        </div>
+        <div>
+          <h3 style="color: var(--gc-on-surface); margin-top: 0;">技術面</h3>
+          <div class="check-item">
+            <span class="check-icon">✓</span>
+            <span><strong>レイテンシ低減:</strong> ワークロードと同一リージョンにトレースデータを保存することで、データアクセスのレイテンシを低減</span>
+          </div>
+          <div class="check-item">
+            <span class="check-icon">✓</span>
+            <span><strong>リソース階層での一括管理:</strong> 組織レベルで設定を行えば、配下のすべてのプロジェクトに自動適用</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <div class="check-item">
+        <span class="cross-icon">✗</span>
+        <span>デフォルト設定は新規作成のバケットにのみ適用され、既存バケットには遡及適用されない</span>
+      </div>
+      <div class="check-item">
+        <span class="cross-icon">✗</span>
+        <span>オブザーバビリティバケットの変更・削除はできない</span>
+      </div>
+      <div class="check-item">
+        <span class="cross-icon">✗</span>
+        <span>Gemini Cloud Assist などグローバルにデータを保存するサービスを有効にすると、データレジデンシーが保証されない可能性がある</span>
+      </div>
+      <div class="check-item">
+        <span class="cross-icon">✗</span>
+        <span>既存プロジェクトでリージョンを変更する場合、新しいバケットが作成されるタイミングの確認が必要</span>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+      <div class="usecase-card">
+        <h4>🏦 ユースケース 1: EU データレジデンシー対応</h4>
+        <p style="font-size: 14px; margin: 8px 0;"><strong>シナリオ:</strong> GDPR 準拠が求められるヨーロッパの金融機関が、トレースデータを EU 域内に保持する必要がある</p>
+        <span class="code-label">Bash</span>
+        <pre><code class="language-bash"># 組織レベルで EU リージョンをデフォルトに設定
+gcloud observability default-settings update \
+  --organization=ORG_ID \
+  --default-storage-location=europe-west2
+
+# CMEK も合わせて設定
+gcloud observability default-settings update \
+  --organization=ORG_ID \
+  --location=europe-west2 \
+  --kms-key=projects/PROJECT/locations/europe-west2/keyRings/RING/cryptoKeys/KEY</code></pre>
+        <p style="font-size: 14px; margin: 8px 0;"><strong>効果:</strong> すべての新規プロジェクトのトレースデータがロンドン (europe-west2) に保存され、顧客管理鍵で暗号化される</p>
+      </div>
+      <div class="usecase-card">
+        <h4>🇨🇦 ユースケース 2: カナダのデータ主権要件</h4>
+        <p style="font-size: 14px; margin: 8px 0;"><strong>シナリオ:</strong> カナダ政府関連のワークロードを運用しており、トレースデータをカナダ国内に保持する必要がある</p>
+        <p style="font-size: 14px; margin: 8px 0;"><strong>効果:</strong> <code>northamerica-northeast1</code> (モントリオール) にオブザーバビリティバケットを配置することで、カナダ国内にデータを保持可能</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>Cloud Trace の料金は、取り込まれたスパン数に基づいて課金されます。オブザーバビリティバケットのリージョン選択による追加料金に関する公式情報は、料金ページをご確認ください。</p>
+      <p><a href="https://cloud.google.com/products/observability/pricing" target="_blank" class="gc-link">Google Cloud Observability 料金ページ →</a></p>
+    </div>
+
+    <!-- Available Regions -->
+    <div class="section">
+      <h2>🌐 利用可能リージョン</h2>
+      <p>今回の追加により、オブザーバビリティバケットは以下の全リージョンで利用可能です。<span class="region-tag new">緑色</span> は今回追加されたリージョンです。</p>
+      <div class="region-grid">
+        <div class="region-category">
+          <h4>🌐 マルチリージョン</h4>
+          <span class="region-tag">eu</span>
+          <span class="region-tag">us</span>
+        </div>
+        <div class="region-category">
+          <h4>🌍 アフリカ</h4>
+          <span class="region-tag">africa-south1</span>
+        </div>
+        <div class="region-category">
+          <h4>🌎 アメリカ</h4>
+          <span class="region-tag new">northamerica-northeast1</span>
+          <span class="region-tag">northamerica-northeast2</span>
+          <span class="region-tag">northamerica-south1</span>
+          <span class="region-tag">southamerica-west1</span>
+          <span class="region-tag">us-central1</span>
+          <span class="region-tag">us-east1</span>
+          <span class="region-tag new">us-east4</span>
+          <span class="region-tag">us-east5</span>
+          <span class="region-tag">us-south1</span>
+          <span class="region-tag">us-west1</span>
+          <span class="region-tag">us-west2</span>
+          <span class="region-tag">us-west3</span>
+        </div>
+        <div class="region-category">
+          <h4>🌏 アジア太平洋</h4>
+          <span class="region-tag">asia-east1</span>
+          <span class="region-tag">asia-east2</span>
+          <span class="region-tag">asia-northeast2</span>
+          <span class="region-tag">asia-northeast3</span>
+          <span class="region-tag">asia-south1</span>
+          <span class="region-tag">asia-south2</span>
+          <span class="region-tag">asia-southeast2</span>
+          <span class="region-tag">asia-southeast3</span>
+          <span class="region-tag new">australia-southeast1</span>
+          <span class="region-tag">australia-southeast2</span>
+        </div>
+        <div class="region-category">
+          <h4>🌍 ヨーロッパ</h4>
+          <span class="region-tag new">europe-central2</span>
+          <span class="region-tag new">europe-north1</span>
+          <span class="region-tag">europe-north2</span>
+          <span class="region-tag new">europe-southwest1</span>
+          <span class="region-tag">europe-west1</span>
+          <span class="region-tag new">europe-west2</span>
+          <span class="region-tag">europe-west3</span>
+          <span class="region-tag">europe-west4</span>
+          <span class="region-tag">europe-west6</span>
+          <span class="region-tag">europe-west8</span>
+          <span class="region-tag new">europe-west10</span>
+          <span class="region-tag new">europe-west12</span>
+        </div>
+        <div class="region-category">
+          <h4>🌍 中東</h4>
+          <span class="region-tag">me-central1</span>
+          <span class="region-tag new">me-central2</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h4 style="margin: 0 0 8px 0; color: var(--gc-on-surface);">📝 Cloud Logging</h4>
+          <p style="margin: 0; font-size: 14px;">同様にリージョナルログバケットをサポートし、データレジデンシー要件に対応</p>
+        </div>
+        <div class="card">
+          <h4 style="margin: 0 0 8px 0; color: var(--gc-on-surface);">📊 Cloud Monitoring</h4>
+          <p style="margin: 0; font-size: 14px;">Application Monitoring でトレースデータと連携してパフォーマンス分析を実施</p>
+        </div>
+        <div class="card">
+          <h4 style="margin: 0 0 8px 0; color: var(--gc-on-surface);">🔑 Cloud KMS</h4>
+          <p style="margin: 0; font-size: 14px;">CMEK を使用したオブザーバビリティバケットの暗号化に利用</p>
+        </div>
+        <div class="card">
+          <h4 style="margin: 0 0 8px 0; color: var(--gc-on-surface);">📡 Telemetry API</h4>
+          <p style="margin: 0; font-size: 14px;">トレースデータの取り込みに使用される新しい API。リージョナルクォータをサポート</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- References -->
+    <div class="section">
+      <h2>📚 参考リンク</h2>
+      <ul style="list-style: none; padding: 0; margin: 0;">
+        <li class="icon-text"><span class="arrow">→</span><a href="https://docs.cloud.google.com/release-notes#May_01_2026" target="_blank" class="gc-link">公式リリースノート</a></li>
+        <li class="icon-text"><span class="arrow">→</span><a href="https://docs.cloud.google.com/stackdriver/docs/observability/observability-bucket-locations" target="_blank" class="gc-link">オブザーバビリティバケットのロケーション</a></li>
+        <li class="icon-text"><span class="arrow">→</span><a href="https://docs.cloud.google.com/stackdriver/docs/observability/set-defaults-for-observability-buckets" target="_blank" class="gc-link">オブザーバビリティバケットのデフォルト設定</a></li>
+        <li class="icon-text"><span class="arrow">→</span><a href="https://docs.cloud.google.com/trace/docs/storage-overview" target="_blank" class="gc-link">トレースストレージの概要</a></li>
+        <li class="icon-text"><span class="arrow">→</span><a href="https://docs.cloud.google.com/trace/docs/release-notes" target="_blank" class="gc-link">Cloud Trace リリースノート</a></li>
+        <li class="icon-text"><span class="arrow">→</span><a href="https://cloud.google.com/products/observability/pricing" target="_blank" class="gc-link">料金ページ</a></li>
+      </ul>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>📎 出典: <a href="https://docs.cloud.google.com/release-notes#May_01_2026" target="_blank" rel="noopener noreferrer">https://docs.cloud.google.com/release-notes#May_01_2026</a></p>
+      <p style="margin-top: 8px;">タグ: #CloudTrace #GoogleCloudObservability #DataResidency #Observability #CMEK</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

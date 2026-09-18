@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Secure Source Manager: コードスキャンに対する日次レートクォータの適用</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1 {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-green);
+    }
+
+    .badge-warning {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-orange);
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 24px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-card h3 {
+      color: var(--gc-red);
+      margin: 0 0 12px 0;
+      font-size: 18px;
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-card h3 {
+      color: var(--gc-green);
+      margin: 0 0 12px 0;
+      font-size: 18px;
+    }
+
+    .before-card ul, .after-card ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .before-card li, .after-card li {
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid) {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-800);
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .usecase-card p {
+      margin: 0;
+      font-size: 14px;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .feature-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .feature-card h4 {
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .feature-card p {
+      margin: 0;
+      font-size: 14px;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .related-services {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .related-service {
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 8px;
+      padding: 12px 16px;
+      text-align: center;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--gc-on-surface);
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stat-cards { grid-template-columns: 1fr; }
+      .feature-grid { grid-template-columns: 1fr; }
+      .related-services { grid-template-columns: 1fr; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>🔒 Secure Source Manager: コードスキャン日次レートクォータ</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Secure Source Manager</span>
+          <span class="badge-ga">GA</span>
+          <span class="badge-warning">Quota</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-05-27</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        Secure Source Manager のクレデンシャルスキャン機能に、インスタンスごとの<span class="highlight">日次レートクォータ (1 GB/日)</span>が適用されるようになりました。
+        リポジトリへの push 時にコミット内容をスキャンし、SSH 秘密鍵、AWS/GCP クレデンシャル、OAuth シークレットなどの機密情報を検出する DLP 機能のリソース使用量が明確に制御されます。
+      </p>
+
+      <div class="note-box">
+        <strong>💡 ポイント:</strong> このクォータは Rate クォータのため、同日内にインスタンスを削除して同一 ID で再作成してもクォータ使用量はリセットされません。翌日まで待つか、異なるインスタンス ID で再作成する必要があります。
+      </div>
+    </div>
+
+    <!-- Statistics -->
+    <div class="stat-cards">
+      <div class="stat-card">
+        <div class="stat-value">1 GB</div>
+        <div class="stat-label">日次クォータ / インスタンス</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">5</div>
+        <div class="stat-label">インスタンス上限 / リージョン</div>
+      </div>
+      <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-green), #1B5E20);">
+        <div class="stat-value">$0</div>
+        <div class="stat-label">クォータ引き上げ追加料金</div>
+      </div>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-card">
+          <h3>❌ Before</h3>
+          <ul>
+            <li>スキャンリソース使用量に明確な上限なし</li>
+            <li>大量 push 集中時にパフォーマンス影響の可能性</li>
+            <li>リソース配分が不透明でキャパシティ管理困難</li>
+            <li>モノレポでスキャンリソース枯渇リスク</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h3>✅ After</h3>
+          <ul>
+            <li>1 GB/日/インスタンスの明確なクォータ設定</li>
+            <li>サービス全体の安定性・パフォーマンス確保</li>
+            <li>Cloud Quotas でクォータ引き上げリクエスト可能</li>
+            <li>リソース使用の予測可能性向上</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>クレデンシャルスキャンフローにおけるクォータ確認の位置付けを示します。push されたコードのサイズが日次クォータ内であればスキャンが実行され、超過した場合はエラーが返されます。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    A[開発者] -->|git push| B[Secure Source Manager インスタンス]
+    B --> C{DLP スキャン有効?}
+    C -->|はい| D[クレデンシャルスキャン処理]
+    D --> E{日次クォータ確認\n1 GB/日/インスタンス}
+    E -->|クォータ内| F[コードスキャン実行]
+    F --> G{機密情報検出?}
+    G -->|検出| H[Push 拒否]
+    G -->|未検出| I[Push 許可]
+    E -->|クォータ超過| J[スキャンエラー\nクォータ超過通知]
+    C -->|いいえ| I
+
+    K[Cloud Quotas] -->|クォータ管理| E
+    L[管理者] -->|クォータ引き上げリクエスト| K
+
+    style E fill:#ff9800,color:#fff
+    style J fill:#f44336,color:#fff
+    style H fill:#f44336,color:#fff
+    style I fill:#4caf50,color:#fff
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <h4>📏 日次レートクォータの適用</h4>
+          <p>インスタンスごとに1日あたりのスキャン対象コードサイズを制限。デフォルトは 1 GB/日/インスタンス。Cloud Quotas システムで管理・モニタリング可能。</p>
+        </div>
+        <div class="feature-card" style="border-left-color: var(--gc-orange);">
+          <h4>🔄 クォータリセットの動作</h4>
+          <p>日次リセットの Rate クォータ。インスタンス削除・再作成しても同日中はリセットされない。インスタンス ID に紐づいて追跡。</p>
+        </div>
+        <div class="feature-card" style="border-left-color: var(--gc-green);">
+          <h4>📈 クォータ引き上げの仕組み</h4>
+          <p>Cloud Console の「クォータとシステム制限」ページからリクエスト可能。カスタマーケアへの連絡による引き上げにも対応。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>📊 技術仕様</h2>
+      <h3 style="font-size: 18px; color: var(--gc-on-surface); margin-bottom: 12px;">クォータ一覧</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>デフォルト値</th>
+            <th>種類</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>プロジェクトあたりのインスタンス数 (リージョンごと)</td>
+            <td><strong>5</strong></td>
+            <td>クォータ</td>
+          </tr>
+          <tr>
+            <td>プロジェクトあたりの API リクエスト数/分</td>
+            <td><strong>1,200</strong></td>
+            <td>クォータ</td>
+          </tr>
+          <tr>
+            <td>クレデンシャルスキャンサイズ/日/インスタンス</td>
+            <td><strong>1 GB</strong></td>
+            <td>クォータ (Rate)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 style="font-size: 18px; color: var(--gc-on-surface); margin: 24px 0 12px 0;">使用制限 (システムリミット)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>値</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>インスタンスあたりのユーザー数</td>
+            <td><strong>500</strong></td>
+          </tr>
+          <tr>
+            <td>インスタンスあたりのストレージ</td>
+            <td><strong>100 GB</strong></td>
+          </tr>
+          <tr>
+            <td>インスタンスあたりの Git 操作数/分</td>
+            <td><strong>1,000</strong></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 style="font-size: 18px; color: var(--gc-on-surface); margin: 24px 0 12px 0;">DLP スキャン対象の機密情報カテゴリ</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>カテゴリ</th>
+            <th>検出対象例</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>🔑 暗号化キー</td>
+            <td>SSH 秘密鍵</td>
+          </tr>
+          <tr>
+            <td>☁️ AWS クレデンシャル</td>
+            <td>アクセスキー、シークレットキー</td>
+          </tr>
+          <tr>
+            <td>🔐 GCP クレデンシャル</td>
+            <td>サービスアカウントキー</td>
+          </tr>
+          <tr>
+            <td>🔓 OAuth クライアントシークレット</td>
+            <td>OAuth 認証用シークレット</td>
+          </tr>
+          <tr>
+            <td>🗝️ シークレットキー</td>
+            <td>認証・認可用の秘密鍵</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup Guide -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <div class="note-box">
+        <strong>前提条件:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>Secure Source Manager インスタンスが作成済みであること</li>
+          <li>リポジトリに対して DLP が有効化されていること</li>
+          <li><code>roles/securesourcemanager.repoAdmin</code> ロールが付与されていること</li>
+        </ul>
+      </div>
+
+      <h3 style="font-size: 18px; color: var(--gc-on-surface); margin: 20px 0 12px 0;">Step 1: 現在のクォータ使用量の確認</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># gcloud CLI でクォータ情報を確認
+gcloud services list --enabled --filter="securesourcemanager"
+
+# Cloud Console でクォータページを確認
+# https://console.cloud.google.com/iam-admin/quotas?service=securesourcemanager.googleapis.com</code></pre>
+
+      <h3 style="font-size: 18px; color: var(--gc-on-surface); margin: 20px 0 12px 0;">Step 2: DLP 機能の有効化</h3>
+      <div class="flow-diagram">
+        <div class="flow-step">🌐 SSM Web UI<br/>にアクセス</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">⚙️ リポジトリ<br/>Settings</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🔒 DLP トグル<br/>を On に設定</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">✅ Push 時に<br/>自動スキャン</div>
+      </div>
+
+      <h3 style="font-size: 18px; color: var(--gc-on-surface); margin: 20px 0 12px 0;">Step 3: クォータ引き上げのリクエスト (必要に応じて)</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># Cloud Console からクォータ引き上げをリクエスト
+# https://console.cloud.google.com/iam-admin/quotas
+
+# または Google Cloud サポートに連絡
+# https://cloud.google.com/support</code></pre>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div class="feature-grid">
+        <div class="feature-card" style="border-left-color: var(--gc-green);">
+          <h4>🏢 サービス安定性の向上</h4>
+          <p>クォータによりリソースの公平な配分が保証され、マルチテナント環境での安定した運用が実現。</p>
+        </div>
+        <div class="feature-card" style="border-left-color: var(--gc-green);">
+          <h4>💰 コスト予測可能性</h4>
+          <p>明確なクォータ制限により、リソース使用量とコストの予測が容易に。</p>
+        </div>
+        <div class="feature-card" style="border-left-color: var(--gc-green);">
+          <h4>📋 コンプライアンス対応</h4>
+          <p>スキャン実行状況をクォータとして可視化でき、セキュリティ監査に活用可能。</p>
+        </div>
+        <div class="feature-card" style="border-left-color: var(--gc-blue-600);">
+          <h4>📊 リソース管理の明確化</h4>
+          <p>Cloud Quotas システムとの統合により、使用量のモニタリングとアラート設定が可能。</p>
+        </div>
+        <div class="feature-card" style="border-left-color: var(--gc-blue-600);">
+          <h4>📐 キャパシティプランニング</h4>
+          <p>クォータ使用率に基づいた計画的なインスタンス追加やクォータ引き上げが可能。</p>
+        </div>
+        <div class="feature-card" style="border-left-color: var(--gc-blue-600);">
+          <h4>🤖 自動化対応</h4>
+          <p>Cloud Quotas API を通じたプログラマティックな管理が可能。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <div class="warning-box">
+        <strong>制限事項:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>デフォルト 1 GB/日/インスタンスは、大規模モノレポや多数リポジトリでは不足する可能性あり</li>
+          <li>同日中のインスタンス削除・再作成ではクォータはリセットされない</li>
+          <li>クォータ超過時、DLP によるセキュリティ保護が一時的に無効になる可能性</li>
+        </ul>
+      </div>
+
+      <div class="error-box">
+        <strong>注意すべき点:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>CI/CD パイプラインで大量 push 発生時はクォータ消費の事前見積もりが必要</li>
+          <li>クォータ引き上げリクエストには審査期間が必要 (余裕を持った計画が重要)</li>
+          <li>1コミットあたり 100 MB を超えないことが推奨</li>
+          <li>同一インスタンス上の複数リポジトリはクォータを共有</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+      <div class="usecase-card">
+        <h4>🏢 エンタープライズ開発チームのセキュリティ管理</h4>
+        <p><strong>シナリオ:</strong> 100名以上の開発者が複数リポジトリで日常的にコードを push する大規模組織。</p>
+        <p style="margin-top: 8px;"><strong>対応:</strong> クォータ使用率 80% でアラート通知、100% で管理者にエスカレーション。必要に応じてクォータ引き上げリクエストを自動化。</p>
+      </div>
+      <div class="usecase-card">
+        <h4>🔧 マイクロサービスアーキテクチャでの運用</h4>
+        <p><strong>シナリオ:</strong> 多数の小規模リポジトリ (各数 MB) を持つマイクロサービス環境。各サービスが独立してデプロイ。</p>
+        <p style="margin-top: 8px;"><strong>効果:</strong> 個々のリポジトリが小さいため、1 GB/日のクォータで十分にカバー可能。安定的なスキャン実行。</p>
+      </div>
+      <div class="usecase-card">
+        <h4>📦 モノレポ運用での大規模コード管理</h4>
+        <p><strong>シナリオ:</strong> 単一の大規模リポジトリ (数十 GB) にすべてのコードを集約するモノレポ方式。</p>
+        <p style="margin-top: 8px;"><strong>効果:</strong> クォータ引き上げリクエストにより適切なクォータを確保。差分スキャンにより実際にスキャンされるのは変更されたコードのみ。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💳 料金情報</h2>
+      <div class="success-box">
+        <strong>✅ クレデンシャルスキャン機能に追加料金は発生しません。</strong>インスタンスの基本料金に含まれます。
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>月額料金</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Secure Source Manager インスタンス (1台)</td>
+            <td><strong>$1,000/月</strong></td>
+          </tr>
+          <tr>
+            <td>クレデンシャルスキャン機能</td>
+            <td>インスタンス料金に含む</td>
+          </tr>
+          <tr>
+            <td>クォータ引き上げ</td>
+            <td>追加料金なし (審査あり)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Region Info -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <p>Secure Source Manager は、アメリカ、EMEA、APAC の複数のリージョンでデプロイ可能です。クレデンシャルスキャンのクォータはリージョンごとではなく、<span class="highlight">インスタンスごと</span>に適用されます。</p>
+      <div class="flow-diagram">
+        <div class="flow-step">🇺🇸 アメリカ</div>
+        <div class="flow-step">🇪🇺 EMEA</div>
+        <div class="flow-step">🌏 APAC</div>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス</h2>
+      <div class="related-services">
+        <div class="related-service">🏗️ Cloud Build</div>
+        <div class="related-service">🛡️ VPC Service Controls</div>
+        <div class="related-service">📊 Cloud Quotas</div>
+        <div class="related-service">🔐 Secret Manager</div>
+        <div class="related-service">🔌 Developer Connect</div>
+      </div>
+      <div style="margin-top: 16px;">
+        <div class="card">
+          <p style="margin: 0;"><strong>Cloud Build:</strong> Secure Source Manager と統合してセキュアな CI/CD パイプラインを構築。漏洩した機密情報がビルドに含まれるリスクを低減。</p>
+        </div>
+        <div class="card">
+          <p style="margin: 0;"><strong>Secret Manager:</strong> 検出されたクレデンシャルの安全な管理先として推奨。コード内に直接記述する代わりに Secret Manager を使用。</p>
+        </div>
+        <div class="card">
+          <p style="margin: 0;"><strong>Cloud Quotas:</strong> クォータの管理、モニタリング、引き上げリクエストを統一的に管理。API を通じた自動化にも対応。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>📎 出典・参考リンク:</strong></p>
+      <ul style="list-style: none; padding: 0; margin: 8px 0 0 0;">
+        <li style="margin-bottom: 4px;">- <a href="https://docs.google.com/release-notes#May_27_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li style="margin-bottom: 4px;">- <a href="https://docs.google.com/secure-source-manager/docs/quotas" target="_blank" rel="noopener noreferrer">Secure Source Manager クォータとリミット</a></li>
+        <li style="margin-bottom: 4px;">- <a href="https://docs.google.com/secure-source-manager/docs/enable-data-loss-prevention" target="_blank" rel="noopener noreferrer">DLP 機能の有効化ガイド</a></li>
+        <li style="margin-bottom: 4px;">- <a href="https://docs.google.com/secure-source-manager/docs/troubleshoot#credential-scanning-recreate" target="_blank" rel="noopener noreferrer">トラブルシューティング (クォータ関連)</a></li>
+        <li style="margin-bottom: 4px;">- <a href="https://cloud.google.com/products/secure-source-manager#pricing" target="_blank" rel="noopener noreferrer">料金ページ</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline);">Generated: 2026-05-29 | Source: Google Cloud Release Notes</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>
