@@ -5,6 +5,11 @@
 
 ## 2026 年
 
+- [2026-09-21 - Dataform: リモート MCP サーバーが開発ワークスペースでのパイプライン作成と Git 操作をサポート (GA)](2026/2026-09-21-dataform-remote-mcp-server-ga.md)
+- [2026-09-21 - BigQuery: 生成 AI 関数が gemini-3.8-flash Gemini モデルをサポート](2026/2026-09-21-bigquery-generative-ai-gemini-3-8-flash.md)
+- [2026-09-21 - Agent Platform Workbench: JupyterLab クライアントサイドログの Cloud Logging 転送](2026/2026-09-21-agent-platform-workbench-jupyterlab-client-log-forwarding.md)
+- [2026-09-21 - Apigee X: メンテナンスウィンドウ設定インスタンスの 1-18-0-apigee-4 への更新開始](2026/2026-09-21-apigee-x-maintenance-1-18-0-apigee-4.md)
+- [2026-09-21 - Access Context Manager: Workforce Identity Federation の拡張セッション長 (Preview)](2026/2026-09-21-access-context-manager-extended-session-length-wif.md)
 - [2026-09-18 - Cloud Load Balancing: バックエンド mTLS のマネージドワークロード ID 対応が GA](2026/2026-09-18-cloud-load-balancing-backend-mtls-managed-workload-identity.md)
 - [2026-09-18 - Model Armor: フィルタバージョン v4 リリースと v3 の Stable 昇格](2026/2026-09-18-model-armor-filter-version-v4.md)
 - [2026-09-18 - Gemini Enterprise: Microsoft 系コネクタの新規アクション対応 (Public Preview)](2026/2026-09-18-gemini-enterprise-microsoft-connector-actions.md)
