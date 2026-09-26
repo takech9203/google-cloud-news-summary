@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AlloyDB for PostgreSQL: Hot Standby (GA)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; }
+
+    h1 {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .badge,
+    .badge-ga {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); color: #FFFFFF; }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card.green-border { border-left-color: var(--gc-green); }
+    .card.yellow-border { border-left-color: var(--gc-yellow); }
+    .card.red-border { border-left-color: var(--gc-red); }
+    .card.purple-border { border-left-color: var(--gc-purple); }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Before/After */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h3 { color: var(--gc-red); margin-top: 0; }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box h3 { color: var(--gc-green); margin-top: 0; }
+
+    /* Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.green { background: linear-gradient(135deg, var(--gc-green), #1B8A3A); }
+    .stat-card.yellow { background: linear-gradient(135deg, #F9A825, #E65100); }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Feature cards grid */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    /* Usecase cards */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h3 {
+      color: var(--gc-blue-800);
+      margin-top: 0;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* Code blocks */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Mermaid */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Note/Warning boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Region grid */
+    .region-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .region-group {
+      background: var(--gc-surface);
+      border-radius: 8px;
+      padding: 16px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .region-group h4 {
+      margin: 0 0 8px 0;
+      color: var(--gc-blue-800);
+      font-size: 14px;
+    }
+
+    .region-group p {
+      margin: 0;
+      font-size: 13px;
+      color: var(--gc-on-surface-variant);
+      line-height: 1.5;
+    }
+
+    /* Pricing table */
+    .pricing-note {
+      font-size: 13px;
+      color: var(--gc-outline);
+      margin-top: 8px;
+    }
+
+    /* Related services */
+    .related-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .related-card {
+      background: var(--gc-surface);
+      border-radius: 8px;
+      padding: 16px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .related-card h4 {
+      margin: 0 0 4px 0;
+      font-size: 14px;
+      color: var(--gc-on-surface);
+    }
+
+    .related-card p {
+      margin: 0;
+      font-size: 13px;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a { word-break: break-all; }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 28px; }
+      .before-after { grid-template-columns: 1fr; }
+      .feature-grid { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .region-grid { grid-template-columns: 1fr; }
+      .related-grid { grid-template-columns: 1fr; }
+      .header { flex-direction: column; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>🗄️ AlloyDB for PostgreSQL: Hot Standby</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">AlloyDB for PostgreSQL</span>
+          <span class="badge badge-ga">GA</span>
+          <span class="badge">PostgreSQL 18</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-03-31</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>AlloyDB for PostgreSQL の <span class="highlight">Hot Standby</span> 機能が一般提供 (GA) となりました。この機能は、AlloyDB の高可用性 (HA) アーキテクチャを強化し、<strong>フェイルオーバー時間の大幅な短縮</strong>と、<strong>フェイルオーバー後の一貫したパフォーマンス</strong>を実現します。</p>
+      <p>Hot Standby の核心は、スタンバイノードのキャッシュを常に「ウォーム」な状態に保つことです。トランザクションをスタンバイノードに継続的にレプリケートし、キャッシュの同期を維持することで、フェイルオーバー発生時にスタンバイノードが即座にプライマリの役割を引き継げるようにします。</p>
+
+      <div class="note-box">
+        <strong>💡 ポイント:</strong> PostgreSQL 18 のすべての新規インスタンスで自動的に有効化されるため、追加の設定作業は不要です。
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card green">
+        <div class="stat-value">0</div>
+        <div class="stat-label">キャッシュウォームアップ時間<br>(事前同期済み)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">PostgreSQL 18</div>
+        <div class="stat-label">対応バージョン</div>
+      </div>
+      <div class="stat-card yellow">
+        <div class="stat-value">44+</div>
+        <div class="stat-label">利用可能リージョン</div>
+      </div>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>🔄 Before / After</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before (従来の HA)</h3>
+          <div class="icon-text">→ フェイルオーバー後、キャッシュがコールド状態でクエリパフォーマンスが大幅に低下</div>
+          <div class="icon-text">→ スタンバイノードはストレージレイヤーからデータを読み込む必要あり</div>
+          <div class="icon-text">→ キャッシュウォームアップに数分~数十分を要する</div>
+          <div class="icon-text">→ フェイルオーバー後のレスポンスタイムが不安定</div>
+        </div>
+        <div class="after-box">
+          <h3>✅ After (Hot Standby)</h3>
+          <div class="icon-text">→ スタンバイノードのキャッシュが常にウォーム状態で維持</div>
+          <div class="icon-text">→ トランザクションの継続的レプリケーションでキャッシュ同期</div>
+          <div class="icon-text">→ ウォームアップ時間が不要 (事前同期済み)</div>
+          <div class="icon-text">→ フェイルオーバー後も一貫したパフォーマンス</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>Hot Standby アーキテクチャでは、アクティブノードからスタンバイノードへトランザクションとキャッシュ状態が継続的にレプリケートされます。フェイルオーバー時にスタンバイノードがウォームキャッシュを持った状態で即座にアクティブノードの役割を引き継ぎます。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TB
+    subgraph Client["クライアントアプリケーション"]
+        APP[アプリケーション]
+    end
+
+    subgraph HA_Cluster["AlloyDB HA クラスタ"]
+        subgraph ZoneA["ゾーン A"]
+            ACTIVE[アクティブノード<br/>読み取り/書き込み]
+            CACHE_A[ウォームキャッシュ]
+            ACTIVE --- CACHE_A
+        end
+
+        subgraph ZoneB["ゾーン B"]
+            STANDBY[Hot Standby ノード<br/>キャッシュ同期済み]
+            CACHE_B[ウォームキャッシュ<br/>継続的に同期]
+            STANDBY --- CACHE_B
+        end
+
+        ACTIVE -->|トランザクション<br/>継続レプリケーション| STANDBY
+        ACTIVE -->|キャッシュ状態<br/>同期| STANDBY
+    end
+
+    subgraph Storage["分散ストレージレイヤー"]
+        STORE[(Google 分散<br/>ストレージエンジン)]
+    end
+
+    APP -->|クエリ| ACTIVE
+    ACTIVE <-->|データ永続化| STORE
+    STANDBY <-->|データ読み取り| STORE
+
+    subgraph Failover["フェイルオーバー時"]
+        direction LR
+        F1[障害検知] --> F2[自動切り替え] --> F3[即座にパフォーマンス発揮<br/>キャッシュがウォーム状態]
+    end
+
+    style ACTIVE fill:#34A853,color:#fff
+    style STANDBY fill:#4285F4,color:#fff
+    style CACHE_A fill:#34A853,color:#fff
+    style CACHE_B fill:#4285F4,color:#fff
+    style STORE fill:#FBBC04,color:#000
+    style F3 fill:#34A853,color:#fff
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h3>🔄 継続的トランザクションレプリケーション</h3>
+          <div class="icon-text">→ すべてのトランザクションがスタンバイノードにリアルタイムでレプリケート</div>
+          <div class="icon-text">→ スタンバイノードのデータ状態がアクティブノードとほぼ同一に維持</div>
+        </div>
+        <div class="card green-border">
+          <h3>🔥 キャッシュウォーミング</h3>
+          <div class="icon-text">→ スタンバイノードのメモリキャッシュがアクティブノードと同期</div>
+          <div class="icon-text">→ フェイルオーバー後にキャッシュのコールドスタートが発生しない</div>
+          <div class="icon-text">→ アクセスパターンに基づいて事前にウォームアップ</div>
+        </div>
+        <div class="card yellow-border">
+          <h3>⚡ 高速フェイルオーバー</h3>
+          <div class="icon-text">→ 従来の HA 構成と比較してフェイルオーバー時間が大幅に短縮</div>
+          <div class="icon-text">→ フェイルオーバー後の性能劣化期間が実質的に排除</div>
+          <div class="icon-text">→ アプリケーションへの影響が最小限</div>
+        </div>
+        <div class="card purple-border">
+          <h3>🔧 自動有効化</h3>
+          <div class="icon-text">→ PostgreSQL 18 のすべての新規インスタンスで自動有効化</div>
+          <div class="icon-text">→ ユーザー側での追加設定は不要</div>
+          <div class="icon-text">→ 既存の HA インスタンスとの互換性を維持</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specs -->
+    <div class="section">
+      <h2>📐 技術仕様</h2>
+      <h3>Hot Standby の技術要件</h3>
+      <table>
+        <tr><th>項目</th><th>詳細</th></tr>
+        <tr><td>対応 PostgreSQL バージョン</td><td>PostgreSQL 18</td></tr>
+        <tr><td>ステータス</td><td><span class="badge badge-ga">GA</span></td></tr>
+        <tr><td>有効化方式</td><td>新規インスタンスで自動有効化</td></tr>
+        <tr><td>インスタンスタイプ</td><td>HA プライマリインスタンス (リージョナル)</td></tr>
+        <tr><td>ノード構成</td><td>アクティブノード + スタンバイノード (異なるゾーン)</td></tr>
+        <tr><td>レプリケーション方式</td><td>継続的トランザクションレプリケーション + キャッシュ同期</td></tr>
+        <tr><td>フェイルオーバー</td><td>自動フェイルオーバー + 手動フェイルオーバー対応</td></tr>
+      </table>
+
+      <h3>従来の HA と Hot Standby の比較</h3>
+      <table>
+        <tr><th>項目</th><th>従来の HA</th><th>Hot Standby</th></tr>
+        <tr><td>フェイルオーバー方式</td><td>自動</td><td>自動</td></tr>
+        <tr><td>スタンバイノードのキャッシュ</td><td>コールド</td><td><strong>ウォーム (継続同期)</strong></td></tr>
+        <tr><td>フェイルオーバー後のパフォーマンス</td><td>一時的に低下</td><td><strong>一貫したパフォーマンス</strong></td></tr>
+        <tr><td>キャッシュウォームアップ時間</td><td>数分~数十分</td><td><strong>不要 (事前同期済み)</strong></td></tr>
+        <tr><td>トランザクションレプリケーション</td><td>ストレージレイヤー経由</td><td><strong>継続的にスタンバイへ直接レプリケート</strong></td></tr>
+        <tr><td>対応バージョン</td><td>PostgreSQL 14 以降</td><td>PostgreSQL 18</td></tr>
+      </table>
+
+      <h3>IAM ロール要件</h3>
+      <span class="code-label">JSON</span>
+      <pre><code class="language-json">{
+  "必要なロール": [
+    "roles/alloydb.admin (AlloyDB Admin)",
+    "roles/owner (Owner)",
+    "roles/editor (Editor)"
+  ]
+}</code></pre>
+    </div>
+
+    <!-- Setup -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <div class="note-box">
+        <strong>📋 前提条件:</strong>
+        <div class="icon-text">✓ Google Cloud プロジェクトで AlloyDB API が有効化されていること</div>
+        <div class="icon-text">✓ 適切な IAM ロール (<code>roles/alloydb.admin</code>、<code>roles/owner</code>、または <code>roles/editor</code>) が付与されていること</div>
+        <div class="icon-text">✓ VPC ネットワークとプライベートサービスアクセスが構成されていること</div>
+      </div>
+
+      <h3>Step 1: HA クラスタの作成</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud alloydb clusters create my-cluster \
+    --region=us-central1 \
+    --password=YOUR_PASSWORD \
+    --project=YOUR_PROJECT_ID</code></pre>
+
+      <h3>Step 2: HA プライマリインスタンスの作成</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud alloydb instances create my-primary \
+    --instance-type=PRIMARY \
+    --cpu-count=16 \
+    --availability-type=REGIONAL \
+    --region=us-central1 \
+    --cluster=my-cluster \
+    --project=YOUR_PROJECT_ID</code></pre>
+      <p><code>--availability-type=REGIONAL</code> を指定することで、異なるゾーンにアクティブノードとスタンバイノードが配置される HA 構成となります。PostgreSQL 18 では Hot Standby が自動的に有効化されます。</p>
+
+      <h3>Step 3: フェイルオーバーのテスト (障害注入)</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud alloydb instances inject-fault my-primary \
+    --fault-type=stop-vm \
+    --region=us-central1 \
+    --cluster=my-cluster \
+    --project=YOUR_PROJECT_ID</code></pre>
+
+      <h3>Step 4: 手動フェイルオーバー (任意)</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud alloydb instances failover my-primary \
+    --region=us-central1 \
+    --cluster=my-cluster \
+    --project=YOUR_PROJECT_ID</code></pre>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div class="feature-grid">
+        <div>
+          <h3>💼 ビジネス面</h3>
+          <div class="card green-border">
+            <div class="icon-text">✓ <strong>ダウンタイムの最小化</strong>: フェイルオーバー時間の短縮により、SLA 達成率を向上</div>
+          </div>
+          <div class="card green-border">
+            <div class="icon-text">✓ <strong>顧客体験の向上</strong>: フェイルオーバーの影響をエンドユーザーが感じない</div>
+          </div>
+          <div class="card green-border">
+            <div class="icon-text">✓ <strong>運用コスト削減</strong>: キャッシュウォームアップ待ちの運用対応が不要に</div>
+          </div>
+          <div class="card green-border">
+            <div class="icon-text">✓ <strong>信頼性の向上</strong>: ミッションクリティカルなワークロードに高い可用性を提供</div>
+          </div>
+        </div>
+        <div>
+          <h3>🔧 技術面</h3>
+          <div class="card">
+            <div class="icon-text">✓ <strong>コールドキャッシュ問題の解消</strong>: フェイルオーバー後のパフォーマンス低下なし</div>
+          </div>
+          <div class="card">
+            <div class="icon-text">✓ <strong>透過的な運用</strong>: 新規インスタンスでは自動有効化、追加設定不要</div>
+          </div>
+          <div class="card">
+            <div class="icon-text">✓ <strong>一貫したレイテンシ</strong>: フェイルオーバー前後でクエリレイテンシが一定</div>
+          </div>
+          <div class="card">
+            <div class="icon-text">✓ <strong>メンテナンス時の影響軽減</strong>: メンテナンスフェイルオーバーでもパフォーマンス維持</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <div class="warning-box">
+        <strong>制限事項:</strong>
+        <div class="icon-text">❌ PostgreSQL 18 のみで利用可能 (PostgreSQL 14/15/16 では利用不可)</div>
+        <div class="icon-text">❌ Basic インスタンス (シングルノード) ではスタンバイノードが存在しないため適用不可</div>
+        <div class="icon-text">❌ 無料トライアルクラスタでは高可用性自体がサポートされないため利用不可</div>
+      </div>
+      <div class="note-box">
+        <strong>考慮すべき点:</strong>
+        <div class="icon-text">💡 スタンバイノードへの継続的レプリケーションによるネットワーク帯域への影響を考慮する</div>
+        <div class="icon-text">💡 HA 構成では 2 ノード分のコンピュートリソースが課金 (Basic の約 2 倍のコスト)</div>
+        <div class="icon-text">💡 既存の PostgreSQL 14/15/16 から PostgreSQL 18 へのアップグレードパスを確認する</div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h3>💰 金融取引システム</h3>
+        <p><strong>シナリオ:</strong> 証券取引プラットフォームでは、取引時間中のダウンタイムが直接的な金銭的損失につながります。従来の HA 構成では、フェイルオーバー後のキャッシュウォームアップ中に取引の遅延が発生していました。</p>
+        <span class="code-label">Bash</span>
+        <pre><code class="language-bash"># 高可用性クラスタの作成 (金融システム向け)
+gcloud alloydb clusters create trading-cluster \
+    --region=asia-northeast1 \
+    --project=trading-project
+
+gcloud alloydb instances create trading-primary \
+    --instance-type=PRIMARY \
+    --cpu-count=64 \
+    --availability-type=REGIONAL \
+    --region=asia-northeast1 \
+    --cluster=trading-cluster \
+    --project=trading-project</code></pre>
+        <div class="success-box">
+          <strong>効果:</strong> Hot Standby により、フェイルオーバー後も取引クエリのレイテンシが一定に保たれ、取引の遅延や損失を防止できます。
+        </div>
+      </div>
+
+      <div class="usecase-card">
+        <h3>🛒 E コマースプラットフォーム</h3>
+        <p><strong>シナリオ:</strong> 大規模 EC サイトでは、セール期間中にデータベースの障害が発生した場合、フェイルオーバー後のパフォーマンス低下がカート離脱率の上昇に直結します。</p>
+        <div class="success-box">
+          <strong>効果:</strong> Hot Standby により、フェイルオーバーがユーザーに対してほぼ透過的になり、セール期間中の売上損失リスクを大幅に低減できます。
+        </div>
+      </div>
+
+      <div class="usecase-card">
+        <h3>🤖 リアルタイム AI アプリケーション</h3>
+        <p><strong>シナリオ:</strong> AlloyDB AI を活用したベクトル検索や ML モデル推論を行うリアルタイムアプリケーションでは、キャッシュのコールドスタートによるレイテンシ上昇が AI 推論のタイムアウトを引き起こす可能性があります。</p>
+        <div class="success-box">
+          <strong>効果:</strong> Hot Standby のウォームキャッシュにより、フェイルオーバー後もベクトル検索やカラムナーエンジンのキャッシュが維持され、AI アプリケーションの安定稼働が保証されます。
+        </div>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金情報</h2>
+      <p>Hot Standby 機能自体に<span class="highlight">追加料金は発生しません</span>。ただし、HA 構成では 2 ノード (アクティブ + スタンバイ) 分のコンピュートリソースが課金されます。</p>
+
+      <h3>料金例 (us-central1, 16 vCPU / 128 GB RAM)</h3>
+      <table>
+        <tr><th>構成</th><th>月額料金 (概算)</th></tr>
+        <tr><td>HA インスタンス (オンデマンド)</td><td><strong>約 $3,635/月</strong></td></tr>
+        <tr><td>HA インスタンス + 1年 CUD</td><td>約 $2,728/月 <span style="color: var(--gc-green); font-weight: 600;">(25% 割引)</span></td></tr>
+        <tr><td>HA インスタンス + 3年 CUD</td><td>約 $1,746/月 <span style="color: var(--gc-green); font-weight: 600;">(52% 割引)</span></td></tr>
+      </table>
+
+      <h3>主要な料金要素</h3>
+      <table>
+        <tr><th>項目</th><th>単価 (us-central1, オンデマンド)</th></tr>
+        <tr><td>vCPU</td><td>$0.06608/vCPU/時間</td></tr>
+        <tr><td>メモリ</td><td>$0.0112/GB/時間</td></tr>
+        <tr><td>ストレージ</td><td>使用量に応じた課金</td></tr>
+        <tr><td>ネットワークエグレス</td><td>エグレストラフィック量に応じた課金</td></tr>
+      </table>
+      <p class="pricing-note">※ HA 構成ではアクティブノードとスタンバイノードの両方に対してコンピュートリソースが課金されます。CUD (確約利用割引) により、1 年契約で 25%、3 年契約で 52% の割引が適用されます。</p>
+    </div>
+
+    <!-- Regions -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <p>Hot Standby は、AlloyDB for PostgreSQL が利用可能なすべてのリージョンで利用できます (PostgreSQL 18 インスタンスが前提)。</p>
+      <div class="region-grid">
+        <div class="region-group">
+          <h4>🌎 アメリカ大陸 (14 リージョン)</h4>
+          <p>us-central1, us-east1, us-east4, us-east5, us-south1, us-west1, us-west2, us-west3, us-west4, northamerica-northeast1, northamerica-northeast2, northamerica-south1, southamerica-east1, southamerica-west1</p>
+        </div>
+        <div class="region-group">
+          <h4>🌍 ヨーロッパ (13 リージョン)</h4>
+          <p>europe-central2, europe-southwest1, europe-north1, europe-north2, europe-west1~west4, europe-west6, europe-west8~west10, europe-west12</p>
+        </div>
+        <div class="region-group">
+          <h4>🌏 アジア太平洋 (12 リージョン)</h4>
+          <p>asia-east1, asia-east2, asia-northeast1 (Tokyo), asia-northeast2 (Osaka), asia-northeast3, asia-south1, asia-south2, asia-southeast1~southeast3, australia-southeast1, australia-southeast2</p>
+        </div>
+        <div class="region-group">
+          <h4>🌐 中東・アフリカ (4 リージョン)</h4>
+          <p>me-central1, me-central2, me-west1, africa-south1</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="related-grid">
+        <div class="related-card">
+          <h4>🌐 AlloyDB Cross-Region Replication</h4>
+          <p>リージョン間のディザスタリカバリ機能。Hot Standby はリージョン内 HA を、Cross-Region Replication はリージョン間 DR を提供する補完的な関係。</p>
+        </div>
+        <div class="related-card">
+          <h4>📊 AlloyDB Columnar Engine</h4>
+          <p>分析クエリを高速化するカラムナーエンジン。Hot Standby によりフェイルオーバー後もカラムナーキャッシュが維持される。</p>
+        </div>
+        <div class="related-card">
+          <h4>🤖 AlloyDB AI</h4>
+          <p>ベクトル検索と ML モデル統合。Hot Standby との組み合わせにより、AI ワークロードの高可用性が向上。</p>
+        </div>
+        <div class="related-card">
+          <h4>🗄️ Cloud SQL for PostgreSQL</h4>
+          <p>Google Cloud のもう一つの PostgreSQL マネージドサービス。より高度な HA が必要な場合は AlloyDB への移行を検討。</p>
+        </div>
+        <div class="related-card">
+          <h4>🔄 Database Migration Service</h4>
+          <p>Cloud SQL や他のデータベースから AlloyDB への移行をサポートするサービス。</p>
+        </div>
+        <div class="related-card">
+          <h4>🏠 AlloyDB Omni</h4>
+          <p>AlloyDB のダウンロード可能なエディション。オンプレミスやマルチクラウド環境で PostgreSQL ストリーミングレプリケーションによる HA を構成可能。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>📎 出典:</strong></p>
+      <ul style="margin: 4px 0; padding-left: 20px;">
+        <li><a href="https://cloud.google.com/alloydb/docs/release-notes#March_31_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート</a></li>
+        <li><a href="https://cloud.google.com/alloydb/docs/high-availability" target="_blank" rel="noopener noreferrer" class="gc-link">AlloyDB 高可用性の概要</a></li>
+        <li><a href="https://cloud.google.com/alloydb/docs/instance-primary-secondary-failover" target="_blank" rel="noopener noreferrer" class="gc-link">AlloyDB フェイルオーバーの管理</a></li>
+        <li><a href="https://cloud.google.com/alloydb/docs/test-high-availability" target="_blank" rel="noopener noreferrer" class="gc-link">AlloyDB HA テスト (障害注入)</a></li>
+        <li><a href="https://cloud.google.com/alloydb/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">AlloyDB 料金</a></li>
+        <li><a href="https://cloud.google.com/alloydb/docs/locations" target="_blank" rel="noopener noreferrer" class="gc-link">AlloyDB リージョン一覧</a></li>
+        <li><a href="https://cloud.google.com/alloydb/docs/overview" target="_blank" rel="noopener noreferrer" class="gc-link">AlloyDB 概要</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: #AAAAAA;">Generated on 2026-03-31 | AlloyDB for PostgreSQL Hot Standby GA Infographic</p>
+    </footer>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

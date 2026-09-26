@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Network Intelligence Center: Connectivity Tests - ソース IP タイプ選択、宛先ネットワーク自動検出、リバースパステスト</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; min-width: 280px; }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-teal { background: var(--gc-teal); }
+    .badge-feature { background: var(--gc-orange); }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-teal { border-left-color: var(--gc-teal); }
+    .card-green { border-left-color: var(--gc-green); }
+    .card-orange { border-left-color: var(--gc-orange); }
+    .card-purple { border-left-color: var(--gc-purple); }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .before-after-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h3, .after-box h3 { margin-top: 0; }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card-teal {
+      background: linear-gradient(135deg, var(--gc-teal), #00838F);
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .usecase-box {
+      background: var(--gc-teal-tint);
+      border-left: 4px solid var(--gc-teal);
+      padding: 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .usecase-box h3 { margin-top: 0; color: #00695C; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .related-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .related-card {
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 10px;
+      padding: 16px;
+      box-shadow: 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .related-card strong { color: var(--gc-on-surface); }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a { word-break: break-all; }
+
+    .feature-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      background: var(--gc-blue-600);
+      color: #FFFFFF;
+      border-radius: 50%;
+      font-size: 14px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .iam-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 12px 0;
+    }
+
+    .iam-card {
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 10px;
+      padding: 16px;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; }
+      .subtitle { text-align: left; margin-top: 8px; }
+      .before-after-grid { grid-template-columns: 1fr; }
+      .stat-grid { grid-template-columns: 1fr; }
+      .iam-grid { grid-template-columns: 1fr; }
+      .related-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>&#x1F310; Network Intelligence Center: Connectivity Tests</h1>
+        <p style="margin: 8px 0 12px; color: var(--gc-on-surface-variant); font-size: 18px;">
+          ソース IP タイプ選択、宛先ネットワーク自動検出、リバースパステスト
+        </p>
+        <span class="badge badge-teal">Network Intelligence Center</span>
+        <span class="badge badge-feature">Feature</span>
+      </div>
+      <div class="subtitle">&#x1F4C5; 2026-02-25</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>&#x1F4CB; 概要</h2>
+      <p>
+        Network Intelligence Center の <span class="highlight">Connectivity Tests</span> に、ネットワーク診断能力を大幅に強化する <strong>4 つの新機能</strong>が追加された。ソース IP アドレスタイプの明示的な選択、Network Management API への INTERNET ネットワークタイプの追加、ユーザー自身の IP アドレスをソースとして使用する機能、そして宛先 VPC ネットワークの自動検出機能である。
+      </p>
+      <p>
+        主な対象ユーザーはネットワーク管理者、セキュリティエンジニア、Solutions Architect であり、VPC ネットワークの接続性診断やトラブルシューティングを日常的に行うチームにとって有用なアップデートである。
+      </p>
+
+      <div class="stat-grid" style="margin-top: 20px;">
+        <div class="stat-card">
+          <div class="stat-value">4</div>
+          <div class="stat-label">新機能の追加</div>
+        </div>
+        <div class="stat-card stat-card-teal">
+          <div class="stat-value">4</div>
+          <div class="stat-label">ソース IP タイプ選択肢</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">&#x267B;&#xFE0F;</div>
+          <div class="stat-label">双方向テスト (--round-trip)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>&#x1F504; Before / After 比較</h2>
+      <div class="before-after-grid">
+        <div class="before-box">
+          <h3>&#x274C; アップデート前</h3>
+          <div class="icon-text"><span>&#x2022;</span><span>ソース IP アドレスのタイプ (内部/外部) を明示的に指定できず、テスト結果があいまいになる場合があった</span></div>
+          <div class="icon-text"><span>&#x2022;</span><span>API で適切なネットワークタイプを指定する方法が限定的 (GCP_NETWORK / NON_GCP_NETWORK のみ)</span></div>
+          <div class="icon-text"><span>&#x2022;</span><span>宛先 IP が Google Cloud 内でも、宛先 VPC ネットワークを手動選択する必要があった</span></div>
+          <div class="icon-text"><span>&#x2022;</span><span>自身のクライアント IP をソースとして直接指定する簡便な方法がなかった</span></div>
+        </div>
+        <div class="after-box">
+          <h3>&#x2705; アップデート後</h3>
+          <div class="icon-text"><span>&#x2022;</span><span>ソース IP タイプを 4 つのオプション (VPC 内部 IP、Google Cloud 外の内部 IP、外部 IP、自動検出) から選択可能に</span></div>
+          <div class="icon-text"><span>&#x2022;</span><span>INTERNET ネットワークタイプが追加され、外部 IP のテストがより正確に記述可能に</span></div>
+          <div class="icon-text"><span>&#x2022;</span><span>宛先 VPC ネットワークが自動検出され、手動選択が不要に</span></div>
+          <div class="icon-text"><span>&#x2022;</span><span>ユーザー自身の IP アドレスをワンクリックで選択可能に</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>&#x1F3D7;&#xFE0F; アーキテクチャ図</h2>
+      <p>Connectivity Tests の新しいソース IP タイプ選択オプションと宛先 VPC 自動検出の全体フローを示す。ユーザーは 4 つのソースタイプから選択でき、宛先が Google Cloud 内であれば VPC ネットワークが自動的に検出される。<code>--round-trip</code> フラグにより、宛先からソースへのリバースパステストも実行可能。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Source["ソースエンドポイント"]
+        S1["VPC 内部 IP\n(GCP_NETWORK)"]
+        S2["Google Cloud 外 内部 IP\n(NON_GCP_NETWORK)"]
+        S3["外部 IP\n(INTERNET)"]
+        S4["自動検出\n(UNSPECIFIED)"]
+        S5["ユーザー自身の IP"]
+    end
+
+    CT{{"Connectivity Tests\n構成分析 + ライブデータプレーン分析"}}
+
+    subgraph Destination["宛先エンドポイント"]
+        D1[("VM インスタンス")]
+        D2[("GKE クラスタ")]
+        D3[("ロードバランサ")]
+        D4[("Cloud SQL")]
+    end
+
+    AD["宛先 VPC\n自動検出"]
+
+    S1 --> CT
+    S2 --> CT
+    S3 --> CT
+    S4 --> CT
+    S5 --> S3
+
+    CT --> AD
+    AD --> D1
+    AD --> D2
+    AD --> D3
+    AD --> D4
+
+    CT -- "--round-trip" --> RT["リバースパス\nトレース"]
+    RT --> Source
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>&#x2B50; 主要機能</h2>
+
+      <div class="card">
+        <div style="display: flex; align-items: flex-start; gap: 12px;">
+          <span class="feature-number">1</span>
+          <div>
+            <h3 style="margin-top: 0;">ソース IP タイプの選択 (Source IP Type Selection)</h3>
+            <p>Google Cloud コンソールで Connectivity Test を作成する際に、ソース IP アドレスのタイプを明示的に選択可能。</p>
+            <p><strong>選択肢:</strong> VPC ネットワーク内の内部 IP / Google Cloud 外の内部 IP / 外部 IP / 自動ソース検出 (全パス評価)</p>
+            <p>API では <code>--source-network-type</code> パラメータで <code>gcp-network</code>、<code>non-gcp-network</code>、<code>internet</code>、<code>unspecified</code> を指定。</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card card-teal">
+        <div style="display: flex; align-items: flex-start; gap: 12px;">
+          <span class="feature-number" style="background: var(--gc-teal);">2</span>
+          <div>
+            <h3 style="margin-top: 0;">INTERNET ネットワークタイプの追加 (New Network Type)</h3>
+            <p>Network Management API に <span class="highlight">INTERNET</span> ネットワークタイプが新規追加。Google Cloud コンソールの「External IP address」ソース IP タイプに対応。</p>
+            <p>インターネット経由のルーティング可能な外部 IP アドレスや、グローバル Google API/サービス向けの IP アドレスに使用。</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card card-green">
+        <div style="display: flex; align-items: flex-start; gap: 12px;">
+          <span class="feature-number" style="background: var(--gc-green);">3</span>
+          <div>
+            <h3 style="margin-top: 0;">ユーザー自身の IP アドレスをソースとして使用</h3>
+            <p>Google Cloud コンソールから、テスト実行者自身のクライアント IP アドレスをソース IP として選択可能。</p>
+            <p>「自分の場所からこのリソースに到達できるか」というテストを簡単に実行できる。</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card card-orange">
+        <div style="display: flex; align-items: flex-start; gap: 12px;">
+          <span class="feature-number" style="background: var(--gc-orange);">4</span>
+          <div>
+            <h3 style="margin-top: 0;">宛先 VPC ネットワークの自動検出 (Automatic VPC Network Detection)</h3>
+            <p>Google Cloud 内の宛先 IP アドレスに対して、Connectivity Tests が宛先 VPC ネットワークを自動検出。</p>
+            <p>手動でのネットワーク選択が不要になり、テスト作成のワークフローが簡素化された。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>&#x2699;&#xFE0F; 技術仕様</h2>
+
+      <h3>ソースネットワークタイプ</h3>
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>ネットワークタイプ</th>
+              <th>コンソール表示</th>
+              <th>説明</th>
+              <th>使用例</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>gcp-network</code></td>
+              <td>VPC ネットワーク内の内部 IP</td>
+              <td>VPC 内部 IP 用。<code>--source-network</code> にネットワーク URI を指定</td>
+              <td>VM 間の内部通信テスト</td>
+            </tr>
+            <tr>
+              <td><code>non-gcp-network</code></td>
+              <td>Google Cloud 外の内部 IP</td>
+              <td>オンプレミスや他クラウドの内部 IP 用。Cloud VPN/Interconnect 経由</td>
+              <td>ハイブリッド接続テスト</td>
+            </tr>
+            <tr>
+              <td><code>internet</code> <span class="badge" style="font-size: 11px; padding: 2px 8px; vertical-align: middle;">NEW</span></td>
+              <td>外部 IP</td>
+              <td>インターネットルーティング可能な外部 IP やグローバル Google API 向け</td>
+              <td>外部からの到達性テスト</td>
+            </tr>
+            <tr>
+              <td><code>unspecified</code></td>
+              <td>自動ソース検出</td>
+              <td>全パスを評価。時間がかかり結果があいまいになる場合がある</td>
+              <td>広範な接続性調査</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>gcloud コマンドのオプション</h3>
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>オプション</th>
+              <th>説明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>--source-network-type</code></td>
+              <td>ソースネットワークタイプの指定 (<code>gcp-network</code>, <code>internet</code>, <code>non-gcp-network</code>, <code>unspecified</code>)</td>
+            </tr>
+            <tr>
+              <td><code>--source-ip-address</code></td>
+              <td>ソース IP アドレス</td>
+            </tr>
+            <tr>
+              <td><code>--source-network</code></td>
+              <td>ソース VPC ネットワークの URI</td>
+            </tr>
+            <tr>
+              <td><code>--destination-network</code></td>
+              <td>宛先 VPC ネットワークの URI (自動検出が利用可能に)</td>
+            </tr>
+            <tr>
+              <td><code>--round-trip</code></td>
+              <td>リバースパステスト (宛先からソースへの戻りトレース) を有効化</td>
+            </tr>
+            <tr>
+              <td><code>--bypass-firewall-checks</code></td>
+              <td>ファイアウォールチェックをスキップ</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>API リクエスト例</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">JSON</span>
+          <span class="code-title">INTERNET ネットワークタイプを使用したリクエスト</span>
+        </div>
+        <pre><code class="language-json">{
+  "source": {
+    "ipAddress": "203.0.113.10",
+    "networkType": "INTERNET"
+  },
+  "destination": {
+    "ipAddress": "10.128.0.2",
+    "port": "443"
+  },
+  "protocol": "TCP"
+}</code></pre>
+      </div>
+
+      <h3>&#x1F512; IAM ロールと権限</h3>
+      <div class="iam-grid">
+        <div class="iam-card">
+          <strong style="color: var(--gc-blue-600);">roles/networkmanagement.admin</strong>
+          <p style="margin: 8px 0 0; font-size: 14px;">Connectivity Tests の全操作 (作成、更新、削除、再実行)</p>
+        </div>
+        <div class="iam-card">
+          <strong style="color: var(--gc-blue-600);">roles/networkmanagement.viewer</strong>
+          <p style="margin: 8px 0 0; font-size: 14px;">テストの一覧表示、詳細表示のみ</p>
+        </div>
+      </div>
+      <p style="font-size: 14px; margin-top: 8px;">
+        <strong>主要な権限:</strong>
+        <code>networkmanagement.connectivitytests.create</code> (作成) /
+        <code>networkmanagement.connectivitytests.rerun</code> (再実行) /
+        <code>networkmanagement.connectivitytests.get</code> (取得)
+      </p>
+    </div>
+
+    <!-- Setup Guide -->
+    <div class="section">
+      <h2>&#x1F6E0;&#xFE0F; 設定方法</h2>
+
+      <div class="note-box">
+        <strong>&#x1F4A1; 前提条件:</strong>
+        <ul style="margin: 8px 0 0;">
+          <li>Google Cloud プロジェクトで Network Management API が有効化されていること</li>
+          <li><code>roles/networkmanagement.admin</code> または <code>networkmanagement.connectivitytests.create</code> 権限を持つ IAM ロールが付与されていること</li>
+          <li>テスト対象のネットワークリソースへの読み取り権限があること</li>
+        </ul>
+      </div>
+
+      <h3>ステップ 1: ソース IP タイプを指定したテストの作成</h3>
+      <p>INTERNET ネットワークタイプを使用して、外部 IP アドレスから VPC 内リソースへの接続性をテストする。宛先 VPC ネットワークは自動検出される。</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">外部 IP から内部リソースへのテスト</span>
+        </div>
+        <pre><code class="language-bash">gcloud network-management connectivity-tests create my-external-test \
+  --source-ip-address=203.0.113.10 \
+  --source-network-type=internet \
+  --destination-ip-address=10.128.0.2 \
+  --destination-port=443 \
+  --protocol=TCP</code></pre>
+      </div>
+
+      <h3>ステップ 2: リバースパステストの実行</h3>
+      <p><code>--round-trip</code> フラグを指定すると、パケットが宛先に到達した後、宛先からソースへの戻り経路も分析される。</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">双方向接続テスト</span>
+        </div>
+        <pre><code class="language-bash">gcloud network-management connectivity-tests create my-roundtrip-test \
+  --source-ip-address=10.128.0.2 \
+  --source-network=projects/my-project/global/networks/default \
+  --source-network-type=gcp-network \
+  --destination-ip-address=10.132.0.3 \
+  --destination-port=80 \
+  --protocol=TCP \
+  --round-trip</code></pre>
+      </div>
+
+      <h3>ステップ 3: テスト結果の確認</h3>
+      <p>テスト結果には構成分析の結果 (Reachable / Unreachable / Ambiguous) と、ライブデータプレーン分析の結果が含まれる。</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">テスト結果の取得</span>
+        </div>
+        <pre><code class="language-bash">gcloud network-management connectivity-tests describe my-external-test</code></pre>
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>&#x1F4C8; メリット</h2>
+      <div class="before-after-grid">
+        <div>
+          <h3>&#x1F4BC; ビジネス面</h3>
+          <div class="card card-green">
+            <div class="icon-text"><span>&#x2714;&#xFE0F;</span><span><strong>トラブルシューティング時間の短縮</strong>: ソース IP タイプの明示的な選択により、テスト意図が明確になり、より正確な診断結果が得られる</span></div>
+          </div>
+          <div class="card card-green">
+            <div class="icon-text"><span>&#x2714;&#xFE0F;</span><span><strong>運用効率の向上</strong>: 宛先 VPC ネットワークの自動検出により、テスト作成時の手動設定ステップが削減される</span></div>
+          </div>
+          <div class="card card-green">
+            <div class="icon-text"><span>&#x2714;&#xFE0F;</span><span><strong>セキュリティ検証の簡素化</strong>: 自身の IP アドレスからの到達性テストにより、ファイアウォールルールの有効性を簡単に確認可能</span></div>
+          </div>
+        </div>
+        <div>
+          <h3>&#x1F527; 技術面</h3>
+          <div class="card card-teal">
+            <div class="icon-text"><span>&#x2714;&#xFE0F;</span><span><strong>テスト精度の向上</strong>: INTERNET ネットワークタイプにより、外部トラフィックのシミュレーションがより正確になった</span></div>
+          </div>
+          <div class="card card-teal">
+            <div class="icon-text"><span>&#x2714;&#xFE0F;</span><span><strong>双方向の接続性検証</strong>: <code>--round-trip</code> フラグにより、往路と復路の両方のネットワーク構成を 1 回のテストで検証可能</span></div>
+          </div>
+          <div class="card card-teal">
+            <div class="icon-text"><span>&#x2714;&#xFE0F;</span><span><strong>API の表現力向上</strong>: NetworkType に INTERNET が追加され、API レベルでソースの種別をより正確に表現できるようになった</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>&#x26A0;&#xFE0F; デメリット・制約事項</h2>
+
+      <h3>制限事項</h3>
+      <div class="warning-box">
+        <div class="icon-text"><span>&#x26A0;&#xFE0F;</span><span>構成分析の反映には <strong>20 秒から 120 秒の遅延</strong>があり、ネットワーク構成変更直後のテストでは最新状態が反映されない場合がある</span></div>
+        <div class="icon-text"><span>&#x26A0;&#xFE0F;</span><span><code>unspecified</code> (自動ソース検出) を選択した場合、全パスの評価に時間がかかり、結果があいまいになる可能性がある</span></div>
+      </div>
+
+      <h3>考慮すべき点</h3>
+      <div class="note-box">
+        <div class="icon-text"><span>&#x1F4CC;</span><span>外部 IP アドレスからのテスト時には、ネットワークタイプとして <strong>INTERNET</strong> を明示的に指定することが推奨される</span></div>
+        <div class="icon-text"><span>&#x1F4CC;</span><span>複数のネットワークインターフェースを持つ VM をテストする場合、適切なネットワークインターフェースを指定する必要がある</span></div>
+        <div class="icon-text"><span>&#x1F4CC;</span><span>リバースパステスト (<code>--round-trip</code>) は、往路でパケットが正常に宛先に到達した場合にのみ復路のトレースが計算される</span></div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>&#x1F3AF; ユースケース</h2>
+
+      <div class="usecase-box">
+        <h3>&#x1F310; ユースケース 1: 外部からのサービス到達性テスト</h3>
+        <p><strong>シナリオ:</strong> インターネット上のクライアントから VPC 内の Web サーバーへの HTTPS アクセスが可能かどうかを検証したい。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">自分の IP アドレスからの到達性テスト</span>
+          </div>
+          <pre><code class="language-bash"># gcloud CLI での操作
+gcloud network-management connectivity-tests create web-access-test \
+  --source-ip-address=YOUR_CLIENT_IP \
+  --source-network-type=internet \
+  --destination-ip-address=10.128.0.5 \
+  --destination-port=443 \
+  --protocol=TCP</code></pre>
+        </div>
+        <p><strong>効果:</strong> ファイアウォールルール、ルーティング、NAT 設定など、パケットが通過する全構成要素の正当性を一括検証できる。</p>
+      </div>
+
+      <div class="usecase-box" style="border-left-color: var(--gc-blue-600);">
+        <h3 style="color: var(--gc-blue-800);">&#x1F517; ユースケース 2: ハイブリッド環境の双方向接続性検証</h3>
+        <p><strong>シナリオ:</strong> オンプレミス環境と Google Cloud VPC 間の接続を Cloud VPN 経由で確立した後、双方向の疎通を確認したい。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">ハイブリッド環境のラウンドトリップテスト</span>
+          </div>
+          <pre><code class="language-bash">gcloud network-management connectivity-tests create hybrid-roundtrip-test \
+  --source-ip-address=192.168.1.10 \
+  --source-network=projects/my-project/global/networks/default \
+  --source-network-type=non-gcp-network \
+  --destination-ip-address=10.128.0.3 \
+  --destination-port=22 \
+  --protocol=TCP \
+  --round-trip</code></pre>
+        </div>
+        <p><strong>効果:</strong> <code>--round-trip</code> フラグにより、Cloud VPN を介した往路・復路の両方のルーティングとファイアウォール設定を 1 回のテストで検証できる。非対称ルーティングの問題も検出可能。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>&#x1F4B0; 料金</h2>
+      <p>Network Intelligence Center の Connectivity Tests は、Network Management API の一部として提供されている。料金の詳細は公式ドキュメントを参照されたい。</p>
+      <p>&#x2192; <a href="https://cloud.google.com/network-intelligence-center/pricing" target="_blank" class="gc-link">Network Intelligence Center 料金ページ</a></p>
+    </div>
+
+    <!-- Available Regions -->
+    <div class="section">
+      <h2>&#x1F30D; 利用可能リージョン</h2>
+      <p>Connectivity Tests は<span class="highlight">グローバルリソース</span>として提供されており、Google Cloud の全リージョンの VPC ネットワークに対してテストを実行可能。</p>
+      <p style="font-size: 14px;">API エンドポイント: <code>networkmanagement.googleapis.com/v1/projects/PROJECT_ID/locations/global/connectivityTests</code></p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#x1F517; 関連サービス・機能</h2>
+      <div class="related-grid">
+        <div class="related-card">
+          <strong>&#x1F5FA;&#xFE0F; Network Topology</strong>
+          <p style="font-size: 14px; margin: 8px 0 0;">VPC ネットワークのトポロジを視覚化し、Connectivity Tests と組み合わせてネットワーク構成の理解を深める</p>
+        </div>
+        <div class="related-card">
+          <strong>&#x1F50D; Network Analyzer</strong>
+          <p style="font-size: 14px; margin: 8px 0 0;">VPC ネットワーク構成を自動監視し、誤構成や最適化の余地を検出。Connectivity Tests と併用して問題の根本原因を特定</p>
+        </div>
+        <div class="related-card">
+          <strong>&#x1F4CA; Flow Analyzer</strong>
+          <p style="font-size: 14px; margin: 8px 0 0;">VPC Flow Logs を分析し、実際のトラフィックフローを可視化。構成分析と実トラフィック分析を使い分け可能</p>
+        </div>
+        <div class="related-card">
+          <strong>&#x1F6E1;&#xFE0F; Firewall Insights</strong>
+          <p style="font-size: 14px; margin: 8px 0 0;">ファイアウォールルールの使用状況を分析し、過剰に許可的なルールを特定。Connectivity Tests のファイアウォール検証結果と合わせて活用</p>
+        </div>
+        <div class="related-card">
+          <strong>&#x1F4C8; Performance Dashboard</strong>
+          <p style="font-size: 14px; margin: 8px 0 0;">Google Cloud ネットワーク全体のパフォーマンス (パケットロス、レイテンシ) を可視化</p>
+        </div>
+        <div class="related-card">
+          <strong>&#x2601;&#xFE0F; Cloud Network Insights (Preview)</strong>
+          <p style="font-size: 14px; margin: 8px 0 0;">マルチクラウド・ハイブリッドネットワークのパフォーマンス監視と可視化ツール (2026 年 2 月 18 日に Preview 提供開始)</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- References -->
+    <div class="section">
+      <h2>&#x1F4DA; 参考リンク</h2>
+      <ul style="list-style: none; padding: 0;">
+        <li style="margin: 8px 0;">&#x1F4C4; <a href="https://cloud.google.com/release-notes#February_25_2026" target="_blank" class="gc-link">公式リリースノート</a></li>
+        <li style="margin: 8px 0;">&#x1F4D6; <a href="https://cloud.google.com/network-intelligence-center/docs/connectivity-tests/concepts/overview" target="_blank" class="gc-link">Connectivity Tests 概要ドキュメント</a></li>
+        <li style="margin: 8px 0;">&#x1F6E0;&#xFE0F; <a href="https://cloud.google.com/network-intelligence-center/docs/connectivity-tests/how-to/running-connectivity-tests" target="_blank" class="gc-link">Connectivity Tests の作成と実行</a></li>
+        <li style="margin: 8px 0;">&#x1F4CB; <a href="https://cloud.google.com/network-intelligence-center/docs/reference/networkmanagement/rest/v1/projects.locations.global.connectivityTests#networktype" target="_blank" class="gc-link">Network Management API - NetworkType リファレンス</a></li>
+        <li style="margin: 8px 0;">&#x2328;&#xFE0F; <a href="https://cloud.google.com/sdk/gcloud/reference/network-management/connectivity-tests/create" target="_blank" class="gc-link">gcloud network-management connectivity-tests create</a></li>
+        <li style="margin: 8px 0;">&#x1F512; <a href="https://cloud.google.com/network-intelligence-center/docs/connectivity-tests/concepts/access-control" target="_blank" class="gc-link">IAM ロールと権限</a></li>
+        <li style="margin: 8px 0;">&#x2601;&#xFE0F; <a href="https://cloud.google.com/network-intelligence-center/docs/overview" target="_blank" class="gc-link">Network Intelligence Center 概要</a></li>
+      </ul>
+    </div>
+
+    <!-- Summary -->
+    <div class="section" style="background: var(--gc-blue-tint); border: 2px solid var(--gc-blue-300);">
+      <h2>&#x1F4DD; まとめ</h2>
+      <p>
+        今回のアップデートにより、Connectivity Tests の<strong>ソース IP タイプ選択</strong>、<strong>INTERNET ネットワークタイプの追加</strong>、<strong>ユーザー IP のワンクリック選択</strong>、<strong>宛先 VPC 自動検出</strong>の 4 機能が利用可能になった。特に外部からの到達性テストやハイブリッド環境の診断がより直感的かつ正確に行えるようになっており、<code>--round-trip</code> フラグによる双方向検証と合わせて、ネットワークトラブルシューティングのワークフローが大幅に改善される。
+      </p>
+      <p>
+        ネットワーク管理者は、既存のテストを新しいソース IP タイプ指定に更新し、宛先 VPC 自動検出の恩恵を活用することを推奨する。
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>&#x1F3F7;&#xFE0F; タグ:</strong> #NetworkIntelligenceCenter #ConnectivityTests #VPC #NetworkDiagnostics #GoogleCloud #NetworkManagementAPI</p>
+      <p style="margin-top: 8px;">&#x1F4CE; 出典:</p>
+      <ul style="list-style: none; padding: 0; margin: 4px 0 0;">
+        <li><a href="https://cloud.google.com/release-notes#February_25_2026" target="_blank" class="gc-link" style="word-break: break-all;">https://cloud.google.com/release-notes#February_25_2026</a></li>
+        <li><a href="https://cloud.google.com/network-intelligence-center/docs/connectivity-tests/concepts/overview" target="_blank" class="gc-link" style="word-break: break-all;">https://cloud.google.com/network-intelligence-center/docs/connectivity-tests/concepts/overview</a></li>
+      </ul>
+    </footer>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

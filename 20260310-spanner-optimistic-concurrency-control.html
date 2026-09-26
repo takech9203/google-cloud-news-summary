@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spanner: 楽観的同時実行制御 (Optimistic Concurrency Control) モードのサポート</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    /* Google Cloud Light Theme Base Styles */
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    /* Flow diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Before/After comparison */
+    .comparison-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-red);
+    }
+
+    .before-card h3 {
+      color: var(--gc-red);
+      margin-top: 0;
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-green);
+    }
+
+    .after-card h3 {
+      color: var(--gc-green);
+      margin-top: 0;
+    }
+
+    .before-card ul, .after-card ul {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    .before-card li, .after-card li {
+      margin: 6px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    /* Feature cards grid */
+    .features-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .feature-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .feature-card .feature-title {
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      font-size: 16px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .feature-card p {
+      margin: 0;
+      font-size: 14px;
+      color: var(--gc-on-surface-variant);
+    }
+
+    /* Use case cards */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+    }
+
+    .usecase-card h3 {
+      color: var(--gc-blue-900);
+      margin-top: 0;
+    }
+
+    .usecase-card p {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    .usecase-card .scenario {
+      color: var(--gc-on-surface-variant);
+    }
+
+    .usecase-card .effect {
+      color: var(--gc-green);
+      font-weight: 500;
+    }
+
+    /* Stat cards */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    /* Table styles */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* Note/Warning boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Code blocks */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Mermaid container */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Merit/Demerit */
+    .merit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin: 16px 0;
+    }
+
+    .merit-section {
+      background: var(--gc-green-tint);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-green);
+    }
+
+    .merit-section h3 {
+      color: var(--gc-green);
+      margin-top: 0;
+    }
+
+    .demerit-section {
+      background: var(--gc-yellow-tint);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-yellow);
+    }
+
+    .demerit-section h3 {
+      color: #E8A100;
+      margin-top: 0;
+    }
+
+    .merit-section ul, .demerit-section ul {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    .merit-section li, .demerit-section li {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    /* Links list */
+    .links-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .links-list li {
+      margin: 8px 0;
+      font-size: 14px;
+    }
+
+    .links-list a {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .links-list a:hover {
+      text-decoration: underline;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .comparison-grid,
+      .features-grid,
+      .stats-grid,
+      .merit-grid {
+        grid-template-columns: 1fr;
+      }
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>🗄️ Spanner: 楽観的同時実行制御</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Spanner</span>
+          <span class="badge badge-ga">GA</span>
+          <span class="badge" style="background: var(--gc-yellow); color: #202124;">Database</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-03-10</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        Spanner に<span class="highlight">楽観的同時実行制御 (Optimistic Concurrency Control)</span> モードが追加されました。読み書きの競合が少ないトランザクションワークロードに最適化された同時実行制御方式で、トランザクション内の読み取りおよびクエリが<span class="highlight">ロックを取得せずに実行</span>されるため、同時実行性が大幅に向上します。
+      </p>
+      <p>
+        この機能は <span class="highlight">Repeatable Read 分離レベル</span>を通じて実装されており、スナップショット分離 (Snapshot Isolation) の技術を活用しています。トランザクション間の競合がまれであることを前提として動作し、<strong>コミット時にのみ競合チェック</strong>が行われます。
+      </p>
+
+      <div class="note-box">
+        <strong>💡 対象ユーザー:</strong> Spanner 上で高い同時実行性を持つアプリケーションを運用しており、特に読み書き競合が少ないワークロードを扱う開発者やデータベース管理者
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value">0</div>
+        <div class="stat-label">読み取り時のロック取得数</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">ALL</div>
+        <div class="stat-label">利用可能リージョン</div>
+      </div>
+      <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-green), #2E7D32);">
+        <div class="stat-value">+0 円</div>
+        <div class="stat-label">追加料金なし</div>
+      </div>
+    </div>
+
+    <!-- Before / After -->
+    <div class="section">
+      <h2>🔄 Before / After</h2>
+      <div class="comparison-grid">
+        <div class="before-card">
+          <h3>❌ Before: 悲観的ロック方式のみ</h3>
+          <ul>
+            <li>読み取り操作が<strong>共有ロック</strong>を取得するため、高い同時実行性でロック競合が発生</li>
+            <li>ロック競合によりトランザクションの<strong>アボート率が上昇</strong>し、リトライ増加</li>
+            <li>デッドロック検出 (wound-wait) により、新しいトランザクションがアボートされるケース</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h3>✅ After: 楽観的同時実行制御</h3>
+          <ul>
+            <li>読み取りが<strong>ロックなし</strong>で実行、同時実行性が大幅に向上</li>
+            <li>ロック競合によるアボートが減少し、<strong>スループット改善</strong></li>
+            <li>読み取りヘビーなワークロードで読み書き / 読み取り専用トランザクションの<strong>性能差が縮小</strong></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>📊 アーキテクチャ図: 悲観的 vs 楽観的同時実行制御</h2>
+      <p>悲観的同時実行制御では読み取り時にロックを取得するため待機が発生しますが、楽観的同時実行制御ではロックなしで読み取りが進み、コミット時にのみ競合を検証します。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+sequenceDiagram
+    participant C1 as クライアント 1
+    participant C2 as クライアント 2
+    participant S as Spanner
+
+    rect rgb(255, 230, 230)
+    Note over C1, S: 悲観的同時実行制御 (従来のデフォルト)
+    C1->>S: READ row X (共有ロック取得)
+    C2->>S: READ row X (共有ロック取得)
+    C1->>S: WRITE row X (排他ロックに昇格を要求)
+    Note over S: C2 の共有ロック解放を待機
+    C2->>S: COMMIT
+    S-->>C1: 排他ロック取得完了
+    C1->>S: COMMIT
+    end
+
+    rect rgb(230, 255, 230)
+    Note over C1, S: 楽観的同時実行制御 (今回の新機能)
+    C1->>S: READ row X (ロックなし / スナップショット読み取り)
+    C2->>S: READ row X (ロックなし / スナップショット読み取り)
+    C1->>S: WRITE row X
+    C2->>S: WRITE row Y
+    S-->>C1: コミット時に競合チェック - 成功
+    S-->>C2: コミット時に競合チェック - 成功
+    end
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-title">🔓 ロックフリーの読み取り</div>
+          <p>読み書きトランザクション内の読み取りおよびクエリがロックを取得せずに実行。トランザクション開始時点のデータベースの一貫したスナップショットに基づいて読み取りが行われる。</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-title">🔍 コミット時の競合検出</div>
+          <p>書き込みセットがトランザクションのスナップショットタイムスタンプからコミットタイムスタンプの間に変更されていないことを検証。競合検出時のみアボート。</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-title">🔗 Repeatable Read 統合</div>
+          <p>楽観的同時実行制御は Repeatable Read 分離レベルを指定することで有効化。クライアントレベルまたはトランザクションレベルで設定可能。</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-title">🛡️ 書き込みスキュー防止</div>
+          <p><code>SELECT...FOR UPDATE</code> 句または <code>lock_scanned_ranges=exclusive</code> ヒントを使用して、Repeatable Read で発生しうる書き込みスキュー異常を防止。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specification: Comparison Table -->
+    <div class="section">
+      <h2>📐 技術仕様: 分離レベルの比較</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>シリアライザブル (悲観的)</th>
+            <th>Repeatable Read (楽観的)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>デフォルト</td>
+            <td>はい</td>
+            <td>いいえ</td>
+          </tr>
+          <tr>
+            <td>読み取り時のロック</td>
+            <td>共有ロックを取得</td>
+            <td><strong>ロックなし</strong></td>
+          </tr>
+          <tr>
+            <td>書き込み時のロック</td>
+            <td>排他ロックに昇格</td>
+            <td>コミット時に排他ロック取得</td>
+          </tr>
+          <tr>
+            <td>一貫性保証</td>
+            <td>外部一貫性 (最強)</td>
+            <td>スナップショット分離</td>
+          </tr>
+          <tr>
+            <td>書き込みスキュー</td>
+            <td>発生しない</td>
+            <td>発生しうる (対策が必要)</td>
+          </tr>
+          <tr>
+            <td>ロック競合時の挙動</td>
+            <td>デッドロック検出 (wound-wait)</td>
+            <td>コミット時に競合検出</td>
+          </tr>
+          <tr>
+            <td>推奨ワークロード</td>
+            <td>高い一貫性が必要なケース</td>
+            <td><strong>読み書き競合が少ないケース</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup: Code Samples -->
+    <div class="section">
+      <h2>🔧 設定方法</h2>
+
+      <h3>前提条件</h3>
+      <ul>
+        <li>Google Cloud プロジェクトに Spanner インスタンスが作成済みであること</li>
+        <li>Spanner クライアントライブラリが最新バージョンに更新されていること</li>
+        <li>適切な IAM 権限 (<code>spanner.databases.beginOrRollbackReadWriteTransaction</code>) が付与されていること</li>
+      </ul>
+
+      <h3>ステップ 1: クライアントライブラリの更新</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">クライアントライブラリの更新</span>
+        </div>
+        <pre><code class="language-bash"># Python の場合
+pip install --upgrade google-cloud-spanner
+
+# Node.js の場合
+npm install @google-cloud/spanner@latest
+
+# Java の場合 (Maven)
+# pom.xml の google-cloud-spanner 依存関係を最新バージョンに更新</code></pre>
+      </div>
+
+      <h3>ステップ 2: トランザクションの分離レベルを設定</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Python</span>
+          <span class="code-title">クライアントレベル / トランザクションレベルの設定</span>
+        </div>
+        <pre><code class="language-python">from google.cloud import spanner
+from google.cloud.spanner_v1 import TransactionOptions
+
+# クライアントレベルでの設定
+spanner_client = spanner.Client(
+    default_transaction_options=DefaultTransactionOptions(
+        isolation_level=TransactionOptions.IsolationLevel.REPEATABLE_READ
+    )
+)
+
+instance = spanner_client.instance("your-instance-id")
+database = instance.database("your-database-id")
+
+# トランザクションレベルでの設定
+def update_data(transaction):
+    results = transaction.execute_sql(
+        "SELECT AlbumTitle FROM Albums WHERE SingerId = 1 AND AlbumId = 1"
+    )
+    for result in results:
+        print("Current Title: {}".format(*result))
+
+    row_ct = transaction.execute_update(
+        "UPDATE Albums SET AlbumTitle = 'New Title' "
+        "WHERE SingerId = 1 AND AlbumId = 1"
+    )
+    print("{} record(s) updated.".format(row_ct))
+
+database.run_in_transaction(
+    update_data,
+    isolation_level=TransactionOptions.IsolationLevel.REPEATABLE_READ
+)</code></pre>
+      </div>
+
+      <h3>ステップ 3: REST API での設定</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">JSON</span>
+          <span class="code-title">REST API トランザクションオプション</span>
+        </div>
+        <pre><code class="language-json">{
+  "options": {
+    "readWrite": {},
+    "isolationLevel": "REPEATABLE_READ"
+  }
+}</code></pre>
+      </div>
+
+      <h3>ステップ 4: 書き込みスキュー対策 (必要な場合)</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">SELECT...FOR UPDATE による書き込みスキュー防止</span>
+        </div>
+        <pre><code class="language-sql">-- 書き込みが読み取りに依存する場合は SELECT...FOR UPDATE を使用
+SELECT Balance FROM Accounts WHERE AccountId = @accountId FOR UPDATE;</code></pre>
+      </div>
+
+      <div class="warning-box">
+        <strong>⚠️ 注意:</strong> アプリケーションレベルの整合性制約に依存する書き込みがある場合は、<code>SELECT...FOR UPDATE</code> 句を使用して書き込みスキューを防止してください。
+      </div>
+    </div>
+
+    <!-- Flow: Setup steps -->
+    <div class="section">
+      <h2>🚀 導入フロー</h2>
+      <div class="flow-diagram">
+        <div class="flow-step">📦 ライブラリ<br/>更新</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">⚙️ 分離レベル<br/>設定</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">🛡️ スキュー<br/>対策実装</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">✅ 動作<br/>確認</div>
+      </div>
+      <p style="text-align: center; font-size: 14px; color: var(--gc-outline);">
+        分離レベルの指定のみで楽観的同時実行制御が有効化。既存のトランザクションロジックの変更は最小限。
+      </p>
+    </div>
+
+    <!-- Merits / Demerits -->
+    <div class="section">
+      <h2>⚖️ メリット / デメリット</h2>
+      <div class="merit-grid">
+        <div class="merit-section">
+          <h3>✅ メリット</h3>
+          <h4 style="font-size:14px; margin:12px 0 4px;">ビジネス面</h4>
+          <ul>
+            <li><strong>スループット向上</strong>: ロック競合削減で同時処理数が増加</li>
+            <li><strong>レイテンシ改善</strong>: ロック待機時間削減とリトライ減少でエンドユーザー体感速度が改善</li>
+          </ul>
+          <h4 style="font-size:14px; margin:12px 0 4px;">技術面</h4>
+          <ul>
+            <li><strong>ロックフリー読み取り</strong>: 読み取りヘビーなワークロードで同時実行性が大幅向上</li>
+            <li><strong>シンプルな設定</strong>: 分離レベル指定のみで有効化、既存コード変更は最小限</li>
+            <li><strong>柔軟なロック制御</strong>: SELECT...FOR UPDATE で楽観的と悲観的を組み合わせ可能</li>
+          </ul>
+        </div>
+        <div class="demerit-section">
+          <h3>⚠️ デメリット / 制約事項</h3>
+          <h4 style="font-size:14px; margin:12px 0 4px;">制限事項</h4>
+          <ul>
+            <li>書き込みスキュー異常が発生する可能性あり (対策が必要)</li>
+            <li>パーティション DML トランザクションでは Repeatable Read を設定不可</li>
+            <li>チェック制約を持つスキーマで制約検証の既知問題あり</li>
+            <li>同時スキーマ変更中に DML リトライエラーや DEADLINE_EXCEEDED の可能性</li>
+          </ul>
+          <h4 style="font-size:14px; margin:12px 0 4px;">考慮すべき点</h4>
+          <ul>
+            <li>シリアライザブルの外部一貫性保証が不要であることを確認の上で採用</li>
+            <li>クリティカルセクションでは SELECT...FOR UPDATE を強く推奨</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h3>🛒 ユースケース 1: 読み取りヘビーな在庫管理システム</h3>
+        <p class="scenario"><strong>シナリオ:</strong> EC サイトの在庫管理システムで、商品の在庫数を頻繁に参照しつつ、注文処理時にのみ在庫を更新するワークロード。多数の在庫参照リクエストと少数の在庫更新が同時に発生。</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Python</span>
+            <span class="code-title">在庫管理の実装例</span>
+          </div>
+          <pre><code class="language-python">def process_order(transaction):
+    # 在庫の読み取り (ロックなし)
+    results = transaction.execute_sql(
+        "SELECT stock_count FROM Products WHERE product_id = @pid",
+        params={"pid": product_id},
+        param_types={"pid": spanner.param_types.INT64}
+    )
+    stock = list(results)[0][0]
+
+    if stock > 0:
+        # 在庫の更新 (コミット時に競合チェック)
+        transaction.execute_update(
+            "UPDATE Products SET stock_count = stock_count - 1 "
+            "WHERE product_id = @pid",
+            params={"pid": product_id},
+            param_types={"pid": spanner.param_types.INT64}
+        )
+
+database.run_in_transaction(
+    process_order,
+    isolation_level=TransactionOptions.IsolationLevel.REPEATABLE_READ
+)</code></pre>
+        </div>
+        <p class="effect">✅ 効果: 大量の在庫参照リクエストがロックなしで処理されるため、注文処理中でも在庫参照のレイテンシが悪化しない。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>👤 ユースケース 2: ユーザープロファイルの更新</h3>
+        <p class="scenario"><strong>シナリオ:</strong> ソーシャルメディアアプリケーションで、ユーザーが自身のプロファイル情報を更新。各ユーザーが自身のプロファイルのみを更新するため、異なるユーザー間での書き込み競合はほぼ発生しない。</p>
+        <p class="effect">✅ 効果: ユーザー数の増加に伴い同時トランザクション数が増加しても、ロック競合によるパフォーマンス劣化を回避。読み取りと更新が同一トランザクション内で効率的に処理される。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>楽観的同時実行制御の使用に<span class="highlight">追加料金は発生しません</span>。通常の Spanner コンピュート容量とストレージの料金が適用されます。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>料金 (概算)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>コンピュート (ノードあたり / 時間)</td>
+            <td>エディションにより異なる</td>
+          </tr>
+          <tr>
+            <td>SSD ストレージ (GB / 月)</td>
+            <td>Spanner 標準料金</td>
+          </tr>
+          <tr>
+            <td>CUD 1 年コミットメント</td>
+            <td>20% 割引</td>
+          </tr>
+          <tr>
+            <td>CUD 3 年コミットメント</td>
+            <td>40% 割引</td>
+          </tr>
+        </tbody>
+      </table>
+      <p style="font-size: 14px;">詳細は <a href="https://cloud.google.com/spanner/pricing" target="_blank" class="gc-link">Spanner の料金ページ</a> を参照してください。</p>
+    </div>
+
+    <!-- Regions -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <p>楽観的同時実行制御は Spanner が利用可能な<strong>すべてのリージョンおよびマルチリージョン構成</strong>で使用できます。Standard、Enterprise、Enterprise Plus の全エディションで利用可能です。</p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス / 機能</h2>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-title">📄 Spanner 分離レベル</div>
+          <p>シリアライザブルと Repeatable Read の分離レベルの詳細な比較</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-title">🔄 Spanner トランザクション</div>
+          <p>読み書き、読み取り専用、パーティション DML の概要</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-title">📊 ロック統計</div>
+          <p>ロック競合の診断と調査に使用できるイントロスペクションツール</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-title">🔒 SELECT...FOR UPDATE</div>
+          <p>Repeatable Read での書き込みスキュー防止手法</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section" style="background: var(--gc-blue-tint); border: 2px solid var(--gc-blue-300);">
+      <h2>📝 まとめ</h2>
+      <p>
+        Spanner の楽観的同時実行制御モードは、読み書き競合が少ないワークロードにおいて<strong>スループットとレイテンシを大幅に改善</strong>する重要なアップデートです。既存のトランザクションコードを大きく変更することなく、<strong>分離レベルの指定のみで有効化</strong>できるため、導入のハードルが低い点も魅力的です。ただし、書き込みスキュー異常のリスクを理解した上で、必要に応じて <code>SELECT...FOR UPDATE</code> を使用するなど、アプリケーション設計を見直すことを推奨します。
+      </p>
+    </div>
+
+    <!-- References -->
+    <div class="section">
+      <h2>📎 参考リンク</h2>
+      <ul class="links-list">
+        <li>📄 <a href="https://cloud.google.com/spanner/docs/concurrency-control" target="_blank" rel="noopener noreferrer">ドキュメント: 同時実行制御</a></li>
+        <li>📄 <a href="https://cloud.google.com/spanner/docs/isolation-levels" target="_blank" rel="noopener noreferrer">ドキュメント: 分離レベル</a></li>
+        <li>📄 <a href="https://cloud.google.com/spanner/docs/use-repeatable-read-isolation" target="_blank" rel="noopener noreferrer">ドキュメント: Repeatable Read 分離の使用</a></li>
+        <li>📄 <a href="https://cloud.google.com/spanner/docs/use-select-for-update-repeatable-read" target="_blank" rel="noopener noreferrer">ドキュメント: SELECT...FOR UPDATE (Repeatable Read)</a></li>
+        <li>📄 <a href="https://cloud.google.com/spanner/docs/transactions" target="_blank" rel="noopener noreferrer">ドキュメント: Spanner トランザクション</a></li>
+        <li>📄 <a href="https://cloud.google.com/spanner/docs/introspection/lock-statistics" target="_blank" rel="noopener noreferrer">ドキュメント: ロック統計</a></li>
+        <li>💰 <a href="https://cloud.google.com/spanner/pricing" target="_blank" rel="noopener noreferrer">Spanner 料金ページ</a></li>
+      </ul>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>📎 出典: <a href="https://cloud.google.com/spanner/docs/release-notes" target="_blank" rel="noopener noreferrer" class="gc-link" style="word-break: break-all;">https://cloud.google.com/spanner/docs/release-notes</a></p>
+      <p style="margin-top: 8px;">
+        #Spanner #ConcurrencyControl #OptimisticLocking #Database #Transaction #Performance #IsolationLevel
+      </p>
+    </footer>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

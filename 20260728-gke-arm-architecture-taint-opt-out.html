@@ -1,0 +1,1433 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GKE: Arm ノードのデフォルト architecture taint のオプトアウトに対応</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      margin-bottom: 32px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.35;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px 0;
+    }
+
+    h4 {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--gc-blue-900);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .card.green { border-left-color: var(--gc-green); }
+    .card.yellow { border-left-color: var(--gc-yellow); }
+    .card.purple { border-left-color: var(--gc-purple); }
+    .card.teal { border-left-color: var(--gc-teal); }
+    .card.red { border-left-color: var(--gc-red); }
+    .card.orange { border-left-color: var(--gc-orange); }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+      flex-shrink: 0;
+      line-height: 1.4;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); color: #FFFFFF; }
+    .badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+    .badge-deprecated { background: var(--gc-red); color: #FFFFFF; }
+    .badge-neutral { background: var(--gc-outline); }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 720px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid rgba(234, 67, 53, 0.3);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid rgba(52, 168, 83, 0.3);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-box h3 { color: #C5221F; }
+    .after-box h3 { color: #188038; }
+
+    .before-box ul, .after-box ul {
+      margin: 8px 0 0 0;
+      padding-left: 20px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 8px 0;
+      font-size: 14px;
+    }
+
+    /* フロー図スタイル */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+      font-size: 14px;
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* チェックリストスタイル */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .warn-icon {
+      color: var(--gc-orange);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    /* コードブロック */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+      text-align: right;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.85em;
+      color: var(--gc-blue-900);
+      word-break: break-all;
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブルスタイル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+      vertical-align: top;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* 統計カード */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px 16px;
+      text-align: center;
+    }
+
+    .stat-card.orange {
+      background: linear-gradient(135deg, #FF8F00, #E65100);
+    }
+
+    .stat-card.green {
+      background: linear-gradient(135deg, #34A853, #188038);
+    }
+
+    .stat-card.purple {
+      background: linear-gradient(135deg, #A142F4, #7B1FA2);
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      line-height: 1.2;
+      word-break: break-word;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.92;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid rgba(26, 115, 232, 0.25);
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+    }
+
+    /* 2 カラムグリッド */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 720px) {
+      .two-col {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* ステップ */
+    .step {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .step-head {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .step-num {
+      background: var(--gc-blue-600);
+      color: #FFFFFF;
+      min-width: 32px;
+      height: 32px;
+      padding: 0 8px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+
+    .step-title {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .caption {
+      font-size: 13px;
+      color: var(--gc-outline);
+      text-align: center;
+      margin-top: -8px;
+    }
+
+    ul.tight { margin: 8px 0; padding-left: 20px; }
+    ul.tight li { margin: 6px 0; }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer ul {
+      padding-left: 20px;
+      margin: 8px 0;
+    }
+
+    footer li {
+      margin: 4px 0;
+    }
+
+    .tag-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 12px;
+    }
+
+    .tag {
+      background: var(--gc-surface-container);
+      color: var(--gc-on-surface-variant);
+      border-radius: 12px;
+      padding: 2px 10px;
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <h1>💠 GKE: Arm ノードのデフォルト architecture taint をオプトアウト可能に</h1>
+      <div class="subtitle">
+        <code>kubernetes.io/arch=arm64:NoSchedule</code> の自動付与を無効化。マルチアーキテクチャワークロードなら Pod 仕様の変更なしに N4A / C4A へスケジュールできる。
+      </div>
+      <div class="meta-row">
+        <span class="badge">Google Kubernetes Engine (GKE)</span>
+        <span class="badge badge-ga">GA (一般提供)</span>
+        <span class="badge badge-neutral">Standard / カスタム ComputeClass</span>
+        <span class="badge badge-neutral">Autopilot 対象外</span>
+        <span class="subtitle">📅 2026-07-28</span>
+      </div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📌 概要 — 何が変わったのか</h2>
+      <p>
+        GKE は従来、<strong>すべての Arm ノード</strong>に対して <code>kubernetes.io/arch=arm64:NoSchedule</code> という taint を自動的に付与していました。
+        これは x86 (amd64) 専用のコンテナイメージを持つワークロードが、誤って Arm ノードにスケジュールされてしまうことを防ぐための<strong>安全機構</strong>です。
+        この taint があるため、Arm ノードで Pod を動かすには対応する toleration が必要でした。
+      </p>
+      <p>
+        今回のアップデートにより、<span class="highlight">このデフォルト taint の付与そのものをオプトアウト (無効化) できる</span>ようになりました。
+        Standard ノードプールでは gcloud CLI の <code>--node-architecture-taint-behavior</code> フラグに <code>none</code> を指定し、
+        カスタム ComputeClass では <code>taintConfig.architectureTaintBehavior</code> フィールドに <code>NONE</code> を指定します。
+        これにより、明示的な Arm 用 toleration を持たないワークロードでも、<strong>N4A や C4A などの Arm ベースのマシンファミリー上にスケジュール</strong>できるようになります。
+      </p>
+      <p>
+        対象となるのは、<strong>マルチアーキテクチャ (multi-arch) イメージ</strong>を利用しているワークロードや、x86 ノードと Arm ノードが混在する <strong>mixed-mode クラスタ</strong>です。
+        マルチアーキテクチャイメージであれば x86 でも Arm でも動作するため、アーキテクチャごとに toleration や nodeSelector を書き分ける必要がなくなり、スケジューリング設定を大幅に簡素化できます。
+      </p>
+
+      <div class="error-box">
+        <strong>🚨 最重要な注意点</strong><br>
+        Arm 非対応イメージが混在するクラスタでこの設定を有効にすると、<strong>非対応ワークロードが Arm ノードに配置され起動に失敗するリスク</strong>があります
+        (<code>exec format error</code> や <code>CrashLoopBackOff</code>)。公式ドキュメントも「クラスタ内に Arm 非対応のワークロードが存在する場合はデフォルト taint を削除しないこと」を明示しています。<strong>適用範囲の見極めが重要です。</strong>
+      </div>
+
+      <h3>数字で見るポイント</h3>
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">1.35.0<br>-gke.2141000</div>
+          <div class="stat-label">Standard ノードプール向け<br>コントロールプレーン最小バージョン</div>
+        </div>
+        <div class="stat-card purple">
+          <div class="stat-value">1.36.2<br>-gke.1498000</div>
+          <div class="stat-label">カスタム ComputeClass 向け<br>クラスタ最小バージョン</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-value">再作成なし</div>
+          <div class="stat-label">Standard ノードプールでは<br>即座に taint を更新 (無停止)</div>
+        </div>
+        <div class="stat-card orange">
+          <div class="stat-value">3 シリーズ</div>
+          <div class="stat-label">対象 Arm マシンシリーズ<br>C4A / N4A / T2A</div>
+        </div>
+      </div>
+
+      <h3>Before / After</h3>
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ アップデート前の課題</h3>
+          <ul>
+            <li>Arm ノードには<strong>常に</strong> <code>kubernetes.io/arch=arm64:NoSchedule</code> taint が付与され、この動作を変更する手段がなかった</li>
+            <li>マルチアーキテクチャイメージを使っていて x86 / Arm のどちらでも動作するワークロードであっても、Arm ノードで動かすには <code>kubernetes.io/arch=arm64</code> に対する toleration を Pod 仕様に<strong>手動で追加</strong>する必要があった</li>
+            <li>x86 ノードと Arm ノードが混在するクラスタでは、Pod ごとに toleration・nodeSelector・node affinity を書き分ける必要があり、マニフェストが煩雑になっていた</li>
+            <li>既存の x86 前提のマニフェスト群を Arm ノードでも動かしたい場合、<strong>多数の Deployment を一括で書き換える</strong>作業が発生していた</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ アップデート後の改善</h3>
+          <ul>
+            <li><strong>Standard ノードプール単位</strong>、または<strong>カスタム ComputeClass 単位</strong>で、デフォルト taint の付与を <code>none</code> / <code>NONE</code> に設定してオプトアウトできる</li>
+            <li>toleration を持たないワークロードでも、そのまま <strong>N4A / C4A などの Arm ノードにスケジュール</strong>できる</li>
+            <li>マルチアーキテクチャワークロードや mixed-mode クラスタにおいて、<strong>Pod 仕様の変更なし</strong>に Arm ノードを活用できる</li>
+            <li>Standard ノードプールでは、GKE が<strong>ノードを再作成せずに即座に taint を更新</strong>するため、既存ノードの入れ替えによるダウンタイムが不要</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図 — スケジューリング挙動の変化</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph BEFORE["従来の動作: architectureTaintBehavior = ARM"]
+        P1["📦 Pod&lt;br/&gt;toleration なし"]
+        P2["📦 Pod&lt;br/&gt;arm64 toleration あり"]
+        N1["🖥️ x86 ノード&lt;br/&gt;amd64"]
+        A1["💠 Arm ノード N4A / C4A&lt;br/&gt;taint: kubernetes.io/arch=arm64:NoSchedule"]
+        P1 --&gt;|"✅ スケジュール可"| N1
+        P1 -.-&gt;|"❌ taint によりブロック"| A1
+        P2 --&gt;|"✅ スケジュール可"| A1
+    end
+
+    subgraph AFTER["今回の新動作: architectureTaintBehavior = NONE"]
+        P3["📦 Pod&lt;br/&gt;toleration なし"]
+        N2["🖥️ x86 ノード&lt;br/&gt;amd64"]
+        A2["💠 Arm ノード N4A / C4A&lt;br/&gt;taint なし"]
+        P3 --&gt;|"✅ スケジュール可"| N2
+        P3 --&gt;|"✅ スケジュール可 (新規)"| A2
+    end
+
+    BEFORE --&gt;|"--node-architecture-taint-behavior=none&lt;br/&gt;taintConfig.architectureTaintBehavior: NONE"| AFTER
+        </pre>
+      </div>
+      <p class="caption">デフォルト taint をオプトアウトすると、Arm 用 toleration を持たない Pod も Arm ノードのスケジューリング候補に含まれる</p>
+      <div class="warning-box">
+        <strong>⚠️ 前提条件:</strong> この挙動は<strong>マルチアーキテクチャイメージ前提</strong>であり、x86 専用イメージが混在する環境では起動失敗を招く点に注意が必要です。
+      </div>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚙️ 主要機能</h2>
+
+      <div class="card">
+        <h3>1️⃣ Standard ノードプールでの taint 動作の設定</h3>
+        <p><code>--node-architecture-taint-behavior</code></p>
+        <ul class="tight">
+          <li>gcloud CLI フラグ <code>--node-architecture-taint-behavior</code> で Arm ノードの taint 動作を指定する</li>
+          <li>指定可能な値は <code>none</code> (デフォルト taint を付与しない) と <code>arm</code> (従来どおり <code>kubernetes.io/arch=arm64:NoSchedule</code> を付与する。<strong>デフォルト</strong>)</li>
+          <li><strong>クラスタ作成時</strong> (デフォルトノードプール向け)、<strong>ノードプール作成時</strong>、<strong>ノードプール更新時</strong>のいずれでも設定できる</li>
+          <li>コントロールプレーンが GKE バージョン <span class="highlight">1.35.0-gke.2141000 以降</span>の Standard ノードプールでのみ設定可能</li>
+          <li>設定変更時、GKE は<strong>ノードを再作成せずに即座に taint を更新</strong>する</li>
+        </ul>
+      </div>
+
+      <div class="card purple">
+        <h3>2️⃣ カスタム ComputeClass での taint 動作の設定</h3>
+        <p><code>taintConfig.architectureTaintBehavior</code></p>
+        <ul class="tight">
+          <li>ComputeClass の <code>spec.nodePoolConfig.taintConfig.architectureTaintBehavior</code> フィールドで指定する</li>
+          <li>指定可能な値は <code>NONE</code> (デフォルト Arm taint を付与しない) と <code>ARM</code> (付与する。フィールド省略時のデフォルト)</li>
+          <li><code>NONE</code> を指定すると、その ComputeClass を選択したワークロードは、Arm 用 toleration を持っていなくても ComputeClass 用に作成された Arm ノードで実行できる</li>
+          <li>クラスタが GKE バージョン <span class="highlight">1.36.2-gke.1498000 以降</span>である必要がある</li>
+        </ul>
+      </div>
+
+      <div class="card teal">
+        <h3>3️⃣ Terraform からの設定</h3>
+        <p><code>taint_config</code></p>
+        <ul class="tight">
+          <li><code>google_container_node_pool</code> リソースの <code>node_config</code> 内に <code>taint_config</code> ブロックを追加し、<code>architecture_taint_behavior</code> に <code>NONE</code> または <code>ARM</code> を指定する</li>
+          <li>IaC による構成管理でも同機能を<strong>宣言的に適用</strong>できる</li>
+        </ul>
+      </div>
+
+      <div class="card red">
+        <h3>4️⃣ Autopilot の Arm ワークロードは対象外</h3>
+        <ul class="tight">
+          <li>この taint 動作の変更は <strong>Autopilot での Arm ワークロードのデプロイには適用されない</strong></li>
+          <li>組み込みの Autopilot Arm ComputeClass (<code>autopilot-arm</code> など) 用に GKE が作成するノードの taint 動作は変更できない</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3>設定値の対応表</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>設定インターフェース</th>
+              <th>フィールド / フラグ</th>
+              <th>値 (オプトアウト)</th>
+              <th>値 (デフォルト)</th>
+              <th>必要な GKE バージョン</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>gcloud CLI (Standard ノードプール)</td>
+              <td><code>--node-architecture-taint-behavior</code></td>
+              <td><code>none</code></td>
+              <td><code>arm</code></td>
+              <td>コントロールプレーン 1.35.0-gke.2141000 以降</td>
+            </tr>
+            <tr>
+              <td>カスタム ComputeClass</td>
+              <td><code>spec.nodePoolConfig.taintConfig.architectureTaintBehavior</code></td>
+              <td><code>NONE</code></td>
+              <td><code>ARM</code> (省略時)</td>
+              <td>1.36.2-gke.1498000 以降</td>
+            </tr>
+            <tr>
+              <td>Terraform</td>
+              <td><code>node_config.taint_config.architecture_taint_behavior</code></td>
+              <td><code>NONE</code></td>
+              <td><code>ARM</code></td>
+              <td>Standard ノードプールに準ずる</td>
+            </tr>
+            <tr>
+              <td>Autopilot 組み込み Arm ComputeClass</td>
+              <td>—</td>
+              <td>設定不可</td>
+              <td>—</td>
+              <td>—</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note-box">
+        <strong>💡 注意:</strong> gcloud CLI では<strong>小文字</strong> (<code>none</code> / <code>arm</code>)、ComputeClass および Terraform では<strong>大文字</strong> (<code>NONE</code> / <code>ARM</code>) を使用します。
+      </div>
+
+      <h3>対象となる taint</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>項目</th><th>詳細</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>taint キー</td><td><code>kubernetes.io/arch</code></td></tr>
+            <tr><td>taint 値</td><td><code>arm64</code></td></tr>
+            <tr><td>effect</td><td><code>NoSchedule</code></td></tr>
+            <tr><td>付与対象</td><td>すべての Arm ノード (Standard ノードプール、カスタム ComputeClass 用ノードを含む)</td></tr>
+            <tr><td>対応するノードラベル</td><td><code>kubernetes.io/arch: arm64</code> (Arm ノード) / <code>kubernetes.io/arch: amd64</code> (x86 ノード)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>対象の Arm マシンシリーズ</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>マシンシリーズ</th><th>概要</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>C4A</strong></td>
+              <td>Google Axion (Arm Neoverse V2 ベース) を採用した最初の Arm VM。最大 72 vCPU / 576 GB DDR5 メモリ。ベアメタルタイプ <code>c4a-standard-96-metal</code> / <code>c4a-highmem-96-metal</code> も提供</td>
+            </tr>
+            <tr>
+              <td><strong>N4A</strong></td>
+              <td>Google Axion (Arm Neoverse N3 ベース) の最新 VM。最大 64 vCPU / 512 GB DDR5 メモリ。価格性能バランス重視</td>
+            </tr>
+            <tr>
+              <td><strong>T2A (Tau T2A)</strong></td>
+              <td>Ampere Altra Arm プロセッサ搭載。水平スケールアウト型ワークロード向け</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>ComputeClass の設定例 (YAML)</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">YAML</span>
+          <span class="code-title">Arm 優先 + x86 フォールバックの ComputeClass</span>
+        </div>
+        <pre><code class="language-yaml">apiVersion: cloud.google.com/v1
+kind: ComputeClass
+metadata:
+  name: multi-arch-class
+spec:
+  nodePoolConfig:
+    # Arm ノードにデフォルトの kubernetes.io/arch=arm64:NoSchedule taint を付与しない
+    taintConfig:
+      architectureTaintBehavior: NONE
+  nodePoolAutoCreation:
+    enabled: true
+  priorities:
+    # 優先度 1: Arm (N4A) を優先
+    - machineFamily: n4a
+      minCores: 4
+    # 優先度 2: Arm (C4A) にフォールバック
+    - machineFamily: c4a
+      minCores: 4
+    # 優先度 3: x86 (N4) にフォールバック
+    - machineFamily: n4
+      minCores: 4
+  whenUnsatisfiable: ScaleUpAnyway</code></pre>
+      </div>
+      <p>この ComputeClass を選択した Pod は、toleration を明示しなくても N4A / C4A の Arm ノードにスケジュールされます。Arm の在庫がない場合は x86 (N4) にフォールバックします。</p>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🚀 設定方法</h2>
+
+      <h3>前提条件</h3>
+      <div class="two-col">
+        <div class="card">
+          <h4>📦 GKE バージョン</h4>
+          <ul class="tight">
+            <li>Standard ノードプール: コントロールプレーンが <strong>1.35.0-gke.2141000 以降</strong></li>
+            <li>カスタム ComputeClass: クラスタが <strong>1.36.2-gke.1498000 以降</strong></li>
+          </ul>
+        </div>
+        <div class="card green">
+          <h4>🐳 Arm 対応イメージ</h4>
+          <p>対象ワークロードのコンテナイメージが Arm (arm64) に対応しているか、マルチアーキテクチャイメージであること</p>
+        </div>
+        <div class="card teal">
+          <h4>🌍 Arm VM が利用可能なロケーション</h4>
+          <p>クラスタが Arm VM (N4A / C4A / T2A) を提供するリージョン・ゾーンにあること</p>
+        </div>
+        <div class="card red">
+          <h4>🔍 クラスタ内の全ワークロードの互換性確認</h4>
+          <p>クラスタ内に Arm 非対応のワークロードが存在しないことを確認すること (存在する場合はデフォルト taint を外さない)</p>
+        </div>
+      </div>
+
+      <h3>実装フロー</h3>
+      <div class="flow-diagram">
+        <div class="flow-step">🔍 STEP 1<br>Arm 互換性確認</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">⚙️ STEP 2<br>taint オプトアウト設定</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">✅ STEP 3<br>taint 解除の確認</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🚢 STEP 4<br>ワークロード検証</div>
+      </div>
+
+      <div class="step">
+        <div class="step-head">
+          <span class="step-num">1</span>
+          <span class="step-title">既存ワークロードの Arm 互換性を確認する</span>
+        </div>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">イメージの棚卸しと manifest 確認</span>
+          </div>
+          <pre><code class="language-bash"># クラスタ内の Deployment で使用しているイメージを一覧化する
+kubectl get deployments --all-namespaces \
+  -o custom-columns='NS:.metadata.namespace,NAME:.metadata.name,IMAGE:.spec.template.spec.containers[*].image'
+
+# 各イメージが arm64 に対応しているか manifest を確認する
+docker manifest inspect IMAGE_NAME | grep -A2 architecture</code></pre>
+        </div>
+        <p>マルチアーキテクチャイメージであれば <code>linux/amd64</code> と <code>linux/arm64</code> の両方のエントリが含まれます。1 つでも Arm 非対応のイメージがある場合、そのワークロードが Arm ノードにスケジュールされる可能性があるため、デフォルト taint を維持するか、別途 nodeSelector / node affinity で x86 に固定してください。</p>
+      </div>
+
+      <div class="step">
+        <div class="step-head">
+          <span class="step-num">2-A</span>
+          <span class="step-title">Standard ノードプールでデフォルト taint をオプトアウトする</span>
+        </div>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">gcloud container node-pools create / update</span>
+          </div>
+          <pre><code class="language-bash"># 新規に Arm ノードプールを作成し、デフォルト taint を付与しない
+gcloud container node-pools create arm-pool \
+  --cluster=my-cluster \
+  --location=us-central1 \
+  --machine-type=n4a-standard-4 \
+  --node-architecture-taint-behavior=none
+
+# 既存の Arm ノードプールの taint 動作を変更する (ノード再作成は不要)
+gcloud container node-pools update arm-pool \
+  --cluster=my-cluster \
+  --location=us-central1 \
+  --node-architecture-taint-behavior=none
+
+# 従来のデフォルト動作に戻す
+gcloud container node-pools update arm-pool \
+  --cluster=my-cluster \
+  --location=us-central1 \
+  --node-architecture-taint-behavior=arm</code></pre>
+        </div>
+        <p>クラスタ作成時にデフォルトノードプールへ適用する場合は、<code>gcloud container clusters create</code> に同じフラグを指定します。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">クラスタ作成時に適用</span>
+          </div>
+          <pre><code class="language-bash">gcloud container clusters create my-arm-cluster \
+  --location=us-central1 \
+  --machine-type=c4a-standard-4 \
+  --node-architecture-taint-behavior=none</code></pre>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-head">
+          <span class="step-num">2-B</span>
+          <span class="step-title">カスタム ComputeClass でデフォルト taint をオプトアウトする</span>
+        </div>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">ComputeClass の適用</span>
+          </div>
+          <pre><code class="language-bash">cat &lt;&lt;'EOF' | kubectl apply -f -
+apiVersion: cloud.google.com/v1
+kind: ComputeClass
+metadata:
+  name: multi-arch-class
+spec:
+  nodePoolConfig:
+    taintConfig:
+      architectureTaintBehavior: NONE
+  nodePoolAutoCreation:
+    enabled: true
+  priorities:
+    - machineFamily: n4a
+      minCores: 4
+    - machineFamily: c4a
+      minCores: 4
+  whenUnsatisfiable: ScaleUpAnyway
+EOF</code></pre>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-head">
+          <span class="step-num">3</span>
+          <span class="step-title">taint が外れていることを確認する</span>
+        </div>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">ノードの taint 状態確認</span>
+          </div>
+          <pre><code class="language-bash"># ノードの taint 状態を確認する
+kubectl get nodes -l kubernetes.io/arch=arm64 \
+  -o custom-columns='NAME:.metadata.name,TAINTS:.spec.taints'
+
+# 個別ノードの詳細確認
+kubectl describe node NODE_NAME | grep -i taints</code></pre>
+        </div>
+        <p><code>kubernetes.io/arch=arm64:NoSchedule</code> が表示されなければオプトアウトが反映されています。</p>
+      </div>
+
+      <div class="step">
+        <div class="step-head">
+          <span class="step-num">4</span>
+          <span class="step-title">toleration なしのワークロードをデプロイして検証する</span>
+        </div>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">YAML</span>
+            <span class="code-title">toleration を書かない Deployment</span>
+          </div>
+          <pre><code class="language-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: multi-arch-app
+spec:
+  replicas: 6
+  selector:
+    matchLabels:
+      app: multi-arch-app
+  template:
+    metadata:
+      labels:
+        app: multi-arch-app
+    spec:
+      # ComputeClass を使う場合のみ以下の nodeSelector を指定する
+      nodeSelector:
+        cloud.google.com/compute-class: multi-arch-class
+      containers:
+        - name: app
+          # マルチアーキテクチャ (linux/amd64 + linux/arm64) イメージであること
+          image: REGION-docker.pkg.dev/PROJECT_ID/REPO/multi-arch-app:v1
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi</code></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">配置されたノードのアーキテクチャ確認</span>
+          </div>
+          <pre><code class="language-bash"># Pod がどのアーキテクチャのノードに配置されたか確認する
+kubectl get pods -l app=multi-arch-app -o wide
+kubectl get nodes -o custom-columns='NAME:.metadata.name,ARCH:.status.nodeInfo.architecture'</code></pre>
+        </div>
+        <div class="success-box">
+          <strong>✅ 検証成功の判定:</strong> toleration を一切書いていない Pod が <code>arm64</code> ノードに配置されていれば、設定は期待どおり機能しています。
+        </div>
+      </div>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>💡 メリット</h2>
+
+      <h3>💼 ビジネス面</h3>
+      <div class="card green">
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>Arm 移行の障壁低減</strong>: 既存マニフェストの大規模な書き換えなしに Arm ノードを導入できるため、Arm 移行の初期コストと工数を削減できる</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>価格性能の改善余地</strong>: Arm アーキテクチャは電力効率に優れ、Arm 互換ワークロードでは価格性能の最適化が期待できる。既存ワークロードを Arm ノードへ流し込みやすくなることで、この効果を得やすくなる</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>運用負荷の削減</strong>: アーキテクチャごとのスケジューリング設定の書き分けが不要になり、マニフェスト管理と運用の複雑さが下がる</span></div>
+      </div>
+
+      <h3>🔧 技術面</h3>
+      <div class="card">
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>無停止での設定変更</strong>: Standard ノードプールでは、taint 動作の変更時に GKE がノードを再作成せず即座に taint を更新するため、ノード入れ替えに伴う Pod の退避が発生しない</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>段階的な適用</strong>: ノードプール単位・ComputeClass 単位で設定できるため、クラスタ全体を一括で切り替えるのではなく、検証済みワークロードの範囲から段階的に適用できる</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>キャパシティの柔軟性向上</strong>: ComputeClass の優先度リストと組み合わせることで、Arm を優先しつつ在庫状況に応じて x86 にフォールバックする構成を、Pod 側の設定変更なしに実現できる</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>宣言的管理との親和性</strong>: gcloud CLI、ComputeClass (Kubernetes CRD)、Terraform のいずれからも設定でき、既存の IaC / GitOps ワークフローに組み込める</span></div>
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>🚧 制限事項</h3>
+      <div class="card red">
+        <div class="check-item"><span class="cross-icon">✗</span><span><strong>Standard ノードプールとカスタム ComputeClass のみ対応</strong>: Autopilot での Arm ワークロードのデプロイには適用されない。組み込みの Autopilot Arm ComputeClass 用に作成されるノードの taint 動作は変更できない</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span><strong>GKE バージョン要件</strong>: Standard ノードプールはコントロールプレーン 1.35.0-gke.2141000 以降、カスタム ComputeClass はクラスタ 1.36.2-gke.1498000 以降が必要</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span><strong>ComputeClass のフィールド配置制約</strong>: ComputeClass では <code>nodePoolConfig</code> 配下の設定であり、優先度 (priority) 単位ではなく <strong>ComputeClass 全体</strong>に適用される</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span><strong>Arm マシンシリーズ側の機能制約は解消されない</strong>: C4A / N4A では Confidential GKE Nodes、コンパクト配置、SMT、Persistent Disk (Hyperdisk を使用)、ネストされた仮想化、GPU が非対応。N4A ではローカル SSD と 1 GB hugepages も非対応</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span><strong>Config Connector / Config Controller</strong>: Arm ノードプールを持つクラスタではサポートされない</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span><strong>リージョン制約</strong>: Arm ノードは Arm アーキテクチャをサポートする Google Cloud のロケーションでのみ利用可能</span></div>
+      </div>
+
+      <h3>🤔 考慮すべき点</h3>
+
+      <div class="error-box">
+        <strong>🚨 マルチアーキテクチャ非対応イメージのスケジューリングリスク (最重要)</strong><br>
+        デフォルト taint は x86 専用イメージが Arm ノードに配置されるのを防ぐ安全機構です。これを <code>none</code> / <code>NONE</code> にすると、Arm 非対応のワークロードが Arm ノードにスケジュールされ、<code>exec format error</code> などでコンテナが起動に失敗する、あるいは <code>CrashLoopBackOff</code> に陥る可能性があります。公式ドキュメントも「クラスタ内に Arm 非対応のワークロードが存在する場合はデフォルト taint を削除しないこと」を明示しています。
+      </div>
+
+      <div class="warning-box">
+        <strong>📋 クラスタ全体のイメージ棚卸しが前提</strong><br>
+        自作アプリケーションだけでなく、Helm チャートで導入したミドルウェア、監視エージェント、サイドカー、DaemonSet、Init コンテナなど、<strong>クラスタで動作するすべてのイメージ</strong>について arm64 対応を確認する必要があります。
+      </div>
+
+      <div class="warning-box">
+        <strong>🔓 サードパーティイメージの追加リスク</strong><br>
+        運用開始後に Arm 非対応のサードパーティイメージを追加すると、想定外に Arm ノードへ配置されて障害となり得ます。<strong>Gatekeeper / Policy Controller</strong> などのポリシー制御や、<strong>CI でのイメージ manifest 検証</strong>を併用する運用設計が望まれます。
+      </div>
+
+      <div class="note-box">
+        <strong>🔁 代替手段としての明示的な制御</strong><br>
+        taint を外す代わりに、マルチアーキテクチャ対応 Pod 側へ <code>kubernetes.io/arch=arm64</code> の toleration を付与する、あるいは node affinity で <code>arm64</code> と <code>amd64</code> の両方を許可する従来の方法も引き続き有効です。<strong>クラスタ内に非対応ワークロードが混在する場合はこちらが安全です。</strong>
+      </div>
+
+      <div class="note-box">
+        <strong>🪜 段階的な検証の推奨</strong><br>
+        まず専用のノードプールまたは ComputeClass を作成して検証済みワークロードのみ流し、問題がないことを確認してから適用範囲を広げる進め方が安全です。
+      </div>
+
+      <div class="note-box">
+        <strong>↩️ ロールバック手段の確保</strong><br>
+        <code>--node-architecture-taint-behavior=arm</code> (または ComputeClass の <code>ARM</code>) に戻すことで従来動作に復帰できます。Standard ノードプールでは即座に taint が再付与されますが、すでに Arm ノード上で稼働している非対応 Pod の扱いは別途対応が必要です。
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>1️⃣ マルチアーキテクチャイメージによる Arm 段階導入</h3>
+        <p><strong>📖 シナリオ:</strong> すべてのアプリケーションイメージを <code>docker buildx</code> でマルチアーキテクチャ (linux/amd64 + linux/arm64) としてビルド済みの環境で、コスト最適化のために Arm ノードを導入したい。ただし数十の Deployment すべてに toleration を追記する変更は避けたい。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">実装例</span>
+          </div>
+          <pre><code class="language-bash"># Arm ノードプールを追加し、デフォルト taint を付与しない
+gcloud container node-pools create n4a-pool \
+  --cluster=prod-cluster \
+  --location=us-central1 \
+  --machine-type=n4a-standard-8 \
+  --num-nodes=3 \
+  --node-architecture-taint-behavior=none</code></pre>
+        </div>
+        <p><strong>✨ 効果:</strong> 既存の Deployment マニフェストを<strong>1 行も変更せずに</strong>、Pod が x86 ノードと Arm ノードの両方に分散配置されるようになる。Arm の価格性能メリットを、アプリケーション側の変更工数ゼロで享受できる。</p>
+      </div>
+
+      <div class="usecase">
+        <h3>2️⃣ ComputeClass による Arm 優先・x86 フォールバック構成</h3>
+        <p><strong>📖 シナリオ:</strong> バッチ処理ワークロードを可能な限り Arm ノード (N4A) で実行してコストを抑えたいが、Arm の在庫が確保できないゾーンでは x86 ノードで実行を継続したい。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">YAML</span>
+            <span class="code-title">ComputeClass: Spot VM + Arm 優先</span>
+          </div>
+          <pre><code class="language-yaml">apiVersion: cloud.google.com/v1
+kind: ComputeClass
+metadata:
+  name: batch-arm-preferred
+spec:
+  nodePoolConfig:
+    taintConfig:
+      architectureTaintBehavior: NONE
+  nodePoolAutoCreation:
+    enabled: true
+  priorities:
+    - machineFamily: n4a
+      minCores: 8
+      spot: true
+    - machineFamily: c4a
+      minCores: 8
+      spot: true
+    - machineFamily: n4
+      minCores: 8
+      spot: true
+  whenUnsatisfiable: ScaleUpAnyway</code></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">YAML</span>
+            <span class="code-title">Job 側は ComputeClass を選択するだけ</span>
+          </div>
+          <pre><code class="language-yaml"># Job 側は ComputeClass を選択するだけ。toleration や arch の記述は不要
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: nightly-batch
+spec:
+  template:
+    spec:
+      nodeSelector:
+        cloud.google.com/compute-class: batch-arm-preferred
+      containers:
+        - name: batch
+          image: REGION-docker.pkg.dev/PROJECT_ID/REPO/batch:v2
+      restartPolicy: Never</code></pre>
+        </div>
+        <p><strong>✨ 効果:</strong> Job 側の記述を最小限に保ちながら、Arm 優先・x86 フォールバックのキャパシティ戦略を ComputeClass 側で<strong>一元管理</strong>できる。Spot VM との組み合わせでさらなるコスト削減が可能。</p>
+      </div>
+
+      <div class="usecase">
+        <h3>3️⃣ mixed-mode クラスタでのスケジューリング簡素化</h3>
+        <p><strong>📖 シナリオ:</strong> x86 ノードプールと Arm ノードプールが混在するクラスタで、共通の監視サイドカーやサービスメッシュのプロキシ (いずれもマルチアーキテクチャ対応) を全ノードで動作させたい。</p>
+        <p><strong>✨ 効果:</strong> デフォルト taint をオプトアウトすることで、DaemonSet や自動注入されるサイドカーに Arm 用 toleration を付与するための <strong>Webhook 設定やパッチ運用が不要</strong>になり、mixed-mode クラスタの構成管理が単純化される。ただしサイドカーを含むすべてのイメージが arm64 に対応していることが前提となる。</p>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <div class="success-box">
+        <strong>✅ この taint 動作の設定自体に追加料金は発生しません。</strong><br>
+        ノードプールおよび ComputeClass の構成オプションとして提供されます。
+      </div>
+      <p>課金は従来どおり以下の要素で構成されます。</p>
+      <div class="two-col">
+        <div class="card">
+          <h4>☸️ GKE クラスタ管理手数料</h4>
+          <p>Standard / Autopilot のエディションに応じたクラスタ単位の料金</p>
+        </div>
+        <div class="card green">
+          <h4>🖥️ ノードの Compute Engine 料金</h4>
+          <p>Arm ノード (N4A / C4A / T2A) のマシンタイプ、vCPU / メモリ、ディスク (Hyperdisk) の使用量に応じた料金。Spot VM や確約利用割引 (CUD) の適用も可能</p>
+        </div>
+      </div>
+      <div class="note-box">
+        <strong>💡 補足:</strong> Arm ベースのマシンシリーズは<strong>電力効率に優れ</strong>、Arm 互換ワークロードにおいて<strong>価格性能の改善が期待できる</strong>とドキュメントに記載されています。具体的な単価は下記の料金ページを参照してください。
+      </div>
+    </div>
+
+    <!-- 利用可能リージョン -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <div class="icon-text">
+        <span class="arrow">→</span>
+        <span>Arm ノードは、Arm アーキテクチャをサポートする Google Cloud のロケーションで利用可能です。マシンタイプごとの提供状況は <a href="https://docs.cloud.google.com/compute/docs/regions-zones#available" target="_blank" rel="noopener noreferrer" class="gc-link">利用可能なリージョンとゾーン</a> のフィルタ可能な表で確認できます</span>
+      </div>
+      <div class="icon-text">
+        <span class="arrow">→</span>
+        <span>本機能自体はバージョン要件 (Standard ノードプール: コントロールプレーン <strong>1.35.0-gke.2141000 以降</strong> / カスタム ComputeClass: <strong>1.36.2-gke.1498000 以降</strong>) を満たすクラスタで利用できます</span>
+      </div>
+    </div>
+
+    <!-- 関連サービス -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>サービス / 機能</th><th>本機能との関係</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>カスタム ComputeClass</strong></td>
+              <td><code>nodePoolConfig.taintConfig</code> を通じて本機能を設定するインターフェース。優先度リストによる Arm 優先・x86 フォールバックの構成と組み合わせると効果的</td>
+            </tr>
+            <tr>
+              <td><strong>ノード自動プロビジョニング (NAP) / クラスタオートスケーラー</strong></td>
+              <td>ComputeClass の <code>nodePoolAutoCreation</code> と併用して Arm ノードプールを自動作成する際、taint 動作の設定が自動作成されたノードプールにも適用される</td>
+            </tr>
+            <tr>
+              <td><strong>Compute Engine Arm マシンシリーズ (N4A / C4A / T2A)</strong></td>
+              <td>本機能が対象とするノードの実体。C4A と N4A は Google Axion プロセッサベース</td>
+            </tr>
+            <tr>
+              <td><strong>Artifact Registry / Cloud Build (docker buildx)</strong></td>
+              <td>マルチアーキテクチャイメージのビルドと保管。本機能を安全に使う前提となる arm64 対応イメージの準備に必要</td>
+            </tr>
+            <tr>
+              <td><strong>Terraform (google_container_node_pool)</strong></td>
+              <td><code>node_config.taint_config.architecture_taint_behavior</code> により IaC から宣言的に設定可能</td>
+            </tr>
+            <tr>
+              <td><strong>Policy Controller / Gatekeeper</strong></td>
+              <td>Arm 非対応イメージのデプロイを検出・ブロックするガードレールとして併用が推奨される</td>
+            </tr>
+            <tr>
+              <td><strong>Hyperdisk</strong></td>
+              <td>C4A / N4A では Persistent Disk が非対応のため、永続ボリュームには Hyperdisk を使用する</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="success-box">
+        <strong>✅ できるようになったこと</strong><br>
+        Arm ノードのデフォルト taint を<strong>ノードプール単位・ComputeClass 単位でオプトアウト</strong>できるようになったことで、マルチアーキテクチャイメージを整備済みの環境では、<strong>既存マニフェストを変更せずに Arm ノードを活用</strong>できるようになりました。Standard ノードプールではノード再作成なしで即座に taint が更新されるため、導入・切り戻しのコストも低く抑えられます。
+      </div>
+      <div class="warning-box">
+        <strong>⚠️ 適用前に必ず確認すること</strong><br>
+        この taint は x86 専用イメージの誤配置を防ぐ<strong>安全機構</strong>であり、無効化するとアーキテクチャ非互換によるコンテナ起動失敗のリスクが生じます。適用前に<strong>サイドカーや DaemonSet を含むクラスタ内の全イメージ</strong>について arm64 対応を棚卸しし、検証用のノードプールまたは ComputeClass から<strong>段階的に適用</strong>することを推奨します。
+      </div>
+
+      <div class="flow-diagram">
+        <div class="flow-step">📋 全イメージの<br>arm64 棚卸し</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🧪 検証用プールで<br>段階適用</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🛡️ Policy Controller<br>でガードレール</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">📈 適用範囲を<br>拡大</div>
+      </div>
+
+      <div class="tag-list">
+        <span class="tag">GKE</span>
+        <span class="tag">Google Kubernetes Engine</span>
+        <span class="tag">Arm</span>
+        <span class="tag">arm64</span>
+        <span class="tag">Axion</span>
+        <span class="tag">N4A</span>
+        <span class="tag">C4A</span>
+        <span class="tag">T2A</span>
+        <span class="tag">Taint</span>
+        <span class="tag">Toleration</span>
+        <span class="tag">ComputeClass</span>
+        <span class="tag">スケジューリング</span>
+        <span class="tag">マルチアーキテクチャ</span>
+        <span class="tag">multi-arch</span>
+        <span class="tag">Standard クラスタ</span>
+        <span class="tag">ノードプール</span>
+        <span class="tag">Terraform</span>
+        <span class="tag">コスト最適化</span>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p><strong>📎 出典</strong></p>
+      <ul>
+        <li><a href="https://cloud.google.com/kubernetes-engine/docs/release-notes" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (GKE)</a></li>
+        <li><a href="https://docs.cloud.google.com/kubernetes-engine/docs/how-to/prepare-arm-workloads-for-deployment#configure-default-taint" target="_blank" rel="noopener noreferrer" class="gc-link">Configure the default Arm architecture taint (Standard ノードプール)</a></li>
+        <li><a href="https://docs.cloud.google.com/kubernetes-engine/docs/concepts/about-custom-compute-classes#architecture-taint" target="_blank" rel="noopener noreferrer" class="gc-link">Configure the default Arm architecture taint (カスタム ComputeClass)</a></li>
+        <li><a href="https://docs.cloud.google.com/kubernetes-engine/docs/reference/crds/computeclass#taintConfig" target="_blank" rel="noopener noreferrer" class="gc-link">ComputeClass CustomResourceDefinition (taintConfig)</a></li>
+        <li><a href="https://docs.cloud.google.com/kubernetes-engine/docs/how-to/prepare-arm-workloads-for-deployment" target="_blank" rel="noopener noreferrer" class="gc-link">Prepare an Arm workload for deployment</a></li>
+        <li><a href="https://docs.cloud.google.com/kubernetes-engine/docs/concepts/arm-on-gke" target="_blank" rel="noopener noreferrer" class="gc-link">Arm workloads on GKE (要件と制限事項)</a></li>
+        <li><a href="https://docs.cloud.google.com/kubernetes-engine/docs/how-to/autopilot-arm-workloads" target="_blank" rel="noopener noreferrer" class="gc-link">Deploy Autopilot workloads on Arm architecture</a></li>
+        <li><a href="https://docs.cloud.google.com/kubernetes-engine/docs/how-to/build-multi-arch-for-arm" target="_blank" rel="noopener noreferrer" class="gc-link">Build multi-architecture images for Arm workloads</a></li>
+        <li><a href="https://docs.cloud.google.com/kubernetes-engine/docs/tutorials/migrate-x86-to-multi-arch-arm" target="_blank" rel="noopener noreferrer" class="gc-link">Migrate x86 application on GKE to multi-arch with Arm</a></li>
+        <li><a href="https://docs.cloud.google.com/compute/docs/instances/arm-on-compute" target="_blank" rel="noopener noreferrer" class="gc-link">Arm VMs on Compute Engine</a></li>
+        <li><a href="https://docs.cloud.google.com/sdk/gcloud/reference/container/node-pools/create#--node-architecture-taint-behavior" target="_blank" rel="noopener noreferrer" class="gc-link">gcloud container node-pools create --node-architecture-taint-behavior</a></li>
+        <li><a href="https://docs.cloud.google.com/kubernetes-engine/docs/troubleshooting/troubleshooting-arm-workloads" target="_blank" rel="noopener noreferrer" class="gc-link">Troubleshooting Arm workloads</a></li>
+        <li><a href="https://cloud.google.com/kubernetes-engine/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">GKE 料金ページ</a></li>
+        <li><a href="https://cloud.google.com/compute/all-pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Compute Engine 料金ページ</a></li>
+      </ul>
+      <p>本インフォグラフィックは Google Cloud News レポート (2026-07-28) をもとに生成されています。</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

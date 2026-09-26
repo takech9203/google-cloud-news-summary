@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Load Balancing: SNI ベースルーティング (プレビュー)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; }
+
+    h1 {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card.green { border-left-color: var(--gc-green); }
+    .card.teal { border-left-color: var(--gc-teal); }
+    .card.orange { border-left-color: var(--gc-orange); }
+    .card.purple { border-left-color: var(--gc-purple); }
+    .card.red { border-left-color: var(--gc-red); }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-preview {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-orange);
+    }
+
+    .badge-networking {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-teal);
+    }
+
+    /* Before/After */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h4 {
+      color: var(--gc-red);
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box h4 {
+      color: var(--gc-green);
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .before-box ul, .after-box ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 4px 0;
+    }
+
+    /* Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.teal {
+      background: linear-gradient(135deg, var(--gc-teal), #00838F);
+    }
+
+    .stat-card.green {
+      background: linear-gradient(135deg, var(--gc-green), #1B5E20);
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Flow */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* Usecase cards */
+    .usecase-card {
+      background: var(--gc-teal-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-teal);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .usecase-card p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    .usecase-card .effect {
+      background: var(--gc-green-tint);
+      border-radius: 8px;
+      padding: 8px 12px;
+      margin-top: 8px;
+      font-size: 13px;
+    }
+
+    /* Warning / Note boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Code blocks */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Mermaid */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Feature grid */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    /* Related services */
+    .related-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .related-card {
+      background: var(--gc-surface);
+      border-radius: 8px;
+      padding: 16px;
+      border: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    .related-card strong {
+      color: var(--gc-on-surface);
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    /* Links */
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    footer ul {
+      list-style: none;
+      padding: 0;
+      margin: 8px 0;
+    }
+
+    footer li {
+      margin: 4px 0;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      h1 { font-size: 28px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .related-grid { grid-template-columns: 1fr; }
+      .flow-diagram { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>🌐 Cloud Load Balancing: SNI ベースルーティング</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge-preview">Preview</span>
+          <span class="badge-networking">Networking</span>
+          <span class="badge">Cloud Load Balancing</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-03-31</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        Google Cloud は、<span class="highlight">プロキシ Network Load Balancer (NLB)</span> において
+        <span class="highlight">Server Name Indication (SNI)</span> に基づく TLS トラフィックルーティング機能をプレビューとしてリリースしました。
+      </p>
+      <p>
+        新しい <code>TLSRoute</code> リソースを使用して、TLS ハンドシェイクの <code>ClientHello</code> メッセージに含まれる SNI ホスト名を検査し、
+        適切なバックエンドサービスにコネクションをルーティングします。
+        ロードバランサでの TLS 終端を行わない<strong>純粋な TLS パススルー</strong>を実現し、
+        クライアントとオリジンサーバー間で<span class="highlight">エンドツーエンドの暗号化 (mTLS / TLS)</span> を維持したまま、
+        SNI ホスト名に基づくインテリジェントなトラフィック振り分けが可能になります。
+      </p>
+
+      <!-- Stats -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value">1 IP</div>
+          <div class="stat-label">単一 IP で複数サービスを集約</div>
+        </div>
+        <div class="stat-card teal">
+          <div class="stat-value">E2E 暗号化</div>
+          <div class="stat-label">TLS パススルーで完全暗号化維持</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-value">ロール分離</div>
+          <div class="stat-label">プラットフォーム/サービスの責務分離</div>
+        </div>
+      </div>
+
+      <!-- Before/After -->
+      <h3>Before / After 比較</h3>
+      <div class="before-after">
+        <div class="before-box">
+          <h4>❌ Before</h4>
+          <ul>
+            <li>サービスごとに個別の IP / ロードバランサが必要</li>
+            <li>IPv4 アドレス枯渇問題が深刻化</li>
+            <li>TLS パススルーでホスト名ルーティング不可</li>
+            <li>フロントエンドとバックエンドの管理が一体化</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h4>✅ After</h4>
+          <ul>
+            <li><code>TLSRoute</code> で SNI ベースの複数バックエンドルーティング</li>
+            <li>単一 PSC エンドポイントに複数サービス集約</li>
+            <li>TLS パススルーでエンドツーエンド暗号化</li>
+            <li>ロール指向の管理モデルで責務分離</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid from source) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>クライアントからの TLS 接続開始時に、暗号化されていない <code>ClientHello</code> メッセージから SNI ホスト名を抽出し、<code>TLSRoute</code> リソースのルールに基づいて適切なバックエンドサービスにルーティングします。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    Client["クライアント"]
+    CH["ClientHello\n(SNI ホスト名)"]
+    NLB["プロキシ NLB\n(TLS パススルー)"]
+    TR["TLSRoute\nリソース"]
+    BS1["バックエンド\nサービス A\n(api.example.com)"]
+    BS2["バックエンド\nサービス B\n(web.example.com)"]
+    BS3["バックエンド\nサービス C\n(app.example.com)"]
+
+    Client -->|"TLS 接続開始"| CH
+    CH -->|"暗号化前の\nClientHello 検査"| NLB
+    NLB -->|"SNI マッチング"| TR
+    TR -->|"api.example.com"| BS1
+    TR -->|"web.example.com"| BS2
+    TR -->|"app.example.com"| BS3
+
+    style NLB fill:#4285F4,color:#fff
+    style TR fill:#34A853,color:#fff
+    style BS1 fill:#FBBC04,color:#000
+    style BS2 fill:#FBBC04,color:#000
+    style BS3 fill:#FBBC04,color:#000
+        </pre>
+      </div>
+      <div class="note-box">
+        <strong>💡 ポイント:</strong> TLS セッションはロードバランサで終端されず、クライアントとバックエンド間でエンドツーエンドの暗号化が維持されます。
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h3>🔀 SNI ベースのトラフィックルーティング</h3>
+          <ul>
+            <li>TLS ハンドシェイクの <code>ClientHello</code> メッセージに含まれる SNI ホスト名を検査</li>
+            <li>ホスト名に基づいて異なるバックエンドサービスにコネクションを振り分け</li>
+            <li>複数の SNI ホスト名ルールを単一のロードバランサで管理可能</li>
+          </ul>
+        </div>
+        <div class="card green">
+          <h3>🔒 TLS パススルー (エンドツーエンド暗号化)</h3>
+          <ul>
+            <li>ロードバランサは TLS を終端せず、コネクションをそのまま転送</li>
+            <li>クライアントとオリジンサーバー間で直接 mTLS / TLS セッションを確立可能</li>
+            <li>証明書管理をバックエンドサーバー側で完結できる</li>
+          </ul>
+        </div>
+        <div class="card teal">
+          <h3>📝 TLSRoute リソース API</h3>
+          <ul>
+            <li>宣言的な YAML 形式でルーティングルールを定義</li>
+            <li>プラットフォーム管理者がフロントエンドインフラを管理し、サービスオーナーが独立してルートとバックエンドを管理</li>
+            <li><code>sniHost</code> と <code>alpn</code> (Application-Layer Protocol Negotiation) によるマッチング条件をサポート</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specs -->
+    <div class="section">
+      <h2>📐 技術仕様</h2>
+      <h3>対応デプロイメントモード</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>リージョナル外部プロキシ NLB</td><td>✅ サポート対象</td></tr>
+          <tr><td>リージョナル内部プロキシ NLB</td><td>✅ サポート対象</td></tr>
+          <tr><td>クロスリージョン内部プロキシ NLB</td><td>✅ サポート対象</td></tr>
+          <tr><td>ロードバランシングスキーム</td><td><code>EXTERNAL_MANAGED</code> / <code>INTERNAL_MANAGED</code></td></tr>
+          <tr><td>プロトコル</td><td>TLS (パススルー)</td></tr>
+          <tr><td>ルーティング基準</td><td>SNI ホスト名、ALPN</td></tr>
+        </tbody>
+      </table>
+
+      <h3>TLSRoute リソースの定義例</h3>
+      <span class="code-label">YAML</span>
+      <pre><code class="language-yaml">name: my-tls-route
+gateways:
+  - projects/PROJECT_NUMBER/locations/REGION/gateways/my-gateway
+rules:
+  - matches:
+      - sniHost:
+          - api.example.com
+    action:
+      destinations:
+        - serviceName: projects/PROJECT_NUMBER/locations/REGION/backendServices/api-backend
+  - matches:
+      - sniHost:
+          - web.example.com
+    action:
+      destinations:
+        - serviceName: projects/PROJECT_NUMBER/locations/REGION/backendServices/web-backend</code></pre>
+    </div>
+
+    <!-- Setup Steps -->
+    <div class="section">
+      <h2>🔧 設定方法</h2>
+
+      <div class="note-box">
+        <strong>📋 前提条件:</strong> Compute Engine API の有効化、プロキシ NLB の構成、バックエンドサービスとバックエンド (MIG / NEG) の作成が必要です。
+      </div>
+
+      <h3>ステップ 1: バックエンドサービスの作成</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># リージョナル内部プロキシ NLB の場合
+gcloud compute backend-services create api-backend \
+    --load-balancing-scheme=INTERNAL_MANAGED \
+    --protocol=TCP \
+    --region=us-central1
+
+gcloud compute backend-services create web-backend \
+    --load-balancing-scheme=INTERNAL_MANAGED \
+    --protocol=TCP \
+    --region=us-central1</code></pre>
+
+      <h3>ステップ 2: TLSRoute リソースの作成</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># tls_route.yaml ファイルを作成
+cat > tls_route.yaml <<EOF
+name: my-tls-route
+gateways:
+  - projects/PROJECT_NUMBER/locations/us-central1/gateways/my-nlb-gateway
+rules:
+  - matches:
+      - sniHost:
+          - api.example.com
+    action:
+      destinations:
+        - serviceName: projects/PROJECT_NUMBER/locations/us-central1/backendServices/api-backend
+  - matches:
+      - sniHost:
+          - web.example.com
+    action:
+      destinations:
+        - serviceName: projects/PROJECT_NUMBER/locations/us-central1/backendServices/web-backend
+EOF
+
+# TLSRoute リソースをインポート
+gcloud network-services tls-routes import my-tls-route \
+    --source=tls_route.yaml \
+    --location=us-central1</code></pre>
+
+      <h3>ステップ 3: 動作確認</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># api.example.com への TLS 接続を検証
+curl https://api.example.com --resolve api.example.com:443:LOAD_BALANCER_IP -k
+
+# web.example.com への TLS 接続を検証
+curl https://web.example.com --resolve web.example.com:443:LOAD_BALANCER_IP -k
+
+# SNI が一致しない場合の接続拒否を確認 (ネガティブテスト)
+curl https://invalid.example.com --resolve invalid.example.com:443:LOAD_BALANCER_IP -k
+# 期待される結果: Connection reset by peer</code></pre>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+
+      <h3>ビジネス面</h3>
+      <div class="card green">
+        <ul style="margin: 0; padding-left: 20px;">
+          <li><strong>コスト削減:</strong> 複数のサービスを単一の IP アドレス / ロードバランサに集約し、追加の IP アドレスやロードバランサの費用を削減</li>
+          <li><strong>運用効率の向上:</strong> ロール指向の管理モデルにより、プラットフォームチームとサービスチームが独立して作業可能。デプロイサイクルが短縮</li>
+          <li><strong>コンプライアンス対応:</strong> エンドツーエンド暗号化により、ロードバランサで平文データが露出しないため、厳格なセキュリティ要件を満たしやすい</li>
+        </ul>
+      </div>
+
+      <h3>技術面</h3>
+      <div class="card teal">
+        <ul style="margin: 0; padding-left: 20px;">
+          <li><strong>エンドツーエンド暗号化:</strong> TLS パススルーにより完全な暗号化を維持。mTLS ユースケースにも対応</li>
+          <li><strong>IP アドレス管理の簡素化:</strong> 単一の PSC エンドポイントに複数サービスを集約し、IPv4 アドレス枯渇問題を緩和</li>
+          <li><strong>柔軟なルーティング:</strong> SNI ホスト名に加えて ALPN プロトコルによるマッチングも可能で、きめ細かなトラフィック制御を実現</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <div class="warning-box">
+        <strong>制限事項</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px; font-size: 14px;">
+          <li>プレビュー段階のため、<strong>SLA の対象外</strong>。本番ワークロードでの使用は推奨されない</li>
+          <li>TLS パススルーのため、ロードバランサレベルでの TLS 終端や SSL ポリシーの適用は不可</li>
+          <li><code>ClientHello</code> の SNI フィールドが暗号化されている場合 (ECH) はルーティングが機能しない可能性がある</li>
+          <li>グローバル外部プロキシ NLB およびクラシックプロキシ NLB では現時点で利用不可</li>
+        </ul>
+      </div>
+
+      <div class="error-box">
+        <strong>考慮すべき点</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px; font-size: 14px;">
+          <li>TLS パススルーのため、ロードバランサでの L7 レベルのトラフィック検査やログ取得は制限される</li>
+          <li>各バックエンドサービスで個別に TLS 証明書の管理が必要。運用負荷が増加する可能性あり</li>
+          <li>Cloud Armor の一部機能 (L7 ポリシーなど) は TLS パススルーモードでは利用不可</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>🏢 ユースケース 1: マルチテナント SaaS プラットフォーム</h4>
+        <p><strong>シナリオ:</strong> SaaS プロバイダーが複数のテナント (tenant-a.saas.com, tenant-b.saas.com) にサービスを提供しており、各テナントが独自の TLS 証明書と mTLS 要件を持つ。</p>
+        <span class="code-label">YAML</span>
+        <pre><code class="language-yaml">rules:
+  - matches:
+      - sniHost:
+          - tenant-a.saas.com
+    action:
+      destinations:
+        - serviceName: projects/123/locations/us-central1/backendServices/tenant-a-backend
+  - matches:
+      - sniHost:
+          - tenant-b.saas.com
+    action:
+      destinations:
+        - serviceName: projects/123/locations/us-central1/backendServices/tenant-b-backend</code></pre>
+        <div class="effect">✅ <strong>効果:</strong> 単一の IP で複数テナントのトラフィックを振り分けつつ、各テナント固有の mTLS セッションを維持。IP アドレス消費を最小化。</div>
+      </div>
+
+      <div class="usecase-card">
+        <h4>🔗 ユースケース 2: Private Service Connect によるサービス集約</h4>
+        <p><strong>シナリオ:</strong> 大規模組織で複数の内部マイクロサービスが PSC 経由で公開されているが、サービスごとに PSC エンドポイントと IP アドレスが必要で、IP アドレスが不足。</p>
+        <div class="effect">✅ <strong>効果:</strong> 単一の PSC エンドポイントの背後に複数サービスを <code>TLSRoute</code> で集約し、IPv4 アドレスの消費を劇的に削減。ネットワーク管理の複雑さも軽減。</div>
+      </div>
+
+      <div class="usecase-card">
+        <h4>🏦 ユースケース 3: 金融機関におけるエンドツーエンド暗号化</h4>
+        <p><strong>シナリオ:</strong> 金融機関がコンプライアンス要件により、すべてのトラフィックでエンドツーエンド暗号化を必須としている。ロードバランサでの TLS 終端が許可されていない環境。</p>
+        <div class="effect">✅ <strong>効果:</strong> TLS パススルーによりロードバランサで平文データが一切露出せず、規制要件を満たしながら柔軟なルーティングを実現。</div>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>SNI ベースルーティング機能自体に追加料金は発生しません。プロキシ Network Load Balancer の標準料金が適用されます。</p>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>月額料金 (概算)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>転送ルール (1 個あたり)</td><td>約 $18.25/月 (リージョナル)</td></tr>
+          <tr><td>データ処理</td><td>約 $0.008 - $0.012/GB (リージョンにより異なる)</td></tr>
+          <tr><td>クロスリージョンデータ転送</td><td>リージョン間の標準ネットワーク料金が適用</td></tr>
+        </tbody>
+      </table>
+      <div class="note-box">
+        <strong>💡 注意:</strong> プレビュー期間中の料金については、<a href="https://cloud.google.com/vpc/network-pricing#lb" class="gc-link" target="_blank">公式の料金ページ</a>で最新情報を確認してください。
+      </div>
+    </div>
+
+    <!-- Regions -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <p>リージョナルプロキシ NLB (外部/内部) をサポートするすべての Google Cloud リージョンで利用可能です。クロスリージョン内部プロキシ NLB はグローバルバックエンドサービスを使用するため、複数リージョンにまたがるデプロイメントが可能です。</p>
+      <div class="warning-box">
+        <strong>⚠️ 注意:</strong> プレビュー段階のため、利用可能なリージョンは変更される可能性があります。
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="related-grid">
+        <div class="related-card">
+          <strong>🔗 Private Service Connect (PSC)</strong>
+          単一の PSC エンドポイントに複数サービスを集約する際に <code>TLSRoute</code> と組み合わせて使用。IP アドレス消費の削減に直結。
+        </div>
+        <div class="related-card">
+          <strong>🛡️ Cloud Armor</strong>
+          プロキシ NLB と連携した DDoS 防御を提供。ただし TLS パススルーモードでは L7 ポリシーは利用不可。
+        </div>
+        <div class="related-card">
+          <strong>🕸️ Cloud Service Mesh</strong>
+          既に <code>TLSRoute</code> リソースをサポートしており、サービスメッシュ環境での TLS ルーティングの基盤技術を共有。
+        </div>
+        <div class="related-card">
+          <strong>📜 Certificate Manager</strong>
+          バックエンドサーバー側での TLS 証明書管理に活用可能。
+        </div>
+        <div class="related-card">
+          <strong>🌐 Cloud DNS</strong>
+          SNI ホスト名の DNS 解決に使用。適切な DNS レコード設定が前提。
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>📌 まとめ</h2>
+      <p>
+        Cloud Load Balancing における SNI ベースルーティングのプレビューリリースは、
+        マルチサービス環境での <span class="highlight">IP アドレス管理の簡素化</span> と
+        <span class="highlight">エンドツーエンド暗号化の維持</span> を両立する重要な機能です。
+      </p>
+      <p>
+        <code>TLSRoute</code> リソースによるロール指向の管理モデルは、プラットフォームチームとサービスチームの責務分離を促進し、
+        大規模組織での運用効率を大幅に向上させます。
+      </p>
+      <div class="note-box">
+        <strong>📋 推奨アクション:</strong> mTLS 要件や厳格なコンプライアンス要件を持つワークロードを運用しているチームは、プレビュー段階から早期に検証を開始することを推奨します。
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>📎 出典・参考リンク:</strong></p>
+      <ul>
+        <li>📄 <a href="https://docs.cloud.google.com/release-notes#March_31_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li>📄 <a href="https://docs.cloud.google.com/load-balancing/docs/tcp/set-up-ext-reg-tcp-proxy-migs#configure-lb-tls-routes" target="_blank" rel="noopener noreferrer">リージョナル外部プロキシ NLB の TLS ルート設定</a></li>
+        <li>📄 <a href="https://docs.cloud.google.com/load-balancing/docs/tcp/set-up-int-tcp-proxy-migs#configure-lb-tls-routes" target="_blank" rel="noopener noreferrer">リージョナル内部プロキシ NLB の TLS ルート設定</a></li>
+        <li>📄 <a href="https://docs.cloud.google.com/load-balancing/docs/tcp/setup-cross-reg-proxy-migs#configure-lb-tls-routes" target="_blank" rel="noopener noreferrer">クロスリージョン内部プロキシ NLB の TLS ルート設定</a></li>
+        <li>📄 <a href="https://cloud.google.com/load-balancing/docs/proxy-network-load-balancer" target="_blank" rel="noopener noreferrer">プロキシ Network Load Balancer 概要</a></li>
+        <li>📄 <a href="https://cloud.google.com/vpc/network-pricing#lb" target="_blank" rel="noopener noreferrer">Cloud Load Balancing 料金</a></li>
+      </ul>
+      <p style="margin-top: 12px; font-size: 11px; color: #9AA0A6;">
+        #CloudLoadBalancing #SNI #TLS #TLSRoute #NetworkLoadBalancer #Preview #Networking #Security #PrivateServiceConnect #mTLS
+      </p>
+    </footer>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

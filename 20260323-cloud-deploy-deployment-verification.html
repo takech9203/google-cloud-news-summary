@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Deploy: デプロイ検証と自動ロールバックアクション (Preview)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    /* Google Cloud Light Theme Base Styles */
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+    }
+
+    h2, .section-title {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card.green { border-left-color: var(--gc-green); }
+    .card.orange { border-left-color: var(--gc-orange); }
+    .card.red { border-left-color: var(--gc-red); }
+    .card.purple { border-left-color: var(--gc-purple); }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+
+    /* Before/After */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h4, .after-box h4 {
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .before-box ul, .after-box ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin-bottom: 6px;
+    }
+
+    /* Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.green-grad {
+      background: linear-gradient(135deg, var(--gc-green), #1B7A34);
+    }
+
+    .stat-card.orange-grad {
+      background: linear-gradient(135deg, var(--gc-orange), #E65100);
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Flow diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Feature cards grid */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    /* Usecase */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase h4 {
+      color: var(--gc-blue-900);
+      margin: 0 0 8px 0;
+    }
+
+    .usecase p {
+      margin: 0;
+      font-size: 14px;
+    }
+
+    /* Note/Warning boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    /* Code blocks */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      background: #1E1E1E;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Mermaid container */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Related services */
+    .related-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .related-item {
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 8px;
+      padding: 14px;
+      text-align: center;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--gc-on-surface);
+    }
+
+    .related-item span {
+      display: block;
+      font-size: 11px;
+      color: var(--gc-outline);
+      margin-top: 4px;
+      font-weight: 400;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .feature-grid { grid-template-columns: 1fr; }
+      .header { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>☁️ Cloud Deploy: デプロイ検証と自動ロールバックアクション</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Cloud Deploy</span>
+          <span class="badge badge-preview">Preview</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-03-23</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        Google Cloud Deploy に、デプロイ後のアプリケーションパフォーマンスを<span class="highlight">任意のモニタリングプラットフォーム</span>で分析し、
+        検証結果に基づいて<span class="highlight">ロールバックなどのアクションを自動トリガー</span>する機能が Preview として追加されました。
+      </p>
+      <p>
+        既存の<strong>デプロイ検証 (Deployment Verification)</strong> と<strong>自動化ルール (Automation Rules)</strong> を組み合わせ、
+        CI/CD パイプライン全体の安全性と信頼性を大幅に向上させます。DevOps エンジニアや SRE チームに特に有用な機能です。
+      </p>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h4>❌ アップデート前</h4>
+          <ul>
+            <li>デプロイ後の検証は手動またはスクリプトが必要</li>
+            <li>ロールバック判断・実行が人手で対応遅延リスク</li>
+            <li>モニタリングとデプロイパイプラインが分断され MTTR が長期化</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h4>✅ アップデート後</h4>
+          <ul>
+            <li>任意のモニタリングで自動パフォーマンス分析</li>
+            <li>検証失敗時に自動ロールバックで迅速復旧</li>
+            <li><code>repairRolloutRule</code> でリトライ+ロールバックの自動化</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value">250</div>
+        <div class="stat-label">パイプラインあたり最大自動化ルール数</div>
+      </div>
+      <div class="stat-card green-grad">
+        <div class="stat-value">3</div>
+        <div class="stat-label">対応ターゲット (GKE / GKE 接続 / Cloud Run)</div>
+      </div>
+      <div class="stat-card orange-grad">
+        <div class="stat-value">4</div>
+        <div class="stat-label">自動化ルールの種類</div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>Cloud Deploy のデプロイ検証と自動ロールバックのフローを示す図。デプロイ後に Skaffold Verify でテストが実行され、失敗時には <code>repairRolloutRule</code> により自動リトライとロールバックが行われます。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    A["Developer\n開発者"] -->|"Release 作成"| B["Cloud Deploy\nDelivery Pipeline"]
+    B -->|"デプロイ"| C["Target\n(GKE / Cloud Run)"]
+    C -->|"verify: true"| D{"デプロイ検証\n(Skaffold Verify)"}
+    D -->|"成功"| E["Rollout 成功\n次のターゲットへ促進"]
+    D -->|"失敗"| F["repairRolloutRule\n自動修復ルール"]
+    F -->|"リトライ\n(設定回数まで)"| D
+    F -->|"全リトライ失敗"| G["自動ロールバック\n前回成功リリースへ"]
+    G --> C
+
+    style D fill:#fff3cd,stroke:#ffc107
+    style F fill:#f8d7da,stroke:#dc3545
+    style G fill:#d4edda,stroke:#28a745
+    style E fill:#d4edda,stroke:#28a745
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+
+      <div class="card">
+        <h3>1. デプロイ検証 (Deployment Verification)</h3>
+        <div class="icon-text"><span>→</span> Cloud Deploy と Skaffold を構成し、ターゲットにデプロイしたアプリケーションが正常に動作しているかを自動検証</div>
+        <div class="icon-text"><span>→</span> 任意のテストイメージを使用してデプロイ完了後にテストを実行</div>
+        <div class="icon-text"><span>→</span> Cloud Deploy 実行環境またはアプリケーションクラスタ上 (GKE のみ) で検証コンテナを実行可能</div>
+        <div class="icon-text"><span>→</span> 複数の検証コンテナを指定した場合は並列実行</div>
+      </div>
+
+      <div class="card orange">
+        <h3>2. 自動ロールバック (repairRolloutRule)</h3>
+        <div class="icon-text"><span>→</span> ロールアウト失敗時に指定回数のリトライを自動実行</div>
+        <div class="icon-text"><span>→</span> 全リトライ失敗後、最後に成功したリリースへ自動ロールバック</div>
+        <div class="icon-text"><span>→</span> リトライ間隔を LINEAR または EXPONENTIAL に設定可能</div>
+        <div class="icon-text"><span>→</span> 特定フェーズやジョブのみをリトライ対象に指定可能</div>
+      </div>
+
+      <div class="card green">
+        <h3>3. 自動化ルール (Automation Rules)</h3>
+        <p style="margin: 8px 0;">デリバリーパイプラインごとに最大 250 の自動化ルールを設定可能:</p>
+        <div class="icon-text"><span>→</span> <strong>promoteReleaseRule</strong>: 成功後の自動プロモーション</div>
+        <div class="icon-text"><span>→</span> <strong>advanceRolloutRule</strong>: カナリアデプロイメントのフェーズ自動進行</div>
+        <div class="icon-text"><span>→</span> <strong>timedPromoteReleaseRule</strong>: cron スケジュールに基づく自動プロモーション</div>
+        <div class="icon-text"><span>→</span> <strong>repairRolloutRule</strong>: 自動リトライとロールバック</div>
+      </div>
+    </div>
+
+    <!-- Technical Specs -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3>デプロイ検証の設定</h3>
+      <p>デリバリーパイプラインのステージ定義で <code>verify: true</code> を設定することで、対象ターゲットでのデプロイ検証が有効になります。</p>
+      <table>
+        <tr><th>項目</th><th>詳細</th></tr>
+        <tr><td>対応ターゲット</td><td>GKE、GKE 接続クラスタ、Cloud Run</td></tr>
+        <tr><td>検証実行環境</td><td>Cloud Deploy 実行環境 (デフォルト) またはアプリケーションクラスタ (GKE のみ)</td></tr>
+        <tr><td>検証コンテナ</td><td>複数指定可能 (並列実行)</td></tr>
+        <tr><td>成功判定</td><td>コンテナの終了コード (0: 成功、非 0: 失敗)</td></tr>
+        <tr><td>Skaffold バージョン</td><td>skaffold/v3alpha1 以降が必要</td></tr>
+      </table>
+
+      <h3>repairRolloutRule 設定例</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">YAML</span>
+          <span class="code-title">Automation リソース定義</span>
+        </div>
+        <pre><code class="language-yaml">apiVersion: deploy.cloud.google.com/v1
+kind: Automation
+metadata:
+  name: auto-repair
+  description: Automatically repair failed rollouts
+suspended: false
+serviceAccount: &lt;SERVICE_ACCOUNT&gt;
+selector:
+  targets:
+    - id: &lt;TARGET_ID&gt;
+rules:
+  - repairRolloutRule:
+      id: "repair-rollout"
+      repairPhases:
+        - retry:
+            attempts: 3
+            wait: 1m
+            backoffMode: EXPONENTIAL
+        - rollback:
+            destinationPhase: "stable"
+            disableRollbackIfRolloutPending: false</code></pre>
+      </div>
+
+      <h3>Skaffold 検証設定例</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">YAML</span>
+          <span class="code-title">skaffold.yaml - verify スタンザ</span>
+        </div>
+        <pre><code class="language-yaml">apiVersion: skaffold/v4beta7
+kind: Config
+manifests:
+  rawYaml:
+    - kubernetes.yaml
+deploy:
+  kubectl: {}
+verify:
+  - name: verify-integration-test
+    container:
+      name: integration-test
+      image: integration-test
+      command: ["./test-systems.sh"]</code></pre>
+      </div>
+    </div>
+
+    <!-- Setup Steps -->
+    <div class="section">
+      <h2>📝 設定方法</h2>
+
+      <div class="note-box">
+        <strong>📌 前提条件:</strong> Cloud Deploy API の有効化、デリバリーパイプライン/ターゲットの定義済み、Skaffold v3alpha1 以降の設定ファイル、検証用テストイメージの準備
+      </div>
+
+      <h3>ステップ 1: パイプラインで検証を有効化</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">YAML</span>
+          <span class="code-title">DeliveryPipeline - verify: true</span>
+        </div>
+        <pre><code class="language-yaml">apiVersion: deploy.cloud.google.com/v1
+kind: DeliveryPipeline
+metadata:
+  name: my-app-pipeline
+serialPipeline:
+  stages:
+    - targetId: dev
+      profiles: []
+      strategy:
+        standard:
+          verify: true
+    - targetId: staging
+      profiles: []
+      strategy:
+        standard:
+          verify: true
+    - targetId: prod
+      profiles: []
+      strategy:
+        standard:
+          verify: true</code></pre>
+      </div>
+
+      <h3>ステップ 2: Skaffold に検証コンテナを設定</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">YAML</span>
+          <span class="code-title">skaffold.yaml - smoke test</span>
+        </div>
+        <pre><code class="language-yaml">verify:
+  - name: smoke-test
+    container:
+      name: smoke-test
+      image: my-test-image:latest
+      command: ["/bin/sh"]
+      args: ["-c", "run-smoke-tests.sh"]</code></pre>
+      </div>
+
+      <h3>ステップ 3: 自動修復ルールを適用</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">Automation リソースの適用</span>
+        </div>
+        <pre><code class="language-bash"># Automation リソースを適用
+gcloud deploy apply --file=automation.yaml --region=&lt;REGION&gt;</code></pre>
+      </div>
+
+      <h3>ステップ 4: パイプラインを登録して検証</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">リリース作成と検証フロー確認</span>
+        </div>
+        <pre><code class="language-bash"># デリバリーパイプラインを登録
+gcloud deploy apply --file=clouddeploy.yaml --region=&lt;REGION&gt;
+
+# リリースを作成して検証フローを確認
+gcloud deploy releases create test-release-001 \
+  --delivery-pipeline=my-app-pipeline \
+  --region=&lt;REGION&gt; \
+  --images=my-app-image=gcr.io/&lt;PROJECT&gt;/my-app:latest</code></pre>
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div class="feature-grid">
+        <div class="card green">
+          <h3>ビジネス面</h3>
+          <div class="icon-text"><span>→</span> <strong>MTTR の短縮</strong>: デプロイ失敗からの復旧が自動化、サービス停止時間を大幅削減</div>
+          <div class="icon-text"><span>→</span> <strong>運用コスト削減</strong>: 手動ロールバック判断・実行が不要、オンコール負荷の軽減</div>
+        </div>
+        <div class="card">
+          <h3>技術面</h3>
+          <div class="icon-text"><span>→</span> <strong>パイプラインの回復力向上</strong>: リトライ+ロールバック自動化で一時的障害に耐性</div>
+          <div class="icon-text"><span>→</span> <strong>柔軟な検証戦略</strong>: 任意のモニタリング・テストフレームワークと統合</div>
+          <div class="icon-text"><span>→</span> <strong>段階的導入</strong>: ターゲットごとに検証の有効/無効を設定可能</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <div class="warning-box">
+        <strong>制限事項</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>Preview 段階のため、本番環境での使用は慎重に検討が必要</li>
+          <li>Cloud Run では検証コンテナをアプリケーションクラスタ上で実行不可 (Cloud Deploy 実行環境のみ)</li>
+          <li>パイプラインあたりの自動化ルールは最大 250 個</li>
+        </ul>
+      </div>
+
+      <div class="note-box">
+        <strong>💡 考慮すべき点</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>テストスクリプトの品質がパイプライン全体の信頼性に影響 (終了コードで判定)</li>
+          <li>リトライ設定 (回数・間隔・バックオフモード) は環境ごとに適切なチューニングが必要</li>
+          <li>自動ロールバック時の通知設定 (Pub/Sub) を事前に構成しておくことを推奨</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <h4>1. マイクロサービスのカナリアデプロイメントとヘルスチェック</h4>
+        <p><strong>シナリオ:</strong> GKE 上のマイクロサービスをカナリアデプロイメントで段階的にリリースし、各段階でエンドポイントのヘルスチェックとレイテンシテストを自動実行。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">YAML</span>
+            <span class="code-title">skaffold.yaml - ヘルスチェック検証</span>
+          </div>
+          <pre><code class="language-yaml">verify:
+  - name: health-check
+    container:
+      name: health-check
+      image: curlimages/curl:latest
+      command: ["/bin/sh"]
+      args: ["-c", "curl -f http://my-service:8080/health || exit 1"]
+    executionMode:
+      kubernetesCluster: {}</code></pre>
+        </div>
+        <p><strong>効果:</strong> デプロイ後にサービスの正常性が自動検証され、問題がある場合は自動リトライとロールバックにより安全に前バージョンに復元。</p>
+      </div>
+
+      <div class="usecase">
+        <h4>2. 本番環境への段階的リリースと自動保護</h4>
+        <p><strong>シナリオ:</strong> ステージング環境でのテスト後に本番環境へ自動プロモーションを行い、本番でもデプロイ検証を実施。検証失敗時は自動ロールバックで保護。</p>
+        <p><strong>効果:</strong> <code>promoteReleaseRule</code> と <code>repairRolloutRule</code> を組み合わせることで、完全自動化されたデリバリーパイプラインを実現しつつ、安全性を担保。</p>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス</h2>
+      <div class="related-grid">
+        <div class="related-item">📊 Cloud Monitoring<span>メトリクス収集・分析</span></div>
+        <div class="related-item">📝 Cloud Logging<span>検証ログ・イベント収集</span></div>
+        <div class="related-item">📨 Pub/Sub<span>検証結果・ロールバック通知</span></div>
+        <div class="related-item">🔧 Skaffold<span>検証コンテナの設定・実行</span></div>
+        <div class="related-item">📦 Artifact Registry<span>テストイメージの保管</span></div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>📌 まとめ</h2>
+      <p>
+        Cloud Deploy のデプロイ検証と自動ロールバックアクション機能は、CI/CD パイプラインの安全性と自動化レベルを大幅に引き上げるアップデートです。
+        任意のモニタリングプラットフォームとの統合により、既存のテスト基盤を活かしながらデプロイの品質ゲートを自動化できます。
+      </p>
+      <div class="note-box">
+        <strong>💡 推奨アクション:</strong> Preview 段階ではありますが、まずは開発・ステージング環境で検証を有効化し、<code>repairRolloutRule</code> の設定を含めたパイプラインの構成を試すことを推奨します。
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="list-style: none; padding-left: 0; margin: 4px 0;">
+        <li><a href="https://docs.cloud.google.com/release-notes#March_23_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li><a href="https://docs.cloud.google.com/deploy/docs/verify-deployment" target="_blank" rel="noopener noreferrer">デプロイ検証ドキュメント</a></li>
+        <li><a href="https://docs.cloud.google.com/deploy/docs/automation-rules" target="_blank" rel="noopener noreferrer">自動化ルールドキュメント</a></li>
+        <li><a href="https://cloud.google.com/deploy/pricing" target="_blank" rel="noopener noreferrer">Cloud Deploy 料金ページ</a></li>
+      </ul>
+      <p style="margin-top: 8px; font-size: 11px; color: #9AA0A6;">#CloudDeploy #DeploymentVerification #AutoRollback #CICD #DevOps #Preview</p>
+    </footer>
+
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

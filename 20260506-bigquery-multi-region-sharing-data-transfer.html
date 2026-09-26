@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BigQuery: マルチリージョン共有リスティング GA & Data Transfer Service バックフィル制限</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      flex: 1;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--gc-outline);
+      text-align: right;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-red {
+      border-left-color: var(--gc-red);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge-breaking {
+      background: var(--gc-red);
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge-service {
+      background: var(--gc-blue-600);
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h4, .after-box h4 {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .before-box h4 { color: var(--gc-red); }
+    .after-box h4 { color: var(--gc-green); }
+
+    .before-box ul, .after-box ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin-bottom: 6px;
+    }
+
+    .warning-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.red {
+      background: linear-gradient(135deg, var(--gc-red), #C62828);
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre:not(.mermaid) code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid) {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-900);
+      margin: 0 0 8px 0;
+    }
+
+    .usecase-card p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 768px) {
+      .feature-grid, .before-after {
+        grid-template-columns: 1fr;
+      }
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; }
+      .subtitle { text-align: left; margin-top: 8px; }
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .timeline-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin: 12px 0;
+      padding: 12px;
+      background: var(--gc-surface);
+      border-radius: 8px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .timeline-date {
+      font-weight: 600;
+      color: var(--gc-red);
+      white-space: nowrap;
+      min-width: 120px;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>BigQuery: マルチリージョン共有リスティング GA & Data Transfer Service バックフィル制限</h1>
+        <div style="margin-top: 12px;">
+          <span class="badge-service">BigQuery</span>
+          <span class="badge-service">Analytics Hub</span>
+          <span class="badge-service">Data Transfer Service</span>
+          <span class="badge-ga">GA</span>
+          <span class="badge-breaking">Breaking Change</span>
+        </div>
+      </div>
+      <div class="subtitle">
+        <div>2026-05-06</div>
+        <div>施行日: 2026-06-01</div>
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>BigQuery に関する 2 つの重要なアップデートが発表されました。</p>
+
+      <div class="feature-grid">
+        <div class="card card-green">
+          <h3>1. マルチリージョン共有リスティング (GA)</h3>
+          <p>Analytics Hub で複数リージョンの構成が一般提供に。データセットとリンクレプリカをグローバルな複数の地理的リージョンで同時に共有可能になりました。</p>
+        </div>
+        <div class="card card-red">
+          <h3>2. Data Transfer Service バックフィル制限</h3>
+          <p><strong>2026年6月1日</strong>より、Google Ads / Search Ads 360 / GA4 コネクタで現在の日付から <span class="highlight">37 か月</span>より前のバックフィルが不可になります。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Key Numbers -->
+    <div class="stat-cards">
+      <div class="stat-card">
+        <div class="stat-value">Multi</div>
+        <div class="stat-label">リージョン共有<br>単一リスティングで実現</div>
+      </div>
+      <div class="stat-card red">
+        <div class="stat-value">37</div>
+        <div class="stat-label">か月<br>バックフィル期間制限</div>
+      </div>
+      <div class="stat-card red">
+        <div class="stat-value">6/1</div>
+        <div class="stat-label">2026年<br>Breaking Change 施行日</div>
+      </div>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+
+      <h3>マルチリージョン共有リスティング</h3>
+      <div class="before-after">
+        <div class="before-box">
+          <h4>Before</h4>
+          <ul>
+            <li>単一リージョンでのみデータセットを共有可能</li>
+            <li>グローバルなサブスクライバーにレイテンシーの問題</li>
+            <li>リージョンごとに個別リスティングの作成・管理が必要</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h4>After</h4>
+          <ul>
+            <li>単一リスティングで複数リージョンにまたがるデータ共有が可能</li>
+            <li>サブスクライバーが最寄りリージョンからアクセス</li>
+            <li>クロスリージョンレプリケーションと連携した統合管理</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>Data Transfer Service バックフィル</h3>
+      <div class="before-after">
+        <div class="before-box">
+          <h4>Before</h4>
+          <ul>
+            <li>データソースの保持期間内であれば過去データを自由に取得可能</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h4>After (2026/6/1~)</h4>
+          <ul>
+            <li>バックフィルに 37 か月の時間制限が適用</li>
+            <li>それ以前のデータは取得不可</li>
+            <li>既に転送済みデータには影響なし</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>マルチリージョン共有リスティングの仕組み: プロバイダーがクロスリージョンレプリケーションで複数リージョンにデータセットを配置し、単一のリスティングを通じてグローバルなサブスクライバーが最寄りのリージョンからデータにアクセスできます。</p>
+
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TB
+    subgraph Provider["データプロバイダー"]
+        DS[("BigQuery<br/>プライマリデータセット<br/>(us-central1)")]
+        R1[("レプリカ<br/>(europe-west1)")]
+        R2[("レプリカ<br/>(asia-northeast1)")]
+        DS -->|"非同期レプリケーション"| R1
+        DS -->|"非同期レプリケーション"| R2
+    end
+
+    subgraph AH["Analytics Hub"]
+        L["マルチリージョン<br/>共有リスティング"]
+    end
+
+    DS --> L
+    R1 --> L
+    R2 --> L
+
+    subgraph Subscribers["サブスクライバー"]
+        S1["US サブスクライバー<br/>(リンクデータセット)"]
+        S2["EU サブスクライバー<br/>(リンクデータセット)"]
+        S3["APAC サブスクライバー<br/>(リンクデータセット)"]
+    end
+
+    L --> S1
+    L --> S2
+    L --> S3
+        </pre>
+      </div>
+    </div>
+
+    <!-- Feature Details: Multi-Region -->
+    <div class="section">
+      <h2>🌐 マルチリージョン共有リスティング (GA) 詳細</h2>
+
+      <div class="card">
+        <h3>1. 複数リージョンでのリスティング構成</h3>
+        <div class="check-item">
+          <span>→</span>
+          <span>リスティング作成時に「Region data availability」メニューでデータセットレプリカが存在する追加リージョンを選択可能</span>
+        </div>
+        <div class="check-item">
+          <span>→</span>
+          <span>クロスリージョンデータセットレプリケーションが有効なリージョンのみ選択可能</span>
+        </div>
+        <div class="check-item">
+          <span>→</span>
+          <span>追加リージョンを選択しない場合、デフォルトで共有データセットのプライマリリージョンが使用される</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>2. クロスリージョンデータセットレプリケーションとの連携</h3>
+        <div class="check-item">
+          <span>→</span>
+          <span>前提条件: 共有データセットに対するクロスリージョンレプリケーションの有効化が必要</span>
+        </div>
+        <div class="check-item">
+          <span>→</span>
+          <span><code>ALTER SCHEMA ADD REPLICA</code> DDL ステートメントでレプリカを追加</span>
+        </div>
+        <div class="check-item">
+          <span>→</span>
+          <span>レプリカのステータスは <code>INFORMATION_SCHEMA.SCHEMATA_REPLICAS</code> ビューで確認可能</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>3. API でのマルチリージョン指定</h3>
+        <div class="check-item">
+          <span>→</span>
+          <span><code>listings.create</code> メソッドのリクエストボディで <code>bigqueryDataset.replicaLocations</code> に追加リージョンを指定</span>
+        </div>
+        <div class="check-item">
+          <span>→</span>
+          <span>既存リスティングの更新は <code>listings.patch</code> メソッドで <code>updateMask</code> に含めて実行</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Feature Details: Data Transfer Service -->
+    <div class="section">
+      <h2>⚠️ Data Transfer Service バックフィル制限 (Breaking Change)</h2>
+
+      <div class="warning-box">
+        <strong>重要:</strong> 2026年6月1日以降、現在の日付から 37 か月より前の日付を指定したバックフィル実行ではデータが投入されなくなります。過去データに依存するワークフローがある場合は、期限前に必要なデータのバックフィルを完了させてください。
+      </div>
+
+      <h3>対象コネクタ</h3>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0;">
+        <span class="badge-breaking">Google Ads</span>
+        <span class="badge-breaking">Search Ads 360</span>
+        <span class="badge-breaking">Google Analytics 4</span>
+      </div>
+
+      <h3>変更内容</h3>
+      <div class="card card-red">
+        <div class="check-item">
+          <span>→</span>
+          <span>2026年6月1日以降、現在から 37 か月より前の日付を指定したバックフィルではデータが投入されない</span>
+        </div>
+        <div class="check-item">
+          <span>→</span>
+          <span>通常のスケジュール転送やリフレッシュウィンドウ内のデータ取得には影響なし</span>
+        </div>
+        <div class="check-item">
+          <span>→</span>
+          <span>Google Ads のデータ保持ポリシー変更に起因する制限</span>
+        </div>
+        <div class="check-item">
+          <span>→</span>
+          <span>既に BigQuery に転送済みのデータには影響なし</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>📐 技術仕様</h2>
+
+      <h3>マルチリージョン共有リスティング</h3>
+      <table>
+        <tr><th>項目</th><th>詳細</th></tr>
+        <tr><td>ステータス</td><td><span class="badge-ga">一般提供 (GA)</span></td></tr>
+        <tr><td>前提条件</td><td>クロスリージョンデータセットレプリケーションの有効化</td></tr>
+        <tr><td>設定方法</td><td>Console / API (<code>bigqueryDataset.replicaLocations</code>)</td></tr>
+        <tr><td>レプリケーション方式</td><td>非同期レプリケーション</td></tr>
+      </table>
+
+      <h3>Data Transfer Service バックフィル制限</h3>
+      <table>
+        <tr><th>項目</th><th>詳細</th></tr>
+        <tr><td>施行日</td><td><strong>2026年6月1日</strong></td></tr>
+        <tr><td>対象コネクタ</td><td>Google Ads, Search Ads 360, Google Analytics 4</td></tr>
+        <tr><td>バックフィル期間制限</td><td>現在日から 37 か月以内</td></tr>
+        <tr><td>原因</td><td>Google Ads データ保持ポリシーの変更</td></tr>
+      </table>
+    </div>
+
+    <!-- Configuration Steps -->
+    <div class="section">
+      <h2>🔧 設定方法</h2>
+
+      <h3>マルチリージョン共有リスティングの作成</h3>
+
+      <div class="note-box">
+        <strong>前提条件:</strong> 共有するデータセットに対してクロスリージョンレプリケーションを有効化していること。Analytics Hub の適切な IAM 権限を持っていること。
+      </div>
+
+      <h3>Step 1: データセットレプリカの作成</h3>
+      <span class="code-label">SQL</span>
+      <pre><code class="language-sql">-- プライマリデータセット (us-central1) にレプリカを追加
+ALTER SCHEMA my_dataset ADD REPLICA `europe-west1`
+OPTIONS(location='europe-west1');
+
+ALTER SCHEMA my_dataset ADD REPLICA `asia-northeast1`
+OPTIONS(location='asia-northeast1');</code></pre>
+
+      <p style="font-size: 14px; color: var(--gc-outline);">レプリカの作成完了は <code>INFORMATION_SCHEMA.SCHEMATA_REPLICAS</code> の <code>creation_complete</code> カラムで確認できます。</p>
+
+      <h3>Step 2: マルチリージョンリスティングの作成 (API)</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">curl -X POST \
+  "https://analyticshub.googleapis.com/v1/projects/PROJECT_ID/location/us-central1/dataExchanges/EXCHANGE_ID/listings?listingId=LISTING_ID" \
+  -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "displayName": "Multi-Region Dataset Listing",
+    "bigqueryDataset": {
+      "dataset": "projects/PROJECT_ID/datasets/my_dataset",
+      "replicaLocations": ["europe-west1", "asia-northeast1"]
+    }
+  }'</code></pre>
+
+      <h3>Data Transfer Service バックフィル制限への対応</h3>
+
+      <h3>Step 1: 影響を受ける転送の確認</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># 既存の Google Ads 転送設定を確認
+bq ls --transfer_config --transfer_location=us \
+  --filter="dataSourceIds:google_ads"</code></pre>
+
+      <h3>Step 2: 必要な過去データのバックフィル実行</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># 期限前にバックフィルを実行 (例: 2023年1月のデータ)
+bq mk --transfer_run \
+  --start_time="2023-01-01T00:00:00Z" \
+  --end_time="2023-01-31T23:59:59Z" \
+  projects/PROJECT_ID/locations/us/transferConfigs/CONFIG_ID</code></pre>
+    </div>
+
+    <!-- Merits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+
+      <div class="feature-grid">
+        <div class="card card-green">
+          <h3>ビジネス面</h3>
+          <div class="check-item">
+            <span>✓</span>
+            <span><strong>グローバルデータ配信の簡素化:</strong> 単一のリスティングで世界中のサブスクライバーにデータを提供でき、管理コストを削減</span>
+          </div>
+          <div class="check-item">
+            <span>✓</span>
+            <span><strong>レイテンシー改善:</strong> サブスクライバーが最寄りのリージョンからデータにアクセスできるため、クエリ性能が向上</span>
+          </div>
+        </div>
+        <div class="card card-green">
+          <h3>技術面</h3>
+          <div class="check-item">
+            <span>✓</span>
+            <span><strong>運用負荷の軽減:</strong> リージョンごとに個別のリスティングを作成・管理する必要がなくなった</span>
+          </div>
+          <div class="check-item">
+            <span>✓</span>
+            <span><strong>既存インフラとの統合:</strong> クロスリージョンレプリケーション機能との自然な統合により、追加の複雑性なく利用可能</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <div class="card card-orange">
+        <h3>マルチリージョン共有の制限事項</h3>
+        <div class="check-item">
+          <span>!</span>
+          <span>事前にクロスリージョンデータセットレプリケーションの設定が必要</span>
+        </div>
+        <div class="check-item">
+          <span>!</span>
+          <span>非同期レプリケーションにより、セカンダリリージョンでわずかなデータ遅延が発生する可能性</span>
+        </div>
+        <div class="check-item">
+          <span>!</span>
+          <span>レプリカストレージに対する追加の料金が発生</span>
+        </div>
+      </div>
+
+      <div class="card card-red">
+        <h3>Data Transfer Service の考慮点</h3>
+        <div class="check-item">
+          <span>!</span>
+          <span>2026年6月1日以降、37 か月以上前の Google Ads / Search Ads 360 / GA4 データのバックフィルは不可能</span>
+        </div>
+        <div class="check-item">
+          <span>!</span>
+          <span>期限前に必要な過去データの取得を完了させる必要がある</span>
+        </div>
+        <div class="check-item">
+          <span>!</span>
+          <span>既に BigQuery に保存されているデータには影響しないが、新規バックフィル操作のみ制限</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>🌍 ユースケース 1: グローバル企業のデータマーケットプレイス</h4>
+        <p><strong>シナリオ:</strong> 複数大陸にオフィスを持つ企業が、各地域のチームに対して分析用データセットを提供する場合</p>
+        <p><strong>効果:</strong> 単一のリスティングでグローバルに分散するチームが最寄りリージョンからデータにアクセスでき、クエリ性能の向上と管理の簡素化を実現</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>📊 ユースケース 2: Data Transfer Service の移行計画</h4>
+        <p><strong>シナリオ:</strong> 3年以上前の Google Ads データを定期的にバックフィルして分析に利用している広告運用チーム</p>
+        <p><strong>効果:</strong> 6月1日までに必要な過去データをすべてバックフィルしておくことで、変更後も既存の分析ワークフローを維持可能。長期保存が必要な場合は BigQuery 内でのデータ管理戦略の見直しが必要</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金</h2>
+
+      <h3>マルチリージョン共有</h3>
+      <table>
+        <tr><th>項目</th><th>料金</th></tr>
+        <tr><td>データレプリケーション</td><td>データレプリケーション料金に準拠</td></tr>
+        <tr><td>セカンダリリージョンのストレージ</td><td>プライマリリージョンと同等のストレージ料金</td></tr>
+        <tr><td>Analytics Hub リスティング</td><td>Analytics Hub の利用料金に準拠</td></tr>
+      </table>
+
+      <div class="note-box">
+        <strong>Data Transfer Service:</strong> 転送料金自体に変更はありません。バックフィル制限は料金ではなくデータ保持ポリシーに基づく制限です。
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+
+      <div class="feature-grid">
+        <div class="card">
+          <strong>BigQuery Analytics Hub</strong>
+          <p style="font-size: 14px; margin: 4px 0;">データセット共有のためのプラットフォーム。今回のマルチリージョン対応はこの機能の拡張。</p>
+        </div>
+        <div class="card">
+          <strong>クロスリージョンデータセットレプリケーション</strong>
+          <p style="font-size: 14px; margin: 4px 0;">マルチリージョン共有の前提条件となる機能。</p>
+        </div>
+        <div class="card">
+          <strong>BigQuery Data Transfer Service</strong>
+          <p style="font-size: 14px; margin: 4px 0;">Google Ads、Search Ads 360、GA4 からのデータ転送サービス。</p>
+        </div>
+        <div class="card">
+          <strong>Google Ads</strong>
+          <p style="font-size: 14px; margin: 4px 0;">データ保持ポリシーの変更元。2026年6月1日施行の新ポリシーが影響。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Action Timeline -->
+    <div class="section">
+      <h2>📅 対応タイムライン</h2>
+
+      <div class="flow-diagram">
+        <div class="flow-step">📋 影響確認<br><small>転送設定の棚卸し</small></div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">💾 バックフィル実行<br><small>37か月以前のデータ取得</small></div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">✅ 完了確認<br><small>6/1 までに完了</small></div>
+      </div>
+
+      <div class="warning-box">
+        <strong>対応期限: 2026年6月1日</strong><br>
+        過去 37 か月以上前のデータが必要な場合は、期限前にバックフィルを完了させてください。既に BigQuery に保存されているデータには影響はありません。
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>出典:</strong></p>
+      <ul style="margin: 4px 0; padding-left: 20px;">
+        <li><a href="https://docs.cloud.google.com/release-notes#May_06_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li><a href="https://docs.cloud.google.com/bigquery/docs/analytics-hub-manage-listings#create_a_listing" target="_blank" rel="noopener noreferrer">リスティングの作成 - Analytics Hub ドキュメント</a></li>
+        <li><a href="https://docs.cloud.google.com/bigquery/docs/transfer-changes#June01-google-ads" target="_blank" rel="noopener noreferrer">Data Transfer Service 変更ログ - Google Ads</a></li>
+        <li><a href="https://docs.cloud.google.com/bigquery/docs/transfer-changes#June01-search-ads" target="_blank" rel="noopener noreferrer">Data Transfer Service 変更ログ - Search Ads 360</a></li>
+        <li><a href="https://docs.cloud.google.com/bigquery/docs/transfer-changes#June01-ga4" target="_blank" rel="noopener noreferrer">Data Transfer Service 変更ログ - Google Analytics 4</a></li>
+        <li><a href="https://ads-developers.googleblog.com/2026/05/new-data-retention-policy-for-google.html" target="_blank" rel="noopener noreferrer">Google Ads 新データ保持ポリシー (2026年6月1日)</a></li>
+        <li><a href="https://docs.cloud.google.com/bigquery/docs/data-replication#use_dataset_replication" target="_blank" rel="noopener noreferrer">クロスリージョンデータセットレプリケーション</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline);">Generated: 2026-05-06 | Google Cloud News Infographic</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GKE 既知の問題: Cloud Storage FUSE マウント失敗 / Dataplane V2 接続タイムアウト</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 12px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-red {
+      border-left-color: var(--gc-red);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-issue {
+      background: var(--gc-red);
+      color: #FFFFFF;
+    }
+
+    .badge-fix {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .badge-workaround {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .after {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .before h4, .after h4 {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .before h4 { color: var(--gc-red); }
+    .after h4 { color: var(--gc-green); }
+
+    .mitigation-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .mitigation-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 16px;
+      border: 1px solid var(--gc-outline-variant);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .mitigation-card h4 {
+      margin: 0 0 8px 0;
+      font-size: 15px;
+      color: var(--gc-on-surface);
+    }
+
+    .mitigation-card p {
+      margin: 0;
+      font-size: 13px;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .recommended {
+      border: 2px solid var(--gc-green);
+      position: relative;
+    }
+
+    .recommended::after {
+      content: "推奨";
+      position: absolute;
+      top: -10px;
+      right: 12px;
+      background: var(--gc-green);
+      color: white;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 8px;
+      font-weight: 600;
+    }
+
+    .related-services {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .service-card {
+      background: var(--gc-surface);
+      border-radius: 8px;
+      padding: 12px 16px;
+      border: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    .service-card strong {
+      display: block;
+      color: var(--gc-on-surface);
+      margin-bottom: 4px;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+      .before-after { grid-template-columns: 1fr; }
+      .mitigation-grid { grid-template-columns: 1fr; }
+      .related-services { grid-template-columns: 1fr; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>&#9888;&#65039; GKE 既知の問題: メタデータサービス起動タイミング障害</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge badge-issue">Known Issue</span>
+          <span class="badge">GKE</span>
+          <span class="badge">Cloud Storage FUSE</span>
+          <span class="badge">Dataplane V2</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-06-23</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>&#128203; 概要</h2>
+      <p>GKE に関する <strong>2 件の既知の問題</strong>が公式に発表された。いずれも <span class="highlight">GKE メタデータサービスの起動タイミングに起因するレースコンディション</span> であり、ノード起動直後にワークロードがメタデータサーバーへ到達できないことで障害が発生する。</p>
+
+      <div class="before-after">
+        <div class="before">
+          <h4>&#10060; 問題発生時</h4>
+          <p style="margin:0; font-size:14px;">ノード起動直後、メタデータサーバーが Ready になる前にサイドカー/ワークロードがアクセスし、接続拒否 (Connection Refused) またはタイムアウトが発生</p>
+        </div>
+        <div class="after">
+          <h4>&#9989; 修正後 / 緩和策適用後</h4>
+          <p style="margin:0; font-size:14px;">initContainer でメタデータサーバーの準備完了を確認してからワークロードを起動、または修正バージョンで根本対応</p>
+        </div>
+      </div>
+
+      <div class="error-box">
+        <strong>&#128680; 影響:</strong> クラスタの可用性に直接影響。特にバースト的なスケールアウトやノードプールの自動スケーリング時に顕在化しやすい。
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>&#128736;&#65039; アーキテクチャ図: レースコンディションの発生メカニズム</h2>
+      <p>ノード起動時のメタデータサービス準備状態とサイドカー/ワークロードの起動タイミングのレースコンディションを示す。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+sequenceDiagram
+    participant Node as GKE Node
+    participant MDS as GKE Metadata Server&lt;br/&gt;(DaemonSet)
+    participant Sidecar as Cloud Storage FUSE&lt;br/&gt;Sidecar
+    participant WL as Workload Pod
+
+    Note over Node: ノード起動開始
+    Node->>MDS: DaemonSet スケジュール
+    Node->>Sidecar: FUSE サイドカー起動
+    Node->>WL: ワークロード Pod 起動
+
+    rect rgb(255, 230, 230)
+        Note over MDS: メタデータサービス<br/>まだ準備未完了
+        Sidecar->>MDS: トークン取得リクエスト<br/>GET /computeMetadata/v1/.../token
+        MDS-->>Sidecar: Connection Refused
+        Note over Sidecar: Failed to fetch<br/>identity pool
+        Sidecar-->>WL: MountVolume.SetUp failed
+    end
+
+    rect rgb(230, 255, 230)
+        Note over MDS: メタデータサービス Ready
+        WL->>MDS: (initContainer でリトライ後)<br/>トークン取得成功
+        MDS-->>WL: 200 OK + Token
+    end
+        </pre>
+      </div>
+    </div>
+
+    <!-- Issue 1 -->
+    <div class="section">
+      <h2>&#128308; 問題 1: Cloud Storage FUSE CSI マウント失敗</h2>
+      <div class="card card-red">
+        <h3>影響を受けるバージョン</h3>
+        <p><strong>GKE 1.34.1-gke.3899001 以降</strong> (サイドカーマウンター v1.21.9 以降)</p>
+      </div>
+
+      <h3>&#128161; エラー症状</h3>
+      <p>Pod イベントに以下のエラーが出力される:</p>
+      <span class="code-label">Error Log</span>
+      <pre><code class="language-plaintext">MountVolume.SetUp failed for volume "volume-name" : rpc error: code = Internal desc = the sidecar container terminated due to Error, exit code: 255</code></pre>
+
+      <p>gcsfuse-sidecar コンテナのログ:</p>
+      <span class="code-label">Sidecar Log</span>
+      <pre><code class="language-plaintext">Failed to fetch identity pool and identity provider details required for bucket access check,
+got error Failed to set up metadata service: failed to get project:
+Get "http://X.X.X.X/computeMetadata/v1/project/project-id":
+dial tcp 169.254.169.254:80: connect: connection refused
+for identity pool PROJECT_ID.svc.id.goog
+and identity provider https://container.googleapis.com/v1/projects/PROJECT_ID/locations/LOCATION/clusters/CLUSTER_NAME</code></pre>
+
+      <h3>&#128270; 原因</h3>
+      <p>Cloud Storage FUSE サイドカーが <strong>Workload Identity Federation for GKE</strong> を使用してバケットアクセスの認証情報を取得する際、GKE メタデータサーバー (<code>169.254.169.254:80</code>) に接続する。ノード起動直後はメタデータサーバーの DaemonSet Pod がまだ Ready 状態になっておらず、接続が拒否される。</p>
+    </div>
+
+    <!-- Issue 2 -->
+    <div class="section">
+      <h2>&#128992; 問題 2: Dataplane V2 + Workload Identity Federation 接続タイムアウト</h2>
+      <div class="card card-orange">
+        <h3>影響を受けるバージョン</h3>
+        <p><strong>GKE 1.35 以降</strong></p>
+      </div>
+
+      <h3>&#128161; エラー症状</h3>
+      <ul>
+        <li>ノード起動直後にワークロードが GKE メタデータサーバーへの接続タイムアウトまたは接続拒否を経験</li>
+        <li>Workload Identity Federation を使用した Google Cloud API への認証が一時的に失敗</li>
+      </ul>
+
+      <h3>&#128270; 原因</h3>
+      <p>GKE 1.35 以降では <strong>ノード起動が高速化 (Faster Node Startup)</strong> されたことで、ワークロード Pod がスケジュールされるタイミングが従来より早くなった。その結果、メタデータサーバーの準備が完了する前にワークロードが認証リクエストを送信し、タイムアウトや接続拒否が発生する。</p>
+    </div>
+
+    <!-- Technical Specs -->
+    <div class="section">
+      <h2>&#128202; 技術仕様</h2>
+
+      <h3>影響バージョンと修正バージョン</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>問題</th>
+            <th>影響バージョン</th>
+            <th>修正バージョン</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Cloud Storage FUSE CSI マウント失敗</td>
+            <td>1.34.1-gke.3899001+ (sidecar mounter 1.21.9+)</td>
+            <td><span class="badge badge-fix">1.34.8-gke.1218000+</span><span class="badge badge-fix">1.35.3-gke.2347000+</span><span class="badge badge-fix">1.36.0-gke.1266000+</span></td>
+          </tr>
+          <tr>
+            <td>Dataplane V2 接続タイムアウト</td>
+            <td>1.35 以降</td>
+            <td><span class="badge badge-workaround">将来のパッチで修正予定</span></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>GKE メタデータサーバーの通信要件</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>メタデータサーバー IP</td><td><code>169.254.169.254</code></td></tr>
+          <tr><td>ポート</td><td>80 (Dataplane V2 クラスタ)</td></tr>
+          <tr><td>プロトコル</td><td>HTTP</td></tr>
+          <tr><td>ヘッダー</td><td><code>Metadata-Flavor: Google</code></td></tr>
+          <tr><td>トークンエンドポイント</td><td><code>/computeMetadata/v1/instance/service-accounts/default/token</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Mitigation: Issue 1 -->
+    <div class="section">
+      <h2>&#128295; 緩和策: 問題 1 (Cloud Storage FUSE CSI)</h2>
+
+      <div class="mitigation-grid">
+        <div class="mitigation-card recommended">
+          <h4>&#9989; 方法 A: アップグレード</h4>
+          <p>修正バージョンへのアップグレードが最も確実な対応策</p>
+        </div>
+        <div class="mitigation-card">
+          <h4>&#128260; 方法 B: initContainer</h4>
+          <p>メタデータサービスの準備完了を待機するコンテナを追加</p>
+        </div>
+        <div class="mitigation-card">
+          <h4>&#128736;&#65039; 方法 C: 手動インジェクション</h4>
+          <p>サイドカーを手動インジェクションし起動順序を制御</p>
+        </div>
+      </div>
+
+      <h3>方法 A: 修正バージョンへのアップグレード</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># クラスタのバージョンを確認
+gcloud container clusters describe CLUSTER_NAME \
+  --location=LOCATION \
+  --format="value(currentMasterVersion)"
+
+# 修正バージョンへアップグレード
+gcloud container clusters upgrade CLUSTER_NAME \
+  --location=LOCATION \
+  --cluster-version=1.34.8-gke.1218000</code></pre>
+
+      <h3>方法 B: initContainer でメタデータサービスの準備を待機</h3>
+      <span class="code-label">YAML</span>
+      <pre><code class="language-yaml">apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-with-gcsfuse
+  annotations:
+    gke-gcsfuse/volumes: "true"
+spec:
+  serviceAccountName: KSA_NAME
+  initContainers:
+  - image: gcr.io/google.com/cloudsdktool/cloud-sdk:alpine
+    name: workload-identity-initcontainer
+    command:
+    - '/bin/bash'
+    - '-c'
+    - |
+      curl -sS -H 'Metadata-Flavor: Google' \
+        'http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token' \
+        --retry 30 --retry-connrefused --retry-max-time 60 \
+        --connect-timeout 3 --fail --retry-all-errors > /dev/null \
+        && exit 0 \
+        || echo 'Retry limit exceeded.' >&2; exit 1
+  containers:
+  - image: gcr.io/your-project/your-image
+    name: main-container
+    volumeMounts:
+    - name: gcs-fuse-csi-ephemeral
+      mountPath: /data
+  volumes:
+  - name: gcs-fuse-csi-ephemeral
+    csi:
+      driver: gcsfuse.csi.storage.gke.io
+      volumeAttributes:
+        bucketName: BUCKET_NAME</code></pre>
+    </div>
+
+    <!-- Mitigation: Issue 2 -->
+    <div class="section">
+      <h2>&#128295; 緩和策: 問題 2 (Dataplane V2 接続タイムアウト)</h2>
+
+      <div class="mitigation-grid">
+        <div class="mitigation-card recommended">
+          <h4>&#128260; 方法 A: initContainer</h4>
+          <p>問題 1 と同様のパターンでメタデータサーバー待機</p>
+        </div>
+        <div class="mitigation-card">
+          <h4>&#128683; 方法 B: Faster Node Startup 無効化</h4>
+          <p>Network Policy で高速起動機能を無効化</p>
+        </div>
+        <div class="mitigation-card">
+          <h4>&#9203; 将来のパッチ</h4>
+          <p>根本修正は将来のパッチリリースで提供予定</p>
+        </div>
+      </div>
+
+      <h3>方法 B: Network Policy で Faster Node Startup を無効化</h3>
+      <span class="code-label">YAML</span>
+      <pre><code class="language-yaml">apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: disable-faster-startup
+  namespace: no-workloads-namespace
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress</code></pre>
+
+      <div class="note-box">
+        <strong>&#128161; ポイント:</strong> ワークロードが存在しない Namespace に Network Policy を追加することで、Faster Node Startup 機能が無効化される。Network Policy の存在自体がトリガーとなる。
+      </div>
+    </div>
+
+    <!-- Considerations -->
+    <div class="section">
+      <h2>&#9888;&#65039; デメリット・制約事項</h2>
+
+      <div class="warning-box">
+        <strong>&#128680; 影響範囲:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>Cloud Storage FUSE CSI ドライバーを使用するすべてのワークロードが影響を受ける可能性</li>
+          <li>Workload Identity Federation を使用し、起動時にリトライロジックを持たないアプリケーションが影響対象</li>
+          <li>バースト的なスケールアウトやノードプールの自動スケーリング時に顕在化しやすい</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>&#128203; 考慮すべきトレードオフ</h3>
+        <div class="icon-text"><span>&#9679;</span><span><strong>initContainer 追加</strong>: Pod の起動時間が数秒~最大 60 秒延長される可能性</span></div>
+        <div class="icon-text"><span>&#9679;</span><span><strong>Network Policy 方式</strong>: ノード起動速度の改善効果 (Faster Node Startup) が失われる</span></div>
+        <div class="icon-text"><span>&#9679;</span><span><strong>Dataplane V2 問題</strong>: 根本修正は将来のパッチ。当面はワークアラウンドのみ</span></div>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#128279; 関連サービス・機能</h2>
+      <div class="related-services">
+        <div class="service-card">
+          <strong>&#128451;&#65039; Cloud Storage FUSE CSI ドライバー</strong>
+          GKE Pod から Cloud Storage バケットをファイルシステムとしてマウントするためのドライバー
+        </div>
+        <div class="service-card">
+          <strong>&#128272; Workload Identity Federation for GKE</strong>
+          Kubernetes ServiceAccount と Google Cloud IAM を連携させる認証メカニズム
+        </div>
+        <div class="service-card">
+          <strong>&#128421;&#65039; GKE Dataplane V2</strong>
+          eBPF (Cilium) ベースのネットワークデータプレーン
+        </div>
+        <div class="service-card">
+          <strong>&#128196; GKE メタデータサーバー</strong>
+          ノード上で DaemonSet として動作し、Workload Identity のトークン発行を仲介するコンポーネント
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>&#128221; まとめ</h2>
+      <div class="success-box">
+        <strong>&#9989; 推奨アクション:</strong>
+        <ol style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li><strong>Cloud Storage FUSE CSI 利用者</strong>: 修正バージョン (1.34.8-gke.1218000+, 1.35.3-gke.2347000+, 1.36.0-gke.1266000+) へのアップグレード</li>
+          <li><strong>即時アップグレードが困難な場合</strong>: initContainer によるメタデータサービス待機パターンの適用</li>
+          <li><strong>Dataplane V2 問題</strong>: initContainer または Network Policy による緩和策で当面対処、将来のパッチを待つ</li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>&#128206; 出典:</p>
+      <ul style="list-style: none; padding: 0; margin: 4px 0;">
+        <li><a href="https://docs.cloud.google.com/release-notes#June_23_2026" target="_blank" rel="noopener noreferrer">Google Cloud Release Notes (June 23, 2026)</a></li>
+        <li><a href="https://docs.cloud.google.com/kubernetes-engine/docs/how-to/cloud-storage-fuse-csi-driver-setup" target="_blank" rel="noopener noreferrer">Cloud Storage FUSE CSI ドライバー セットアップガイド</a></li>
+        <li><a href="https://github.com/GoogleCloudPlatform/gcs-fuse-csi-driver/blob/main/docs/troubleshooting.md" target="_blank" rel="noopener noreferrer">Cloud Storage FUSE CSI ドライバー トラブルシューティング (GitHub)</a></li>
+        <li><a href="https://docs.cloud.google.com/kubernetes-engine/docs/troubleshooting/authentication#troubleshoot-timeout" target="_blank" rel="noopener noreferrer">Workload Identity Federation 認証トラブルシューティング</a></li>
+        <li><a href="https://docs.cloud.google.com/kubernetes-engine/docs/how-to/dataplane-v2" target="_blank" rel="noopener noreferrer">GKE Dataplane V2 既知の問題</a></li>
+        <li><a href="https://docs.cloud.google.com/kubernetes-engine/docs/troubleshooting/known-issues" target="_blank" rel="noopener noreferrer">GKE 既知の問題一覧</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: #999;">Generated: 2026-06-24</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

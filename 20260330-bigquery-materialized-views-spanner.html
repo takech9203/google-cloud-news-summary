@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BigQuery: Spanner データに対する非インクリメンタル Materialized View が GA</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    /* Google Cloud Light Theme Base Styles */
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 12px;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--gc-outline);
+      text-align: right;
+      min-width: 120px;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); color: #FFFFFF; }
+
+    .badges-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-bottom: 16px;
+    }
+
+    /* Before/After */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .before-box h4 {
+      color: var(--gc-red);
+      margin-bottom: 8px;
+      font-size: 15px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .after-box h4 {
+      color: var(--gc-green);
+      margin-bottom: 8px;
+      font-size: 15px;
+    }
+
+    .before-box ul, .after-box ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .before-box li, .after-box li {
+      padding: 4px 0;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .before-box li::before { content: "✗ "; color: var(--gc-red); font-weight: bold; }
+    .after-box li::before { content: "✓ "; color: var(--gc-green); font-weight: bold; }
+
+    /* Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    /* Feature cards */
+    .feature-cards {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+
+    .feature-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .feature-card h4 {
+      color: var(--gc-on-surface);
+      margin-bottom: 8px;
+      font-size: 16px;
+    }
+
+    .feature-card p {
+      font-size: 14px;
+      margin: 0;
+    }
+
+    /* Usecase */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-900);
+      margin-bottom: 8px;
+    }
+
+    .usecase-card p {
+      font-size: 14px;
+      margin: 4px 0;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* Code blocks */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-block {
+      overflow: hidden;
+      padding: 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+      font-family: 'Roboto Mono', monospace;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      border-radius: 0;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Mermaid container */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Note/Warning boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Merits/Demerits */
+    .merit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .merit-box {
+      background: var(--gc-green-tint);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-green);
+    }
+
+    .merit-box h4 { color: var(--gc-green); margin-bottom: 12px; }
+
+    .demerit-box {
+      background: var(--gc-yellow-tint);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-yellow);
+    }
+
+    .demerit-box h4 { color: #E37400; margin-bottom: 12px; }
+
+    .merit-box ul, .demerit-box ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .merit-box li, .demerit-box li {
+      padding: 4px 0;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .merit-box li::before { content: "✓ "; color: var(--gc-green); font-weight: bold; }
+    .demerit-box li::before { content: "! "; color: #E37400; font-weight: bold; }
+
+    /* Flow diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* GC Link */
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* Pricing table */
+    .pricing-section table td:first-child {
+      font-weight: 600;
+      color: var(--gc-on-surface);
+    }
+
+    /* Related services */
+    .related-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .related-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 16px;
+      border: 1px solid var(--gc-outline-variant);
+      box-shadow: 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .related-card strong {
+      color: var(--gc-on-surface);
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .related-card p {
+      font-size: 13px;
+      margin: 0;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    footer ul {
+      list-style: none;
+      padding: 0;
+      margin: 8px 0;
+    }
+
+    footer li {
+      padding: 2px 0;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; }
+      .subtitle { text-align: left; margin-top: 8px; }
+      .before-after, .merit-grid, .related-grid { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .flow-diagram { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>☁️ BigQuery: Spanner データに対する非インクリメンタル Materialized View が GA</h1>
+        <div class="badges-row" style="margin-top: 12px;">
+          <span class="badge">BigQuery</span>
+          <span class="badge" style="background: #F4B400; color: #FFFFFF;">Spanner</span>
+          <span class="badge badge-ga">GA</span>
+        </div>
+      </div>
+      <div class="subtitle">
+        2026-03-30<br>
+        Google Cloud Release Notes
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>BigQuery において、<span class="highlight">Spanner 外部データセットに対する非インクリメンタル Materialized View</span> の作成が一般提供 (GA) となりました。<code>allow_non_incremental_definition</code> オプションを使用することで、Spanner データに対するクエリ結果を定期的にキャッシュし、クエリパフォーマンスを大幅に向上させることが可能になります。</p>
+      <p style="margin-top: 12px;">Spanner はトランザクション処理に優れた OLTP データベースですが、分析クエリの実行には最適化されていません。BigQuery の Materialized View を活用することで、Spanner に格納されたデータに対する集計・フィルタリング・結合などの分析クエリを高速化でき、ハイブリッドアーキテクチャが構築できます。</p>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h4>❌ アップデート前の課題</h4>
+          <ul>
+            <li>Materialized View は Preview 段階で本番利用に制限あり</li>
+            <li>分析クエリは毎回 Data Boost 経由でデータ取得が必要</li>
+            <li>Spanner から BigQuery へのデータパイプラインを別途構築する必要があった</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h4>✅ アップデート後の改善</h4>
+          <ul>
+            <li>GA リリースにより本番環境での利用が正式サポート</li>
+            <li><code>max_staleness</code> と <code>refresh_interval_minutes</code> で鮮度を柔軟に制御</li>
+            <li>定期キャッシュ更新で分析クエリのコストとレイテンシを大幅削減</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value">GA</div>
+        <div class="stat-label">本番環境での SLA 適用</div>
+      </div>
+      <div class="stat-card" style="background: linear-gradient(135deg, #34A853, #1E8E3E);">
+        <div class="stat-value">60 min</div>
+        <div class="stat-label">リフレッシュ間隔 (設定例)</div>
+      </div>
+      <div class="stat-card" style="background: linear-gradient(135deg, #F4B400, #E37400);">
+        <div class="stat-value">24 H</div>
+        <div class="stat-label">max_staleness (設定例)</div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    subgraph Spanner["Cloud Spanner"]
+        A[("トランザクション\nデータベース")]
+    end
+
+    subgraph Connection["BigQuery Connection"]
+        B["CLOUD_RESOURCE\nコネクション"]
+    end
+
+    subgraph BigQuery["BigQuery"]
+        C["Spanner 外部\nデータセット"]
+        D["非インクリメンタル\nMaterialized View"]
+        E["クエリエンジン"]
+    end
+
+    subgraph Users["ユーザー"]
+        F["データアナリスト /\nBI ツール"]
+    end
+
+    A -- "Data Boost" --> B
+    B --> C
+    C -- "定期リフレッシュ\n(全体再構築)" --> D
+    D -- "キャッシュ済み\n結果を返却" --> E
+    C -- "max_staleness 超過時\n直接読み取り" --> E
+    F -- "クエリ実行" --> E
+        </pre>
+      </div>
+      <p style="font-size: 14px; margin-top: 8px;">Spanner のデータは CLOUD_RESOURCE コネクション経由で BigQuery の外部データセットとして公開されます。Materialized View は定期的にリフレッシュされ、キャッシュされた結果を返却します。<code>max_staleness</code> を超過した場合は、ベーステーブル (Spanner) から直接データが読み取られます。</p>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="feature-cards">
+        <div class="feature-card">
+          <h4>🔧 非インクリメンタル Materialized View の作成</h4>
+          <p><code>allow_non_incremental_definition = true</code> オプションを指定して、Spanner 外部データセットのテーブルに対する Materialized View を作成可能。リフレッシュ時にビュー全体が再構築されます。</p>
+        </div>
+        <div class="feature-card" style="border-left-color: var(--gc-green);">
+          <h4>🔄 自動リフレッシュ制御</h4>
+          <p><code>enable_refresh = true</code> で自動リフレッシュを有効化。<code>refresh_interval_minutes</code> でリフレッシュ間隔を分単位で指定可能。リフレッシュはバックグラウンドで実行され、クエリの可用性に影響しません。</p>
+        </div>
+        <div class="feature-card" style="border-left-color: #F4B400;">
+          <h4>📊 データ鮮度管理 (max_staleness)</h4>
+          <p><code>max_staleness</code> パラメータでキャッシュデータの許容鮮度を設定。範囲内であればキャッシュから返却、超過時は Spanner のベーステーブルから直接読み取ります。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specs -->
+    <div class="section">
+      <h2>📐 技術仕様</h2>
+      <h3>Materialized View の設定パラメータ</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>パラメータ</th>
+            <th>説明</th>
+            <th>例</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>allow_non_incremental_definition</code></td>
+            <td>非インクリメンタル定義を許可 (Spanner では必須)</td>
+            <td><code>true</code></td>
+          </tr>
+          <tr>
+            <td><code>enable_refresh</code></td>
+            <td>自動リフレッシュの有効/無効</td>
+            <td><code>true</code></td>
+          </tr>
+          <tr>
+            <td><code>refresh_interval_minutes</code></td>
+            <td>リフレッシュ間隔 (分)</td>
+            <td><code>60</code></td>
+          </tr>
+          <tr>
+            <td><code>max_staleness</code></td>
+            <td>キャッシュデータの最大許容鮮度</td>
+            <td><code>INTERVAL "24" HOUR</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top: 20px;">必要な権限とロール</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>ロール / 権限</th>
+            <th>用途</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>bigquery.connections.delegate</code></td>
+            <td>CLOUD_RESOURCE コネクションの作成・管理 (BigQuery Connection Admin ロール)</td>
+          </tr>
+          <tr>
+            <td><code>bigquery.tables.create</code></td>
+            <td>Materialized View の作成</td>
+          </tr>
+          <tr>
+            <td>Spanner データベースへの読み取り権限</td>
+            <td>コネクションのサービスアカウントに付与</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup Steps -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <div class="note-box">
+        <strong>💡 前提条件:</strong> Spanner データベースが作成済み / CLOUD_RESOURCE コネクションが作成済み / サービスアカウントに読み取り権限付与済み / Spanner 外部データセットが作成済み
+      </div>
+
+      <h3>ステップ 1: CLOUD_RESOURCE コネクションの作成</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">コネクション作成</span>
+        </div>
+        <pre><code class="language-bash">bq mk --connection --location=REGION --project_id=PROJECT_ID \
+  --connection_type=CLOUD_RESOURCE CONNECTION_ID
+
+# サービスアカウント ID の確認
+bq show --connection PROJECT_ID.REGION.CONNECTION_ID</code></pre>
+      </div>
+
+      <h3>ステップ 2: Spanner 外部データセットの作成</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">外部データセット作成</span>
+        </div>
+        <pre><code class="language-sql">CREATE EXTERNAL SCHEMA spanner_external_dataset
+  WITH CONNECTION PROJECT_ID.REGION.CONNECTION_ID
+  OPTIONS (
+    external_source = 'google-cloudspanner:/projects/PROJECT_ID/instances/INSTANCE/databases/DATABASE',
+    location = 'REGION'
+  );</code></pre>
+      </div>
+
+      <h3>ステップ 3: 非インクリメンタル Materialized View の作成</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">Materialized View 作成</span>
+        </div>
+        <pre><code class="language-sql">CREATE MATERIALIZED VIEW my_dataset.my_spanner_mv
+  OPTIONS (
+    enable_refresh = true,
+    refresh_interval_minutes = 60,
+    max_staleness = INTERVAL "24" HOUR,
+    allow_non_incremental_definition = true
+  )
+AS
+  SELECT
+    column1,
+    COUNT(*) AS cnt,
+    SUM(column2) AS total
+  FROM
+    spanner_external_dataset.my_table
+  GROUP BY
+    column1;</code></pre>
+      </div>
+
+      <h3>ステップ 4: Materialized View へのクエリ実行</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">クエリ実行</span>
+        </div>
+        <pre><code class="language-sql">SELECT * FROM my_dataset.my_spanner_mv;</code></pre>
+      </div>
+    </div>
+
+    <!-- Merits / Demerits -->
+    <div class="section">
+      <h2>⚖️ メリット / デメリット</h2>
+      <div class="merit-grid">
+        <div class="merit-box">
+          <h4>✅ メリット</h4>
+          <ul>
+            <li>繰り返し分析クエリのコスト削減 (Data Boost 使用量 + BigQuery クエリコスト)</li>
+            <li>Spanner→BigQuery のデータパイプライン構築が不要になり運用負荷軽減</li>
+            <li>GA リリースにより SLA 適用、本番ワークロードを正式サポート</li>
+            <li>事前計算された集計結果でクエリレイテンシが大幅改善</li>
+            <li><code>max_staleness</code> + <code>refresh_interval_minutes</code> で鮮度とパフォーマンスのバランス調整可能</li>
+            <li>分析クエリをキャッシュで処理し Spanner への負荷を軽減</li>
+          </ul>
+        </div>
+        <div class="demerit-box">
+          <h4>⚠️ デメリット・制約</h4>
+          <ul>
+            <li>差分リフレッシュ非対応 (全体再構築のため大量データ時にコスト増)</li>
+            <li>スマートチューニング (自動リライト) は非インクリメンタル MV に非対応</li>
+            <li><code>max_staleness</code> 超過時は直接読み取りでレイテンシ増加の可能性</li>
+            <li>SQL 定義は作成後変更不可 (変更時は再作成が必要)</li>
+            <li>CLOUD_RESOURCE コネクション必須 (EUC 認証は使用不可)</li>
+            <li>列レベルセキュリティ制約がある場合はクエリ実行時に制約検証</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+      <div class="usecase-card">
+        <h4>🛒 ユースケース 1: EC サイトの売上ダッシュボード</h4>
+        <p><strong>シナリオ:</strong> Spanner でトランザクション処理を行う EC サイトにおいて、日次の売上集計ダッシュボードを Looker で表示。リアルタイム性は不要だが 1 時間以内のデータ鮮度を確保したい。</p>
+        <div class="code-block" style="margin-top: 12px;">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">EC サイト売上集計</span>
+          </div>
+          <pre><code class="language-sql">CREATE MATERIALIZED VIEW analytics.daily_sales_summary
+  OPTIONS (
+    enable_refresh = true,
+    refresh_interval_minutes = 30,
+    max_staleness = INTERVAL "1" HOUR,
+    allow_non_incremental_definition = true
+  )
+AS
+  SELECT
+    DATE(order_timestamp) AS order_date,
+    product_category,
+    COUNT(*) AS order_count,
+    SUM(total_amount) AS total_sales,
+    AVG(total_amount) AS avg_order_value
+  FROM
+    spanner_ecommerce.orders
+  GROUP BY
+    order_date, product_category;</code></pre>
+        </div>
+        <p style="margin-top: 8px;">→ Looker ダッシュボードのロード時間が数十秒から数秒に短縮、Data Boost 使用量も大幅削減。</p>
+      </div>
+      <div class="usecase-card" style="background: var(--gc-teal-tint);">
+        <h4>📡 ユースケース 2: IoT デバイスのセンサーデータ分析</h4>
+        <p><strong>シナリオ:</strong> Spanner に格納された IoT センサーデータに対して、デバイスごとの統計情報を定期的に分析。24 時間以内のデータ鮮度で十分。</p>
+        <p style="margin-top: 8px;">→ 大量のセンサーデータに対する集計クエリが事前計算され、アドホッククエリの応答時間が劇的に改善。Data Boost コストも最適化。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section pricing-section">
+      <h2>💰 料金情報</h2>
+      <p>Materialized View の料金は以下の 3 つの要素で構成されます。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>コンポーネント</th>
+            <th>オンデマンド料金</th>
+            <th>容量ベース料金</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>クエリ</td>
+            <td>MV およびベーステーブルから処理されたバイト数に基づく</td>
+            <td>クエリ実行中のスロット消費</td>
+          </tr>
+          <tr>
+            <td>メンテナンス (リフレッシュ)</td>
+            <td>リフレッシュ時に処理されたバイト数に基づく</td>
+            <td>リフレッシュ時のスロット消費</td>
+          </tr>
+          <tr>
+            <td>ストレージ</td>
+            <td>MV に格納されたバイト数に基づく</td>
+            <td>MV に格納されたバイト数に基づく</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="warning-box" style="margin-top: 12px;">
+        <strong>⚠️ 注意:</strong> Spanner 側では Data Boost の使用に対する料金が発生します。リフレッシュ時に Spanner からデータを取得する際は Data Boost が使用されるため、リフレッシュ頻度に応じた Data Boost コストを考慮してください。
+      </div>
+    </div>
+
+    <!-- Region -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <p>BigQuery の Materialized View は、BigQuery がサポートする<span class="highlight">すべてのリージョンおよびマルチリージョン</span>で利用可能です。ただし、CLOUD_RESOURCE コネクションは Spanner データベースと同じロケーションに作成する必要があります。</p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="related-grid">
+        <div class="related-card">
+          <strong>☁️ Cloud Spanner</strong>
+          <p>トランザクション処理を行うベースデータベース。外部データセットのソースとなる。</p>
+        </div>
+        <div class="related-card">
+          <strong>🔌 BigQuery Connection (CLOUD_RESOURCE)</strong>
+          <p>Spanner と BigQuery を接続するコネクション。サービスアカウントによるアクセス委任を実現。</p>
+        </div>
+        <div class="related-card">
+          <strong>⚡ Spanner Data Boost</strong>
+          <p>フェデレーテッドクエリおよびリフレッシュ時に使用される独立したコンピューティングリソース。</p>
+        </div>
+        <div class="related-card">
+          <strong>📊 BigQuery Materialized View (インクリメンタル)</strong>
+          <p>BigQuery マネージドストレージテーブルに対する標準的な MV。スマートチューニングをサポート。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>📎 出典・参考リンク:</strong></p>
+      <ul>
+        <li>📄 <a href="https://docs.cloud.google.com/release-notes#March_30_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li>📖 <a href="https://docs.cloud.google.com/bigquery/docs/materialized-views-create#spanner" target="_blank" rel="noopener noreferrer">ドキュメント: Spanner データに対する Materialized View の作成</a></li>
+        <li>📖 <a href="https://docs.cloud.google.com/bigquery/docs/materialized-views-intro" target="_blank" rel="noopener noreferrer">ドキュメント: Materialized View の概要</a></li>
+        <li>📖 <a href="https://docs.cloud.google.com/bigquery/docs/spanner-external-datasets" target="_blank" rel="noopener noreferrer">ドキュメント: Spanner 外部データセット</a></li>
+        <li>💰 <a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer">料金ページ: BigQuery</a></li>
+        <li>💰 <a href="https://cloud.google.com/spanner/pricing" target="_blank" rel="noopener noreferrer">料金ページ: Spanner Data Boost</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline);">Generated: 2026-03-30 | Google Cloud News Infographic</p>
+    </footer>
+
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

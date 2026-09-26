@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Managed Service for Apache Kafka: zstd トピック圧縮サポート</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1 {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-green);
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 20px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .before-card h3, .after-card h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-card ul, .after-card ul {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    .before-card li, .after-card li {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .usecase-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h3 {
+      color: var(--gc-blue-900);
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .usecase-card p {
+      font-size: 14px;
+      margin: 8px 0 0 0;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .feature-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .feature-card h3 {
+      margin-top: 0;
+      color: var(--gc-blue-800);
+      font-size: 16px;
+    }
+
+    .feature-card p {
+      margin: 8px 0 0 0;
+      font-size: 14px;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      background: #1E1E1E;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .region-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .region-group {
+      background: var(--gc-surface);
+      border-radius: 8px;
+      padding: 16px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .region-group h4 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      margin: 0 0 8px 0;
+    }
+
+    .region-group p {
+      font-size: 12px;
+      color: var(--gc-on-surface-variant);
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    .pricing-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid var(--gc-outline-variant);
+      margin: 12px 0;
+    }
+
+    .pricing-card h3 {
+      margin-top: 0;
+    }
+
+    .discount-badge {
+      display: inline-block;
+      background: var(--gc-green);
+      color: #FFFFFF;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-left: 8px;
+    }
+
+    .related-services {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .related-service-card {
+      background: var(--gc-surface);
+      border-radius: 8px;
+      padding: 16px;
+      border: 1px solid var(--gc-outline-variant);
+      box-shadow: 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .related-service-card h4 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      margin: 0 0 8px 0;
+    }
+
+    .related-service-card p {
+      font-size: 13px;
+      color: var(--gc-on-surface-variant);
+      margin: 0;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stat-cards { grid-template-columns: 1fr; }
+      .usecase-grid { grid-template-columns: 1fr; }
+      .region-grid { grid-template-columns: 1fr; }
+      .related-services { grid-template-columns: 1fr; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>📦 Managed Kafka: zstd トピック圧縮サポート</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Managed Service for Apache Kafka</span>
+          <span class="badge-ga">GA</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-07-07</div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>Google Cloud Managed Service for Apache Kafka において、トピックレベルの圧縮設定で <span class="highlight">zstd (Zstandard)</span> アルゴリズムがサポートされました。zstd は Meta (Facebook) が開発した高性能な可逆圧縮アルゴリズムで、従来の gzip や snappy と比較して、圧縮率と速度の両面で優れたバランスを提供します。</p>
+      <p>トピック作成時または更新時に <code>compression.type=zstd</code> を指定するだけで利用開始できます。大量のメッセージストリーミングを行うワークロードにおいて、ストレージコストの削減とネットワーク帯域幅の効率的な利用が可能になります。</p>
+    </div>
+
+    <!-- Before/After Section -->
+    <div class="section">
+      <h2>🔄 Before / After</h2>
+      <div class="before-after">
+        <div class="before-card">
+          <h3>❌ Before (課題)</h3>
+          <ul>
+            <li>トピック圧縮に zstd を指定できず、高圧縮率と高速処理を両立する選択肢が限定的</li>
+            <li>gzip は圧縮率が高いが処理速度が遅い</li>
+            <li>snappy は高速だが圧縮率が低い</li>
+            <li>大容量ストリーミングのコスト最適化に制約</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h3>✅ After (改善)</h3>
+          <ul>
+            <li><code>compression.type=zstd</code> で圧縮率と速度のバランスを最適化</li>
+            <li>ティアード・ストレージとの組み合わせでコスト削減</li>
+            <li>プロデューサー側 zstd 圧縮時はブローカーでの再圧縮が不要</li>
+            <li>CPU 負荷の軽減</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats Section -->
+    <div class="section">
+      <h2>📊 数字で見る zstd の特徴</h2>
+      <div class="stat-cards">
+        <div class="stat-card">
+          <div class="stat-value">gzip同等+</div>
+          <div class="stat-label">圧縮率</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">snappy並</div>
+          <div class="stat-label">解凍速度</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-green), #1B5E20);">
+          <div class="stat-value">5-10x</div>
+          <div class="stat-label">テキストデータ圧縮率</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>プロデューサーで zstd 圧縮されたメッセージがブローカーに送信され、ティアード・ストレージに永続化されるまでのデータフローを示しています。圧縮済みのまま保存されるため、ストレージ使用量が削減されます。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    subgraph Producer["プロデューサー"]
+        P1[アプリケーション]
+        P2[zstd 圧縮]
+    end
+
+    subgraph ManagedKafka["Managed Service for Apache Kafka"]
+        subgraph Broker["ブローカー"]
+            B1[トピック\ncompression.type=zstd]
+        end
+        subgraph LocalStorage["ローカルストレージ"]
+            LS[SSD Persistent Disk\n圧縮済みセグメント]
+        end
+        subgraph TieredStorage["ティアード・ストレージ"]
+            TS[Cloud Storage\n圧縮済みデータ永続化]
+        end
+    end
+
+    subgraph Consumer["コンシューマー"]
+        C1[zstd 解凍]
+        C2[アプリケーション]
+    end
+
+    P1 --> P2
+    P2 -->|圧縮済みメッセージ| B1
+    B1 --> LS
+    LS -->|セグメントロール後| TS
+    B1 -->|圧縮済みメッセージ| C1
+    C1 --> C2
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features Section -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <h3>🗜️ zstd トピック圧縮</h3>
+          <p>トピックレベルの設定パラメータ <code>compression.type</code> に <code>zstd</code> を指定可能。プロデューサーが zstd で圧縮済みのメッセージはそのまま保存 (再圧縮なし) され、CPU 負荷を軽減します。</p>
+        </div>
+        <div class="feature-card">
+          <h3>🔀 既存圧縮オプションとの共存</h3>
+          <p><code>producer</code>、<code>gzip</code>、<code>snappy</code>、<code>lz4</code>、<code>zstd</code>、<code>uncompressed</code> から選択可能。トピック単位で異なる圧縮方式を設定でき、既存トピックの設定も後から変更可能です。</p>
+        </div>
+        <div class="feature-card">
+          <h3>☁️ ティアード・ストレージとの統合</h3>
+          <p>圧縮されたセグメントがそのままローカル SSD から Cloud Storage に移動。永続化層でも圧縮効果を維持し、ストレージコストを大幅に削減できます。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specs Section -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+      <h3>zstd 圧縮の特性</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>アルゴリズム</td><td>Zstandard (zstd) - RFC 8878</td></tr>
+          <tr><td>開発元</td><td>Meta (Facebook)</td></tr>
+          <tr><td>圧縮率</td><td>gzip と同等以上 (データに依存)</td></tr>
+          <tr><td>圧縮速度</td><td>gzip より高速、snappy に近い</td></tr>
+          <tr><td>解凍速度</td><td>非常に高速 (snappy と同等)</td></tr>
+          <tr><td>Kafka 設定キー</td><td><code>compression.type</code></td></tr>
+          <tr><td>設定値</td><td><code>zstd</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3>圧縮方式の比較</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>圧縮方式</th>
+            <th>圧縮率</th>
+            <th>圧縮速度</th>
+            <th>解凍速度</th>
+            <th>推奨ユースケース</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>zstd</strong></td><td>高い</td><td>高速</td><td>非常に高速</td><td>汎用 (バランス重視)</td></tr>
+          <tr><td>gzip</td><td>高い</td><td>低速</td><td>中程度</td><td>ストレージ削減重視</td></tr>
+          <tr><td>snappy</td><td>低い</td><td>非常に高速</td><td>非常に高速</td><td>レイテンシ重視</td></tr>
+          <tr><td>lz4</td><td>中程度</td><td>非常に高速</td><td>非常に高速</td><td>スループット重視</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup Section -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <div class="note-box">
+        <strong>📝 前提条件:</strong> Managed Kafka クラスタが作成済みであること、適切な IAM 権限 (<code>managedkafka.topics.create</code> または <code>managedkafka.topics.update</code>) を持っていること。
+      </div>
+
+      <h3>ステップ 1: トピック作成時に zstd 圧縮を指定</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">gcloud CLI - トピック作成</span>
+        </div>
+        <pre><code class="language-bash">gcloud managed-kafka topics create my-topic \
+  --cluster=my-cluster \
+  --location=us-central1 \
+  --partitions=6 \
+  --replication-factor=3 \
+  --configs=compression.type=zstd</code></pre>
+      </div>
+
+      <h3>ステップ 2: 既存トピックの圧縮設定を変更</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">gcloud CLI - 圧縮設定変更</span>
+        </div>
+        <pre><code class="language-bash">gcloud managed-kafka topics update my-topic \
+  --cluster=my-cluster \
+  --location=us-central1 \
+  --configs=compression.type=zstd</code></pre>
+      </div>
+
+      <h3>ステップ 3: 設定を確認</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">Kafka CLI - 設定確認</span>
+        </div>
+        <pre><code class="language-bash">kafka-topics.sh --describe \
+  --bootstrap-server=BOOTSTRAP_ADDRESS \
+  --command-config client.properties \
+  --topic my-topic</code></pre>
+      </div>
+    </div>
+
+    <!-- Benefits Section -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">
+        <div>
+          <h3>💼 ビジネス面</h3>
+          <div class="icon-text"><span>→</span><span><strong>ストレージコスト削減</strong>: 高い圧縮率により Cloud Storage データ量が減少</span></div>
+          <div class="icon-text"><span>→</span><span><strong>ネットワーク転送コスト削減</strong>: 圧縮済みデータ転送で帯域幅使用量を削減</span></div>
+          <div class="icon-text"><span>→</span><span><strong>運用効率の向上</strong>: フルマネージドで圧縮ライブラリ管理不要</span></div>
+        </div>
+        <div>
+          <h3>🔬 技術面</h3>
+          <div class="icon-text"><span>→</span><span><strong>高スループットと高圧縮率の両立</strong>: gzip 相当の圧縮率を snappy に近い速度で実現</span></div>
+          <div class="icon-text"><span>→</span><span><strong>CPU 効率</strong>: プロデューサー側 zstd 圧縮時はブローカーでの再圧縮不要</span></div>
+          <div class="icon-text"><span>→</span><span><strong>柔軟な圧縮レベル</strong>: ワークロードに応じた最適化が可能</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations Section -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <div class="warning-box">
+        <strong>制限事項:</strong>
+        <ul style="margin: 8px 0; padding-left: 20px;">
+          <li>コンシューマー側クライアントライブラリが zstd 解凍をサポートしている必要がある (Apache Kafka 2.1.0 以降)</li>
+          <li>圧縮/解凍には CPU リソースを消費するため、非常に低レイテンシが求められるユースケースでは影響を考慮</li>
+        </ul>
+      </div>
+      <div class="note-box">
+        <strong>💡 考慮すべき点:</strong>
+        <ul style="margin: 8px 0; padding-left: 20px;">
+          <li>既存トピックの圧縮方式変更後、セグメント内に異なる圧縮方式が混在する可能性</li>
+          <li>プロデューサーとトピックの圧縮方式が異なる場合、ブローカーで再圧縮が発生し CPU 負荷が増加</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases Section -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+      <div class="usecase-grid">
+        <div class="usecase-card">
+          <h3>📡 IoT データストリーミング</h3>
+          <p>大量の IoT センサーデータを Managed Kafka に収集し、BigQuery にストリーミング。センサーデータは反復パターンが多いため zstd で高い圧縮率を達成。</p>
+          <div class="code-block" style="margin-top: 12px;">
+            <div class="code-header">
+              <span class="code-lang">Bash</span>
+            </div>
+            <pre><code class="language-bash">gcloud managed-kafka topics create iot-sensor-data \
+  --cluster=iot-cluster \
+  --location=asia-northeast1 \
+  --partitions=12 \
+  --replication-factor=3 \
+  --configs=compression.type=zstd,retention.ms=604800000</code></pre>
+          </div>
+        </div>
+        <div class="usecase-card">
+          <h3>📝 ログ集約基盤</h3>
+          <p>マイクロサービスアーキテクチャにおける各サービスのアプリケーションログを集約。テキストベースのログデータは zstd で 5-10 倍の圧縮率を期待でき、長期保存コストを大幅に削減。</p>
+        </div>
+        <div class="usecase-card">
+          <h3>🛒 イベント駆動アーキテクチャ</h3>
+          <p>E コマースプラットフォームにおける注文、在庫、配送イベントのストリーミング処理。JSON 形式のイベントデータに対して高い圧縮率を実現しつつ、リアルタイム処理に必要な低レイテンシを維持。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pricing Section -->
+    <div class="section">
+      <h2>💰 料金情報</h2>
+      <p>Managed Service for Apache Kafka の料金は、圧縮方式の選択に関わらず同一の料金体系が適用されます。zstd 圧縮を有効にすることで、実質的にストレージ使用量が減少しコスト削減につながります。</p>
+      <div class="pricing-card">
+        <h3>料金構成要素</h3>
+        <div class="icon-text"><span>→</span><span>vCPU および RAM (コンピュートリソース)</span></div>
+        <div class="icon-text"><span>→</span><span>ローカル SSD ストレージ (100 GiB/vCPU)</span></div>
+        <div class="icon-text"><span>→</span><span>ティアード・ストレージ (Cloud Storage) のデータ量</span></div>
+      </div>
+      <div class="pricing-card">
+        <h3>確約利用割引 (CUD)</h3>
+        <div class="icon-text"><span>→</span><span>1 年契約 <span class="discount-badge">20% 割引</span></span></div>
+        <div class="icon-text"><span>→</span><span>3 年契約 <span class="discount-badge">40% 割引</span></span></div>
+      </div>
+    </div>
+
+    <!-- Regions Section -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <p>zstd トピック圧縮は、Managed Service for Apache Kafka が利用可能な<strong>全リージョン</strong>でサポートされます。</p>
+      <div class="region-grid">
+        <div class="region-group">
+          <h4>🇺🇸 北米・南米</h4>
+          <p>us-central1, us-east1, us-east4, us-east5, us-south1, us-west1, us-west2, us-west3, us-west4, northamerica-northeast1, northamerica-northeast2, southamerica-east1, southamerica-west1</p>
+        </div>
+        <div class="region-group">
+          <h4>🌏 アジア太平洋</h4>
+          <p>asia-east1, asia-east2, asia-northeast1, asia-northeast2, asia-northeast3, asia-south1, asia-south2, asia-southeast1, asia-southeast2, australia-southeast1, australia-southeast2</p>
+        </div>
+        <div class="region-group">
+          <h4>🇪🇺 ヨーロッパ</h4>
+          <p>europe-west1, europe-west2, europe-west3, europe-west4, europe-west6, europe-west8, europe-west9, europe-west10, europe-west12, europe-north1, europe-north2, europe-central2, europe-southwest1</p>
+        </div>
+        <div class="region-group">
+          <h4>🌍 中東・アフリカ</h4>
+          <p>me-central1, me-central2, me-west1, africa-south1</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Related Services Section -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="related-services">
+        <div class="related-service-card">
+          <h4>🔌 Kafka Connect</h4>
+          <p>他システム間のデータストリーミングに利用。圧縮済みデータの効率的な転送に貢献。</p>
+        </div>
+        <div class="related-service-card">
+          <h4>☁️ Cloud Storage (ティアード・ストレージ)</h4>
+          <p>ローカル SSD からロールされたセグメントの永続化先。zstd 圧縮により保存コストを削減。</p>
+        </div>
+        <div class="related-service-card">
+          <h4>🔄 Dataflow</h4>
+          <p>Kafka から BigQuery や Cloud Storage へのデータ移動テンプレート。圧縮済みメッセージの効率的なパイプライン処理。</p>
+        </div>
+        <div class="related-service-card">
+          <h4>📋 Schema Registry</h4>
+          <p>スキーマレジストリ機能と組み合わせて、構造化データの効率的な圧縮・転送が可能。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary Section -->
+    <div class="section">
+      <h2>📌 まとめ</h2>
+      <div class="success-box">
+        <p>Google Cloud Managed Service for Apache Kafka における <strong>zstd トピック圧縮のサポート</strong>は、高い圧縮率と高速な処理速度を両立する選択肢を提供し、大規模データストリーミング基盤のコスト最適化に貢献します。</p>
+        <p style="margin-top: 12px;">特にログ集約、IoT データ処理、イベント駆動アーキテクチャなどの大量データを扱うワークロードでは、ストレージコストとネットワーク帯域幅の削減効果が期待できます。</p>
+        <p style="margin-top: 12px;"><strong>即座に導入可能</strong>: 既存のトピック設定に <code>compression.type=zstd</code> を追加するだけで利用開始できます。</p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="list-style: none; padding: 0; margin: 8px 0;">
+        <li>- <a href="https://docs.cloud.google.com/release-notes#July_07_2026" target="_blank" rel="noopener noreferrer">Google Cloud Release Notes (July 7, 2026)</a></li>
+        <li>- <a href="https://docs.cloud.google.com/managed-service-for-apache-kafka/docs/create-topic" target="_blank" rel="noopener noreferrer">Managed Service for Apache Kafka - トピック作成ドキュメント</a></li>
+        <li>- <a href="https://docs.cloud.google.com/managed-service-for-apache-kafka/docs/overview" target="_blank" rel="noopener noreferrer">Managed Service for Apache Kafka 概要</a></li>
+        <li>- <a href="https://docs.cloud.google.com/managed-service-for-apache-kafka/pricing" target="_blank" rel="noopener noreferrer">料金ページ</a></li>
+      </ul>
+      <p style="margin-top: 8px; font-size: 11px; color: var(--gc-outline);">Generated on 2026-07-08 | Google Cloud News Infographic</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

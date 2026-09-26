@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Looker Studio: PostgreSQL へのプライベート IP 接続サポート</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .badge-deprecated {
+      background: var(--gc-red);
+      color: #FFFFFF;
+    }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 720px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid rgba(234, 67, 53, 0.3);
+      border-top: 4px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid rgba(52, 168, 83, 0.3);
+      border-top: 4px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .before-box h3 { color: #C5221F; }
+    .after-box h3 { color: #188038; }
+
+    /* フロー図スタイル */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* チェックリストスタイル */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+    }
+
+    /* コードブロック (pre:not(.mermaid) で Mermaid を除外) */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block {
+      overflow: hidden;
+      padding: 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      border-radius: 0;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      display: block;
+      padding: 16px !important;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+      word-break: break-all;
+    }
+
+    /* テーブルスタイル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* 統計カード */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 30px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border: 1px solid var(--gc-blue-100);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    ul, ol {
+      padding-left: 24px;
+      margin: 8px 0;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <div style="margin-bottom: 8px;">
+          <span class="badge">📊 Looker Studio (Data Studio)</span>
+          <span class="badge" style="background: var(--gc-yellow); color: #202124;">🐘 Cloud SQL for PostgreSQL</span>
+          <span class="badge badge-preview">Feature (段階的ロールアウト中)</span>
+        </div>
+        <h1>🔒 PostgreSQL へのプライベート IP 接続サポート</h1>
+        <div class="subtitle">パブリックインターネットを経由せず Cloud SQL のデータを可視化</div>
+      </div>
+      <div class="subtitle">📅 リリース日: 2026-09-24</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📌 概要</h2>
+      <p>
+        Looker Studio の PostgreSQL コネクタが、<span class="highlight">Cloud SQL for PostgreSQL へのプライベート IP 接続</span>に対応しました。
+        トラフィックがパブリックインターネットを経由せず、<span class="highlight">プライベートネットワーク内に保持</span>されます。
+      </p>
+      <p>
+        これまでは Cloud SQL インスタンスにパブリック IP を割り当て、Looker Studio の IP 範囲を承認済みネットワークに追加する必要がありました。
+        今回のアップデートにより、パブリック IP を持たないインスタンスのデータも<strong>セキュリティ要件を維持したまま可視化</strong>できます。
+        セキュリティポリシー上パブリックアクセスを禁止している企業や、規制業界のユーザーにとって BI 活用の障壁を取り除く重要なアップデートです。
+      </p>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before: アップデート前の課題</h3>
+          <div class="check-item"><span class="cross-icon">✗</span><span>PostgreSQL コネクタは Cloud SQL Auth Proxy を使用しないため、接続には<strong>パブリック IP が必須</strong>だった</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>Looker Studio 用 IP 範囲 (142.251.74.0/23 など) を承認済みネットワークに追加し、DB を<strong>パブリックインターネットに公開</strong>する必要があった</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>パブリック IP を禁止するセキュリティポリシーを持つ組織では、Cloud SQL PostgreSQL のデータを直接可視化できなかった</span></div>
+        </div>
+        <div class="after-box">
+          <h3>✅ After: アップデート後の改善</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>プライベート IP のみ</strong>の Cloud SQL for PostgreSQL インスタンスに Looker Studio から直接接続可能に</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>データベーストラフィックが<strong>プライベートネットワーク内に閉じる</strong>ようになった</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>パブリック IP の付与や IP 範囲追加が不要になり、<strong>攻撃対象領域 (アタックサーフェス) を縮小</strong>できる</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    subgraph Before["Before: パブリック IP 接続"]
+        LS1["📊 Looker Studio"] -->|"パブリックインターネット経由<br/>(承認済みネットワーク設定が必要)"| P1["🌐 パブリック IP"]
+        P1 --> DB1[("🐘 Cloud SQL<br/>PostgreSQL")]
+    end
+
+    subgraph After["After: プライベート IP 接続"]
+        LS2["📊 Looker Studio"] -->|"jdbc:google:postgresql://<br/>INSTANCE_CONNECTION_NAME/DATABASE"| PP["🔒 Private path for<br/>Google Cloud services"]
+        PP -->|"プライベートネットワーク"| DB2[("🐘 Cloud SQL<br/>PostgreSQL<br/>(プライベート IP)")]
+    end
+
+    Before ~~~ After
+        </pre>
+      </div>
+      <p>
+        従来はパブリック IP 経由でインターネットを経由する接続のみでしたが、今回のアップデートにより、Cloud SQL の
+        <span class="highlight">「Google Cloud サービスのプライベートパス」</span>オプションを介してトラフィックをプライベートネットワーク内に保持したまま接続できます。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+
+      <div class="card">
+        <h3>🔒 1. プライベート IP 接続のサポート (メイン機能)</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>Cloud SQL for PostgreSQL インスタンスにプライベート IP アドレスで接続可能</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>JDBC URL 接続オプションを使用し、<code>jdbc:google:postgresql://INSTANCE_CONNECTION_NAME/DATABASE</code> 形式で指定</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>Cloud SQL 側で「Google Cloud サービスのプライベートパス」オプションの有効化が必要</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>段階的ロールアウト中のため、早期利用を希望する場合は Cloud カスタマーケアへの連絡でプレビューグループに追加可能</span></div>
+      </div>
+
+      <div class="card" style="border-left-color: var(--gc-green);">
+        <h3>🎨 2. 一括スタイル設定 (Bulk styling) (同日の関連アップデート)</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>チャート内のすべての系列 (series)、ディメンション、指標のスタイルを一括カスタマイズ可能</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>個別アイテムを選択した個別設定も可能で、個別設定は一括設定より優先される</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>ラインチャート・コンボチャート、時系列チャート、テーブルで利用可能</span></div>
+      </div>
+
+      <div class="card" style="border-left-color: var(--gc-purple);">
+        <h3>🔌 3. パートナーコネクタの追加 (同日の関連アップデート)</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>Connector Gallery に Facebook Ads Analytics (Langquang)、Nextdoor / Attentive / Contractors Cloud / AppLovin (Windsor.ai)、SEOmonitor (SEOmonitor) が追加</span></div>
+      </div>
+
+      <div class="note-box">
+        💡 同日に発表された MySQL 5.6 / 5.7 の非推奨化については、別レポート (2026-09-24-looker-studio-mysql-5-6-5-7-deprecation) を参照してください。
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3>🔑 プライベート IP 接続の要件</h3>
+      <table>
+        <tr><th>項目</th><th>詳細</th></tr>
+        <tr><td>接続方式</td><td>JDBC URL 接続オプション (BASIC 接続では不可)</td></tr>
+        <tr><td>JDBC URL 形式</td><td><code>jdbc:google:postgresql://INSTANCE_CONNECTION_NAME/DATABASE</code></td></tr>
+        <tr><td>INSTANCE_CONNECTION_NAME</td><td><code>projectID:region:instanceID</code> 形式の Cloud SQL 接続名</td></tr>
+        <tr><td>Cloud SQL 側の設定</td><td>「Google Cloud サービスのプライベートパス」オプションの選択が必要</td></tr>
+        <tr><td>提供状況</td><td>段階的ロールアウト中 (未提供の場合は Cloud カスタマーケアで opt-in 可能)</td></tr>
+      </table>
+
+      <h3>⚠️ PostgreSQL コネクタの主な制限事項</h3>
+      <table>
+        <tr><th>項目</th><th>詳細</th></tr>
+        <tr><td>Cloud SQL Auth Proxy</td><td>使用しない (パブリック IP 接続時は承認済みネットワークへの IP 追加が必要)</td></tr>
+        <tr><td>クエリあたりの最大行数</td><td>150,000 行 (超過分は切り捨て)</td></tr>
+        <tr><td>スキーマ</td><td>public スキーマ外のテーブル選択は不可 (カスタムクエリで回避可能)</td></tr>
+        <tr><td>列ヘッダー</td><td>ASCII 文字のみサポート</td></tr>
+        <tr><td>暗号化</td><td>TLS 1.2 による SSL 接続をサポート</td></tr>
+        <tr><td>サポートするデータ型</td><td>Numeric、Character、Boolean、Date/Time (Interval を除く)</td></tr>
+      </table>
+
+      <h3>🌐 パブリック IP 接続時に必要な IP アドレス範囲 (参考)</h3>
+      <p>プライベート IP を使用しない場合、従来通り以下の Looker Studio 用 IP 範囲を承認済みネットワークに追加する必要があります。</p>
+      <table>
+        <tr><th>構成</th><th>IP アドレス範囲</th></tr>
+        <tr><td>通常</td><td>142.251.74.0/23、2001:4860:4807::/48 (IPv6、任意)</td></tr>
+        <tr><td>データレジデンシー有効 (Pro)</td><td>142.251.56.0/24、2001:4860:4815::/48 (IPv6、任意)</td></tr>
+      </table>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>📋 前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>Cloud SQL for PostgreSQL インスタンスにプライベート IP が構成されていること (VPC ネットワークでのプライベートサービスアクセスの設定が必要)</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>Cloud SQL インスタンスで「Google Cloud サービスのプライベートパス」オプションが有効になっていること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>インスタンスの接続名 (<code>projectID:region:instanceID</code>) を確認済みであること</span></div>
+
+      <div class="flow-diagram">
+        <div class="flow-step">🌐 プライベート<br/>サービスアクセス構成</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🔒 プライベートパス<br/>オプション有効化</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🔗 JDBC URL で<br/>データソース作成</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">📊 ダッシュボード<br/>作成</div>
+      </div>
+
+      <h3>ステップ 1: Cloud SQL 側でプライベートサービスアクセスとプライベートパスを構成</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">プライベートサービスアクセスの構成</span>
+        </div>
+        <pre><code class="language-bash"># Service Networking API と Compute Engine API を有効化
+gcloud services enable servicenetworking.googleapis.com compute.googleapis.com \
+  --project=PROJECT_ID
+
+# プライベートサービスアクセス用の IP 範囲を割り当て
+gcloud compute addresses create google-managed-services-VPC_NETWORK_NAME \
+  --global \
+  --purpose=VPC_PEERING \
+  --prefix-length=16 \
+  --network=projects/PROJECT_ID/global/networks/VPC_NETWORK_NAME \
+  --project=PROJECT_ID
+
+# VPC ネットワークと Cloud SQL 間のプライベート接続を作成
+gcloud services vpc-peerings connect \
+  --service=servicenetworking.googleapis.com \
+  --ranges=google-managed-services-VPC_NETWORK_NAME \
+  --network=VPC_NETWORK_NAME \
+  --project=PROJECT_ID</code></pre>
+      </div>
+      <p>Cloud SQL インスタンスの設定で、プライベート IP を有効にし、「Google Cloud サービスのプライベートパス」オプションを選択します。</p>
+
+      <h3>ステップ 2: Looker Studio でデータソースを作成</h3>
+      <ol>
+        <li>Looker Studio にサインインし、「作成」→「データソース」を選択</li>
+        <li><strong>PostgreSQL コネクタ</strong>を選択</li>
+        <li>接続パネルで「JDBC URL」を選択し、以下の形式で入力</li>
+      </ol>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Text</span>
+          <span class="code-title">JDBC URL の形式</span>
+        </div>
+        <pre><code class="language-text">jdbc:google:postgresql://PROJECT_ID:REGION:INSTANCE_ID/DATABASE_NAME</code></pre>
+      </div>
+      <ol start="4">
+        <li>ユーザー名とパスワードを入力して「AUTHENTICATE」をクリック</li>
+        <li>テーブルを選択するかカスタムクエリを入力し、「CONNECT」をクリック</li>
+      </ol>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>💡 メリット</h2>
+      <div class="before-after">
+        <div class="card" style="border-left-color: var(--gc-green); margin: 0;">
+          <h3>💼 ビジネス面</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>セキュリティポリシーへの準拠</strong>: DB をパブリックインターネットに公開せずに BI ダッシュボードを構築でき、規制業界や厳格なセキュリティ要件を持つ組織でも採用しやすい</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>BI 活用範囲の拡大</strong>: プライベート IP のみの Cloud SQL PostgreSQL データを、追加のデータ移動なしにレポート化できる</span></div>
+        </div>
+        <div class="card" style="border-left-color: var(--gc-blue-600); margin: 0;">
+          <h3>⚙️ 技術面</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>攻撃対象領域の縮小</strong>: パブリック IP と承認済みネットワーク設定が不要になり、外部からの到達経路を排除</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>ネットワーク経路の閉域化</strong>: DB トラフィックがプライベートネットワーク内に保持される</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>中間コンポーネント不要</strong>: プロキシ VM や BigQuery への複製などを介さず直接接続</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>🚧 制限事項</h3>
+      <div class="warning-box">
+        <div class="check-item"><span class="cross-icon">•</span><span>段階的ロールアウト中のため、すべてのユーザーで利用できるとは限らない (利用できない場合は Cloud カスタマーケアへの連絡が必要)</span></div>
+        <div class="check-item"><span class="cross-icon">•</span><span>プライベート IP 接続には <strong>JDBC URL 接続オプションの使用が必須</strong> (ホスト名/IP を指定する BASIC 接続では利用不可)</span></div>
+        <div class="check-item"><span class="cross-icon">•</span><span>Cloud SQL インスタンス側で「Google Cloud サービスのプライベートパス」オプションの有効化が必要</span></div>
+        <div class="check-item"><span class="cross-icon">•</span><span>コネクタ共通の制限: クエリあたり最大 150,000 行、public スキーマ外のテーブル直接選択不可、列ヘッダーは ASCII 文字のみ</span></div>
+      </div>
+
+      <h3>🤔 考慮すべき点</h3>
+      <div class="note-box">
+        <div class="check-item"><span class="arrow">→</span><span>プライベートサービスアクセスの構成には VPC ピアリングと専用の IP 範囲割り当て (リージョン・データベースタイプごとに最低 /24) が必要</span></div>
+        <div class="check-item"><span class="arrow">→</span><span>プライベート接続を削除すると、同じ接続を使用する他の Google サービス (Filestore、Memorystore など) のプライベート接続にも影響する</span></div>
+        <div class="check-item"><span class="arrow">→</span><span>カスタムクエリは 3〜5 分でタイムアウトする場合があるため、重いクエリは事前集計テーブルの利用を検討</span></div>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>🏦 ユースケース 1: 閉域構成の基幹データベースの BI ダッシュボード化</h3>
+        <p><strong>シナリオ</strong>: 金融・医療などの規制業界で、セキュリティポリシーにより Cloud SQL インスタンスへのパブリック IP 割り当てが禁止されている環境で、業務データを Looker Studio でダッシュボード化したい。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Text</span>
+            <span class="code-title">実装例</span>
+          </div>
+          <pre><code class="language-text">1. Cloud SQL for PostgreSQL をプライベート IP のみで構成
+2. 「Google Cloud サービスのプライベートパス」オプションを有効化
+3. Looker Studio の PostgreSQL コネクタで JDBC URL を指定:
+   jdbc:google:postgresql://my-project:asia-northeast1:prod-db/analytics
+4. ダッシュボードを作成して関係者に共有</code></pre>
+        </div>
+        <div class="success-box">
+          <strong>✅ 効果</strong>: データベースをインターネットに公開することなく BI ダッシュボードを提供でき、セキュリティ監査要件を満たしながらデータ活用を推進できる。
+        </div>
+      </div>
+
+      <div class="usecase">
+        <h3>🔁 ユースケース 2: 承認済みネットワーク運用からの移行</h3>
+        <p><strong>シナリオ</strong>: 現在パブリック IP + 承認済みネットワーク (Looker Studio の IP 範囲を許可) で Looker Studio に接続しているが、ネットワーク境界を最小化したい。</p>
+        <div class="success-box">
+          <strong>✅ 効果</strong>: プライベート IP 接続に切り替えることで、パブリック IP と承認済みネットワーク設定を廃止でき、外部からの到達経路を排除してセキュリティ体制を強化できる。
+        </div>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>
+        Looker Studio の PostgreSQL コネクタ自体に<span class="highlight">追加料金はありません</span>。
+        接続先の Cloud SQL for PostgreSQL インスタンスには通常の Cloud SQL 料金が適用されます。
+      </p>
+      <div class="icon-text"><span class="arrow">→</span><a class="gc-link" href="https://cloud.google.com/sql/pricing" target="_blank" rel="noopener noreferrer">Cloud SQL の料金</a></div>
+      <div class="icon-text"><span class="arrow">→</span><a class="gc-link" href="https://cloud.google.com/looker-studio" target="_blank" rel="noopener noreferrer">Looker Studio の概要 (Pro を含むエディション)</a></div>
+    </div>
+
+    <!-- 利用可能リージョン -->
+    <div class="section">
+      <h2>🌏 利用可能リージョン・提供状況</h2>
+      <div class="warning-box">
+        <strong>⚠️ 段階的ロールアウト中</strong>: この機能は段階的にロールアウトされており、すべてのユーザーがすぐに利用できるとは限りません。
+        接続できない場合や、ロールアウト期間中に明示的に opt-in したい場合は、
+        <a class="gc-link" href="https://docs.cloud.google.com/support" target="_blank" rel="noopener noreferrer">Cloud カスタマーケア</a>に連絡してプレビューグループへの追加を依頼できます。
+      </div>
+    </div>
+
+    <!-- 関連サービス -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card"><strong>🐘 Cloud SQL for PostgreSQL</strong>: 接続先のマネージド PostgreSQL データベース。プライベート IP 構成とプライベートパスオプションの有効化が必要</div>
+      <div class="card"><strong>🔒 プライベートサービスアクセス (Private Services Access)</strong>: VPC ネットワークと Cloud SQL 間のプライベート接続を実現する VPC ピアリングベースの仕組み</div>
+      <div class="card"><strong>🔧 Service Networking API</strong>: プライベートサービスアクセスの構成に必要な API</div>
+      <div class="card"><strong>⭐ Looker Studio Pro</strong>: データレジデンシーなどのエンタープライズ機能を提供する有償エディション (データレジデンシー有効時はパブリック接続用 IP 範囲が異なる)</div>
+      <div class="card"><strong>🗄️ AlloyDB for PostgreSQL</strong>: 同じ PostgreSQL コネクタで接続可能 (ただし SSL 接続は非サポート)</div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="success-box">
+        <p style="margin: 0 0 8px 0;">
+          Looker Studio から Cloud SQL for PostgreSQL への<strong>プライベート IP 接続対応</strong>により、データベースをパブリックインターネットに公開せずに BI ダッシュボードを構築できるようになりました。
+          セキュリティ要件によりこれまで Looker Studio を利用できなかった環境では、大きな導入機会となります。
+        </p>
+        <p style="margin: 0;">
+          段階的ロールアウト中のため、まず自環境で JDBC URL 形式 (<code>jdbc:google:postgresql://INSTANCE_CONNECTION_NAME/DATABASE</code>) での接続を検証し、利用できない場合は Cloud カスタマーケア経由での opt-in を検討してください。
+        </p>
+      </div>
+      <p>
+        <span class="badge">#LookerStudio</span>
+        <span class="badge">#DataStudio</span>
+        <span class="badge">#CloudSQL</span>
+        <span class="badge">#PostgreSQL</span>
+        <span class="badge">#PrivateIP</span>
+        <span class="badge">#ネットワークセキュリティ</span>
+        <span class="badge">#BI</span>
+        <span class="badge">#データ可視化</span>
+      </p>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="margin: 4px 0; padding-left: 20px;">
+        <li><a href="https://docs.cloud.google.com/release-notes#September_24_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (September 24, 2026)</a></li>
+        <li><a href="https://docs.cloud.google.com/data-studio/connect-to-postgresql" target="_blank" rel="noopener noreferrer" class="gc-link">Connect to PostgreSQL (公式ドキュメント)</a></li>
+        <li><a href="https://docs.cloud.google.com/sql/docs/postgres/configure-private-services-access" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud SQL for PostgreSQL: プライベートサービスアクセスの構成</a></li>
+        <li><a href="https://docs.cloud.google.com/sql/docs/postgres/connect-instance-private-ip" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud SQL for PostgreSQL: プライベート IP を使用した接続</a></li>
+        <li><a href="https://cloud.google.com/sql/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud SQL の料金</a></li>
+      </ul>
+      <p>ベースレポート: reports/2026/2026-09-24-looker-studio-postgresql-private-ip.md | 生成日: 2026-09-25</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>
