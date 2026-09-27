@@ -5,6 +5,8 @@
 
 ## 2026 年
 
+- [2026-09-27 - Google SecOps SOAR: リリース 6.3.101 の第 1 フェーズリージョンへのロールアウト開始](2026/2026-09-27-google-secops-soar-6-3-101-rollout.md)
+- [2026-09-26 - Google SecOps SOAR: Release 6.3.100 が全リージョンで利用可能に](2026/2026-09-26-google-secops-soar-6-3-100-all-regions.md)
 - [2026-09-25 - API Keys API: リモート MCP サーバー (Preview)](2026/2026-09-25-api-keys-api-remote-mcp-server-preview.md)
 - [2026-09-25 - Compute Engine: X5 シリーズ メモリ最適化ベアメタルマシンタイプの一般提供 (GA)](2026/2026-09-25-compute-engine-x5-memory-optimized-ga.md)
 - [2026-09-25 - Google Kubernetes Engine: ノードあたり最大 512 Pod のサポート](2026/2026-09-25-gke-512-pods-per-node.md)
