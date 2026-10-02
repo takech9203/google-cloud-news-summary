@@ -5,6 +5,12 @@
 
 ## 2026 年
 
+- [2026-10-02 - BigQuery: Data Engineering Agent が gemini-3.7-flash モデルをサポート](2026/2026-10-02-bigquery-data-engineering-agent-gemini-3-7-flash.md)
+- [2026-10-02 - BigQuery: Rust SDK が一般提供 (GA) 開始](2026/2026-10-02-bigquery-rust-sdk-ga.md)
+- [2026-10-02 - Network Connectivity Center: サイト間データ転送がポーランドをサポート](2026/2026-10-02-network-connectivity-center-site-to-site-data-transfer-poland.md)
+- [2026-10-02 - Google Kubernetes Engine: Cloud Storage FUSE CSI driver (gcsfusecsi-node) Pod が特定ノードプールで起動に失敗する既知の問題](2026/2026-10-02-gke-gcsfuse-csi-driver-pod-startup-issue.md)
+- [2026-10-02 - Cloud NAT: Private NAT の NAT64 (IPv6 から IPv4 への変換) が GA](2026/2026-10-02-cloud-nat-private-nat-nat64-ga.md)
+- [2026-10-02 - Google Kubernetes Engine: VPA と HPA の併用による HPA ワークロードのライトサイジング (Public Preview)](2026/2026-10-02-gke-vpa-hpa-rightsizing-preview.md)
 - [2026-10-01 - BigQuery: Conversational Analytics の「グラフとのチャット」が GA](2026/2026-10-01-bigquery-conversational-analytics-graph-chat.md)
 - [2026-10-01 - BigQuery pipelines / Dataform: 自動メタデータエンリッチメントと Knowledge Catalog データ品質スコアカード統合 (GA)](2026/2026-10-01-bigquery-dataform-metadata-enrichment-knowledge-catalog.md)
 - [2026-10-01 - Bigtable: Google Cloud Data Agent Kit による Bigtable 操作が GA](2026/2026-10-01-bigtable-data-agent-kit-ga.md)
@@ -19,6 +25,7 @@
 - [2026-09-30 - Gemini Enterprise Agent Platform: CodeMender v0.11.0 リリース](2026/2026-09-30-codemender-v0-11-0.md)
 - [2026-09-30 - Cloud Tasks: タスクレベルのリトライ設定とタスクのバッチ作成・削除が GA](2026/2026-09-30-cloud-tasks-retry-batch-ga.md)
 - [2026-09-30 - Looker: Conversational Analytics System Activity の Token usage 可観測性メトリクス強化](2026/2026-09-30-looker-conversational-analytics-token-usage.md)
+- [2026-09-30 - Google SecOps: Chronicle API Restricted Data Access Viewer ロールの読み取り専用権限を拡張](2026/2026-09-30-google-secops-restricted-data-access-viewer-permissions.md)
 - [2026-09-30 - Cloud Storage: クライアントライブラリによる自動エンドツーエンドチェックサム検証がデフォルトで有効に](2026/2026-09-30-cloud-storage-client-libraries-e2e-checksumming.md)
 - [2026-09-30 - API Gateway: MCP tools/list メソッドの API キー認証サポート](2026/2026-09-30-api-gateway-mcp-tools-list-api-key-auth.md)
 - [2026-09-30 - BigQuery: クエリプランで UPDATE / DELETE / MERGE / EXPORT 実行ステップの表示に対応](2026/2026-09-30-bigquery-query-plan-dml-export-steps.md)
