@@ -1,0 +1,1278 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Compute Engine: Hyperdisk Balanced の C4D インスタンス向け最大スループット上限を引き上げ</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      margin-bottom: 32px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 12px 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px 0;
+    }
+
+    h4 {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--gc-blue-900);
+      margin: 16px 0 4px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .card.green { border-left-color: var(--gc-green); }
+    .card.orange { border-left-color: var(--gc-orange); }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-box h3 { color: #C5221F; }
+    .after-box h3 { color: #188038; }
+
+    .before-after ul {
+      margin: 8px 0 0 0;
+      padding-left: 20px;
+    }
+
+    .before-after li {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    /* 統計カード */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.green {
+      background: linear-gradient(135deg, var(--gc-green), #0D652D);
+    }
+
+    .stat-value {
+      font-size: 34px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      line-height: 1.2;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.95;
+    }
+
+    /* スループット比較バー */
+    .bar-chart {
+      margin: 16px 0;
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 12px;
+      padding: 20px 16px;
+    }
+
+    .bar-group-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--gc-blue-900);
+      margin: 14px 0 4px 0;
+    }
+
+    .bar-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 6px 0;
+    }
+
+    .bar-label {
+      width: 90px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    .bar-track {
+      flex: 1;
+      display: flex;
+      align-items: center;
+    }
+
+    .bar {
+      height: 26px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 8px;
+      color: #FFFFFF;
+      font-size: 12px;
+      font-weight: 700;
+      min-width: 70px;
+      white-space: nowrap;
+    }
+
+    .bar.old { background: var(--gc-outline); }
+    .bar.new { background: var(--gc-green); }
+    .bar.unchanged { background: var(--gc-blue-200); color: var(--gc-blue-900); }
+
+    .bar-delta {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--gc-green);
+      margin-left: 10px;
+      white-space: nowrap;
+    }
+
+    .bar-legend {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      font-size: 12px;
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px dashed var(--gc-outline-variant);
+    }
+
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+    .legend-swatch { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* コードブロック */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 0 0 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 12px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* テーブル */
+    .table-wrap { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    tr.row-target td { background: #F0F9F2; font-weight: 600; }
+    tr.row-target:hover td { background: var(--gc-green-tint); }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* チェックリスト */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .warn-icon {
+      color: var(--gc-orange);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    /* ユースケースボックス */
+    .usecase-box {
+      background: var(--gc-blue-tint);
+      border: 1px solid var(--gc-blue-200);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+    }
+
+    .usecase-box h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+    }
+
+    /* フロー図 */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 20px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 16px;
+      text-align: center;
+      min-width: 130px;
+      font-size: 14px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* 2 カラムグリッド */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .formula {
+      background: var(--gc-surface);
+      border: 2px dashed var(--gc-blue-300);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin: 16px 0;
+      text-align: center;
+      font-family: 'Roboto Mono', 'Courier New', monospace;
+      font-size: 15px;
+      color: var(--gc-blue-900);
+      font-weight: 600;
+    }
+
+    .region-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .region-card {
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 12px;
+      padding: 14px 16px;
+    }
+
+    .region-card h4 { margin-top: 0; }
+
+    .region-card span.rg {
+      display: inline-block;
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      border-radius: 4px;
+      padding: 2px 6px;
+      margin: 2px 4px 2px 0;
+      font-size: 12px;
+      font-family: 'Roboto Mono', 'Courier New', monospace;
+    }
+
+    ul.tight { margin: 8px 0; padding-left: 22px; }
+    ul.tight li { margin: 6px 0; }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a { word-break: break-all; }
+
+    footer ul {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .tag {
+      background: var(--gc-surface-container);
+      color: var(--gc-on-surface-variant);
+      border-radius: 12px;
+      padding: 2px 10px;
+      font-size: 11px;
+    }
+
+    @media (max-width: 700px) {
+      .before-after { grid-template-columns: 1fr; }
+      .stat-grid { grid-template-columns: 1fr; }
+      .two-col { grid-template-columns: 1fr; }
+      .bar-label { width: 70px; font-size: 11px; }
+      h1 { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- ヘッダー -->
+    <div class="header">
+      <h1>⚡ Hyperdisk Balanced<br>C4D の最大スループット上限を引き上げ (最大 12,500 MiB/s)</h1>
+      <div class="meta-row">
+        <span class="badge">Compute Engine</span>
+        <span class="badge">Hyperdisk Balanced</span>
+        <span class="badge-ga">Feature (GA / 上限引き上げ)</span>
+        <span class="subtitle">📅 リリース日: 2026-07-28</span>
+      </div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📌 概要</h2>
+      <p>
+        Google Cloud は 2026 年 7 月 28 日、Compute Engine の <span class="highlight">C4D マシンシリーズ</span>にアタッチした
+        <span class="highlight">Hyperdisk Balanced ボリュームの最大スループット上限</span>を引き上げました。
+        対象は大規模な 3 つのマシンタイプサイズ (<strong>96 / 192 / 384 vCPU</strong>) です。
+      </p>
+
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">3,125</div>
+          <div class="stat-label">MiB/s (<code style="color:#fff;background:none;border:none">c4d-*-96</code>)<br>2,800 → 3,125 (約 +11.6%)</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-value">6,250</div>
+          <div class="stat-label">MiB/s (<code style="color:#fff;background:none;border:none">c4d-*-192</code>)<br>4,800 → 6,250 (約 +30.2%)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">12,500</div>
+          <div class="stat-label">MiB/s (<code style="color:#fff;background:none;border:none">c4d-*-384</code>)<br>10,000 → 12,500 (+25%)</div>
+        </div>
+      </div>
+
+      <p>
+        C4D は第 5 世代 AMD EPYC Turin プロセッサと Titanium を採用した汎用マシンシリーズで、最大 384 vCPU / 3,024 GB DDR5 をサポートし、
+        <span class="highlight">ブロックストレージとして Hyperdisk のみをサポート</span> (Persistent Disk 非対応) します。
+        つまり C4D 上のすべてのワークロードのストレージ性能は Hyperdisk の性能上限に直結するため、今回の引き上げは C4D 利用者に直接的な意味を持ちます。
+      </p>
+
+      <div class="warning-box">
+        <strong>⚠️ 最重要ポイント:</strong> これは<strong>インスタンス側 (マシンタイプ側) の性能上限の引き上げ</strong>です。
+        単一 Hyperdisk Balanced ボリュームあたりのプロビジョニング上限 (<strong>160,000 IOPS / 2,400 MiB/s</strong>) は変わっていません。
+        新しい上限を実際に引き出すには、<strong>同一インスタンスに複数のボリュームをアタッチする</strong>必要があります。
+      </div>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>😓 Before: アップデート前の課題</h3>
+          <ul>
+            <li><code>c4d-*-96</code> のスループットはインスタンス側の上限 <strong>2,800 MiB/s</strong> で頭打ち</li>
+            <li><code>c4d-*-192</code> は <strong>4,800 MiB/s</strong>、<code>c4d-*-384</code> は <strong>10,000 MiB/s</strong> が上限で、vCPU 数を増やしてもストレージ帯域が比例して伸びない領域があった</li>
+            <li>ボリュームを追加してプロビジョニング済みスループットの合計を増やしても、<strong>インスタンス側の上限を超える分は消費できなかった</strong> (性能上限は全ボリュームで共有)</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>😀 After: アップデート後の改善</h3>
+          <ul>
+            <li><code>c4d-*-96</code>: <strong>3,125 MiB/s</strong> (従来比 約 +11.6%)</li>
+            <li><code>c4d-*-192</code>: <strong>6,250 MiB/s</strong> (従来比 約 +30.2%)</li>
+            <li><code>c4d-*-384</code>: <strong>12,500 MiB/s</strong> (従来比 +25%)</li>
+            <li>スループット律速のワークロードで、<strong>マシンシリーズの乗り換えや Hyperdisk Extreme / ML への切り替えなしに</strong>、既存の C4D 構成のままボリューム追加で帯域を拡張できる余地が広がった</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>📊 マシンタイプ別 Before / After スループット比較</h3>
+      <div class="bar-chart">
+        <div class="bar-group-title">c4d-*-96</div>
+        <div class="bar-row">
+          <div class="bar-label">Before</div>
+          <div class="bar-track"><div class="bar old" style="width: 20.6%;">2,800</div></div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">After</div>
+          <div class="bar-track"><div class="bar new" style="width: 23.0%;">3,125</div><span class="bar-delta">+325 (約 +11.6%)</span></div>
+        </div>
+
+        <div class="bar-group-title">c4d-*-192</div>
+        <div class="bar-row">
+          <div class="bar-label">Before</div>
+          <div class="bar-track"><div class="bar old" style="width: 35.3%;">4,800</div></div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">After</div>
+          <div class="bar-track"><div class="bar new" style="width: 46.0%;">6,250</div><span class="bar-delta">+1,450 (約 +30.2%)</span></div>
+        </div>
+
+        <div class="bar-group-title">c4d-*-384</div>
+        <div class="bar-row">
+          <div class="bar-label">Before</div>
+          <div class="bar-track"><div class="bar old" style="width: 73.6%;">10,000</div></div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">After</div>
+          <div class="bar-track"><div class="bar new" style="width: 92.0%;">12,500</div><span class="bar-delta">+2,500 (+25%)</span></div>
+        </div>
+
+        <div class="bar-group-title">c4d-*-384-metal (対象外)</div>
+        <div class="bar-row">
+          <div class="bar-label">変更なし</div>
+          <div class="bar-track"><div class="bar unchanged" style="width: 73.6%;">10,000</div></div>
+        </div>
+
+        <div class="bar-legend">
+          <span class="legend-item"><span class="legend-swatch" style="background:#80868B"></span>Before (従来上限)</span>
+          <span class="legend-item"><span class="legend-swatch" style="background:#34A853"></span>After (新上限)</span>
+          <span class="legend-item"><span class="legend-swatch" style="background:#8AB4F8"></span>今回の引き上げ対象外</span>
+          <span class="legend-item">単位: MiB/s</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図 (Before / After)</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph AFTER["✅ After (2026-07-28 以降)"]
+        VM2["🖥️ c4d-*-384 インスタンス&lt;br/&gt;スループット上限 12,500 MiB/s"]
+        D2A["💾 Hyperdisk Balanced #1&lt;br/&gt;最大 2,400 MiB/s"]
+        D2B["💾 Hyperdisk Balanced #2&lt;br/&gt;最大 2,400 MiB/s"]
+        D2C["💾 ... 計 6 本以上&lt;br/&gt;合計で 12,500 MiB/s に到達"]
+        VM2 --- D2A
+        VM2 --- D2B
+        VM2 --- D2C
+    end
+
+    subgraph BEFORE["⚠️ Before (従来)"]
+        VM1["🖥️ c4d-*-384 インスタンス&lt;br/&gt;スループット上限 10,000 MiB/s"]
+        D1A["💾 Hyperdisk Balanced #1&lt;br/&gt;最大 2,400 MiB/s"]
+        D1B["💾 Hyperdisk Balanced #2&lt;br/&gt;最大 2,400 MiB/s"]
+        D1C["💾 ... 計 5 本以上&lt;br/&gt;合計は 10,000 MiB/s で頭打ち"]
+        VM1 --- D1A
+        VM1 --- D1B
+        VM1 --- D1C
+    end
+
+    BEFORE ==&gt;|"上限引き上げ&lt;br/&gt;+25%"| AFTER
+        </pre>
+      </div>
+      <p>
+        インスタンス側のスループット上限が引き上げられたことで、同じ C4D マシンタイプに複数の Hyperdisk Balanced ボリュームをアタッチした際に消費できる合計帯域が増えます。
+        単一ボリュームの上限 (2,400 MiB/s) は変わらないため、<strong>新上限を引き出すには複数ボリューム構成が前提</strong>になります。
+      </p>
+
+      <h3>⚡ 新上限を活用するまでの流れ</h3>
+      <div class="flow-diagram">
+        <div class="flow-step">📈 現状確認<br>Cloud Monitoring で<br>帯域の張り付きを確認</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">💾 ボリューム作成<br>2,400 MiB/s を<br>プロビジョニング</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🔗 複数アタッチ<br>NVMe + LVM /<br>RAID 0 でストライプ</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">✅ 検証<br>I/O サイズ 256 KB 以上<br>でベンチマーク</div>
+      </div>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>🔧 主要機能 (3 つのマシンタイプサイズ)</h2>
+
+      <div class="card">
+        <h3>1️⃣ <code>c4d-*-96</code>: 2,800 → 3,125 MiB/s</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>96 vCPU の standard / highcpu / highmem すべてのバリアントが対象 (<code>c4d-*</code> はワイルドカード表記)</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>最大 IOPS 上限は <strong>160,000 のまま変更なし</strong></span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>単一ボリューム上限 2,400 MiB/s を超えるため、3,125 MiB/s の到達には <strong>2 本以上</strong>の Hyperdisk Balanced が必要</span></div>
+      </div>
+
+      <div class="card green">
+        <h3>2️⃣ <code>c4d-*-192</code>: 4,800 → 6,250 MiB/s</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>3 つのサイズ変更のうち、<strong>相対的な伸び幅が最も大きい (約 +30.2%)</strong></span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>最大 IOPS 上限は <strong>240,000 のまま変更なし</strong></span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>6,250 MiB/s の到達には <strong>3 本以上</strong>の Hyperdisk Balanced が必要</span></div>
+      </div>
+
+      <div class="card">
+        <h3>3️⃣ <code>c4d-*-384</code>: 10,000 → 12,500 MiB/s</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>C4D の最大構成 (384 vCPU) における<strong>絶対値の伸びが最大 (+2,500 MiB/s)</strong></span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>最大 IOPS 上限は <strong>320,000 のまま変更なし</strong></span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>12,500 MiB/s の到達には <strong>6 本以上</strong>の Hyperdisk Balanced が必要</span></div>
+      </div>
+
+      <div class="error-box">
+        <strong>❗ 注意:</strong> ベアメタルの <code>c4d-*-384-metal</code> は <strong>10,000 MiB/s のまま</strong>で、今回の引き上げ対象外です。
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>📐 技術仕様</h2>
+
+      <h3>Before / After スループット比較</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>マシンタイプ</th>
+              <th>最大 IOPS (変更なし)</th>
+              <th>最大スループット (Before)</th>
+              <th>最大スループット (After)</th>
+              <th>増加量</th>
+              <th>増加率</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="row-target"><td><code>c4d-*-96</code></td><td>160,000</td><td>2,800 MiB/s</td><td><strong>3,125 MiB/s</strong></td><td>+325 MiB/s</td><td>約 +11.6%</td></tr>
+            <tr class="row-target"><td><code>c4d-*-192</code></td><td>240,000</td><td>4,800 MiB/s</td><td><strong>6,250 MiB/s</strong></td><td>+1,450 MiB/s</td><td>約 +30.2%</td></tr>
+            <tr class="row-target"><td><code>c4d-*-384</code></td><td>320,000</td><td>10,000 MiB/s</td><td><strong>12,500 MiB/s</strong></td><td>+2,500 MiB/s</td><td>+25%</td></tr>
+            <tr><td><code>c4d-*-384-metal</code></td><td>320,000</td><td>10,000 MiB/s</td><td>10,000 MiB/s (変更なし)</td><td>—</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:13px;">増加率は公式ドキュメント記載の前後値から算出した参考値です。</p>
+
+      <h3>C4D の Hyperdisk Balanced 性能上限 (全マシンタイプ・更新後の現行値)</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>マシンタイプ</th><th>最大 IOPS</th><th>最大スループット (MiB/s)</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>c4d-*-2</code></td><td>22,500</td><td>400</td></tr>
+            <tr><td><code>c4d-*-4</code></td><td>50,000</td><td>400</td></tr>
+            <tr><td><code>c4d-*-8</code></td><td>50,000</td><td>800</td></tr>
+            <tr><td><code>c4d-*-16</code></td><td>75,000</td><td>1,200</td></tr>
+            <tr><td><code>c4d-*-32</code></td><td>75,000</td><td>1,600</td></tr>
+            <tr><td><code>c4d-*-48</code></td><td>75,000</td><td>1,600</td></tr>
+            <tr><td><code>c4d-*-64</code></td><td>160,000</td><td>2,400</td></tr>
+            <tr class="row-target"><td><code>c4d-*-96</code></td><td>160,000</td><td>3,125 ⬆️</td></tr>
+            <tr class="row-target"><td><code>c4d-*-192</code></td><td>240,000</td><td>6,250 ⬆️</td></tr>
+            <tr class="row-target"><td><code>c4d-*-384</code></td><td>320,000</td><td>12,500 ⬆️</td></tr>
+            <tr><td><code>c4d-*-384-metal</code></td><td>320,000</td><td>10,000</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:13px;">2 vCPU から 48 vCPU までのマシンタイプ、および 64 vCPU、ベアメタルの値は今回変更されていません。</p>
+
+      <h3>新上限に到達するために必要なボリューム本数</h3>
+      <p>単一 Hyperdisk Balanced ボリュームの上限は <strong>2,400 MiB/s</strong> であるため、インスタンス上限に到達するには複数ボリュームが必要です。</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>マシンタイプ</th><th>インスタンス上限</th><th>必要な最小ボリューム本数 (計算値)</th><th>アタッチ可能な本数の上限</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>c4d-*-96</code></td><td>3,125 MiB/s</td><td><strong>2 本</strong> (3,125 ÷ 2,400 = 1.30)</td><td>32</td></tr>
+            <tr><td><code>c4d-*-192</code></td><td>6,250 MiB/s</td><td><strong>3 本</strong> (6,250 ÷ 2,400 = 2.61)</td><td>64</td></tr>
+            <tr><td><code>c4d-*-384</code></td><td>12,500 MiB/s</td><td><strong>6 本</strong> (12,500 ÷ 2,400 = 5.21)</td><td>128</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:13px;">アタッチ可能本数の上限は十分に余裕があるため、ボリューム本数がボトルネックになることは通常ありません。</p>
+
+      <h3>Hyperdisk Balanced のプロビジョニング上限とスループット計算式</h3>
+      <div class="two-col">
+        <div class="formula">最小スループット<br>= MAX(140, P / 256) MiB/s</div>
+        <div class="formula">最大スループット<br>= MIN(2,400, P / 4) MiB/s</div>
+      </div>
+      <p style="font-size:13px; text-align:center;">P = プロビジョニング IOPS</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>項目</th><th>詳細</th></tr></thead>
+          <tbody>
+            <tr><td>ボリュームサイズ</td><td>4 GiB 〜 64 TiB (デフォルト 100 GiB)</td></tr>
+            <tr><td>プロビジョニング可能 IOPS</td><td>3,000 〜 160,000 (320 GiB 未満はサイズ依存)</td></tr>
+            <tr><td>プロビジョニング可能スループット</td><td>140 〜 2,400 MiB/s</td></tr>
+            <tr><td>ベースライン (無償枠)</td><td>3,000 IOPS + 140 MiB/s (ボリュームごと)</td></tr>
+            <tr><td>最大 IOPS 到達条件</td><td>I/O サイズ 4 KB</td></tr>
+            <tr><td>最大スループット到達条件</td><td>I/O サイズ 256 KB 以上</td></tr>
+            <tr><td>性能の方向性</td><td>半二重 (read と write で IOPS / スループットを共有)</td></tr>
+            <tr><td>性能変更の頻度制限</td><td>プロビジョニング性能は 4 時間に 1 回まで、サイズは 4 時間に 2 回まで</td></tr>
+            <tr><td>耐久性 (設計値)</td><td>99.999% 超</td></tr>
+            <tr><td>対応ディスクインターフェイス (C4D)</td><td>NVMe のみ</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note-box">
+        <strong>💡 計算例:</strong> 1 本のボリュームで 2,400 MiB/s を出すには <strong>9,600 IOPS 以上のプロビジョニングが必要</strong> (2,400 = P/4 → P = 9,600)。
+        たとえば <code>c4d-*-384</code> で 12,500 MiB/s を狙う場合、6 本 × 9,600 = <strong>57,600 IOPS 相当</strong>となり、インスタンスの IOPS 上限 320,000 に対して十分な余裕があります。
+      </div>
+
+      <h3>インスタンスあたりの Hyperdisk 共通制限</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>項目</th><th>詳細</th></tr></thead>
+          <tbody>
+            <tr><td>ディスク総数 (全タイプ合計)</td><td>128</td></tr>
+            <tr><td>Hyperdisk Balanced 本数 (<code>c4d-*-96</code>)</td><td>32</td></tr>
+            <tr><td>Hyperdisk Balanced 本数 (<code>c4d-*-192</code>)</td><td>64</td></tr>
+            <tr><td>Hyperdisk Balanced 本数 (<code>c4d-*-384</code>)</td><td>128</td></tr>
+            <tr><td>Hyperdisk Balanced 本数 (<code>c4d-*-384-metal</code>)</td><td>32</td></tr>
+            <tr><td>総容量上限 (32 vCPU 以上)</td><td>512 TiB</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>⚙️ 設定方法</h2>
+
+      <h3>✅ 前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>対象マシンタイプ (<code>c4d-*-96</code>、<code>c4d-*-192</code>、<code>c4d-*-384</code>) の C4D インスタンスが存在する、または作成できること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>Hyperdisk Balanced のプロビジョニング IOPS / スループットのクォータに余裕があること (ベースラインの 3,000 IOPS と 140 MiB/s はクォータを消費しません)</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>C4D が利用可能なリージョンであること</span></div>
+
+      <h3>ステップ 1: 高スループットの Hyperdisk Balanced ボリュームを作成する</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># 単一ボリューム上限の 2,400 MiB/s をプロビジョニング
+# 2,400 MiB/s には 9,600 IOPS 以上が必要 (最大スループット = MIN(2,400, IOPS/4))
+for i in 1 2 3 4 5 6; do
+  gcloud compute disks create hd-bal-data-${i} \
+    --type=hyperdisk-balanced \
+    --size=1000GB \
+    --provisioned-iops=20000 \
+    --provisioned-throughput=2400 \
+    --zone=us-central1-a
+done</code></pre>
+      <p><code>c4d-*-384</code> で 12,500 MiB/s を狙う場合、6 本以上のボリュームが必要です。</p>
+
+      <h3>ステップ 2: 複数ボリュームを C4D インスタンスにアタッチする</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">for i in 1 2 3 4 5 6; do
+  gcloud compute instances attach-disk my-c4d-instance \
+    --disk=hd-bal-data-${i} \
+    --zone=us-central1-a
+done</code></pre>
+      <div class="note-box">
+        <strong>💡 OS 側の構成:</strong> C4D は <strong>NVMe インターフェイスのみ</strong>をサポートします。
+        OS 側では複数の NVMe デバイスとして見えるため、<strong>LVM やソフトウェア RAID 0 でストライピング</strong>し、単一のファイルシステムとして帯域を集約するのが一般的な構成です。
+      </div>
+
+      <h3>ステップ 3: 既存ボリュームのプロビジョニング性能を引き上げる</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># 既存ボリュームの IOPS / スループットを変更
+gcloud compute disks update hd-bal-data-1 \
+  --provisioned-iops=20000 \
+  --provisioned-throughput=2400 \
+  --zone=us-central1-a</code></pre>
+      <p>
+        プロビジョニング性能の変更は <strong>4 時間に 1 回まで</strong>という制限があります。
+        REST API を使う場合は <code>compute.disks.update</code> メソッドに対して <code>provisionedIops</code> / <code>provisionedThroughput</code> を含む PATCH リクエストを送信します。
+      </p>
+      <span class="code-label">JSON</span>
+      <pre><code class="language-json">{
+  "sizeGb": "1000",
+  "provisionedIops": "20000",
+  "provisionedThroughput": "2400"
+}</code></pre>
+
+      <h3>ステップ 4: 実効スループットを検証する</h3>
+      <div class="warning-box">
+        最大スループット上限に到達するには <strong>I/O サイズが 256 KB 以上</strong>である必要があります。ベンチマーク時は I/O サイズの設定を確認してください。
+        IOPS 上限の測定には <strong>4 KB</strong> の I/O サイズを使用します。
+      </div>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>🎯 メリット</h2>
+      <div class="two-col">
+        <div class="card green">
+          <h3>💼 ビジネス面</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>スケールアップの継続性</strong>: より高価な Hyperdisk Extreme や別マシンシリーズへの移行を検討せずに、既存の C4D + Hyperdisk Balanced 構成のまま帯域を拡張できる可能性がある</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>処理時間の短縮</strong>: バッチ処理、バックアップ/リストア、大量データロードなど帯域が支配的な処理で、上限引き上げ分に応じた所要時間の短縮が期待できる</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>設定変更のみで恩恵</strong>: インスタンスの再作成やマシンタイプ変更は不要で、ボリューム追加やプロビジョニング値の引き上げで対応できる</span></div>
+        </div>
+        <div class="card">
+          <h3>🔬 技術面</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>vCPU 数とストレージ帯域のバランス改善</strong>: <code>c4d-*-192</code> で約 +30.2%、<code>c4d-*-384</code> で +25% の引き上げにより、大規模マシンタイプの vCPU あたり帯域が改善</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>IOPS 上限は据え置きだがスループット側に余裕</strong>: 320,000 IOPS 上限に対し、12,500 MiB/s を 6 本構成で満たす必要 IOPS は 57,600 相当のため両立させやすい</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>ベースライン無償枠の活用</strong>: ボリューム 1 本ごとに 3,000 IOPS と 140 MiB/s が無償ベースラインとして含まれるため、複数ボリューム構成では無償枠の合計も増える</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>🚫 制限事項</h3>
+      <div class="error-box">
+        <div class="check-item"><span class="cross-icon">✕</span><span><strong>単一ボリュームでは新上限に到達できない</strong>: 単一ボリューム上限は 160,000 IOPS / 2,400 MiB/s のままで、新上限を引き出すには複数ボリュームのアタッチが必須</span></div>
+        <div class="check-item"><span class="cross-icon">✕</span><span><strong><code>c4d-*-384-metal</code> は対象外</strong>: ベアメタルのスループット上限は 10,000 MiB/s で変更されていない</span></div>
+        <div class="check-item"><span class="cross-icon">✕</span><span><strong>64 vCPU 以下は対象外</strong>: <code>c4d-*-64</code> (2,400 MiB/s) 以下のマシンタイプの上限は変更されていない</span></div>
+        <div class="check-item"><span class="cross-icon">✕</span><span><strong>性能上限はインスタンス内で共有</strong>: 各ボリュームのプロビジョニング値の合計がインスタンス上限を超えても、実際に消費できるのはインスタンス上限まで</span></div>
+        <div class="check-item"><span class="cross-icon">✕</span><span><strong>半二重</strong>: IOPS / スループットは read と write の合計に対する上限</span></div>
+        <div class="check-item"><span class="cross-icon">✕</span><span><strong>性能変更の頻度制限</strong>: プロビジョニング性能の変更は 4 時間に 1 回まで、サイズ変更は 4 時間に 2 回まで</span></div>
+        <div class="check-item"><span class="cross-icon">✕</span><span><strong>CUD / SUD の対象外</strong>: Hyperdisk ボリュームはリソースベース確約利用割引 (CUD) および継続利用割引 (SUD) の対象外。Spot VM でも Hyperdisk の割引価格はない</span></div>
+      </div>
+
+      <h3>🤔 考慮すべき点</h3>
+      <div class="warning-box">
+        <div class="check-item"><span class="warn-icon">!</span><span><strong>I/O サイズの確認</strong>: 最大スループットには 256 KB 以上の I/O サイズが必要。アプリケーションの I/O サイズが小さい場合、効果を体感できない可能性がある</span></div>
+        <div class="check-item"><span class="warn-icon">!</span><span><strong>プロビジョニングは自動では増えない</strong>: 上限が引き上げられても既存ボリュームのプロビジョニング値は自動で増えない。明示的にボリュームを追加するか値を引き上げる必要がある</span></div>
+        <div class="check-item"><span class="warn-icon">!</span><span><strong>課金への影響</strong>: ベースライン (3,000 IOPS / 140 MiB/s) を超えるプロビジョニング分は課金対象。スループットを引き上げる場合は追加コストが発生する</span></div>
+        <div class="check-item"><span class="warn-icon">!</span><span><strong>ボリューム集約の運用コスト</strong>: LVM / RAID 0 でストライピングする構成では、スナップショットや障害時のリストア手順が単一ボリューム構成より複雑になる</span></div>
+        <div class="check-item"><span class="warn-icon">!</span><span><strong>他のボトルネック</strong>: ネットワーク帯域や CPU がボトルネックになるケースもあるため、ストレージ帯域の引き上げ単独では性能が改善しない場合がある</span></div>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+
+      <div class="usecase-box">
+        <h3>🗄️ ユースケース 1: C4D 上の大規模リレーショナルデータベース</h3>
+        <p>
+          <strong>シナリオ</strong>: <code>c4d-highmem-192</code> 上でセルフマネージドの PostgreSQL / MySQL を運用しており、
+          大規模なテーブルスキャンやバルクロード、WAL/binlog の書き出しでストレージ帯域が <strong>4,800 MiB/s に張り付いていた</strong>。
+        </p>
+        <span class="code-label">Bash</span>
+        <pre><code class="language-bash"># 3 本以上のボリュームで 6,250 MiB/s の新上限に到達させる
+for i in 1 2 3; do
+  gcloud compute disks create pg-data-${i} \
+    --type=hyperdisk-balanced --size=4TB \
+    --provisioned-iops=40000 --provisioned-throughput=2400 \
+    --zone=us-central1-a
+  gcloud compute instances attach-disk pg-primary \
+    --disk=pg-data-${i} --zone=us-central1-a
+done
+# ゲスト OS 側で 3 本を LVM ストライプ化してデータディレクトリに割り当てる</code></pre>
+        <p>
+          <strong>効果</strong>: インスタンス側の帯域上限が 4,800 → 6,250 MiB/s になったことで、
+          スキャン主体のクエリやバルクロードのスループットを<strong>最大で約 30% 拡張できる余地</strong>が生まれる。
+        </p>
+      </div>
+
+      <div class="usecase-box">
+        <h3>📊 ユースケース 2: 384 vCPU 構成での分析・ETL 処理</h3>
+        <p>
+          <strong>シナリオ</strong>: <code>c4d-standard-384</code> 上で大量の中間データを書き出す ETL / 分析ジョブを実行しており、
+          <strong>10,000 MiB/s のストレージ帯域上限が処理時間を決めていた</strong>。
+        </p>
+        <p>
+          <strong>効果</strong>: 上限が 12,500 MiB/s になり、6 本以上の Hyperdisk Balanced 構成で <strong>+25% の帯域</strong>を利用できる。
+          ジョブが完全に帯域律速であれば、それに応じた処理時間の短縮が期待できる。
+          384 vCPU では Hyperdisk Balanced を<strong>最大 128 本</strong>までアタッチできるため、本数上限が制約になることはない。
+        </p>
+      </div>
+
+      <div class="usecase-box">
+        <h3>🔄 ユースケース 3: Hyperdisk Extreme からの構成見直し</h3>
+        <p>
+          <strong>シナリオ</strong>: これまで C4D で高スループットを確保するために <strong>Hyperdisk Extreme を併用</strong>していた。
+        </p>
+        <p>
+          <strong>効果</strong>: Hyperdisk Balanced 側の上限が引き上げられたことで、要求スループットが新上限の範囲内に収まるワークロードについては、
+          <strong>Hyperdisk Balanced のみの構成を再検討</strong>できる。
+          なお <code>c4d-*-64</code> 以上では Hyperdisk Extreme を最大 8 本アタッチできるため、より高い IOPS が必要な場合は引き続き併用が選択肢となる。
+        </p>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <div class="note-box">
+        今回のアップデートは<strong>性能上限の引き上げであり、料金体系自体の変更ではありません</strong>。
+        ただし、新しい上限を活用するためにボリュームを追加したりプロビジョニング値を引き上げた場合は、その分の課金が発生します。
+      </div>
+
+      <p>Hyperdisk Balanced の課金は以下の 3 要素で構成されます (公式ドキュメントに基づく)。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>課金要素</th><th>課金単位</th><th>備考</th></tr></thead>
+          <tbody>
+            <tr><td>プロビジョニング済み容量</td><td>GiB / 月</td><td>ボリュームを削除するまで課金。インスタンスにアタッチしていない場合、インスタンスが停止/一時停止中の場合も課金される</td></tr>
+            <tr><td>プロビジョニング済み IOPS</td><td>IOPS / 月</td><td>ベースライン 3,000 IOPS を超える分のみが課金対象</td></tr>
+            <tr><td>プロビジョニング済みスループット</td><td>MiB/s / 月</td><td>ベースライン 140 MiB/s を超える分のみが課金対象</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <ul class="tight">
+        <li>ベースライン (3,000 IOPS + 140 MiB/s) は<strong>ボリュームごとに無償</strong>で含まれます。たとえば 5,000 IOPS をプロビジョニングした場合、課金対象は 2,000 IOPS です。</li>
+        <li>ベースラインは Standard performance / Standard capacity / Advanced capacity の Hyperdisk Storage Pools 内のボリュームにも含まれますが、<strong>Advanced performance の Storage Pools 内のボリュームには含まれません</strong>。</li>
+        <li>Hyperdisk Balanced High Availability はデータを 2 箇所に書き込むため、ストレージコストは Hyperdisk Balanced の <strong>2 倍</strong>です。</li>
+        <li>Hyperdisk はリソースベース CUD および SUD の対象外です。</li>
+      </ul>
+      <p style="font-size:13px;">
+        リージョンごとの具体的な単価は
+        <a href="https://cloud.google.com/compute/disks-image-pricing#disk" target="_blank" rel="noopener noreferrer" class="gc-link">料金ページ</a>
+        を参照してください (レポート作成時点で公式単価を確認できなかったため、具体的な金額の記載は割愛)。
+      </p>
+    </div>
+
+    <!-- 利用可能リージョン -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <p>
+        今回の上限引き上げは対象マシンタイプの<strong>性能仕様の変更</strong>であり、公式リリースノートではリージョン限定の記載はありません。
+        前提として C4D マシンシリーズが利用できるリージョンが必要です。
+        2026 年 7 月時点で C4D が提供されているリージョンは以下の <strong>17 リージョン</strong>です。
+      </p>
+      <div class="region-grid">
+        <div class="region-card">
+          <h4>🇺🇸 北米 (7)</h4>
+          <span class="rg">us-central1</span><span class="rg">us-east1</span><span class="rg">us-east4</span><span class="rg">us-east5</span><span class="rg">us-west1</span><span class="rg">us-west4</span><span class="rg">northamerica-northeast1</span>
+        </div>
+        <div class="region-card">
+          <h4>🇪🇺 ヨーロッパ (5)</h4>
+          <span class="rg">europe-west1</span><span class="rg">europe-west2</span><span class="rg">europe-west3</span><span class="rg">europe-west4</span><span class="rg">europe-west9</span>
+        </div>
+        <div class="region-card">
+          <h4>🌏 アジア太平洋 (4)</h4>
+          <span class="rg">asia-northeast1 (東京)</span><span class="rg">asia-south1</span><span class="rg">asia-southeast1</span><span class="rg">australia-southeast1</span>
+        </div>
+        <div class="region-card">
+          <h4>🌍 アフリカ (1)</h4>
+          <span class="rg">africa-south1</span>
+        </div>
+      </div>
+      <div class="warning-box">
+        マシンタイプごとの提供状況は<strong>ゾーン単位で異なる</strong>場合があるため、実際の利用前に対象ゾーンでの可用性を確認してください。
+      </div>
+    </div>
+
+    <!-- 関連サービス -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <h3>🖥️ C4D マシンシリーズ</h3>
+        <p>第 5 世代 AMD EPYC Turin + Titanium 構成の汎用マシンシリーズ。最大 384 vCPU / 3,024 GB DDR5、最大 12 TiB のローカル Titanium SSD (<code>-lssd</code> バリアント)、Tier_1 ネットワーキングで最大 200 Gbps。<strong>ブロックストレージは Hyperdisk のみ対応で Persistent Disk 非対応</strong>。</p>
+      </div>
+      <div class="card">
+        <h3>🛡️ Hyperdisk Balanced High Availability</h3>
+        <p>リージョン (2 ゾーン) レプリケーション対応の Hyperdisk。C4D の <code>c4d-*-96</code> / <code>c4d-*-192</code> / <code>c4d-*-384</code> についても、性能上限表で <strong>3,125 / 6,250 / 12,500 MiB/s</strong> と同じ値が示されている。単一ボリューム上限は 100,000 IOPS / 2,400 MiB/s。</p>
+      </div>
+      <div class="card orange">
+        <h3>🚀 Hyperdisk Extreme</h3>
+        <p>IOPS 重視のワークロード向け。単一ボリュームで最大 <strong>350,000 IOPS</strong>。C4D では <code>c4d-*-64</code> 以上で最大 8 本アタッチ可能。</p>
+      </div>
+      <div class="card">
+        <h3>🤖 Hyperdisk ML</h3>
+        <p>読み取り主体の ML ワークロード向け。複数 VM からの同時アタッチに追加料金が不要。</p>
+      </div>
+      <div class="card">
+        <h3>🗂️ Hyperdisk Storage Pools</h3>
+        <p>複数ボリュームで容量と性能をプールして共有・管理する仕組み。<strong>Advanced performance プール内のボリュームはベースライン性能が含まれない</strong>点に注意。</p>
+      </div>
+      <div class="card">
+        <h3>⚡ Local Titanium SSD</h3>
+        <p>C4D の <code>-lssd</code> マシンタイプで自動的にアタッチされるローカルストレージ。最大 12 TiB。</p>
+      </div>
+      <div class="card">
+        <h3>☸️ GKE (Compute Engine Persistent Disk CSI Driver)</h3>
+        <p><code>hyperdisk-balanced</code> を StorageClass の <code>type</code> に指定して GKE から利用可能。<code>use-allowed-disk-topology: "true"</code> パラメータで Hyperdisk 対応ノードへの自動スケジューリングが可能 (クラスタ / ノードプールが 1.34.1-gke.2541000 以降)。</p>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="success-box">
+        <div class="check-item"><span class="check-icon">✓</span><span>C4D の大規模マシンタイプ (96 / 192 / 384 vCPU) における Hyperdisk Balanced のスループット上限が<strong>最大 +30% 引き上げ</strong>られ、<code>c4d-*-384</code> では <strong>12,500 MiB/s</strong> まで利用可能に</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>C4D は <strong>Hyperdisk のみをサポート</strong>するマシンシリーズなので、スループット律速のデータベースや分析ワークロードを運用するチームには、マシンシリーズ変更や高価なディスクタイプへの移行なしに性能余地を確保できる実利あるアップデート</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>新上限は<strong>自動的に適用されるわけではなく</strong>、単一ボリューム上限 (2,400 MiB/s) の制約から<strong>複数ボリューム構成が前提</strong></span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>次のアクション</strong>: ① Cloud Monitoring でディスクスループットが従来上限に張り付いていないか確認 → ② ボリューム追加とプロビジョニング値の見直し → ③ <strong>256 KB 以上の I/O サイズ</strong>が出ているかを検証</span></div>
+      </div>
+
+      <div class="tags">
+        <span class="tag">Compute Engine</span>
+        <span class="tag">Hyperdisk</span>
+        <span class="tag">Hyperdisk Balanced</span>
+        <span class="tag">C4D</span>
+        <span class="tag">ストレージ</span>
+        <span class="tag">スループット</span>
+        <span class="tag">パフォーマンス</span>
+        <span class="tag">AMD EPYC Turin</span>
+        <span class="tag">Titanium</span>
+        <span class="tag">ブロックストレージ</span>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul>
+        <li><a href="https://cloud.google.com/compute/docs/release-notes" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (Compute Engine)</a></li>
+        <li><a href="https://docs.cloud.google.com/compute/docs/disks/hd-types/hyperdisk-balanced" target="_blank" rel="noopener noreferrer" class="gc-link">Hyperdisk Balanced について</a></li>
+        <li><a href="https://docs.cloud.google.com/compute/docs/disks/hd-types/hyperdisk-balanced#perf-limits" target="_blank" rel="noopener noreferrer" class="gc-link">インスタンスにアタッチした際の Hyperdisk Balanced 性能上限</a></li>
+        <li><a href="https://docs.cloud.google.com/compute/docs/disks/hyperdisk-perf-limits" target="_blank" rel="noopener noreferrer" class="gc-link">Hyperdisk の性能上限 (全タイプ)</a></li>
+        <li><a href="https://docs.cloud.google.com/compute/docs/general-purpose-machines#c4d_series" target="_blank" rel="noopener noreferrer" class="gc-link">汎用マシンファミリー (C4D マシンシリーズ)</a></li>
+        <li><a href="https://docs.cloud.google.com/compute/docs/disks/modify-hyperdisks" target="_blank" rel="noopener noreferrer" class="gc-link">Hyperdisk ボリュームのサイズとプロビジョニング性能の変更</a></li>
+        <li><a href="https://docs.cloud.google.com/compute/docs/disks/hyperdisks" target="_blank" rel="noopener noreferrer" class="gc-link">Hyperdisk について (料金・耐久性)</a></li>
+        <li><a href="https://docs.cloud.google.com/compute/docs/regions-zones/regions-zones" target="_blank" rel="noopener noreferrer" class="gc-link">リージョンとゾーン</a></li>
+        <li><a href="https://cloud.google.com/compute/disks-image-pricing#disk" target="_blank" rel="noopener noreferrer" class="gc-link">料金ページ (ディスクとイメージ)</a></li>
+      </ul>
+      <p>本インフォグラフィックは Google Cloud News レポート (2026-07-28) を基に作成されています。</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

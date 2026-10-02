@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spanner: Go / Java クライアントの Dynamic Channel Pooling (DCP) が GA</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); color: #FFFFFF; }
+    .badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+    .badge-deprecated { background: var(--gc-red); color: #FFFFFF; }
+
+    /* Before / After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 720px) {
+      .before-after { grid-template-columns: 1fr; }
+    }
+
+    .before-panel {
+      background: var(--gc-red-tint);
+      border: 1px solid rgba(234, 67, 53, 0.35);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-panel {
+      background: var(--gc-green-tint);
+      border: 1px solid rgba(52, 168, 83, 0.35);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-panel h3, .after-panel h3 {
+      margin-top: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .before-panel h3 { color: #C5221F; }
+    .after-panel h3 { color: #188038; }
+
+    .before-panel ul, .after-panel ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+    }
+
+    .before-panel li, .after-panel li {
+      margin: 8px 0;
+      font-size: 14.5px;
+    }
+
+    /* フロー図スタイル */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+      font-size: 14px;
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* チェックリストスタイル */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon { color: var(--gc-green); font-size: 18px; }
+    .cross-icon { color: var(--gc-red); font-size: 18px; }
+
+    /* コードブロック */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block {
+      overflow: hidden;
+      padding: 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-title { color: #AAAAAA; }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      background: #1E1E1E;
+      border-radius: 0;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブルスタイル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* 統計カード */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px 16px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 34px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border: 1px solid var(--gc-blue-100);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a { word-break: break-all; }
+
+    ul.link-list {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    ul.link-list li { margin: 6px 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <div style="margin-bottom: 8px;">
+          <span class="badge">🗄️ Spanner</span>
+          <span class="badge badge-ga">✅ GA (一般提供)</span>
+          <span class="badge" style="background: var(--gc-blue-800);">Go / Java クライアント</span>
+        </div>
+        <h1>⚡ Dynamic Channel Pooling (DCP) が GA</h1>
+        <div class="subtitle">gRPC チャネルプールを負荷に応じて自動リサイズ — チューニング不要の接続管理へ</div>
+      </div>
+      <div class="subtitle">📅 リリース日: 2026-08-10</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📌 概要</h2>
+      <p>
+        Spanner の <span class="highlight">Go / Java クライアントライブラリ</span>で、gRPC チャネルの
+        <span class="highlight">Dynamic Channel Pooling (DCP)</span> が一般提供 (GA) になりました。
+        アプリケーションの負荷変動に応じて gRPC チャネルプールのサイズを<strong>自動的に拡大・縮小</strong>し、
+        プロビジョニング不足・過剰プロビジョニングの両方を防ぎます。
+      </p>
+      <p>
+        1 つの gRPC チャネルは概ね 1 本の TCP 接続に相当し、<strong>最大 100 同時リクエスト</strong>を処理します。
+        従来は同時実行数を見積もってチャネル数を静的に設定する必要があり、高負荷時にはチャネル輻輳による
+        <span class="highlight">テールレイテンシ (p95/p99) の悪化</span>が発生しがちでした。
+      </p>
+      <div class="note-box">
+        <strong>💡 ポイント:</strong> DCP は<strong>デフォルトでは無効</strong> (オプトイン)。同時リクエスト数が大きく変動するアプリや、
+        チャネル数チューニングに悩む高スループットワークロードの開発者・SRE が主な対象です。
+      </div>
+
+      <div class="before-after">
+        <div class="before-panel">
+          <h3>❌ Before: 静的チャネルプール</h3>
+          <ul>
+            <li>チャネル数は固定値 (デフォルト 4、Java の gRPC-GCP 拡張有効時は 8) で、手動チューニングが必要</li>
+            <li>チャネル不足時は 100 同時リクエスト上限による輻輳で p95/p99 が悪化</li>
+            <li>チャネル過剰時は TCP 接続やメモリを不必要に消費</li>
+            <li>負荷変動ワークロードではピークとオフピークの両立が不可能</li>
+          </ul>
+        </div>
+        <div class="after-panel">
+          <h3>✅ After: 動的チャネルプール (DCP)</h3>
+          <ul>
+            <li>負荷に応じてクライアントが自動リサイズ、手動チューニング不要</li>
+            <li>スケールアップはイベント駆動で負荷の急上昇に即時追従</li>
+            <li>輻輳起因のテールレイテンシ低減とアイドル時のリソース削減を両立</li>
+            <li>Go / Java の両クライアントで GA 品質として本番利用が可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- 数字で見る DCP -->
+    <div class="section">
+      <h2>📊 数字で見る DCP (デフォルト値)</h2>
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">2〜10</div>
+          <div class="stat-label">最小〜最大プールサイズ (チャネル)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">25</div>
+          <div class="stat-label">スケールアップしきい値 (同時 RPC/チャネル)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">15</div>
+          <div class="stat-label">スケールダウンしきい値 (同時 RPC/チャネル)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">3 分</div>
+          <div class="stat-label">スケールダウンチェック間隔</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ: 従来 vs DCP 有効時</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Before["従来: 静的チャネルプール"]
+        A1([👤 アプリケーション]) --> B1["📦 固定チャネルプール<br/>(常に 4 チャネル)"]
+        B1 -->|"高負荷時: 輻輳 ⚠️<br/>p95/p99 悪化"| C1[("🗄️ Spanner")]
+    end
+
+    subgraph After["DCP 有効時: 動的チャネルプール"]
+        A2([👤 アプリケーション]) --> B2["📦 動的チャネルプール<br/>(最小 2 〜 最大 10 チャネル)"]
+        B2 -->|"負荷に応じて自動リサイズ ✅"| C2[("🗄️ Spanner")]
+        M["📈 負荷モニタ<br/>スケールアップ: 25 RPC/チャネル超で即時<br/>スケールダウン: 15 RPC/チャネル未満が3分継続"] -.->|自動調整| B2
+    end
+        </pre>
+      </div>
+      <p>
+        従来は固定数の gRPC チャネルで全リクエストを処理していたため高負荷時に輻輳が発生していましたが、
+        DCP 有効時は<strong>チャネルあたりの同時 RPC 数を監視</strong>し、プールサイズを自動的に拡大・縮小します。
+      </p>
+      <div class="flow-diagram">
+        <div class="flow-step">📈 負荷上昇<br/>25 RPC/チャネル超</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">⚡ イベント駆動で<br/>即時チャネル追加</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">📉 負荷低下<br/>15 RPC/チャネル未満が 3 分継続</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🧹 チャネル削減<br/>(最小 2 まで)</div>
+      </div>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>🚀 主要機能</h2>
+
+      <div class="card">
+        <h3>1️⃣ 負荷に応じたチャネルプールの自動リサイズ</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span>チャネルあたりの同時 RPC 数が<strong>スケールアップしきい値 (デフォルト 25)</strong> を超えると、イベント駆動で即座にチャネルを追加</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>スケールダウンしきい値 (デフォルト 15)</strong> を下回った状態が定期チェック間隔 (デフォルト 3 分) 継続すると、チャネルを削減</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>プロビジョニング不足・過剰プロビジョニングの両方を回避</span></div>
+      </div>
+
+      <div class="card" style="border-left-color: var(--gc-teal);">
+        <h3>2️⃣ Go クライアントライブラリでの DCP サポート (GA)</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span><code>ClientConfig</code> の <code>DynamicChannelPoolConfig</code> で <code>DCPEnabled: true</code> を設定して有効化</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><code>DCPInitialChannels</code> / <code>DCPMinChannels</code> / <code>DCPMaxChannels</code> / <code>DCPMaxRPCPerChannel</code> / <code>DCPMinRPCPerChannel</code> でカスタマイズ可能</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>無効時は従来通りデフォルト 4 チャネル (<code>option.WithGRPCConnectionPool</code> で固定数の変更も可能)</span></div>
+      </div>
+
+      <div class="card" style="border-left-color: var(--gc-orange);">
+        <h3>3️⃣ Java クライアントライブラリでの DCP サポート (GA)</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span><code>SpannerOptions</code> の <code>enableDynamicChannelPool()</code> で有効化</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><code>setGcpChannelPoolOptions</code> (<code>GcpChannelPoolOptions</code>) で初期サイズ、最小/最大サイズ、動的スケーリングのしきい値をカスタマイズ可能</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span><code>setNumChannels</code> で静的なチャネル数を設定した場合、DCP は無効化される</span></div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>⚙️ 技術仕様</h2>
+
+      <h3>📋 DCP のデフォルト設定 (Go / Java 共通)</h3>
+      <table>
+        <tr><th>項目</th><th>デフォルト値</th></tr>
+        <tr><td>有効/無効</td><td>無効 (オプトイン)</td></tr>
+        <tr><td>初期プールサイズ</td><td>4 チャネル</td></tr>
+        <tr><td>最小プールサイズ</td><td>2 チャネル</td></tr>
+        <tr><td>最大プールサイズ</td><td>10 チャネル (Java のハードキャップ: 256 チャネル)</td></tr>
+        <tr><td>スケールアップしきい値</td><td>チャネルあたり 25 同時 RPC</td></tr>
+        <tr><td>スケールダウンしきい値</td><td>チャネルあたり 15 同時 RPC</td></tr>
+        <tr><td>スケールダウンチェック間隔</td><td>3 分</td></tr>
+      </table>
+
+      <h3>🔌 gRPC チャネルの基礎仕様</h3>
+      <table>
+        <tr><th>項目</th><th>詳細</th></tr>
+        <tr><td>gRPC チャネル</td><td>概ね 1 本の TCP 接続に相当</td></tr>
+        <tr><td>チャネルあたりの同時リクエスト上限</td><td>100</td></tr>
+        <tr><td>DCP 無効時のチャネル数</td><td>Go: 4 / Java: 4 (gRPC-GCP 拡張有効時は 8)</td></tr>
+        <tr><td>スケールアップ動作</td><td>イベント駆動 (負荷上昇に即時追従)</td></tr>
+        <tr><td>スケールダウン動作</td><td>定期チェック (しきい値未満が継続した場合のみ削減)</td></tr>
+      </table>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>✅ 前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>Go または Java の Spanner クライアントライブラリを使用していること (DCP をサポートするバージョン)</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>Java でマルチプレックスセッションを利用する場合はバージョン 6.98.0 以降 (デフォルトで有効)</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>Java で <code>setNumChannels</code> による静的チャネル数設定を行っていないこと (設定すると DCP が無効化される)</span></div>
+
+      <h3>ステップ 1: Go クライアントで DCP を有効化</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Go</span>
+          <span class="code-title">DCP の有効化</span>
+        </div>
+        <pre><code class="language-go">client, err := spanner.NewClientWithConfig(ctx,
+    "projects/PROJECT_ID/instances/INSTANCE_ID/databases/DATABASE_ID",
+    spanner.ClientConfig{
+        DynamicChannelPoolConfig: spanner.DynamicChannelPoolConfig{
+            DCPEnabled: true,
+        },
+    })</code></pre>
+      </div>
+      <p style="font-size: 14px;">
+        <code>DCPEnabled: true</code> のみ設定した場合、デフォルト値 (初期 4 / 最小 2 / 最大 10 チャネルなど) が適用されます。
+        カスタマイズには <code>DCPInitialChannels</code>、<code>DCPMinChannels</code>、<code>DCPMaxChannels</code>、
+        <code>DCPMaxRPCPerChannel</code>、<code>DCPMinRPCPerChannel</code> を設定します。
+      </p>
+
+      <h3>ステップ 2: Java クライアントで DCP を有効化</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Java</span>
+          <span class="code-title">DCP の有効化</span>
+        </div>
+        <pre><code class="language-java">SpannerOptions options =
+    SpannerOptions.newBuilder()
+        .setProjectId("PROJECT_ID")
+        .enableDynamicChannelPool()
+        .build();</code></pre>
+      </div>
+
+      <h3>ステップ 3: Java クライアントで DCP をカスタマイズ (任意)</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Java</span>
+          <span class="code-title">プールサイズとしきい値のカスタマイズ</span>
+        </div>
+        <pre><code class="language-java">SpannerOptions options =
+    SpannerOptions.newBuilder()
+        .setProjectId("PROJECT_ID")
+        .enableDynamicChannelPool()
+        .setGcpChannelPoolOptions(
+            GcpChannelPoolOptions.newBuilder()
+                .setMaxSize(15)
+                .setMinSize(3)
+                .setInitSize(5)
+                // スケールアップ: チャネル負荷が 30 同時 RPC を超えたら即時拡大
+                // スケールダウン: 5 分ごとのチェックで 10 同時 RPC 未満が続いたら削減
+                .setDynamicScaling(10, 30, Duration.ofMinutes(5))
+                .build())
+        .build();</code></pre>
+      </div>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>💡 メリット</h2>
+
+      <h3>💼 ビジネス面</h3>
+      <div class="success-box">
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>運用コストの削減</strong>: チャネル数の見積もり・チューニング・再デプロイのサイクルが不要になり、パフォーマンスチューニング工数を削減</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>ユーザー体験の安定化</strong>: 高負荷時のテールレイテンシ (p95/p99) 悪化を抑制し、トラフィック変動下でも安定した応答性能を維持</span></div>
+      </div>
+
+      <h3>🔧 技術面</h3>
+      <div class="success-box">
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>輻輳の自動回避</strong>: チャネルあたり 100 同時リクエストの上限に近づく前に、イベント駆動でチャネルを即時追加</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>リソース効率の向上</strong>: アイドル時にはチャネルを最小サイズまで自動削減し、TCP 接続やメモリの無駄な消費を抑制</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>マルチプレックスセッションとの組み合わせ</strong>: Go / Java ではデフォルト有効のマルチプレックスセッションと合わせて、接続管理をほぼフルマネージド化</span></div>
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>🚫 制限事項</h3>
+      <div class="error-box">
+        <div class="check-item"><span class="cross-icon">✗</span><span>DCP はデフォルトで無効であり、明示的なオプトイン設定が必要</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>GA の対象は Go / Java クライアントライブラリのみ (Node.js はマルチ gRPC チャネル自体を非サポート、PHP はチャネル数の設定不可など、言語ごとの差異あり)</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>Java で <code>setNumChannels</code> を設定すると DCP は無効化され、静的なチャネル数が使用される</span></div>
+      </div>
+
+      <h3>🤔 考慮すべき点</h3>
+      <div class="warning-box">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>スケーリングのオーバーヘッド</strong>: プールの拡大・縮小には gRPC チャネル / TCP 接続の作成・破棄が伴う。急峻なバーストを伴うレイテンシ重視のワークロードでは、大きめの静的プールの方が適する場合がある</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>リソース使用量の変動</strong>: 動的プールは負荷に応じてメモリ・接続数が変動するため、キャパシティ計画では最大プールサイズ時のリソース消費を考慮する</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>デフォルトしきい値 (25 / 15 同時 RPC) は一般的なワークロード向け。特殊なトラフィックパターンでは <code>setDynamicScaling</code> (Java) や <code>DCPMaxRPCPerChannel</code> / <code>DCPMinRPCPerChannel</code> (Go) での調整を検討</span></div>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>🛒 ユースケース 1: 時間帯によって負荷が変動する EC サイトのバックエンド</h3>
+        <p>
+          <strong>シナリオ</strong>: 日中のピーク時間帯には数千の同時リクエストが発生し、深夜はほぼアイドルになる EC サイトで、
+          Java 製バックエンドから Spanner にアクセス。固定 4 チャネルではピーク時に輻輳が発生し、
+          ピークに合わせて静的に増やすと深夜のリソースが無駄になる。
+        </p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Java</span>
+            <span class="code-title">実装例</span>
+          </div>
+          <pre><code class="language-java">SpannerOptions options =
+    SpannerOptions.newBuilder()
+        .setProjectId("my-ecommerce-project")
+        .enableDynamicChannelPool()
+        .build();</code></pre>
+        </div>
+        <p style="margin-bottom: 0;">
+          <strong>効果</strong>: ピーク時はチャネルが自動追加されて輻輳による p95/p99 悪化を防ぎ、
+          深夜は最小 2 チャネルまで縮小してリソース消費を抑制。チャネル数の手動チューニングが不要に。
+        </p>
+      </div>
+
+      <div class="usecase">
+        <h3>🧩 ユースケース 2: Go 製マイクロサービスのチューニングレス運用</h3>
+        <p>
+          <strong>シナリオ</strong>: 多数の Go 製マイクロサービスがそれぞれ Spanner クライアントを持ち、
+          サービスごとにトラフィック特性が異なる。サービスごとに <code>WithGRPCConnectionPool</code> の
+          最適値を検証・設定する運用が負担になっている。
+        </p>
+        <p style="margin-bottom: 0;">
+          <strong>効果</strong>: 全サービスで <code>DCPEnabled: true</code> を共通設定にするだけで、
+          各サービスの負荷特性に応じてチャネルプールが自動調整され、サービス個別のチューニング作業を廃止できる。
+        </p>
+      </div>
+    </div>
+
+    <!-- 料金・リージョン -->
+    <div class="section">
+      <h2>💰 料金・利用可能リージョン</h2>
+      <div class="note-box">
+        <strong>💵 料金:</strong> DCP はクライアントライブラリの機能であり、この機能自体に<strong>追加料金はありません</strong>。
+        Spanner の利用料金 (コンピュート容量、ストレージ、ネットワーク) は通常どおり適用されます。
+        詳細は <a href="https://cloud.google.com/spanner/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Spanner の料金ページ</a> を参照。
+      </div>
+      <div class="note-box">
+        <strong>🌍 リージョン:</strong> DCP はクライアントライブラリ (Go / Java) 側の機能であるため、
+        特定のリージョンに依存せず、<strong>Spanner が利用可能なすべての環境</strong>で使用できます。
+      </div>
+    </div>
+
+    <!-- 関連サービス・機能 -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <h3>🔀 マルチプレックスセッション</h3>
+        <p style="margin: 0; font-size: 14.5px;">単一セッションで多数の同時リクエストを処理する機能。Go / Java クライアントライブラリではデフォルトで有効。DCP と組み合わせることでセッション・チャネル管理の両方が自動化される。</p>
+      </div>
+      <div class="card" style="border-left-color: var(--gc-teal);">
+        <h3>🧰 gRPC-GCP 拡張 (Java)</h3>
+        <p style="margin: 0; font-size: 14.5px;">Java クライアントで従来から利用可能なチャネル管理拡張。有効時のデフォルトは 8 チャネル。DCP のカスタマイズには <code>GcpChannelPoolOptions</code> を使用する。</p>
+      </div>
+      <div class="card" style="border-left-color: var(--gc-purple);">
+        <h3>📡 OpenTelemetry メトリクス</h3>
+        <p style="margin: 0; font-size: 14.5px;">セッションプールとマルチプレックスセッション間のトラフィック分布を可視化 (<code>is_multiplexed</code> フィルタ) でき、接続まわりの監視に活用できる。</p>
+      </div>
+      <div class="card" style="border-left-color: var(--gc-green);">
+        <h3>📈 Cloud Monitoring</h3>
+        <p style="margin: 0; font-size: 14.5px;">Spanner のレイテンシメトリクス (p95/p99) を監視し、DCP 導入前後の効果測定に利用できる。</p>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="success-box">
+        <p style="margin: 0;">
+          Spanner の Go / Java クライアントライブラリで <strong>Dynamic Channel Pooling が GA</strong> となり、
+          gRPC チャネル数の手動チューニングなしに、負荷変動へ自動追従する接続管理が本番品質で利用可能になりました。
+          高負荷時のテールレイテンシ悪化やチャネル数の見積もりに課題を抱えているワークロードでは、
+          まず<strong>ステージング環境で <code>DCPEnabled</code> / <code>enableDynamicChannelPool()</code> を有効化</strong>し、
+          p95/p99 レイテンシとリソース消費の変化を計測した上での本番導入を推奨します。
+        </p>
+      </div>
+      <div class="flow-diagram">
+        <div class="flow-step">🧪 ステージングで<br/>DCP を有効化</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">📊 p95/p99 と<br/>リソース消費を計測</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🎛️ 必要なら<br/>しきい値を調整</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🚀 本番導入</div>
+      </div>
+      <p style="text-align: center; font-size: 14px; color: var(--gc-outline);">
+        #Spanner #gRPC #DynamicChannelPooling #Go #Java #ClientLibrary #GA #パフォーマンス
+      </p>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p><strong>📎 出典</strong></p>
+      <ul class="link-list">
+        <li>公式リリースノート: <a href="https://docs.cloud.google.com/release-notes#August_10_2026" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/release-notes#August_10_2026</a></li>
+        <li>ドキュメント (セッションと gRPC チャネルのプール設定): <a href="https://docs.cloud.google.com/spanner/docs/sessions#configure_the_number_of_sessions_and_grpc_channels_in_the_pools" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/spanner/docs/sessions#configure_the_number_of_sessions_and_grpc_channels_in_the_pools</a></li>
+        <li>料金ページ: <a href="https://cloud.google.com/spanner/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">https://cloud.google.com/spanner/pricing</a></li>
+      </ul>
+      <p>本インフォグラフィックは Google Cloud News レポート (2026-08-10) を基に生成されています。</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

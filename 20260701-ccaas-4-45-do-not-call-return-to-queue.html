@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Google Cloud CCaaS 4.45 - Do Not Call 機能と切断後キュー復帰</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-red {
+      border-left-color: var(--gc-red);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-green);
+    }
+
+    .badge-orange {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-orange);
+    }
+
+    .badge-red {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-red);
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 24px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.green {
+      background: linear-gradient(135deg, var(--gc-green), #1B7D34);
+    }
+
+    .stat-card.orange {
+      background: linear-gradient(135deg, var(--gc-orange), #E65100);
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-box h4 {
+      color: var(--gc-red);
+      margin: 0 0 12px 0;
+      font-size: 16px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-box h4 {
+      color: var(--gc-green);
+      margin: 0 0 12px 0;
+      font-size: 16px;
+    }
+
+    .before-box ul, .after-box ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 6px 0;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-800);
+      margin: 0 0 8px 0;
+    }
+
+    .usecase-card p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .deployment-table {
+      margin: 16px 0;
+    }
+
+    .related-services {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .related-service-card {
+      background: var(--gc-surface);
+      border-radius: 8px;
+      padding: 16px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .related-service-card h4 {
+      color: var(--gc-blue-800);
+      margin: 0 0 4px 0;
+      font-size: 14px;
+    }
+
+    .related-service-card p {
+      margin: 0;
+      font-size: 13px;
+      color: var(--gc-on-surface-variant);
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stat-cards { grid-template-columns: 1fr; }
+      .flow-diagram { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>📞 CCaaS 4.45 リリース</h1>
+        <p style="margin: 8px 0 0 0; color: var(--gc-on-surface-variant);">Do Not Call 機能と切断後キュー復帰</p>
+      </div>
+      <div class="subtitle">
+        <span class="badge">CCaaS</span>
+        <span class="badge-ga">Feature</span>
+        <span class="badge-orange">Fixed</span>
+        <br>
+        <span style="font-size: 14px;">2026-07-01</span>
+      </div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>Google Cloud CCaaS バージョン 4.45 がリリースされました。本リリースは<span class="highlight">コンプライアンス強化</span>、<span class="highlight">顧客体験改善</span>、<span class="highlight">プラットフォーム安定性向上</span>の 3 つの柱で構成されています。</p>
+
+      <div class="stat-cards">
+        <div class="stat-card">
+          <div class="stat-value">2</div>
+          <div class="stat-label">新機能</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-value">12</div>
+          <div class="stat-label">バグ修正</div>
+        </div>
+        <div class="stat-card orange">
+          <div class="stat-value">3</div>
+          <div class="stat-label">デプロイスケジュール</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Before/After Section -->
+    <div class="section">
+      <h2>🔄 Before / After</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h4>❌ Before (v4.44 以前)</h4>
+          <ul>
+            <li>DNC リストの連絡先に警告なしで発信可能 (コンプライアンス違反リスク)</li>
+            <li>通話切断後、発信者はキューに再度並び直す必要あり</li>
+            <li>キャンペーン完了失敗で後続キャンペーンがブロック</li>
+            <li>コールドトランスファー時に無応答・無音問題</li>
+            <li>ゴーストアサイメントによる通話放棄</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h4>✅ After (v4.45)</h4>
+          <ul>
+            <li>HubSpot 連携で DNC 警告表示、コンプライアンス遵守を支援</li>
+            <li>切断後にキュー先頭へ自動復帰、顧客体験が向上</li>
+            <li>キャンペーン処理の信頼性が改善</li>
+            <li>ボイスメール転送・コールドトランスファーの問題解消</li>
+            <li>エージェントデスクトップの表示問題を修正</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>Do Not Call チェックフローと切断後キュー復帰フローの 2 つの主要な新機能のシーケンスを示しています。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+sequenceDiagram
+    participant Caller as 発信者
+    participant IVR as IVR システム
+    participant Queue as キュー
+    participant Agent as エージェント
+    participant Platform as CCAI Platform
+
+    Note over Caller, Platform: Do Not Call チェックフロー
+    Agent->>Platform: 発信開始
+    Platform->>Platform: HubSpot アカウントルックアップ
+    Platform->>Platform: DNC フィールド値チェック
+    alt DNC 一致
+        Platform->>Agent: DNC 警告表示
+        alt エージェントが続行を選択
+            Agent->>Platform: 通話続行
+            Platform->>Platform: CRM にコメント記録
+        else エージェントが中止
+            Agent->>Platform: 通話中止
+        end
+    else DNC 不一致
+        Platform->>Agent: 通常通り通話接続
+    end
+
+    Note over Caller, Platform: 切断後キュー復帰フロー
+    Caller->>IVR: 着信通話
+    IVR->>Queue: キューに配置
+    Queue->>Agent: エージェントに接続
+    Agent--xCaller: 予期しない切断発生
+    alt 即時オファー (エージェント切断)
+        Platform->>Caller: 確認メッセージ再生
+        Caller->>Platform: 1 を押下 (復帰を選択)
+        Platform->>Queue: キュー先頭に復帰 (VA スキップ)
+    else リダイヤルオファー (システム切断)
+        Caller->>IVR: コールバック期間内に再発信
+        IVR->>Caller: コールバック確認メッセージ
+        Caller->>Platform: 1 を押下 (復帰を選択)
+        Platform->>Queue: キュー先頭に復帰 (VA スキップ)
+    end
+        </pre>
+      </div>
+    </div>
+
+    <!-- Feature 1: Do Not Call -->
+    <div class="section">
+      <h2>🚫 Do Not Call (DNC) - HubSpot 連携</h2>
+      <p>エージェントが DNC 登録済み連絡先に発信する際、コールアダプターに警告メッセージを表示し、コンプライアンス遵守を支援します。</p>
+
+      <div class="feature-grid">
+        <div class="card">
+          <div class="icon-text">
+            <span>⚠️</span>
+            <span><strong>警告表示</strong>: DNC リスト登録済み番号への発信時に「This number is on the Do Not Call list」を表示</span>
+          </div>
+        </div>
+        <div class="card card-green">
+          <div class="icon-text">
+            <span>📝</span>
+            <span><strong>自動記録</strong>: 通話続行時に CRM へ「The contact is in TPS, the agent chose to proceed with the call.」のコメントを自動記録</span>
+          </div>
+        </div>
+        <div class="card card-purple">
+          <div class="icon-text">
+            <span>🔍</span>
+            <span><strong>ルックアップ対応</strong>: プライマリおよびセカンダリのルックアップオブジェクト (連絡先 / カンパニー) に対応</span>
+          </div>
+        </div>
+        <div class="card card-orange">
+          <div class="icon-text">
+            <span>📞</span>
+            <span><strong>適用範囲</strong>: 非キャンペーンのアウトバウンド通話 (手動発信・Click-to-Call) のみ。キャンペーン通話には影響なし</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>DNC 設定要件</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>対象通話</td><td>非キャンペーンのアウトバウンド通話 (手動発信・Click-to-Call)</td></tr>
+          <tr><td>CRM 連携</td><td>HubSpot (連絡先またはカンパニーのルックアップオブジェクト)</td></tr>
+          <tr><td>値の照合</td><td>大文字小文字を完全一致で比較</td></tr>
+          <tr><td>HubSpot 到達不能時</td><td>警告は表示されず通話は通常通り進行</td></tr>
+          <tr><td>ルックアップ対象</td><td>プライマリ + セカンダリルックアップオブジェクト</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Feature 2: Return to Queue -->
+    <div class="section">
+      <h2>🔄 切断後キュー復帰 (Return to Queue After Disconnection)</h2>
+      <p>IVR 通話で予期しない切断が発生した場合、発信者にキュー復帰オプションを提供し、長い待ち時間の再発を防止します。</p>
+
+      <div class="flow-diagram">
+        <div class="flow-step">😵 予期しない<br>切断発生</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">📢 確認<br>メッセージ再生</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">1️⃣ 発信者が<br>1を押下</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🥇 キュー先頭<br>に復帰</div>
+      </div>
+
+      <div class="feature-grid">
+        <div class="card">
+          <div class="icon-text">
+            <span>⚡</span>
+            <span><strong>即時オファー</strong>: エージェント側切断時に発信者へ直接復帰オプションを提供</span>
+          </div>
+        </div>
+        <div class="card card-green">
+          <div class="icon-text">
+            <span>📱</span>
+            <span><strong>リダイヤルオファー</strong>: システム切断時にコールバック期間内の再発信で復帰可能</span>
+          </div>
+        </div>
+        <div class="card card-purple">
+          <div class="icon-text">
+            <span>🤖</span>
+            <span><strong>VA スキップ</strong>: 復帰時にバーチャルエージェントをスキップし、直接人間のエージェントにエスカレーション</span>
+          </div>
+        </div>
+        <div class="card card-orange">
+          <div class="icon-text">
+            <span>⚙️</span>
+            <span><strong>柔軟な設定</strong>: グローバル設定とキューレベル設定の両方で構成可能 (キューレベルが優先)</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>キュー復帰設定要件</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>対象チャネル</td><td>IVR 通話のみ</td></tr>
+          <tr><td>ルーティング方式</td><td>FIFO: キュー先頭 / 非 FIFO: 先頭付近に優先配置</td></tr>
+          <tr><td>VA スキップ</td><td>復帰時にバーチャルエージェントをスキップ</td></tr>
+          <tr><td>設定レベル</td><td>グローバル / キューレベル (キューレベルが優先)</td></tr>
+          <tr><td>除外リスト</td><td>特定電話番号を機能対象外に設定可能</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Bug Fixes -->
+    <div class="section">
+      <h2>🐛 バグ修正 (12 件)</h2>
+      <p>通話処理とエージェントデスクトップの信頼性を大幅に改善する 12 件のバグ修正が含まれています。</p>
+
+      <div class="feature-grid">
+        <div class="card card-red">
+          <div class="icon-text">
+            <span>🔧</span>
+            <span><strong>キャンペーン処理</strong>: 完了失敗による後続キャンペーンブロック問題の修正</span>
+          </div>
+        </div>
+        <div class="card card-red">
+          <div class="icon-text">
+            <span>🔧</span>
+            <span><strong>ウォームトランスファー</strong>: ボイスメール接続問題の修正</span>
+          </div>
+        </div>
+        <div class="card card-red">
+          <div class="icon-text">
+            <span>🔧</span>
+            <span><strong>ゴーストアサイメント</strong>: 通話放棄問題の修正</span>
+          </div>
+        </div>
+        <div class="card card-red">
+          <div class="icon-text">
+            <span>🔧</span>
+            <span><strong>コールドトランスファー</strong>: 無応答・無音問題の修正</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="note-box">
+        <strong>💡 その他の修正:</strong> 切断通話のダッシュボード表示、強制ディスポジション時のパネルロード失敗、ストリーミング会話の接続エラー、HubSpot 重複連絡先作成、ACW 期間の誤計算、Start Call ボタン非表示、コールドトランスファー時のボイスメール損失・誤ルーティング、ラップアップ超過時のアクティブ通話の保留表示問題を修正。
+      </div>
+    </div>
+
+    <!-- Configuration Steps -->
+    <div class="section">
+      <h2>⚙️ 設定方法</h2>
+
+      <h3>前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>Google Cloud CCaaS インスタンスが有効であること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>CCAI Platform ポータルへの管理者アクセス権があること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>DNC 機能の場合: HubSpot 連携が設定済みであること</span></div>
+
+      <h3>ステップ 1: Do Not Call 機能の設定</h3>
+      <div class="card">
+        <ol style="margin: 0; padding-left: 20px; font-size: 14px;">
+          <li><strong>Settings > Developer Settings</strong> に移動</li>
+          <li><strong>CRM</strong> ペインの <strong>Account Lookup</strong> セクションを開く</li>
+          <li><strong>Primary Lookup Object</strong> を展開</li>
+          <li><strong>Do-Not-Call CRM Field</strong> リストから DNC 情報を含むフィールドを選択</li>
+          <li><strong>Opt-out Values</strong> に HubSpot のフィールド値と完全一致する値を入力</li>
+          <li>必要に応じて <strong>Secondary Lookup Object</strong> も同様に設定</li>
+          <li><strong>Save</strong> をクリック</li>
+        </ol>
+      </div>
+
+      <h3>ステップ 2: 切断後キュー復帰のグローバル設定</h3>
+      <div class="card card-green">
+        <ol style="margin: 0; padding-left: 20px; font-size: 14px;">
+          <li><strong>Settings > Call</strong> に移動</li>
+          <li><strong>Call Details</strong> ペインの <strong>Return to Queue After Disconnection</strong> セクションを有効化</li>
+          <li><strong>Call disconnection timeframe</strong> を設定 (復帰対象となる最大通話時間)</li>
+          <li><strong>Callback timeframe</strong> を設定 (リダイヤルワークフロー用のコールバック期間)</li>
+          <li>必要に応じて除外電話番号リストを追加</li>
+          <li><strong>Save Call Details</strong> をクリック</li>
+        </ol>
+      </div>
+
+      <h3>ステップ 3: キューレベルの復帰設定 (オプション)</h3>
+      <div class="card card-purple">
+        <ol style="margin: 0; padding-left: 20px; font-size: 14px;">
+          <li><strong>Settings > Queue</strong> に移動</li>
+          <li><strong>IVR</strong> ペインで <strong>Edit / View</strong> をクリック</li>
+          <li>対象キューを選択し、<strong>Settings</strong> の <strong>Return to Queue after disconnection</strong> で <strong>Configure</strong> をクリック</li>
+          <li>チェックボックスを有効化し、タイムフレームを設定</li>
+          <li><strong>Save</strong> をクリック</li>
+        </ol>
+      </div>
+
+      <h3>ステップ 4: 音声メッセージのカスタマイズ</h3>
+      <div class="card card-orange">
+        <ol style="margin: 0; padding-left: 20px; font-size: 14px;">
+          <li><strong>Settings > Languages & Messages</strong> に移動</li>
+          <li><strong>Audible Messages</strong> ペインの <strong>Return to Queue After Disconnection Messages</strong> セクションを開く</li>
+          <li>テキスト読み上げ内容を編集するか、カスタム MP3/WAV ファイルをアップロード</li>
+          <li><code>@{QUEUE}</code> 変数でキュー名を動的に挿入可能</li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- Deployment Schedule -->
+    <div class="section">
+      <h2>🚀 デプロイメントスケジュール</h2>
+      <p>インスタンスへの更新タイミングは、選択したデプロイメントスケジュールに依存します。</p>
+      <table>
+        <thead>
+          <tr><th>スケジュール</th><th>更新タイミング</th><th>推奨用途</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Rapid</strong></td><td>最速で適用</td><td>開発・テスト環境</td></tr>
+          <tr><td><strong>Regular</strong></td><td>Rapid から 2 日以上後</td><td>一般環境</td></tr>
+          <tr><td><strong>Critical</strong></td><td>Rapid から 2 日以上後、ピーク時間外</td><td>本番環境</td></tr>
+        </tbody>
+      </table>
+      <div class="note-box">
+        <strong>💡 セキュリティパッチ:</strong> セキュリティパッチは全スケジュールで即時適用されます。
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+
+      <h3>ビジネス面</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>コンプライアンス遵守</strong>: DNC 機能により、法規制 (TPS、TCPA など) への準拠を支援し、罰金リスクを低減</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>顧客満足度向上</strong>: 切断後のキュー復帰により、顧客は再度長時間待つ必要がなくなり、NPS/CSAT の改善が期待できる</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>運用効率改善</strong>: 12 件のバグ修正により、エージェントの生産性低下やコール放棄率の問題が解消</span></div>
+
+      <h3>技術面</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>柔軟な設定粒度</strong>: グローバルレベルとキューレベルの両方で切断後復帰を設定でき、キューの特性に応じた最適化が可能</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>監査証跡</strong>: DNC 通話の続行時に CRM へ自動コメント記録されるため、監査対応が容易</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>信頼性向上</strong>: ゴーストアサイメント、無音接続、ボイスメール損失など致命的な問題が解消</span></div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>制限事項</h3>
+      <div class="check-item"><span class="cross-icon">✗</span><span>DNC 機能は HubSpot 連携のみに対応 (Salesforce やその他 CRM は未対応)</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>DNC 機能はキャンペーンコールには適用されない</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>切断後キュー復帰は IVR 通話チャネルのみに対応 (チャット・メールは対象外)</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>HubSpot が到達不能な場合、DNC 警告は表示されず通話が進行する</span></div>
+
+      <h3>考慮すべき点</h3>
+      <div class="warning-box">
+        <ul style="margin: 0; padding-left: 20px; font-size: 14px;">
+          <li>DNC フィールド値は大文字小文字を含め完全一致が必要であり、HubSpot のデータ品質が重要</li>
+          <li>切断後復帰のタイムフレーム設定が短すぎると、正当な復帰リクエストが拒否される可能性がある</li>
+          <li>デプロイメントスケジュールに応じて更新適用のタイミングが異なるため、本番環境への反映に数日かかる場合がある</li>
+          <li>除外リストの管理は手動であるため、大量の除外番号がある場合は運用負荷が増大する可能性がある</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>📋 ユースケース 1: テレマーケティングチームのコンプライアンス確保</h4>
+        <p><strong>シナリオ:</strong> 金融サービス企業のテレマーケティングチームが HubSpot を使用して見込み客に発信する際、DNC 登録済み番号への発信を防止したい。</p>
+        <p><strong>効果:</strong> 法規制違反による罰金リスクの低減、コンプライアンス監査への対応力強化、エージェントの判断を支援しつつ最終決定権を付与。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>🏢 ユースケース 2: 高優先度サポートキューの顧客体験改善</h4>
+        <p><strong>シナリオ:</strong> エンタープライズサポートのプレミアムキューで、ネットワーク問題による通話切断が発生した場合に、顧客が 30 分以上の待ち時間を再度経験することを防止したい。</p>
+        <p><strong>効果:</strong> 切断後キュー復帰により顧客はキュー先頭に即座に復帰し、プレミアムサポート体験を損なわない。キューレベルで長めのコールバックタイムフレームを設定することで、再発信までの猶予を十分に確保可能。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>🏭 ユースケース 3: 大規模コールセンターの運用安定化</h4>
+        <p><strong>シナリオ:</strong> 数百人のエージェントを擁するコールセンターで、ゴーストアサイメントや無音接続により通話放棄率が上昇していた。</p>
+        <p><strong>効果:</strong> 本リリースのバグ修正により、エージェントデスクトップでの通話表示問題、コールドトランスファーの無応答問題、ディスポジションパネルの読み込み失敗が解消され、通話処理の信頼性が大幅に向上。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>バージョン 4.45 の新機能は既存ライセンスの範囲内で利用可能であり、<span class="highlight">追加料金は発生しません</span>。</p>
+      <table>
+        <thead>
+          <tr><th>プラン</th><th>内容</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>CCaaS ライセンス</td><td>エージェント数ベースのサブスクリプション</td></tr>
+          <tr><td>追加料金</td><td>本リリースの機能については追加料金なし</td></tr>
+        </tbody>
+      </table>
+      <div class="note-box">
+        <strong>💡 詳細な料金:</strong> Google Cloud のセールスチームへお問い合わせください。
+      </div>
+    </div>
+
+    <!-- Availability -->
+    <div class="section">
+      <h2>🌐 利用可能リージョン</h2>
+      <p>Google Cloud CCaaS はグローバルに提供されており、デプロイメントスケジュールに基づいてインスタンスが更新されます。</p>
+      <div class="success-box">
+        <strong>✅ グローバル提供:</strong> 更新タイミングは Rapid (最速)、Regular (2 日以上後)、Critical (ピーク時間外、2 日以上後) から選択できます。セキュリティパッチは全スケジュールで即時適用されます。
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="related-services">
+        <div class="related-service-card">
+          <h4>☁️ CCAI Platform</h4>
+          <p>CCaaS の基盤プラットフォーム。IVR、キューイング、エージェントルーティングなどのコアコンタクトセンター機能を提供。</p>
+        </div>
+        <div class="related-service-card">
+          <h4>🤖 Dialogflow CX</h4>
+          <p>バーチャルエージェントの構築に使用。切断後キュー復帰時にスキップされる VA もこのサービスで構築。</p>
+        </div>
+        <div class="related-service-card">
+          <h4>🔗 HubSpot CRM 連携</h4>
+          <p>DNC 機能の基盤となる CRM 統合。アカウントルックアップ、連絡先管理を提供。</p>
+        </div>
+        <div class="related-service-card">
+          <h4>📊 CCAI Insights</h4>
+          <p>通話分析とレポーティング。ACW 期間計算やセッションデータレポートの修正が本リリースに含まれる。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <p>Google Cloud CCaaS 4.45 は、<span class="highlight">コンプライアンス強化</span> (DNC 機能)、<span class="highlight">顧客体験改善</span> (切断後キュー復帰)、<span class="highlight">プラットフォーム安定性向上</span> (12 件のバグ修正) の 3 つの柱で構成された重要なリリースです。</p>
+      <p>特にコンタクトセンターの法規制遵守と顧客満足度の両立が求められる企業にとって、早期の適用検討を推奨します。デプロイメントスケジュールを確認し、テスト環境での検証後に本番環境への展開を計画してください。</p>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="list-style: none; padding: 0; margin: 4px 0;">
+        <li><a href="https://docs.cloud.google.com/release-notes#July_01_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li><a href="https://docs.cloud.google.com/contact-center/ccai-platform/docs/hubspot-do-not-call" target="_blank" rel="noopener noreferrer">Do Not Call for HubSpot ドキュメント</a></li>
+        <li><a href="https://docs.cloud.google.com/contact-center/ccai-platform/docs/return-to-queue" target="_blank" rel="noopener noreferrer">Return to Queue ドキュメント</a></li>
+        <li><a href="https://docs.cloud.google.com/contact-center/ccai-platform/docs/deployment-schedules" target="_blank" rel="noopener noreferrer">デプロイメントスケジュール</a></li>
+      </ul>
+      <p style="margin-top: 8px; font-size: 11px; color: var(--gc-outline);">Generated on 2026-07-02 | Google Cloud CCaaS v4.45 Release Notes Infographic</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+</body>
+</html>

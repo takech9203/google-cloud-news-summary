@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Trace: リモート MCP サーバーの tools/call トレーススパン対応拡大</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--gc-outline);
+      text-align: right;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-new {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-green);
+    }
+
+    .badge-feature {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-purple);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h4, .after-box h4 {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .before-box ul, .after-box ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin-bottom: 6px;
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .ai-box {
+      background: var(--gc-purple-tint);
+      border-left: 4px solid var(--gc-purple);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      background: #1E1E1E;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-900);
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .usecase-card p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    .services-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .service-item {
+      background: var(--gc-surface);
+      border-radius: 8px;
+      padding: 16px;
+      border: 1px solid var(--gc-outline-variant);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .service-item .icon {
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+
+    .service-item .info {
+      flex: 1;
+    }
+
+    .service-item .name {
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      font-size: 14px;
+    }
+
+    .service-item .desc {
+      font-size: 12px;
+      color: var(--gc-outline);
+      margin-top: 2px;
+    }
+
+    .pricing-table {
+      margin: 16px 0;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    footer {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    footer ul {
+      list-style: none;
+      padding: 0;
+      margin: 8px 0;
+    }
+
+    footer li {
+      margin: 6px 0;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+      .subtitle { text-align: left; }
+      .before-after { grid-template-columns: 1fr; }
+      .stat-cards { grid-template-columns: 1fr; }
+      .services-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>Cloud Trace: リモート MCP サーバーの tools/call トレーススパン対応拡大</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Cloud Trace</span>
+          <span class="badge-feature">Feature</span>
+          <span class="badge-new">NEW</span>
+        </div>
+      </div>
+      <div class="subtitle">
+        <div>2026-05-06</div>
+        <div>Google Cloud Release Notes</div>
+      </div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>Google Cloud は、リモート <span class="highlight">MCP (Model Context Protocol)</span> サーバーにおける Cloud Trace のトレーススパン自動生成機能の対象サービスを拡大しました。新たに <strong>Agent Search</strong>、<strong>AlloyDB for PostgreSQL</strong>、<strong>Google Security Operations</strong> の 3 つのリモート MCP サーバーが <code>tools/call</code> オペレーション時にトレーススパンを自動生成するようになりました。</p>
+      <p>エージェント型 AI アプリケーションが MCP サーバーを呼び出す際の挙動を Cloud Trace で可視化でき、ツール呼び出しの成否、レイテンシの原因、エラーの発生箇所をエンドツーエンドで追跡可能になります。</p>
+
+      <div class="ai-box">
+        <strong>背景:</strong> 本アップデートは、2026 年 4 月 10 日に発表された MCP サーバーの Cloud Trace 対応に続く拡張であり、対応サービスの範囲が着実に広がっています。
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stat-cards">
+      <div class="stat-card">
+        <div class="stat-value">+3</div>
+        <div class="stat-label">新規対応サービス</div>
+      </div>
+      <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-green), #1B7340);">
+        <div class="stat-value">9+</div>
+        <div class="stat-label">対応サービス合計</div>
+      </div>
+      <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-purple), #7B2EAF);">
+        <div class="stat-value">W3C</div>
+        <div class="stat-label">Trace Context 準拠</div>
+      </div>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>🔄 Before / After</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h4>❌ Before</h4>
+          <ul>
+            <li>Agent Search、AlloyDB、Security Operations の MCP サーバーでトレース情報が自動送信されなかった</li>
+            <li>レイテンシの原因やエラー箇所の特定が困難</li>
+            <li>複数 MCP サーバー横断のフローで一部のトレースが欠落</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h4>✅ After</h4>
+          <ul>
+            <li>3 つのサービスが <code>tools/call</code> 時にトレーススパンを自動生成</li>
+            <li>Cloud Trace Explorer でパフォーマンスとエラーを可視化</li>
+            <li>既存対応サービスと合わせて包括的なオブザーバビリティを実現</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>エージェントアプリケーションが MCP リクエストに W3C Trace Context を含めて送信すると、対応する各リモート MCP サーバーが <code>tools/call</code> オペレーションのトレーススパンを生成し、Cloud Trace に送信します。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TB
+    subgraph Agent["エージェントアプリケーション"]
+        direction TB
+        SDK["OpenTelemetry SDK / ADK"]
+        Client["MCP クライアント"]
+    end
+
+    subgraph MCP_Request["MCP リクエスト (tools/call)"]
+        direction TB
+        Meta["_meta.traceparent W3C Trace Context"]
+    end
+
+    subgraph Supported["対応リモート MCP サーバー"]
+        direction TB
+        New["新規対応"]
+        Existing["既存対応"]
+    end
+
+    subgraph NewServers["新規対応サーバー"]
+        AS["Agent Search"]
+        AlloyDB["AlloyDB for PostgreSQL"]
+        SecOps["Google Security Operations"]
+    end
+
+    subgraph ExistingServers["既存対応サーバー"]
+        Logging["Cloud Logging"]
+        Monitoring["Cloud Monitoring"]
+        GKE["GKE"]
+        CloudRun["Cloud Run"]
+        CE["Compute Engine"]
+        Maps["Maps Grounding Lite"]
+    end
+
+    subgraph Trace["Cloud Trace"]
+        Explorer["Trace Explorer"]
+        Spans["トレーススパン"]
+    end
+
+    SDK --> Client
+    Client --> Meta
+    Meta --> New
+    Meta --> Existing
+    New --> AS
+    New --> AlloyDB
+    New --> SecOps
+    Existing --> Logging
+    Existing --> Monitoring
+    Existing --> GKE
+    Existing --> CloudRun
+    Existing --> CE
+    Existing --> Maps
+    AS --> Spans
+    AlloyDB --> Spans
+    SecOps --> Spans
+    Logging --> Spans
+    Monitoring --> Spans
+    GKE --> Spans
+    CloudRun --> Spans
+    CE --> Spans
+    Maps --> Spans
+    Spans --> Explorer
+        </pre>
+      </div>
+    </div>
+
+    <!-- New Services -->
+    <div class="section">
+      <h2>🆕 新規対応サービス</h2>
+      <div class="services-grid">
+        <div class="service-item">
+          <div class="icon">🔍</div>
+          <div class="info">
+            <div class="name">Agent Search</div>
+            <div class="desc">AI エージェント向け検索機能を提供する MCP サーバー</div>
+          </div>
+        </div>
+        <div class="service-item">
+          <div class="icon">🗄️</div>
+          <div class="info">
+            <div class="name">AlloyDB for PostgreSQL</div>
+            <div class="desc">AlloyDB クラスターおよびインスタンスの管理を AI アプリケーションから行う MCP サーバー</div>
+          </div>
+        </div>
+        <div class="service-item">
+          <div class="icon">🛡️</div>
+          <div class="info">
+            <div class="name">Google Security Operations</div>
+            <div class="desc">セキュリティオペレーション (SIEM/SOAR) の操作を AI エージェントから行う MCP サーバー</div>
+          </div>
+        </div>
+      </div>
+
+      <h3>既存対応サービス</h3>
+      <div class="services-grid">
+        <div class="service-item">
+          <div class="icon">📝</div>
+          <div class="info">
+            <div class="name">Cloud Logging</div>
+          </div>
+        </div>
+        <div class="service-item">
+          <div class="icon">📊</div>
+          <div class="info">
+            <div class="name">Cloud Monitoring</div>
+          </div>
+        </div>
+        <div class="service-item">
+          <div class="icon">☸️</div>
+          <div class="info">
+            <div class="name">GKE</div>
+          </div>
+        </div>
+        <div class="service-item">
+          <div class="icon">🚀</div>
+          <div class="info">
+            <div class="name">Cloud Run</div>
+          </div>
+        </div>
+        <div class="service-item">
+          <div class="icon">💻</div>
+          <div class="info">
+            <div class="name">Compute Engine</div>
+          </div>
+        </div>
+        <div class="service-item">
+          <div class="icon">🗺️</div>
+          <div class="info">
+            <div class="name">Maps Grounding Lite</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="card">
+        <h3>1. tools/call オペレーションの自動スパン生成</h3>
+        <div class="icon-text">
+          <span>→</span>
+          <span>対応 MCP サーバーがリクエストを受信すると、<code>tools/call</code> オペレーションに対してトレーススパンを自動生成</span>
+        </div>
+        <div class="icon-text">
+          <span>→</span>
+          <span>スパン名は <code>tools/call &lt;TOOL_NAME&gt;</code> 形式 (OpenTelemetry Semantic Conventions for MCP に準拠)</span>
+        </div>
+        <div class="icon-text">
+          <span>→</span>
+          <span>認証済みかつ認可されたリクエストが対象</span>
+        </div>
+      </div>
+
+      <div class="card card-green">
+        <h3>2. W3C Trace Context によるコンテキスト伝播</h3>
+        <div class="icon-text">
+          <span>→</span>
+          <span>MCP リクエストの <code>params._meta.traceparent</code> フィールドを通じてトレースコンテキストを伝達</span>
+        </div>
+        <div class="icon-text">
+          <span>→</span>
+          <span>HTTP ヘッダーの <code>traceparent</code> による伝達もサポート</span>
+        </div>
+        <div class="icon-text">
+          <span>→</span>
+          <span>sampled フラグが <code>1</code> に設定されている場合にスパンが生成</span>
+        </div>
+      </div>
+
+      <div class="card card-purple">
+        <h3>3. 豊富なスパン属性</h3>
+        <div class="icon-text">
+          <span>→</span>
+          <span><code>gen_ai.tool.name</code>: 呼び出された MCP ツール名</span>
+        </div>
+        <div class="icon-text">
+          <span>→</span>
+          <span><code>mcp.method.name</code>: MCP オペレーション名 (<code>tools/call</code>)</span>
+        </div>
+        <div class="icon-text">
+          <span>→</span>
+          <span><code>mcp.protocol.version</code>: 使用された MCP プロトコルバージョン</span>
+        </div>
+        <div class="icon-text">
+          <span>→</span>
+          <span><code>error.message</code> / <code>error.type</code>: エラー情報 (エラー発生時)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specs -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3>トレースコンテキストの形式</h3>
+      <p>MCP リクエストにトレースコンテキストを含める方法:</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">JSON</span>
+          <span class="code-title">MCP リクエスト (tools/call)</span>
+        </div>
+        <pre><code class="language-json">{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "TOOL_NAME",
+    "arguments": {},
+    "_meta": {
+      "traceparent": "00-TRACE_ID-PARENT_SPAN_ID-01",
+      "tracestate": "vendor=specific_information"
+    }
+  },
+  "id": 1
+}</code></pre>
+      </div>
+
+      <h3>スパン属性一覧</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>カテゴリ</th>
+            <th>属性名</th>
+            <th>説明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>リソース</td>
+            <td><code>cloud.account.id</code></td>
+            <td>Google Cloud 課金プロジェクト ID</td>
+          </tr>
+          <tr>
+            <td>リソース</td>
+            <td><code>gcp.mcp.server.id</code></td>
+            <td>MCP サーバーの URN</td>
+          </tr>
+          <tr>
+            <td>リソース</td>
+            <td><code>gcp.project_id</code></td>
+            <td>テレメトリデータ送信先プロジェクト ID</td>
+          </tr>
+          <tr>
+            <td>スパン</td>
+            <td><code>gen_ai.operation.name</code></td>
+            <td><code>execute_tool</code> (固定値)</td>
+          </tr>
+          <tr>
+            <td>スパン</td>
+            <td><code>gen_ai.tool.name</code></td>
+            <td>呼び出された MCP ツール名</td>
+          </tr>
+          <tr>
+            <td>スパン</td>
+            <td><code>mcp.method.name</code></td>
+            <td><code>tools/call</code></td>
+          </tr>
+          <tr>
+            <td>スパン</td>
+            <td><code>mcp.protocol.version</code></td>
+            <td>MCP プロトコルバージョン</td>
+          </tr>
+          <tr>
+            <td>スコープ</td>
+            <td><code>gcp.server.service</code></td>
+            <td>MCP サーバーのサービス名</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>前提条件</h3>
+      <div class="note-box">
+        <ol style="margin: 0; padding-left: 20px;">
+          <li>Cloud Trace API が有効化された Google Cloud プロジェクト</li>
+          <li>OpenTelemetry SDK または Agent Development Kit (ADK) がインストールされたアプリケーション</li>
+          <li>対象の MCP サーバーの API が有効化されていること</li>
+        </ol>
+      </div>
+
+      <h3>ステップ 1: トレースコンテキストの伝播を有効化</h3>
+      <p>Agent Development Kit (ADK) を使用する場合:</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Python</span>
+          <span class="code-title">ADK エージェント構成例</span>
+        </div>
+        <pre><code class="language-python">from google.adk import Agent
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+
+# TracerProvider の設定
+provider = TracerProvider()
+provider.add_span_processor(
+    BatchSpanProcessor(OTLPSpanExporter())
+)
+trace.set_tracer_provider(provider)
+
+# ADK エージェントの構成 (トレースコンテキストは自動伝播)
+agent = Agent(
+    name="my-agent",
+    tools=["agent-search", "alloydb", "secops"]
+)</code></pre>
+      </div>
+
+      <h3>ステップ 2: Trace Explorer でスパンを確認</h3>
+      <p>Google Cloud Console で Trace Explorer を開き、以下のフィルタを適用します:</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Filter</span>
+          <span class="code-title">Trace Explorer フィルタ</span>
+        </div>
+        <pre><code>mcp.method.name = "tools/call"</code></pre>
+      </div>
+      <p>特定のサービスのスパンのみを表示する場合は、<code>gcp.server.service</code> 属性でフィルタリングします。</p>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div class="card card-green">
+        <h3>ビジネス面</h3>
+        <div class="icon-text">
+          <span>💼</span>
+          <span><strong>エージェントアプリケーションの信頼性向上:</strong> MCP ツール呼び出しの失敗原因を迅速に特定し、ユーザー体験の改善につなげられる</span>
+        </div>
+        <div class="icon-text">
+          <span>💰</span>
+          <span><strong>運用コストの削減:</strong> 問題の根本原因分析にかかる時間を短縮し、MTTR (平均復旧時間) を改善</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>技術面</h3>
+        <div class="icon-text">
+          <span>🔭</span>
+          <span><strong>エンドツーエンドの可視性:</strong> エージェントアプリケーションから MCP サーバーまでの完全なトレースを取得可能</span>
+        </div>
+        <div class="icon-text">
+          <span>📐</span>
+          <span><strong>標準ベースの実装:</strong> W3C Trace Context と OpenTelemetry Semantic Conventions に準拠しており、既存のオブザーバビリティスタックとシームレスに統合</span>
+        </div>
+        <div class="icon-text">
+          <span>🤖</span>
+          <span><strong>自動インストルメンテーション:</strong> MCP サーバー側でのスパン生成は自動的に行われ、追加のコード変更が不要</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ 制限事項・注意点</h2>
+      <div class="warning-box">
+        <h4 style="margin: 0 0 8px 0;">制限事項</h4>
+        <ul style="margin: 0; padding-left: 20px; font-size: 14px;">
+          <li><code>tools/call</code> オペレーションのみがトレーススパンを生成 (その他の MCP オペレーションは非対応)</li>
+          <li>生成されるのは単一のスパンのみで、<code>tools/call</code> オペレーション内部の子スパンは生成されない</li>
+          <li>W3C Trace Context 形式のみサポート (<code>X-Cloud-Trace-Context</code> など非 W3C ヘッダーは非対応)</li>
+        </ul>
+      </div>
+      <div class="note-box">
+        <h4 style="margin: 0 0 8px 0;">考慮すべき点</h4>
+        <ul style="margin: 0; padding-left: 20px; font-size: 14px;">
+          <li>認証済みかつ認可されたリクエストのみがトレース対象</li>
+          <li>sampled フラグが <code>1</code> に設定されている必要がある</li>
+          <li>API の有効化やポリシーチェックを通過しないリクエストはトレース対象外となる場合がある</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+      <div class="usecase-card">
+        <h4>🛡️ ユースケース 1: セキュリティオペレーションエージェントのデバッグ</h4>
+        <p><strong>シナリオ:</strong> Google Security Operations の MCP サーバーを利用してインシデント調査を自動化するエージェントを構築。エージェントが特定のケースで期待通りに動作しない原因を調査したい。</p>
+        <p><strong>効果:</strong> Cloud Trace Explorer で当該エージェントのトレースを確認し、<code>tools/call</code> スパンのエラー属性やレイテンシを分析することで、ツール呼び出しの失敗箇所や遅延の原因を迅速に特定できる。</p>
+      </div>
+      <div class="usecase-card">
+        <h4>🚀 ユースケース 2: マルチサービスエージェントのパフォーマンス最適化</h4>
+        <p><strong>シナリオ:</strong> Agent Search でデータを検索し、AlloyDB for PostgreSQL に結果を保存するマルチステップエージェントのレスポンスタイムを最適化したい。</p>
+        <p><strong>効果:</strong> 各 MCP ツール呼び出しのスパンを Trace Explorer で比較し、どのステップがボトルネックになっているかを視覚的に把握できる。ネットワークレイテンシか MCP サーバーの処理時間かを切り分け、適切な最適化戦略を策定できる。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💲 料金情報</h2>
+      <p>Cloud Trace の利用料金に準じます。スパンの取り込みと保存に対して課金されます。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>料金</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>最初の 250 万スパン / 月</td>
+            <td><strong>無料</strong></td>
+          </tr>
+          <tr>
+            <td>250 万スパン超過分</td>
+            <td>$0.20 / 100 万スパン</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="note-box">
+        <strong>💡 ヒント:</strong> 最新の料金情報は<a href="https://cloud.google.com/trace#pricing" target="_blank" class="gc-link">公式料金ページ</a>を参照してください。
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス</h2>
+      <div class="services-grid">
+        <div class="service-item">
+          <div class="icon">📡</div>
+          <div class="info">
+            <div class="name">Cloud Trace</div>
+            <div class="desc">分散トレーシングサービス。MCP サーバーからのスパンデータを収集・可視化</div>
+          </div>
+        </div>
+        <div class="service-item">
+          <div class="icon">🔬</div>
+          <div class="info">
+            <div class="name">OpenTelemetry</div>
+            <div class="desc">トレースコンテキストの伝播と収集に使用されるオープンソースのオブザーバビリティフレームワーク</div>
+          </div>
+        </div>
+        <div class="service-item">
+          <div class="icon">🤖</div>
+          <div class="info">
+            <div class="name">Agent Development Kit (ADK)</div>
+            <div class="desc">Google のエージェント開発フレームワーク。OpenTelemetry によるインストルメンテーションをサポート</div>
+          </div>
+        </div>
+        <div class="service-item">
+          <div class="icon">🖥️</div>
+          <div class="info">
+            <div class="name">Cloud Trace Explorer</div>
+            <div class="desc">トレースデータの検索・分析 UI</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>📎 出典:</strong></p>
+      <ul>
+        <li><a href="https://docs.cloud.google.com/release-notes#May_06_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li><a href="https://docs.cloud.google.com/stackdriver/docs/instrumentation/trace-remote-mcp-server-calls" target="_blank" rel="noopener noreferrer">ドキュメント: Investigate MCP calls using Trace</a></li>
+        <li><a href="https://docs.cloud.google.com/trace/docs/overview" target="_blank" rel="noopener noreferrer">Cloud Trace の概要</a></li>
+        <li><a href="https://docs.cloud.google.com/mcp/monitor-mcp-tool-use-with-cloud-trace" target="_blank" rel="noopener noreferrer">MCP サーバーの Cloud Trace 対応について</a></li>
+        <li><a href="https://cloud.google.com/trace#pricing" target="_blank" rel="noopener noreferrer">料金ページ</a></li>
+      </ul>
+      <p style="margin-top: 12px; font-size: 11px; color: #999;">Generated on 2026-05-06 | Google Cloud News Summary</p>
+    </footer>
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+    hljs.highlightAll();
+  </script>
+</body>
+</html>

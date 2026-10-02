@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Logging: ログビューのフィルタ機能拡張 (OR, NOT, ラベル対応)</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; min-width: 280px; }
+
+    h1 {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 12px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+      margin-top: 8px;
+    }
+
+    .header-right {
+      text-align: right;
+      padding-top: 4px;
+    }
+
+    .badge, .badge-ga, .badge-preview, .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); color: #FFFFFF; }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-red {
+      border-left-color: var(--gc-red);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .card-teal {
+      border-left-color: var(--gc-teal);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* Before/After */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h4 {
+      color: var(--gc-red);
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box h4 {
+      color: var(--gc-green);
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .before-box ul, .after-box ul {
+      padding-left: 20px;
+      margin: 0;
+    }
+
+    .before-box li, .after-box li {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    /* Flow diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Feature cards grid */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .feature-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .feature-card h4 {
+      color: var(--gc-on-surface);
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .feature-card p {
+      font-size: 14px;
+      margin: 4px 0;
+    }
+
+    /* Usecase cards */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-900);
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .usecase-card p {
+      font-size: 14px;
+      color: var(--gc-on-surface-variant);
+      margin: 4px 0;
+    }
+
+    /* Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    /* Stat cards */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Note/Warning boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Code blocks */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Mermaid container */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Related services */
+    .related-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .related-item {
+      background: var(--gc-surface);
+      border-radius: 8px;
+      padding: 12px 16px;
+      border: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    .related-item strong {
+      color: var(--gc-on-surface);
+    }
+
+    /* Footer */
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      h1 { font-size: 28px; }
+      h2 { font-size: 20px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stat-grid { grid-template-columns: 1fr; }
+      .header { flex-direction: column; }
+      .header-right { text-align: left; margin-top: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>&#x1F4CB; Cloud Logging: ログビューのフィルタ機能拡張</h1>
+        <div class="subtitle">論理和句 (OR)、否定 (NOT)、ラベル (Labels) によるフィルタリングが GA に</div>
+        <div style="margin-top: 12px;">
+          <span class="badge">Cloud Logging</span>
+          <span class="badge badge-ga">GA</span>
+        </div>
+      </div>
+      <div class="header-right">
+        <div style="font-size: 14px; color: var(--gc-outline);">2026-04-02</div>
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>&#x1F50D; 概要</h2>
+      <p>Cloud Logging のログビュー (Log Views) において、フィルタ機能が大幅に拡張されました。従来は <span class="highlight">AND 演算子のみ</span> がサポートされていましたが、今回のアップデートにより <span class="highlight">OR (論理和句)</span>、<span class="highlight">NOT (否定文)</span>、<span class="highlight">ラベル (Labels)</span> によるフィルタリングが新たにサポートされました。</p>
+      <p style="margin-top: 12px;">大規模な組織でログ管理を行うプラットフォームチーム、セキュリティチーム、および複数のプロジェクトやサービスのログを横断的に管理する運用チームに特に有益です。</p>
+    </div>
+
+    <!-- Before / After -->
+    <div class="section">
+      <h2>&#x1F504; Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h4>&#x274C; Before (従来)</h4>
+          <ul>
+            <li>AND 演算子のみサポート</li>
+            <li>複数条件の「いずれか一方」でのマッチ不可</li>
+            <li>ラベルベースのフィルタリング不可</li>
+            <li>環境別 (本番/ステージング) のビュー作成が困難</li>
+            <li>複数リソースタイプには個別ビューが必要</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h4>&#x2705; After (拡張後)</h4>
+          <ul>
+            <li>OR 演算子で複数条件のいずれかにマッチ</li>
+            <li>NOT 演算子の適用範囲が拡張</li>
+            <li>ラベルフィルタリングで精密な制御</li>
+            <li>1 つのビューで複数リソースタイプを表示</li>
+            <li>ビュー数を削減しつつ適切なアクセス制御</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>&#x1F3D7;&#xFE0F; アーキテクチャ図</h2>
+      <p>ログバケットに格納された全ログエントリに対して、拡張されたフィルタエンジンが OR、NOT、ラベル条件を評価し、各ログビューに適切なログエントリのみを表示します。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph LogBucket["ログバケット"]
+        A["全ログエントリ"]
+    end
+
+    subgraph FilterEngine["拡張フィルタエンジン"]
+        B["OR: 論理和句"]
+        C["NOT: 否定文"]
+        D["Labels: ラベル"]
+        E["AND: 論理積 (既存)"]
+    end
+
+    subgraph LogViews["ログビュー"]
+        F["ビュー A\nresource.type = gce_instance\nOR resource.type = gke_container"]
+        G["ビュー B\nNOT LOG_ID: stdout\nAND labels.env = production"]
+        H["ビュー C\nSOURCE: project-x\nAND resource.labels.zone = us-central1-a"]
+    end
+
+    subgraph Users["利用者"]
+        I["開発チーム"]
+        J["セキュリティチーム"]
+        K["SRE チーム"]
+    end
+
+    A --> FilterEngine
+    B --> F
+    C --> G
+    D --> H
+    E --> F
+    E --> G
+    E --> H
+    F --> I
+    G --> J
+    H --> K
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>&#x2B50; 主要機能</h2>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <h4>&#x1F517; 1. 論理和句 (OR)</h4>
+          <p>ログビューフィルタで OR 演算子が使用可能に。複数のリソースタイプ、ログ ID、データソースのいずれかにマッチするフィルタを記述できます。</p>
+          <p style="margin-top: 8px;"><strong>例:</strong> <code>resource.type = "gce_instance" OR resource.type = "gke_container"</code></p>
+          <p><strong>簡略記法:</strong> <code>resource.type = ("gce_instance" OR "gke_container")</code></p>
+        </div>
+        <div class="feature-card" style="border-left-color: var(--gc-red);">
+          <h4>&#x1F6AB; 2. 否定文 (NOT)</h4>
+          <p>NOT 演算子の適用範囲が拡張されました。データソース、ログ ID、リソースタイプに加えて、ラベル条件にも否定を適用可能です。</p>
+          <p style="margin-top: 8px;"><strong>例:</strong> <code>SOURCE("projects/myproject") AND NOT LOG_ID("stdout")</code></p>
+        </div>
+        <div class="feature-card" style="border-left-color: var(--gc-green);">
+          <h4>&#x1F3F7;&#xFE0F; 3. ラベルフィルタリング (Labels)</h4>
+          <p><code>resource.labels</code> や <code>labels</code> フィールドを使ったフィルタリングが新たにサポート。リソースラベル (ゾーン、インスタンス ID など) やユーザー定義ラベルを条件に指定可能です。</p>
+          <p style="margin-top: 8px;"><strong>例:</strong> <code>resource.labels.zone = "us-central1-a"</code></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>&#x1F4D0; 技術仕様</h2>
+      <h3>フィルタ構文の拡張</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>従来</th>
+            <th>拡張後</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>論理演算子</td>
+            <td>AND のみ</td>
+            <td><strong>AND, OR</strong></td>
+          </tr>
+          <tr>
+            <td>否定演算子</td>
+            <td>NOT (データソース、ログ ID、リソースタイプ)</td>
+            <td><strong>NOT (全修飾子に適用可能)</strong></td>
+          </tr>
+          <tr>
+            <td>フィルタ対象</td>
+            <td><code>SOURCE()</code>, <code>resource.type</code>, <code>LOG_ID()</code></td>
+            <td>上記に加え <code>resource.labels.*</code>, <code>labels.*</code></td>
+          </tr>
+          <tr>
+            <td>括弧によるグルーピング</td>
+            <td>非対応</td>
+            <td><strong>対応</strong></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top: 24px;">フィルタの使用例</h3>
+      <span class="code-label">Logging Filter</span>
+      <pre><code class="language-bash"># 複数リソースタイプを OR で結合
+SOURCE("projects/myproject") AND (resource.type = "gce_instance" OR resource.type = "gke_container")
+
+# 否定とラベルの組み合わせ
+SOURCE("projects/myproject") AND NOT LOG_ID("stdout") AND resource.labels.zone = "us-central1-a"
+
+# ラベルによる環境別フィルタリング
+SOURCE("projects/myproject") AND labels.env = "production"</code></pre>
+    </div>
+
+    <!-- Setup Guide -->
+    <div class="section">
+      <h2>&#x2699;&#xFE0F; 設定方法</h2>
+
+      <div class="note-box">
+        <strong>&#x1F4A1; 前提条件:</strong> Cloud Logging が有効化されたプロジェクト、ログバケットが作成済みであること、<code>logging.views.create</code> または <code>logging.views.update</code> の IAM 権限が必要です。
+      </div>
+
+      <h3 style="margin-top: 16px;">ステップ 1: ログビューの作成 (拡張フィルタ付き)</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud logging views create my-view \
+  --bucket=my-bucket \
+  --location=global \
+  --description="Production GCE and GKE logs" \
+  --log-filter='SOURCE("projects/my-project") AND (resource.type = "gce_instance" OR resource.type = "gke_container") AND labels.env = "production"'</code></pre>
+      <p style="font-size: 14px; margin-top: 8px;">OR 句とラベルフィルタを組み合わせて、本番環境の Compute Engine と GKE のログのみを表示するビューを作成します。</p>
+
+      <h3 style="margin-top: 24px;">ステップ 2: 既存ログビューのフィルタ更新</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud logging views update my-view \
+  --bucket=my-bucket \
+  --location=global \
+  --log-filter='SOURCE("projects/my-project") AND NOT LOG_ID("stdout") AND resource.labels.zone = "us-central1-a"'</code></pre>
+      <p style="font-size: 14px; margin-top: 8px;">既存のログビューに対して、否定条件とラベルフィルタを追加してフィルタを更新します。</p>
+
+      <h3 style="margin-top: 24px;">ステップ 3: Google Cloud コンソールでの設定</h3>
+      <p style="font-size: 14px;">Google Cloud コンソールの「ログストレージ」画面からもログビューの作成・更新が可能です。フィルタ入力欄で新しい OR、NOT、ラベル構文を使用できます。</p>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>&#x1F4C8; メリット</h2>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div>
+          <h3>&#x1F4BC; ビジネス面</h3>
+          <div class="card card-green">
+            <div class="icon-text"><span class="arrow">&#x2192;</span><span><strong>運用コスト削減:</strong> 複数の単純なログビューを 1 つの柔軟なビューに統合でき、管理対象が減少する</span></div>
+          </div>
+          <div class="card card-green">
+            <div class="icon-text"><span class="arrow">&#x2192;</span><span><strong>セキュリティ強化:</strong> ラベルや否定条件を活用した精密なアクセス制御により、チームごとに適切なログのみを公開できる</span></div>
+          </div>
+        </div>
+        <div>
+          <h3>&#x1F527; 技術面</h3>
+          <div class="card">
+            <div class="icon-text"><span class="arrow">&#x2192;</span><span><strong>フィルタの表現力向上:</strong> OR 演算子とラベルの追加により、複雑なログ分類を 1 つのフィルタで表現可能</span></div>
+          </div>
+          <div class="card">
+            <div class="icon-text"><span class="arrow">&#x2192;</span><span><strong>管理の簡素化:</strong> ログビューの数を削減しつつ、同等以上のアクセス制御を実現</span></div>
+          </div>
+          <div class="card">
+            <div class="icon-text"><span class="arrow">&#x2192;</span><span><strong>Logging Query Language との一貫性:</strong> ログビューフィルタが Logging Query Language の構文により近づき、学習コストが低減</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>&#x26A0;&#xFE0F; デメリット・制約事項</h2>
+      <div class="warning-box">
+        <strong>&#x26A0;&#xFE0F; 制限事項:</strong>
+        <ul style="margin-top: 8px; padding-left: 20px;">
+          <li>ログビューのフィルタの最大長は引き続き制限がある (Logging API 全体のフィルタ最大長は 20,000 文字)</li>
+          <li>NOT 演算子は個々の修飾子に適用可能だが、複合文 (例: <code>NOT (A AND B)</code>) には適用不可</li>
+        </ul>
+      </div>
+      <div class="note-box">
+        <strong>&#x1F4DD; 考慮すべき点:</strong>
+        <ul style="margin-top: 8px; padding-left: 20px;">
+          <li>既存のログビューのフィルタは引き続き動作するため、即時の移行は不要</li>
+          <li>OR 句を多用した複雑なフィルタはクエリパフォーマンスに影響を与える可能性がある</li>
+          <li>フィルタの変更はログビューのアクセス範囲に直結するため、セキュリティレビューを経て更新することを推奨</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>&#x1F3AF; ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>&#x1F4E6; ユースケース 1: マルチサービスの統合ログビュー</h4>
+        <p><strong>シナリオ:</strong> プラットフォームチームが Compute Engine と GKE の両方を運用しており、1 つのログビューで両サービスのログを確認したい。</p>
+        <span class="code-label">Filter</span>
+        <pre><code class="language-bash">SOURCE("projects/platform-project") AND (resource.type = "gce_instance" OR resource.type = "gke_container")</code></pre>
+        <p style="margin-top: 8px;"><strong>効果:</strong> 2 つの個別ログビューを 1 つに統合でき、チームの運用効率が向上する。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>&#x1F512; ユースケース 2: 環境別のセキュリティログビュー</h4>
+        <p><strong>シナリオ:</strong> セキュリティチームが本番環境のログのみを監視する必要があり、デバッグ用の stdout ログは除外したい。</p>
+        <span class="code-label">Filter</span>
+        <pre><code class="language-bash">SOURCE("projects/prod-project") AND NOT LOG_ID("stdout") AND labels.env = "production"</code></pre>
+        <p style="margin-top: 8px;"><strong>効果:</strong> ノイズの少ない本番環境専用のセキュリティログビューにより、インシデント対応が迅速化する。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>&#x1F30D; ユースケース 3: リージョン別ログの分離</h4>
+        <p><strong>シナリオ:</strong> コンプライアンス要件により、特定のリージョンのログのみを特定のチームに公開する必要がある。</p>
+        <span class="code-label">Filter</span>
+        <pre><code class="language-bash">SOURCE("projects/global-project") AND resource.labels.zone = ("us-central1-a" OR "us-central1-b")</code></pre>
+        <p style="margin-top: 8px;"><strong>効果:</strong> データレジデンシー要件を満たしつつ、運用チームに必要なログへのアクセスを提供できる。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>&#x1F4B0; 料金</h2>
+      <p>ログビューのフィルタ機能自体には追加料金は発生しません。Cloud Logging の料金は、ログの取り込み量と保持期間に基づきます。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>料金</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ログ取り込み (最初の 50 GiB/月)</td>
+            <td><strong style="color: var(--gc-green);">無料</strong></td>
+          </tr>
+          <tr>
+            <td>ログ取り込み (50 GiB 超過分)</td>
+            <td>$0.50/GiB</td>
+          </tr>
+          <tr>
+            <td>ログ保持 (デフォルト保持期間内)</td>
+            <td><strong style="color: var(--gc-green);">無料</strong></td>
+          </tr>
+          <tr>
+            <td>ログ保持 (デフォルト超過分)</td>
+            <td>$0.01/GiB</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Region Availability -->
+    <div class="section">
+      <h2>&#x1F30F; 利用可能リージョン</h2>
+      <p>ログビューはログバケットに関連付けられており、ログバケットが配置されている全てのリージョンで利用可能です。<code>global</code> ロケーションを含む全てのサポート対象リージョンでフィルタ拡張機能を使用できます。</p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#x1F517; 関連サービス・機能</h2>
+      <div class="related-grid">
+        <div class="related-item">
+          <strong>&#x1F4E6; Cloud Logging ログバケット</strong><br>
+          ログビューはログバケット上に作成され、バケット内のログエントリへのアクセスを制御する
+        </div>
+        <div class="related-item">
+          <strong>&#x1F50D; Logging Query Language</strong><br>
+          ログビューフィルタの構文は Logging Query Language に基づいており、今回の拡張で両者の一貫性が向上した
+        </div>
+        <div class="related-item">
+          <strong>&#x1F4CA; Observability Analytics</strong><br>
+          ログビュー上にアナリティクスビューを作成し、SQL クエリによるログ分析が可能
+        </div>
+        <div class="related-item">
+          <strong>&#x27A1;&#xFE0F; Cloud Logging シンク</strong><br>
+          ログのルーティングに使用するシンクフィルタでは既に OR や NOT がサポートされており、今回のアップデートでログビューフィルタとの一貫性が向上した
+        </div>
+        <div class="related-item">
+          <strong>&#x1F512; IAM</strong><br>
+          ログビューへのアクセスは IAM ロールで制御され、フィルタによるデータレベルのアクセス制御と組み合わせて多層防御を実現する
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section" style="background: var(--gc-blue-tint); border: 2px solid var(--gc-blue-300);">
+      <h2>&#x1F4DD; まとめ</h2>
+      <p>Cloud Logging のログビューフィルタに <span class="highlight">OR 演算子</span>、<span class="highlight">NOT 演算子の拡張</span>、<span class="highlight">ラベルフィルタリング</span> が追加されたことにより、ログの可視性制御がより柔軟で強力になりました。特に大規模な組織において、ログビューの数を削減しながらセキュリティ要件を満たすアクセス制御を実現できる点が大きな利点です。</p>
+      <p style="margin-top: 12px;">既存のログビューへの影響はないため、段階的に新しいフィルタ構文を活用してログビュー構成を最適化することを推奨します。</p>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>&#x1F4CE; 出典:</p>
+      <ul style="margin-top: 4px; padding-left: 20px; list-style: disc;">
+        <li><a href="https://cloud.google.com/logging/docs/logs-views" target="_blank" rel="noopener noreferrer">ログビューのドキュメント</a></li>
+        <li><a href="https://cloud.google.com/logging/docs/view/logging-query-language" target="_blank" rel="noopener noreferrer">Logging Query Language</a></li>
+        <li><a href="https://cloud.google.com/products/observability/pricing" target="_blank" rel="noopener noreferrer">Cloud Logging 料金</a></li>
+        <li><a href="https://docs.cloud.google.com/release-notes#April_02_2026" target="_blank" rel="noopener noreferrer">公式リリースノート (2026-04-02)</a></li>
+      </ul>
+      <p style="margin-top: 8px; font-size: 11px; color: var(--gc-outline);">&#x1F916; Generated by Claude Code | #CloudLogging #LogViews #Observability</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

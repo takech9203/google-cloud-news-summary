@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Error Reporting: Rust アプリケーションのスタックトレース (std::backtrace) サポート</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+      white-space: nowrap;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+    }
+
+    .badge-deprecated {
+      background: var(--gc-red);
+    }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box, .after-box {
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid rgba(234, 67, 53, 0.35);
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid rgba(52, 168, 83, 0.35);
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-box h3 { color: #C5221F; }
+    .after-box h3 { color: #188038; }
+
+    .before-box ul, .after-box ul {
+      margin: 8px 0 0 0;
+      padding-left: 20px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 8px 0;
+      font-size: 14px;
+    }
+
+    /* チェックリスト */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon { color: var(--gc-green); font-size: 18px; }
+    .cross-icon { color: var(--gc-red); font-size: 18px; }
+
+    /* コードブロック */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block {
+      overflow: hidden;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      border-radius: 0;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    .new-row {
+      background: var(--gc-green-tint) !important;
+      font-weight: 600;
+      color: #188038;
+    }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* 統計カード */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px 16px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 30px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      line-height: 1.3;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* ステップ */
+    .step-item {
+      display: flex;
+      gap: 16px;
+      margin: 16px 0;
+      align-items: flex-start;
+    }
+
+    .step-number {
+      background: var(--gc-blue-600);
+      color: #FFFFFF;
+      width: 32px;
+      height: 32px;
+      min-width: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 16px;
+      margin-top: 2px;
+    }
+
+    .step-content { flex: 1; min-width: 0; }
+
+    .step-content h3 { margin-top: 0; }
+
+    /* ユースケース */
+    .usecase-box {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+      border: 1px solid var(--gc-blue-100);
+    }
+
+    .usecase-box h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+    }
+
+    /* メリット/デメリット 2 カラム */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    ul { margin: 8px 0; padding-left: 22px; }
+    li { margin: 6px 0; }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a { word-break: break-all; }
+
+    @media (max-width: 720px) {
+      .before-after, .two-col { grid-template-columns: 1fr; }
+      h1 { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <div style="margin-bottom: 8px;">
+          <span class="badge">Error Reporting</span>
+          <span class="badge" style="background: var(--gc-orange);">🦀 Rust</span>
+          <span class="badge badge-ga">新言語サポート</span>
+        </div>
+        <h1>🚨 Error Reporting が Rust の<br>スタックトレース (std::backtrace) に対応</h1>
+      </div>
+      <div class="subtitle">📅 リリース日: 2026-08-13</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📝 概要</h2>
+      <p>
+        Error Reporting が、Rust アプリケーションから <code>std::backtrace</code> を使用して収集された
+        <span class="highlight">スタックトレースのレポートに対応</span>しました。
+        環境変数 <code>RUST_BACKTRACE=1</code> の設定とデバッグシンボルの有効化だけで、
+        Rust アプリケーションのパニックやエラー発生時のスタックトレースが自動的に検出・集約されます。
+      </p>
+      <p>
+        これまでのサポート言語は Java、Python、JavaScript、Ruby、C#、PHP、Go の 7 言語に限られていましたが、
+        今回のアップデートで <span class="highlight">Rust が 8 番目のサポート言語</span>として加わり、
+        Cloud Run や GKE、Compute Engine で稼働する Rust アプリケーションでも一元的なエラー管理が可能になります。
+      </p>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before: アップデート前の課題</h3>
+          <ul>
+            <li>スタックトレース解析は Java / Python / JavaScript / Ruby / C# / PHP / Go のみで、Rust のバックトレース形式は非サポート</li>
+            <li>Rust のパニックログを Cloud Logging に出力しても、スタックトレースとして認識されず、自動グループ化・集約の対象外</li>
+            <li>Rust のエラー一元管理には独自の整形処理やサードパーティツールの導入が必要</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After: アップデート後の改善</h3>
+          <ul>
+            <li><code>std::backtrace</code> で収集した Rust のスタックトレースをそのまま解析・レポート可能に</li>
+            <li><code>RUST_BACKTRACE=1</code> とデバッグシンボル有効化だけで利用でき、コードの大きな変更が不要</li>
+            <li>Rust のエラーも他言語と同様に自動グループ化・集約され、コンソールで一元管理</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">8 言語目</div>
+          <div class="stat-label">Rust がサポート言語に追加</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">設定 2 つ</div>
+          <div class="stat-label">環境変数 + デバッグシンボルのみで有効化</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">追加料金なし</div>
+          <div class="stat-label">Error Reporting 自体は無料で利用可能</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    subgraph Runtime["🖥️ 実行環境 (Cloud Run / GKE / GCE など)"]
+        APP["🦀 Rust アプリケーション<br/>RUST_BACKTRACE=1<br/>デバッグシンボル有効"]
+    end
+    APP -->|"panic / エラー発生時に<br/>std::backtrace を stderr へ出力"| LOG[("📝 Cloud Logging")]
+    LOG -->|"ログエントリを解析<br/>Rust バックトレース形式を検出"| ER["🚨 Error Reporting"]
+    ER --> GROUP["📊 エラーの自動グループ化・集約"]
+    GROUP --> CONSOLE(["👤 開発者<br/>(コンソール / 通知)"])
+        </pre>
+      </div>
+      <p>
+        Rust アプリケーションが出力した <code>std::backtrace</code> 形式のスタックトレースを Cloud Logging 経由で
+        Error Reporting が検出し、エラーを自動的にグループ化して開発者に提示するデータフローです。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+
+      <div class="card">
+        <h3>1️⃣ Rust の std::backtrace 形式のスタックトレース解析</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span>Rust 標準ライブラリの <code>std::backtrace</code> で収集されたスタックトレースを Error Reporting が解析</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>ログに含まれるバックトレースからエラーイベントを自動推定し、エラーグループとして集約</span></div>
+      </div>
+
+      <div class="card">
+        <h3>2️⃣ 環境変数ベースのシンプルな有効化</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span>環境変数 <code>RUST_BACKTRACE=1</code> の設定でバックトレース収集が有効化</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>あわせてビルド時にデバッグシンボルの有効化が必要 (シンボルがないと関数名や行番号が解決されない)</span></div>
+      </div>
+
+      <div class="card">
+        <h3>3️⃣ 既存のエラー管理機能との統合</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span>検出された Rust のエラーは、他のサポート言語と同様に同一の根本原因ごとに自動グループ化</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>Error Reporting の通知機能やエラーグループ管理機能をそのまま利用可能</span></div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3>📚 サポート言語 (今回のアップデート後)</h3>
+      <table>
+        <thead>
+          <tr><th>言語</th><th>スタックトレース形式</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Java</td><td><code>Throwable.printStackTrace()</code> の戻り値</td></tr>
+          <tr><td>Python</td><td><code>traceback.format_exc()</code> の戻り値</td></tr>
+          <tr><td>JavaScript</td><td>V8 が返す <code>error.stack</code> の値</td></tr>
+          <tr><td>Ruby</td><td><code>Exception.backtrace</code> のフレーム</td></tr>
+          <tr><td>C#</td><td><code>Exception.ToString()</code> の戻り値</td></tr>
+          <tr><td>PHP</td><td><code>PHP (Notice|Parse error|Fatal error|Warning):</code> プレフィックス + <code>(string)$exception</code></td></tr>
+          <tr><td>Go</td><td><code>debug.Stack()</code> の戻り値</td></tr>
+          <tr class="new-row"><td>🦀 Rust (NEW)</td><td><code>std::backtrace</code> で収集されたバックトレース</td></tr>
+        </tbody>
+      </table>
+
+      <h3>⚙️ Error Reporting の主な動作条件</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>サービス形態</td><td>Cloud Logging 上に構築されたグローバルサービス</td></tr>
+          <tr><td>エラー検出</td><td>ログエントリのスタックトレースなど共通パターンから自動推定、または Error Reporting API で直接レポート</td></tr>
+          <tr><td>サンプリング</td><td>1 時間あたり最大 1,000 エラーをサンプリング (超過時は推定値を表示)</td></tr>
+          <tr><td>エラーイベント保持</td><td>生成後 30 日以上保証</td></tr>
+          <tr><td>制約</td><td>Assured Workloads 有効時は自動無効化、CMEK 有効なログバケットは解析対象外</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <div class="note-box">
+        <strong>💡 前提条件:</strong>
+        <ul style="margin-bottom: 0;">
+          <li>アプリケーションのログが Cloud Logging に書き込まれていること (Cloud Run、GKE、Compute Engine などサポート対象リソース上で稼働)</li>
+          <li>Rust アプリケーションがデバッグシンボル付きでビルドされていること</li>
+        </ul>
+      </div>
+
+      <div class="step-item">
+        <div class="step-number">1</div>
+        <div class="step-content">
+          <h3>デバッグシンボルを有効にしてビルドする</h3>
+          <div class="code-block">
+            <div class="code-header">
+              <span class="code-lang">TOML</span>
+              <span class="code-title">Cargo.toml (リリースビルドでもデバッグシンボルを保持する例)</span>
+            </div>
+            <pre><code class="language-toml">[profile.release]
+debug = true</code></pre>
+          </div>
+          <p>リリースビルドではデフォルトでデバッグシンボルが含まれないため、<code>[profile.release]</code> で <code>debug = true</code> を設定します。シンボルがないと関数名や行番号が解決されません。</p>
+        </div>
+      </div>
+
+      <div class="step-item">
+        <div class="step-number">2</div>
+        <div class="step-content">
+          <h3>RUST_BACKTRACE 環境変数を設定する</h3>
+          <div class="code-block">
+            <div class="code-header">
+              <span class="code-lang">Bash</span>
+              <span class="code-title">Cloud Run サービスに環境変数を設定</span>
+            </div>
+            <pre><code class="language-bash">gcloud run services update SERVICE_NAME \
+  --set-env-vars=RUST_BACKTRACE=1</code></pre>
+          </div>
+          <p>実行環境に <code>RUST_BACKTRACE=1</code> を設定すると、パニック発生時に <code>std::backtrace</code> によるバックトレースが stderr に出力されます。</p>
+        </div>
+      </div>
+
+      <div class="step-item">
+        <div class="step-number">3</div>
+        <div class="step-content">
+          <h3>Error Reporting でエラーを確認する</h3>
+          <div class="code-block">
+            <div class="code-header">
+              <span class="code-lang">Bash</span>
+              <span class="code-title">エラーグループの統計を確認 (コンソールでも可)</span>
+            </div>
+            <pre><code class="language-bash">gcloud beta error-reporting events list --service=SERVICE_NAME</code></pre>
+          </div>
+          <p>Cloud Logging に出力された Rust のバックトレースが検出され、Google Cloud コンソールの Error Reporting ページでエラーグループとして確認できます。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- メリット / デメリット -->
+    <div class="section">
+      <h2>⚖️ メリットと制約事項</h2>
+      <div class="two-col">
+        <div>
+          <h3>💼 ビジネス面のメリット</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>運用コスト削減</strong>: サードパーティのエラートラッキングツール不要で、Google Cloud 標準サービスで Rust のエラーを一元管理</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>障害対応の迅速化</strong>: 自動グループ化と通知で新規エラー・急増エラーを早期発見し、根本原因の特定を高速化</span></div>
+
+          <h3>🔬 技術面のメリット</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>導入の容易さ</strong>: 環境変数とビルド設定の変更のみ。コードへの侵襲的変更やエージェント導入が不要</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>多言語環境での一貫性</strong>: Java / Go / Python と Rust が混在する環境でも同一のコンソール・通知・API でエラー管理を統一</span></div>
+        </div>
+        <div>
+          <h3>🚧 制限事項</h3>
+          <div class="check-item"><span class="cross-icon">✗</span><span>サンプリング上限 (1 時間あたり最大 1,000 エラー、超過時は推定値) が適用される</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>CMEK (顧客管理の暗号鍵) が有効なログバケットのログは解析対象外</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>Assured Workloads が有効なプロジェクトでは Error Reporting が自動無効化</span></div>
+
+          <h3>🤔 考慮すべき点</h3>
+          <div class="check-item"><span style="font-size: 18px;">⚠️</span><span>デバッグシンボル有効化でバイナリサイズが増加し、イメージサイズやデプロイ時間に影響</span></div>
+          <div class="check-item"><span style="font-size: 18px;">⚠️</span><span>パニック時のバックトレース生成にはオーバーヘッドがあるため、パニックを通常フローで多用する設計は避ける</span></div>
+          <div class="check-item"><span style="font-size: 18px;">⚠️</span><span>スタックトレース出力によりログのインジェスト量 (課金対象) がわずかに増加する可能性</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase-box">
+        <h3>💡 ユースケース 1: Cloud Run 上の Rust 製 API サービスのエラー監視</h3>
+        <p><strong>シナリオ</strong>: パフォーマンス要件から Rust (Axum や Actix Web など) で実装した API サービスを Cloud Run で運用しており、本番環境で発生するパニックやエラーを見逃さず検知したい。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">デバッグシンボル付きイメージをデプロイし環境変数を設定</span>
+          </div>
+          <pre><code class="language-bash">gcloud run deploy rust-api \
+  --image=REGION-docker.pkg.dev/PROJECT_ID/repo/rust-api:latest \
+  --set-env-vars=RUST_BACKTRACE=1</code></pre>
+        </div>
+        <p style="margin-bottom: 0;"><strong>効果</strong>: パニック発生時のバックトレースが自動的に Error Reporting に集約され、新規エラーを通知で検知し、スタックトレースから原因箇所を即座に特定できる。</p>
+      </div>
+
+      <div class="usecase-box">
+        <h3>💡 ユースケース 2: 多言語マイクロサービス環境でのエラー管理の統一</h3>
+        <p><strong>シナリオ</strong>: Go や Java のサービスに加えて、一部の高性能コンポーネントを Rust で実装している GKE クラスタで、言語ごとにエラー監視ツールが分かれており運用が煩雑になっている。</p>
+        <p style="margin-bottom: 0;"><strong>効果</strong>: Rust サービスも含めてすべての言語のエラーを Error Reporting に統一でき、エラーグループの管理、通知設定、コンソールでの確認を単一のワークフローに集約できる。</p>
+      </div>
+    </div>
+
+    <!-- 料金 / リージョン -->
+    <div class="section">
+      <h2>💰 料金・利用可能リージョン</h2>
+      <div class="success-box">
+        <strong>✅ 料金:</strong> Error Reporting 自体は<strong>追加料金なし</strong>で利用できます。エラー検出の元となるログの取り込みには Cloud Logging の料金が適用されます。
+        詳細は <a href="https://cloud.google.com/products/observability/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Google Cloud Observability の料金ページ</a> を参照してください。
+      </div>
+      <div class="note-box">
+        <strong>🌏 利用可能リージョン:</strong> Error Reporting は<strong>グローバルサービス</strong>として提供されており、エラーグループは任意のリージョンからアクセスできます。ログのリージョン化を設定している場合、エラーグループはログバケットのリージョンに基づいて整理されます。
+      </div>
+    </div>
+
+    <!-- 関連サービス -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card" style="border-left-color: var(--gc-teal);">
+        <strong>📝 Cloud Logging</strong>: Error Reporting のエラー検出基盤。Rust アプリケーションが stderr に出力したバックトレースは Cloud Logging 経由で解析される
+      </div>
+      <div class="card">
+        <strong>⚡ Cloud Run / GKE / Compute Engine</strong>: Error Reporting がサポートするモニタリング対象リソース。これらの上で稼働する Rust アプリケーションが今回のアップデートの主な対象
+      </div>
+      <div class="card" style="border-left-color: var(--gc-green);">
+        <strong>📈 Cloud Monitoring</strong>: エラー発生状況と組み合わせてアラートやダッシュボードを構成し、Rust サービスの可観測性を強化できる
+      </div>
+      <div class="card" style="border-left-color: var(--gc-purple);">
+        <strong>🔌 Error Reporting API</strong>: ログ経由の自動検出に加えて、<code>ReportedErrorEvent</code> を直接レポートする方式も利用可能
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📌 まとめ</h2>
+      <div class="success-box">
+        <p style="margin-top: 0;">
+          Error Reporting が Rust の <code>std::backtrace</code> 形式に対応したことで、
+          <strong>Rust アプリケーションでも Google Cloud 標準のエラー管理を追加ツールなしで利用</strong>できるようになりました。
+        </p>
+        <p style="margin-bottom: 0;">
+          Rust ワークロードを運用しているチームは、<code>RUST_BACKTRACE=1</code> の設定とデバッグシンボルの有効化という
+          小さな変更で導入できるため、まずは<strong>本番環境のビルド設定と環境変数の見直し</strong>から始めることをおすすめします。
+        </p>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p><strong>📎 出典・参考リンク</strong></p>
+      <ul style="padding-left: 20px;">
+        <li>公式リリースノート: <a href="https://docs.cloud.google.com/release-notes#August_13_2026" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/release-notes#August_13_2026</a></li>
+        <li>ReportedErrorEvent リファレンス: <a href="https://docs.cloud.google.com/error-reporting/reference/rest/v1beta1/projects.events/report#ReportedErrorEvent" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/error-reporting/reference/rest/v1beta1/projects.events/report#ReportedErrorEvent</a></li>
+        <li>Error Reporting ドキュメント: <a href="https://docs.cloud.google.com/error-reporting/docs" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/error-reporting/docs</a></li>
+        <li>ログ内のエラーのフォーマット: <a href="https://docs.cloud.google.com/error-reporting/docs/formatting-error-messages" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/error-reporting/docs/formatting-error-messages</a></li>
+        <li>料金ページ: <a href="https://cloud.google.com/products/observability/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">https://cloud.google.com/products/observability/pricing</a></li>
+      </ul>
+      <p>🏷️ タグ: Error Reporting / Rust / std::backtrace / Observability / Cloud Logging / スタックトレース / エラー監視</p>
+      <p>このインフォグラフィックは Google Cloud News レポート (2026-08-13) を基に生成されました。</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

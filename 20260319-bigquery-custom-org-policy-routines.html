@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BigQuery: ルーティンに対するカスタム組織ポリシーのサポート</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    /* Google Cloud Light Theme Base Styles */
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; min-width: 280px; }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .header-meta {
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    .badge,
+    .badge-preview {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-preview { background: var(--gc-orange); }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green { border-left-color: var(--gc-green); }
+    .card-red { border-left-color: var(--gc-red); }
+    .card-orange { border-left-color: var(--gc-orange); }
+    .card-purple { border-left-color: var(--gc-purple); }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow { color: var(--gc-blue-600); font-size: 20px; }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* Before/After */
+    .before-after-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-red);
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-green);
+    }
+
+    .before-card h3, .after-card h3 { margin-top: 0; font-size: 16px; }
+
+    .before-card ul, .after-card ul {
+      padding-left: 20px;
+      margin: 8px 0 0 0;
+    }
+    .before-card li, .after-card li { margin: 6px 0; font-size: 14px; }
+
+    /* Feature cards grid */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    /* Use case cards */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+    }
+
+    .usecase-card h3 { margin-top: 0; }
+
+    /* Stats row */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    /* Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* Note/Warning boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Code blocks */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-block {
+      overflow: hidden;
+      padding: 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      border-radius: 0;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    /* Inline code */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Mermaid */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Flow diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Related services */
+    .related-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .related-item {
+      background: var(--gc-surface);
+      border-radius: 8px;
+      padding: 16px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .related-item strong { color: var(--gc-on-surface); }
+
+    /* Footer */
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; }
+      .header-meta { text-align: left; margin-top: 12px; }
+      .before-after-grid { grid-template-columns: 1fr; }
+      .stats-row { grid-template-columns: 1fr 1fr; }
+      .related-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>🔒 BigQuery: ルーティンに対するカスタム組織ポリシーのサポート</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">BigQuery</span>
+          <span class="badge">Organization Policy</span>
+          <span class="badge-preview">Preview</span>
+        </div>
+      </div>
+      <div class="header-meta">
+        <div class="subtitle">2026-03-19</div>
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        BigQuery において、<span class="highlight">ルーティン (Routines)</span> リソースに対するカスタム組織ポリシーが新たにサポートされました。
+        Organization Policy Service のカスタム制約を使用して、UDF、UDAF、テーブル関数、リモート関数、ストアドプロシージャの作成・更新操作を
+        組織全体で統一的に制御できるようになります。
+      </p>
+      <p style="margin-top: 12px;">
+        これまで BigQuery のカスタム組織ポリシーは Dataset や TransferConfig など限られたリソースのみをサポートしていましたが、
+        今回 <code>bigquery.googleapis.com/Routine</code> リソースタイプが追加され、より包括的なガバナンスが実現可能になりました。
+      </p>
+    </div>
+
+    <!-- Before / After -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after-grid">
+        <div class="before-card">
+          <h3>❌ アップデート前の課題</h3>
+          <ul>
+            <li>ルーティンの作成・更新を組織ポリシーレベルで制御する手段がなく、IAM ロールのみに依存</li>
+            <li>組織全体でルーティンの命名規則やプロパティを統一的に強制する仕組みがなかった</li>
+            <li>リモート関数やストアドプロシージャの作成を組織レベルで制限できなかった</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h3>✅ アップデート後の改善</h3>
+          <ul>
+            <li>カスタム組織ポリシーにより、ルーティン操作を CEL 条件式で柔軟に制御可能</li>
+            <li>組織、フォルダ、プロジェクトの各レベルで階層的にポリシーを適用可能</li>
+            <li>IAM と組織ポリシーを組み合わせた多層防御が実現</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>Organization Policy Service を通じて、組織の階層構造に沿ってカスタム制約がルーティン操作に適用される流れを示します。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    Admin["Organization Policy\nAdministrator"]
+    OrgPolicy["Organization Policy Service"]
+    Constraint["Custom Constraint\n(bigquery.googleapis.com/Routine)"]
+
+    Admin -->|"制約を定義"| Constraint
+    Constraint -->|"ポリシーとして適用"| OrgPolicy
+
+    OrgPolicy -->|"組織レベルで適用"| Org["Organization"]
+    OrgPolicy -->|"フォルダレベルで適用"| Folder["Folder"]
+    OrgPolicy -->|"プロジェクトレベルで適用"| Project["Project"]
+
+    Org --> Folder
+    Folder --> Project
+
+    Project -->|"ルーティン操作を評価"| BQ["BigQuery"]
+
+    BQ -->|"ポリシー準拠"| Allow["操作を許可"]
+    BQ -->|"ポリシー違反"| Deny["操作を拒否\n(エラー返却)"]
+
+    subgraph Routines["対象ルーティン"]
+        UDF["UDF"]
+        UDAF["UDAF"]
+        TVF["テーブル関数"]
+        Remote["リモート関数"]
+        SP["ストアドプロシージャ"]
+    end
+
+    BQ --> Routines
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Stats -->
+    <div class="section">
+      <h2>📊 数字で見るアップデート</h2>
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-value">5</div>
+          <div class="stat-label">対象ルーティンタイプ</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">2</div>
+          <div class="stat-label">対象メソッド (CREATE / UPDATE)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">20</div>
+          <div class="stat-label">組織あたりの最大カスタム制約数</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">~2 分</div>
+          <div class="stat-label">ポリシー適用の反映時間</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h3>🔧 ルーティンリソースに対するカスタム制約</h3>
+          <p style="margin-top: 8px;"><code>bigquery.googleapis.com/Routine</code> リソースタイプに対してカスタム制約を定義可能。
+          CEL (Common Expression Language) を使用して条件式を記述し、ALLOW (許可) または DENY (拒否) のアクションを設定できます。</p>
+        </div>
+        <div class="card">
+          <h3>🎯 対象操作の制御</h3>
+          <div class="icon-text"><span class="arrow">→</span><span><strong>CREATE</strong>: ルーティンの新規作成を制御</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span><strong>UPDATE</strong>: 既存ルーティンの更新を制御</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>CREATE と UPDATE の両方、または片方のみを指定可能</span></div>
+        </div>
+        <div class="card">
+          <h3>🏛️ 階層的ポリシー継承</h3>
+          <div class="flow-diagram">
+            <div class="flow-step">🏢 組織</div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-step">📁 フォルダ</div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-step">📂 プロジェクト</div>
+          </div>
+          <p style="font-size: 14px; text-align: center; color: var(--gc-outline);">上位レベルのポリシーが下位に自動継承。階層評価ルールにより継承の無効化も可能。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>🔬 技術仕様</h2>
+      <h3>カスタム制約の構成要素</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>リソースタイプ</td><td><code>bigquery.googleapis.com/Routine</code></td></tr>
+          <tr><td>サポートメソッド</td><td>CREATE, UPDATE</td></tr>
+          <tr><td>条件式言語</td><td>CEL (Common Expression Language)</td></tr>
+          <tr><td>アクションタイプ</td><td>ALLOW, DENY</td></tr>
+          <tr><td>制約名の最大長</td><td>70 文字</td></tr>
+          <tr><td>条件式の最大長</td><td>1000 文字</td></tr>
+          <tr><td>説明の最大長</td><td>2000 文字</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top: 20px;">必要な IAM ロール</h3>
+      <table>
+        <thead>
+          <tr><th>ロール</th><th>用途</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>roles/orgpolicy.policyAdmin</code></td><td>組織ポリシーの管理 (組織リソースに付与)</td></tr>
+          <tr><td><code>roles/bigquery.admin</code></td><td>BigQuery ルーティンの作成・更新</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup Steps -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <div class="note-box">
+        <strong>📋 前提条件:</strong> Google Cloud 組織が設定済み / 組織 ID を把握 / <code>roles/orgpolicy.policyAdmin</code> ロールが付与済み
+      </div>
+
+      <h3>ステップ 1: カスタム制約の YAML ファイルを作成</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">YAML</span>
+          <span class="code-title">constraint-restrict-routine.yaml</span>
+        </div>
+        <pre><code class="language-yaml"># constraint-restrict-routine.yaml
+name: organizations/ORGANIZATION_ID/customConstraints/custom.restrictRoutineCreation
+resourceTypes:
+  - bigquery.googleapis.com/Routine
+methodTypes:
+  - CREATE
+condition: "resource.routineType == 'SCALAR_FUNCTION'"
+actionType: DENY
+displayName: Restrict scalar function creation
+description: Deny creating scalar UDFs in BigQuery to enforce usage of approved routines only.</code></pre>
+      </div>
+
+      <h3>ステップ 2: カスタム制約を適用</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+        </div>
+        <pre><code class="language-bash">gcloud org-policies set-custom-constraint ~/constraint-restrict-routine.yaml</code></pre>
+      </div>
+
+      <h3>ステップ 3: 制約の存在を確認</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+        </div>
+        <pre><code class="language-bash">gcloud org-policies list-custom-constraints --organization=ORGANIZATION_ID</code></pre>
+      </div>
+
+      <h3>ステップ 4: 組織ポリシーを作成して適用</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">YAML</span>
+          <span class="code-title">policy-restrict-routine.yaml</span>
+        </div>
+        <pre><code class="language-yaml"># policy-restrict-routine.yaml
+name: projects/PROJECT_ID/policies/custom.restrictRoutineCreation
+spec:
+  rules:
+    - enforce: true</code></pre>
+      </div>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+        </div>
+        <pre><code class="language-bash">gcloud org-policies set-policy ~/policy-restrict-routine.yaml</code></pre>
+      </div>
+
+      <div class="note-box">
+        <strong>💡 注意:</strong> ポリシー適用後、約 2 分で Google Cloud がポリシーの適用を開始します。
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div class="before-after-grid">
+        <div style="background: var(--gc-blue-tint); border-radius: 12px; padding: 20px; border-left: 4px solid var(--gc-blue-600);">
+          <h3>💼 ビジネス面</h3>
+          <div class="icon-text"><span class="arrow">→</span><span><strong>コンプライアンス強化:</strong> 規制要件に沿ったルーティン管理ポリシーを組織全体に強制でき、監査対応が容易に</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span><strong>ガバナンスの一元化:</strong> 階層構造を活用し、部門ごとのポリシーを効率的に管理</span></div>
+        </div>
+        <div style="background: var(--gc-teal-tint); border-radius: 12px; padding: 20px; border-left: 4px solid var(--gc-teal);">
+          <h3>🔧 技術面</h3>
+          <div class="icon-text"><span class="arrow">→</span><span><strong>多層防御の実現:</strong> IAM + 組織ポリシーでセキュリティの多層化が可能</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span><strong>柔軟な条件定義:</strong> CEL でルーティンのプロパティに基づく細かな条件を定義</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span><strong>自動継承:</strong> 上位レベルのポリシーが下位に自動継承、設定漏れを防止</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <div class="warning-box">
+        <strong>⚠️ 制限事項:</strong>
+        <ul style="margin-top: 8px; padding-left: 20px;">
+          <li>Preview 段階 -- 本番環境での利用は「Pre-GA Offerings Terms」が適用される</li>
+          <li>Preview 機能はサポートが限定的であり、変更される可能性がある</li>
+          <li>監査ログで PolicyViolationInfo が公開されない (エラーメッセージに constraintId は含まれる)</li>
+          <li>ポリシー変更は既存のリソースに対して遡及的に適用されない</li>
+        </ul>
+      </div>
+      <div class="note-box">
+        <strong>💡 考慮すべき点:</strong>
+        <ul style="margin-top: 8px; padding-left: 20px;">
+          <li>既存ルーティンはポリシー適用前のものであるため、新規の作成・更新操作のみが制御対象</li>
+          <li>ポリシーの適用には最大約 2 分のラグがある</li>
+          <li>過度に厳格なポリシーは開発者の生産性に影響を与える可能性あり</li>
+          <li>カスタム制約は組織ごとにリソースタイプあたり最大 20 個まで作成可能</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+      <div class="usecase-card">
+        <h3>🛡️ ユースケース 1: リモート関数の作成制限</h3>
+        <p><strong>シナリオ:</strong> セキュリティチームが、外部サービスと連携するリモート関数の作成を本番環境のプロジェクトで制限したい。</p>
+        <div class="code-block" style="margin-top: 12px;">
+          <div class="code-header">
+            <span class="code-lang">YAML</span>
+            <span class="code-title">リモート関数制限の例</span>
+          </div>
+          <pre><code class="language-yaml">name: organizations/123456789/customConstraints/custom.denyRemoteFunctions
+resourceTypes:
+  - bigquery.googleapis.com/Routine
+methodTypes:
+  - CREATE
+condition: "resource.routineType == 'SCALAR_FUNCTION' && resource.remoteFunctionOptions != null"
+actionType: DENY
+displayName: Deny remote function creation
+description: Prevent creating remote functions that connect to external services.</code></pre>
+        </div>
+        <p style="margin-top: 8px;"><strong>効果:</strong> 本番環境での予期しない外部連携を防止し、データ流出リスクを低減。</p>
+      </div>
+      <div class="usecase-card">
+        <h3>📏 ユースケース 2: ルーティン管理の標準化</h3>
+        <p><strong>シナリオ:</strong> データガバナンスチームが、組織全体でルーティンの作成を特定のプロジェクトまたは命名規則に準拠させたい。</p>
+        <p style="margin-top: 8px;"><strong>効果:</strong> ルーティンの乱立を防止し、承認されたルーティンのみが利用される環境を構築。管理対象のルーティンが明確になり、メンテナンスコストを削減。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>Organization Policy Service 自体の追加料金は<strong>発生しません</strong>。BigQuery のルーティンに関する料金は、通常の BigQuery 料金体系に準じます。</p>
+      <p style="margin-top: 8px;">詳細は <a href="https://cloud.google.com/bigquery/pricing" target="_blank" class="gc-link">BigQuery 料金ページ</a> を参照してください。</p>
+    </div>
+
+    <!-- Regions -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <p>Organization Policy Service はグローバルサービスであり、<strong>BigQuery が利用可能なすべてのリージョン</strong>で使用可能です。</p>
+      <p style="margin-top: 8px;">詳細は <a href="https://cloud.google.com/bigquery/docs/locations" target="_blank" class="gc-link">BigQuery のロケーションに関するドキュメント</a> を参照してください。</p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="related-grid">
+        <div class="related-item">
+          <strong>🏛️ Organization Policy Service</strong>
+          <p style="font-size: 14px; margin-top: 4px;">カスタム制約の管理基盤。BigQuery 以外のサービスにも同様の仕組みを適用可能。</p>
+        </div>
+        <div class="related-item">
+          <strong>📊 BigQuery カスタム組織ポリシー (Dataset)</strong>
+          <p style="font-size: 14px; margin-top: 4px;">既に GA の Dataset リソースに対するカスタム制約。今回のルーティン対応はこの拡張。</p>
+        </div>
+        <div class="related-item">
+          <strong>🔄 Data Transfer Service カスタム組織ポリシー</strong>
+          <p style="font-size: 14px; margin-top: 4px;">TransferConfig リソースに対するカスタム制約。</p>
+        </div>
+        <div class="related-item">
+          <strong>🔐 IAM</strong>
+          <p style="font-size: 14px; margin-top: 4px;">ルーティンに対する既存のアクセス制御。組織ポリシーと併用で多層防御を実現。</p>
+        </div>
+        <div class="related-item">
+          <strong>📝 Cloud Audit Logs</strong>
+          <p style="font-size: 14px; margin-top: 4px;">ポリシー違反の検出と監査に使用。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section" style="background: var(--gc-blue-50); border: 2px solid var(--gc-blue-300);">
+      <h2>📌 まとめ</h2>
+      <p>
+        BigQuery のルーティンに対するカスタム組織ポリシーのサポートにより、UDF、ストアドプロシージャ、リモート関数などのルーティン操作を
+        組織レベルで統一的に制御できるようになりました。
+      </p>
+      <p style="margin-top: 12px;">
+        セキュリティ・ガバナンスチームは、この Preview 機能を評価し、既存の IAM ベースのアクセス制御と組み合わせた
+        <span class="highlight">多層防御戦略</span>を検討することを推奨します。GA への昇格を見据え、非本番環境での検証を開始するのが良いでしょう。
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>📎 出典:</strong></p>
+      <ul style="list-style: none; padding: 0; margin-top: 8px;">
+        <li>- <a href="https://cloud.google.com/release-notes#March_19_2026" target="_blank" rel="noopener noreferrer">Google Cloud Release Notes (March 19, 2026)</a></li>
+        <li>- <a href="https://cloud.google.com/bigquery/docs/custom-constraints" target="_blank" rel="noopener noreferrer">BigQuery カスタム制約ドキュメント</a></li>
+        <li>- <a href="https://cloud.google.com/bigquery/docs/routines-intro" target="_blank" rel="noopener noreferrer">ルーティンの概要</a></li>
+        <li>- <a href="https://cloud.google.com/organization-policy/overview" target="_blank" rel="noopener noreferrer">Organization Policy Service 概要</a></li>
+        <li>- <a href="https://cloud.google.com/organization-policy/create-custom-constraints" target="_blank" rel="noopener noreferrer">カスタム制約の作成と管理</a></li>
+        <li>- <a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer">BigQuery 料金</a></li>
+      </ul>
+      <p style="margin-top: 12px; font-style: italic;">#BigQuery #OrganizationPolicy #Governance #Security #Routines #UDF #StoredProcedure #Preview</p>
+    </footer>
+
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

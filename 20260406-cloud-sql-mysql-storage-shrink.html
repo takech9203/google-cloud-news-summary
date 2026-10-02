@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud SQL for MySQL: Storage Shrink (ストレージ縮小)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    /* Google Cloud Light Theme Base Styles */
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 12px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-feature {
+      background: var(--gc-green);
+      color: #FFFFFF;
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    /* Before/After */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .before-card h3 {
+      color: var(--gc-red);
+      margin-bottom: 8px;
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .after-card h3 {
+      color: var(--gc-green);
+      margin-bottom: 8px;
+    }
+
+    .before-card ul, .after-card ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .before-card li, .after-card li {
+      margin: 6px 0;
+      padding-left: 20px;
+      position: relative;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .before-card li::before {
+      content: "\2717";
+      position: absolute;
+      left: 0;
+      color: var(--gc-red);
+      font-weight: bold;
+    }
+
+    .after-card li::before {
+      content: "\2713";
+      position: absolute;
+      left: 0;
+      color: var(--gc-green);
+      font-weight: bold;
+    }
+
+    /* Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Feature cards */
+    .feature-cards {
+      display: grid;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .feature-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .feature-card h3 {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .feature-card ul {
+      padding-left: 20px;
+      margin: 8px 0 0 0;
+    }
+
+    .feature-card li {
+      margin: 4px 0;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* Use case */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h3 {
+      color: var(--gc-blue-800);
+      margin-bottom: 8px;
+    }
+
+    .usecase-scenario {
+      font-size: 14px;
+      margin-bottom: 8px;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .usecase-effect {
+      background: var(--gc-surface);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 14px;
+      border-left: 3px solid var(--gc-green);
+      margin-top: 8px;
+    }
+
+    /* Flow diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    /* Note/Warning boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Code blocks */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      background: #1E1E1E;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      padding: 16px !important;
+      color: #E8E8E8;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Mermaid */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Check lists */
+    .merit-list, .demerit-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .merit-list li {
+      padding: 6px 0 6px 24px;
+      position: relative;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .merit-list li::before {
+      content: "\2713";
+      position: absolute;
+      left: 0;
+      color: var(--gc-green);
+      font-weight: bold;
+    }
+
+    .demerit-list li {
+      padding: 6px 0 6px 24px;
+      position: relative;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .demerit-list li::before {
+      content: "\26A0";
+      position: absolute;
+      left: 0;
+      color: var(--gc-yellow);
+    }
+
+    /* Link list */
+    .link-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .link-list li {
+      padding: 8px 0;
+      border-bottom: 1px solid var(--gc-outline-variant);
+    }
+
+    .link-list li:last-child {
+      border-bottom: none;
+    }
+
+    .link-list a {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .link-list a:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .flow-diagram { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); }
+      body { padding: 12px; }
+      .section { padding: 16px; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>🗄️ Cloud SQL for MySQL: Storage Shrink</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Cloud SQL for MySQL</span>
+          <span class="badge-feature">Feature</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-04-06</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>Cloud SQL for MySQL において、インスタンスのストレージ容量を<span class="highlight">手動で縮小 (shrink)</span> できる機能が利用可能になりました。過剰にプロビジョニングされたストレージを削減し、不要なストレージコストを直接削減できます。</p>
+      <p style="margin-top: 12px;">プライマリインスタンスおよびリードレプリカの両方で利用可能。すべての Cloud SQL エディション (<strong>Enterprise / Enterprise Plus</strong>) でサポートされています。</p>
+
+      <div class="warning-box" style="margin-top: 16px;">
+        <strong>&#9888;&#65039; 注意:</strong> ストレージ縮小操作にはインスタンスのダウンタイムが伴います。ダウンタイムを最小限に抑えたい場合は <strong>Database Migration Service</strong> を使用して新しいインスタンスへデータを移行する方法が推奨されます。
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value">~80%</div>
+        <div class="stat-label">ストレージコスト削減 (開発環境の例)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">2</div>
+        <div class="stat-label">対応エディション (Enterprise / Enterprise Plus)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">20%+</div>
+        <div class="stat-label">推奨バッファ (使用量の 20% or 100GB)</div>
+      </div>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>🔄 Before / After</h2>
+      <div class="before-after">
+        <div class="before-card">
+          <h3>&#10060; アップデート前</h3>
+          <ul>
+            <li>ストレージ容量は増加のみ可能で、一度拡張すると縮小できなかった</li>
+            <li>過剰にプロビジョニングされたストレージに不要なコストが継続的に発生</li>
+            <li>ストレージ削減には新しいインスタンスを作成してデータ移行が必要</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h3>&#9989; アップデート後</h3>
+          <ul>
+            <li>gcloud CLI や REST API でストレージ容量を直接縮小可能</li>
+            <li>不要なストレージコストを削減、リソース最適化が実現</li>
+            <li>プライマリ・リードレプリカの両方でサポート</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>ストレージ縮小操作の全体フローです。ユーザーは最小許容サイズを確認した上でバックアップを作成し、縮小リクエストを実行します。操作中はインスタンスが停止し、ディスクサイズが変更された後に再起動されます。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    A[ユーザー / 管理者] -->|1. 最小ストレージ容量を確認| B[gcloud sql instances describe]
+    B -->|現在のサイズと最小許容サイズを取得| A
+    A -->|2. バックアップ作成| C[Cloud SQL バックアップ]
+    A -->|3. ストレージ縮小リクエスト| D[Cloud SQL Admin API performDiskShrink]
+    D -->|インスタンス停止| E[Cloud SQL MySQL インスタンス]
+    E -->|ディスクサイズ変更| F[Hyperdisk Balanced 永続ディスク]
+    F -->|完了後再起動| E
+    E -->|4. 操作完了通知| A
+
+    style D fill:#4285F4,color:#fff
+    style E fill:#34A853,color:#fff
+    style F fill:#FBBC04,color:#000
+    style C fill:#EA4335,color:#fff
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="feature-cards">
+        <div class="feature-card">
+          <h3>📉 ストレージ容量の手動縮小</h3>
+          <ul>
+            <li>プロビジョニングされたストレージ容量を指定したターゲットサイズまで縮小可能</li>
+            <li>ターゲットサイズはインスタンスに対して安全と判断される最小許容容量より大きい必要がある</li>
+            <li>パフォーマンスの一貫性のため、現在の使用量の <strong>20%</strong> または <strong>100 GB</strong> のいずれか大きい方をバッファとして確保することを推奨</li>
+          </ul>
+        </div>
+        <div class="feature-card">
+          <h3>🔗 プライマリ & リードレプリカ サポート</h3>
+          <ul>
+            <li>プライマリインスタンスとリードレプリカの両方でストレージ縮小が可能</li>
+            <li>リードレプリカを縮小する場合は、先にプライマリインスタンスの縮小を完了する必要がある</li>
+            <li>リードレプリカはプライマリインスタンスより小さいストレージ容量を持つことはできない</li>
+          </ul>
+        </div>
+        <div class="feature-card">
+          <h3>🔙 操作のキャンセル機能</h3>
+          <ul>
+            <li>プライマリインスタンスまたはスタンドアロンインスタンスでは縮小操作のキャンセルが可能</li>
+            <li><code>gcloud sql operations cancel</code> コマンドまたは REST API でキャンセルを実行</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+      <h3>要件と制限事項</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>対応エディション</td><td>Cloud SQL Enterprise / Enterprise Plus</td></tr>
+          <tr><td>対応インスタンスタイプ</td><td>プライマリ、リードレプリカ (共有コアインスタンスは非対応)</td></tr>
+          <tr><td>gcloud CLI バージョン</td><td>563.0.0 以降</td></tr>
+          <tr><td>操作タイムアウト</td><td>10 日間 (超過した場合は CPU アップグレードで対処)</td></tr>
+          <tr><td>ダウンタイム</td><td>あり (リードレプリカの復元と同程度)</td></tr>
+          <tr><td>Terraform サポート</td><td>非対応</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top: 20px;">必要な IAM 権限</h3>
+      <table>
+        <thead>
+          <tr><th>権限</th><th>説明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>cloudsql.instances.getDiskShrinkConfig</code></td><td>ストレージ縮小の設定情報を取得</td></tr>
+          <tr><td><code>cloudsql.instances.performDiskShrink</code></td><td>ストレージ縮小操作を実行</td></tr>
+        </tbody>
+      </table>
+      <div class="note-box" style="margin-top: 12px;">
+        <strong>&#128161; ヒント:</strong> これらの権限は <code>roles/cloudsql.admin</code> (Cloud SQL Admin) および <code>roles/cloudsql.editor</code> (Cloud SQL Editor) ロールに含まれています。
+      </div>
+    </div>
+
+    <!-- Setup Steps -->
+    <div class="section">
+      <h2>📝 設定手順</h2>
+
+      <h3>前提条件</h3>
+      <ul style="padding-left: 20px; margin-bottom: 20px; font-size: 14px;">
+        <li>gcloud CLI バージョン 563.0.0 以降がインストールされていること</li>
+        <li>対象インスタンスが <code>RUNNABLE</code> 状態であること</li>
+        <li>必要な IAM 権限が付与されていること</li>
+        <li>外部接続を使用する拡張機能やフィーチャーが無効化されていること</li>
+      </ul>
+
+      <div class="flow-diagram">
+        <div class="flow-step">&#128270; 状態確認</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">&#128190; バックアップ</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">&#128207; 最小容量確認</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">&#9660; 縮小実行</div>
+      </div>
+
+      <h3>ステップ 1: インスタンスの状態を確認</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">インスタンス状態の確認</span>
+        </div>
+        <pre><code class="language-bash">gcloud sql instances describe INSTANCE_NAME</code></pre>
+      </div>
+
+      <h3>ステップ 2: バックアップを作成</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">オンデマンドバックアップの作成</span>
+        </div>
+        <pre><code class="language-bash">gcloud sql backups create --instance=INSTANCE_NAME</code></pre>
+      </div>
+
+      <h3>ステップ 3: 最小許容ストレージ容量を確認</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">縮小可能な最小サイズの確認</span>
+        </div>
+        <pre><code class="language-bash">gcloud sql instances describe INSTANCE_NAME \
+  --format="value(diskShrinkContext)"</code></pre>
+      </div>
+
+      <h3>ステップ 4: ストレージ縮小を実行</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">ストレージ縮小の実行 (gcloud CLI)</span>
+        </div>
+        <pre><code class="language-bash">gcloud sql instances perform-storage-shrink INSTANCE_NAME \
+  --storage-size=TARGET_STORAGE_SIZE \
+  --async</code></pre>
+      </div>
+
+      <h3>ステップ 5 (REST API の場合)</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">REST API での実行</span>
+        </div>
+        <pre><code class="language-bash">curl -X POST \
+  -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Content-Type: application/json; charset=utf-8" \
+  -d '{"targetSizeGb": TARGET_STORAGE_SIZE}' \
+  "https://sqladmin.googleapis.com/v1/projects/PROJECT_ID/instances/INSTANCE_ID/performDiskShrink"</code></pre>
+      </div>
+    </div>
+
+    <!-- Merits -->
+    <div class="section">
+      <h2>&#9989; メリット</h2>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div>
+          <h3>&#128188; ビジネス面</h3>
+          <ul class="merit-list">
+            <li><strong>ストレージコストの最適化</strong>: 過剰プロビジョニングを削減し、月額ストレージ費用を直接削減</li>
+            <li><strong>リソース管理の柔軟性向上</strong>: ビジネス要件の変化に応じてストレージ容量を増減可能に</li>
+          </ul>
+        </div>
+        <div>
+          <h3>&#128736; 技術面</h3>
+          <ul class="merit-list">
+            <li><strong>シンプルな操作</strong>: gcloud CLI / REST API を使用した直感的なコマンド</li>
+            <li><strong>安全性の確保</strong>: 最小許容容量のチェック機能によりデータ損失リスクを最小化</li>
+            <li><strong>キャンセル対応</strong>: プライマリインスタンスでは実行中の縮小操作をキャンセル可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Demerits / Constraints -->
+    <div class="section">
+      <h2>&#9888;&#65039; デメリット・制約事項</h2>
+      <div class="error-box">
+        <strong>制限事項</strong>
+        <ul class="demerit-list" style="margin-top: 8px;">
+          <li>共有コアインスタンスでは非サポート</li>
+          <li>MySQL レガシー高可用性構成では利用不可</li>
+          <li>外部サーバーからのレプリケーション構成では非サポート</li>
+          <li>カスケードレプリカ・リードプールへの適用不可</li>
+          <li>Terraform でのサポートなし</li>
+        </ul>
+      </div>
+      <div class="warning-box">
+        <strong>考慮すべき点</strong>
+        <ul class="demerit-list" style="margin-top: 8px;">
+          <li>縮小操作中はインスタンスにダウンタイムが発生 (ディスクサイズに依存して相当な時間になる可能性)</li>
+          <li>操作中は他のすべての操作 (バックアップ、インポートなど) が利用不可</li>
+          <li>操作が 10 日を超えるとタイムアウトする場合がある (CPU アップグレードで短縮可能)</li>
+          <li>リードレプリカの最小ストレージ容量を直接確認する手段がない</li>
+          <li>ダウンタイムを許容できない場合は Database Migration Service の利用を検討</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>&#128161; ユースケース</h2>
+      <div class="usecase-card">
+        <h3>&#128187; 開発/テスト環境のコスト最適化</h3>
+        <div class="usecase-scenario">
+          <strong>シナリオ:</strong> 本番環境と同じ構成で作成された開発環境のインスタンスが 500 GB のストレージを持つが、実際のデータ使用量は 50 GB 程度。
+        </div>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">開発環境のストレージ縮小例</span>
+          </div>
+          <pre><code class="language-bash"># 最小許容サイズを確認
+gcloud sql instances describe dev-mysql-instance
+
+# ストレージを 100 GB に縮小 (50 GB の使用量 + バッファ)
+gcloud sql instances perform-storage-shrink dev-mysql-instance \
+  --storage-size=100 \
+  --async</code></pre>
+        </div>
+        <div class="usecase-effect">
+          <strong>&#128200; 効果:</strong> 月額ストレージコストを最大 80% 削減しつつ、十分なバッファを確保。
+        </div>
+      </div>
+
+      <div class="usecase-card">
+        <h3>&#128451; データクリーンアップ後のストレージ最適化</h3>
+        <div class="usecase-scenario">
+          <strong>シナリオ:</strong> 大量の履歴データを削除またはアーカイブした後、実際のデータ使用量に対してプロビジョニングされたストレージが大幅に過剰になっている。
+        </div>
+        <div class="usecase-effect">
+          <strong>&#128200; 効果:</strong> データクリーンアップの効果をストレージコストの削減として直接反映でき、継続的なコスト最適化が実現。
+        </div>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>&#128176; 料金</h2>
+      <p>Cloud SQL のストレージ料金はプロビジョニングされた容量 (GiB/月) に基づいて課金されます。<span class="highlight">ストレージ縮小操作自体に追加料金は発生しません</span>が、縮小後は新しい (小さい) ストレージ容量に基づいた料金が適用されます。</p>
+      <p style="margin-top: 8px;">詳細な料金はリージョンやエディションにより異なります。</p>
+    </div>
+
+    <!-- Available Regions -->
+    <div class="section">
+      <h2>&#127758; 利用可能リージョン</h2>
+      <p>すべての Cloud SQL エディション (Enterprise / Enterprise Plus) で利用可能です。<span class="highlight">Cloud SQL が利用可能なすべてのリージョン</span>でサポートされています。</p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#128279; 関連サービス・機能</h2>
+      <ul class="link-list">
+        <li>&#128640; <a href="https://cloud.google.com/database-migration/docs" target="_blank" rel="noopener noreferrer"><strong>Database Migration Service</strong></a> - ダウンタイムを最小限に抑えたい場合の代替手段</li>
+        <li>&#128190; <a href="https://cloud.google.com/sql/docs/mysql/storage-options-overview" target="_blank" rel="noopener noreferrer"><strong>Cloud SQL ストレージオプション</strong></a> - Hyperdisk Balanced によるストレージ性能の詳細</li>
+        <li>&#128200; <a href="https://cloud.google.com/sql/docs/mysql/instance-settings#automatic-storage-increase-2ndgen" target="_blank" rel="noopener noreferrer"><strong>Cloud SQL 自動ストレージ増加</strong></a> - ストレージの自動増加設定 (縮小の逆機能)</li>
+        <li>&#128190; <a href="https://cloud.google.com/sql/docs/mysql/backup-recovery/backing-up" target="_blank" rel="noopener noreferrer"><strong>Cloud SQL バックアップとリストア</strong></a> - 縮小操作前の必須バックアップ作成</li>
+      </ul>
+    </div>
+
+    <!-- References -->
+    <div class="section">
+      <h2>&#128218; 参考リンク</h2>
+      <ul class="link-list">
+        <li>&#128196; <a href="https://docs.cloud.google.com/release-notes#April_06_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li>&#128214; <a href="https://docs.cloud.google.com/sql/docs/mysql/about-storage-shrink" target="_blank" rel="noopener noreferrer">About storage shrink (ドキュメント)</a></li>
+        <li>&#128221; <a href="https://docs.cloud.google.com/sql/docs/mysql/shrink-instance-storage-capacity" target="_blank" rel="noopener noreferrer">Shrink instance storage capacity (手順)</a></li>
+        <li>&#128176; <a href="https://cloud.google.com/sql/pricing" target="_blank" rel="noopener noreferrer">Cloud SQL 料金ページ</a></li>
+      </ul>
+    </div>
+
+    <!-- Summary -->
+    <div class="note-box">
+      <strong>&#128204; まとめ:</strong> Cloud SQL for MySQL のストレージ縮小機能は、過剰にプロビジョニングされたストレージ容量を削減し、コスト最適化を実現する重要なアップデートです。特に開発・テスト環境やデータクリーンアップ後のインスタンスにおいて大きな効果が期待できます。ダウンタイムが発生する点に留意し、メンテナンスウィンドウでの実行を計画するか、ダウンタイムを許容できない場合は Database Migration Service の利用を検討してください。
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>&#128206; 出典:</p>
+      <ul style="list-style: none; padding: 0; margin: 4px 0;">
+        <li><a href="https://docs.cloud.google.com/release-notes#April_06_2026" target="_blank" rel="noopener noreferrer">https://docs.cloud.google.com/release-notes#April_06_2026</a></li>
+        <li><a href="https://docs.cloud.google.com/sql/docs/mysql/about-storage-shrink" target="_blank" rel="noopener noreferrer">https://docs.cloud.google.com/sql/docs/mysql/about-storage-shrink</a></li>
+        <li><a href="https://docs.cloud.google.com/sql/docs/mysql/shrink-instance-storage-capacity" target="_blank" rel="noopener noreferrer">https://docs.cloud.google.com/sql/docs/mysql/shrink-instance-storage-capacity</a></li>
+      </ul>
+      <p style="margin-top: 8px; color: var(--gc-outline);">#CloudSQL #MySQL #StorageShrink #コスト最適化 #データベース</p>
+    </footer>
+
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

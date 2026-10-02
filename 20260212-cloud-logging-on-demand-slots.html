@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Logging: Log Analytics のオンデマンドスロット対応</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    /* Google Cloud Light Theme Base Styles */
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; min-width: 280px; }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .header-meta {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 8px;
+      padding-top: 4px;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge-service { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); }
+
+    h2, .section-title {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green { border-left-color: var(--gc-green); }
+    .card-red { border-left-color: var(--gc-red); }
+    .card-yellow { border-left-color: var(--gc-yellow); }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow { color: var(--gc-blue-600); font-size: 20px; }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* Before/After */
+    .before-after-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h3 { color: var(--gc-red); margin-top: 0; }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box h3 { color: var(--gc-green); margin-top: 0; }
+
+    .before-box ul, .after-box ul {
+      margin: 8px 0 0 0;
+      padding-left: 20px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    /* Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    /* Feature cards */
+    .feature-cards {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+
+    .feature-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .feature-card h3 {
+      margin-top: 0;
+      font-size: 16px;
+      color: var(--gc-blue-900);
+    }
+
+    .feature-card p {
+      font-size: 14px;
+      margin: 8px 0 0 0;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* Usecase */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+    }
+
+    .usecase-card .scenario {
+      font-size: 14px;
+      color: var(--gc-on-surface-variant);
+      margin: 8px 0;
+      font-style: italic;
+    }
+
+    .usecase-card .effect {
+      font-size: 14px;
+      color: var(--gc-on-surface);
+      background: var(--gc-surface);
+      padding: 12px;
+      border-radius: 8px;
+      margin-top: 8px;
+    }
+
+    /* Note/Warning boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Code blocks */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      background: #1E1E1E;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Mermaid */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Flow diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Merit / Demerit grid */
+    .merit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .merit-section h3 { color: var(--gc-green); }
+    .demerit-section h3 { color: var(--gc-red); }
+
+    .merit-section .card { border-left-color: var(--gc-green); }
+    .demerit-section .card { border-left-color: var(--gc-red); }
+
+    /* Related services */
+    .related-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 12px 0;
+    }
+
+    .related-card {
+      background: var(--gc-surface);
+      border-radius: 8px;
+      padding: 16px;
+      border: 1px solid var(--gc-outline-variant);
+      box-shadow: 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .related-card strong {
+      color: var(--gc-blue-900);
+    }
+
+    .related-card p {
+      font-size: 13px;
+      margin: 4px 0 0 0;
+    }
+
+    /* Footer */
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    footer a:hover { text-decoration: underline; }
+
+    footer ul {
+      list-style: none;
+      padding: 0;
+      margin: 8px 0;
+    }
+
+    footer li { margin: 4px 0; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .before-after-grid,
+      .stats-grid,
+      .merit-grid,
+      .related-grid { grid-template-columns: 1fr; }
+      .header { flex-direction: column; }
+      .header-meta { align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>&#9729;&#65039; Cloud Logging: Log Analytics のオンデマンドスロット対応</h1>
+        <div class="subtitle">BigQuery リザベーション不要で Log Analytics を即座に利用可能に</div>
+      </div>
+      <div class="header-meta">
+        <div>
+          <span class="badge badge-service">Cloud Logging</span>
+          <span class="badge badge-ga">GA</span>
+        </div>
+        <div class="subtitle">2026-02-12</div>
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>&#128203; 概要</h2>
+      <p>Cloud Logging の <span class="highlight">Log Analytics</span> および <span class="highlight">SQL ベースのアラートポリシー</span> において、BigQuery の <span class="highlight">オンデマンドスロット</span> がデフォルトで使用されるようになった。これにより、BigQuery のリザベーション割り当てを事前に構成しなくても、Log Analytics クエリや SQL ベースのアラートポリシーを BigQuery スロット上で実行できるようになる。</p>
+
+      <p style="margin-top: 12px;">従来は BigQuery のリザベーション作成とプロジェクトへの割り当てという追加ステップが必須であったが、今回のアップデートによりこれらが不要となり、ユーザーは <span class="highlight">リンク済み BigQuery データセット</span> さえあれば即座にクエリやアラートの実行が可能になる。</p>
+
+      <!-- Stats -->
+      <div class="stats-grid" style="margin-top: 20px;">
+        <div class="stat-card">
+          <div class="stat-value">0</div>
+          <div class="stat-label">必要な事前リザベーション数</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">1 Step</div>
+          <div class="stat-label">利用開始に必要な設定<br>(リンク済みデータセットのみ)</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-green), #2E7D32);">
+          <div class="stat-value">GA</div>
+          <div class="stat-label">一般提供開始</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Before / After -->
+    <div class="section">
+      <h2>&#128260; Before / After 比較</h2>
+      <div class="before-after-grid">
+        <div class="before-box">
+          <h3>&#10060; アップデート前の課題</h3>
+          <ul>
+            <li>BigQuery リザベーションの作成 (専用スロットの購入) が<strong>必須</strong></li>
+            <li>作成したリザベーションをプロジェクトに割り当てる必要があった</li>
+            <li>リザベーションの容量計画 (ベースラインスロット数やオートスケーリングの設定) を事前に行う必要があった</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>&#9989; アップデート後の改善</h3>
+          <ul>
+            <li>リザベーション割り当てが存在しない場合、クエリは<strong>自動的にオンデマンドスロット</strong>を使用</li>
+            <li>SQL ベースのアラートポリシー作成時にリザベーション構成ステップが<strong>不要</strong></li>
+            <li>利用開始に必要なステップが<strong>リンク済み BigQuery データセットの作成のみ</strong></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>&#128736;&#65039; アーキテクチャ図</h2>
+      <p>従来はリザベーション割り当てがない場合にクエリが実行できなかったが、アップデート後はオンデマンドスロットにフォールバックすることで、リザベーションの有無にかかわらずクエリが実行可能になった。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Before["以前の構成 (リザベーション必須)"]
+        direction TB
+        B1[("Cloud Logging\nログバケット")] --> B2["リンク済み\nBigQuery データセット"]
+        B2 --> B3{"リザベーション\n割り当て確認"}
+        B3 -->|割り当てあり| B4["BigQuery\nリザーブドスロット"]
+        B3 -->|割り当てなし| B5["クエリ実行不可"]
+        B4 --> B6["Log Analytics\nクエリ実行"]
+    end
+
+    subgraph After["現在の構成 (オンデマンド対応)"]
+        direction TB
+        A1[("Cloud Logging\nログバケット")] --> A2["リンク済み\nBigQuery データセット"]
+        A2 --> A3{"リザベーション\n割り当て確認"}
+        A3 -->|割り当てあり| A4["BigQuery\nリザーブドスロット"]
+        A3 -->|割り当てなし| A5["BigQuery\nオンデマンドスロット"]
+        A4 --> A6["Log Analytics\nクエリ実行"]
+        A5 --> A6
+    end
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>&#9889; 主要機能</h2>
+      <div class="feature-cards">
+        <div class="feature-card">
+          <h3>&#128312; オンデマンドスロットのデフォルト使用</h3>
+          <p>BigQuery リザベーション割り当てが存在しない場合、Log Analytics クエリは自動的にオンデマンドスロットで実行される。既存のリザベーション割り当てがある場合は、従来通りリザーブドスロットが使用される。</p>
+        </div>
+        <div class="feature-card">
+          <h3>&#128312; SQL ベースアラートポリシーの簡素化</h3>
+          <p>SQL ベースのアラートポリシーの作成にリザベーション構成が不要になった。アラートポリシーが実行する SQL クエリもオンデマンドスロットで処理可能。条件タイプ (Row count threshold、Boolean) はそのまま利用可能。</p>
+        </div>
+        <div class="feature-card">
+          <h3>&#128312; リンク済み BigQuery データセットとの連携</h3>
+          <p>オンデマンドスロット利用時もリンク済み BigQuery データセットは引き続き必要。ログバケットとの連携構造に変更はなく、データセットの作成・管理方法も従来と同様。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>&#128295; 技術仕様</h2>
+
+      <h3>BigQuery スロットモデルの比較</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>オンデマンド</th>
+            <th>リザベーション (容量ベース)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>課金方式</strong></td>
+            <td>処理データ量 (TiB) 単位</td>
+            <td>スロット時間単位</td>
+          </tr>
+          <tr>
+            <td><strong>参考価格</strong></td>
+            <td>$6.25/TiB (US マルチリージョン)</td>
+            <td>エディションにより異なる</td>
+          </tr>
+          <tr>
+            <td><strong>スロット上限</strong></td>
+            <td>プロジェクトあたり最大 2,000 スロット (ソフトキャップ)</td>
+            <td>予約量に依存</td>
+          </tr>
+          <tr>
+            <td><strong>事前設定</strong></td>
+            <td>不要</td>
+            <td>リザベーション作成 + 割り当て必要</td>
+          </tr>
+          <tr>
+            <td><strong>コスト予測性</strong></td>
+            <td>クエリ量に依存 (変動)</td>
+            <td>固定コスト (予測可能)</td>
+          </tr>
+          <tr>
+            <td><strong>ワークロード分離</strong></td>
+            <td>なし</td>
+            <td>リザベーション単位で分離可能</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top: 24px;">必要な IAM ロール</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>ロール</th>
+            <th>用途</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>roles/logging.viewer</code></td>
+            <td>_Required / _Default ログバケットのクエリ</td>
+          </tr>
+          <tr>
+            <td><code>roles/logging.viewAccessor</code></td>
+            <td>プロジェクト内の全ログビューへのクエリ</td>
+          </tr>
+          <tr>
+            <td><code>roles/logging.configWriter</code></td>
+            <td>リンク済みデータセットの作成・表示</td>
+          </tr>
+          <tr>
+            <td><code>roles/monitoring.editor</code></td>
+            <td>SQL ベースアラートポリシーの作成・管理</td>
+          </tr>
+          <tr>
+            <td><code>roles/logging.sqlAlertWriter</code></td>
+            <td>SQL ベースアラートポリシーの作成・管理</td>
+          </tr>
+          <tr>
+            <td><code>roles/bigquery.dataViewer</code></td>
+            <td>リンク済みデータセットの閲覧</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup Guide -->
+    <div class="section">
+      <h2>&#128221; 設定方法</h2>
+
+      <div class="note-box">
+        <strong>&#128161; 前提条件:</strong>
+        <ul style="margin: 8px 0 0 20px;">
+          <li>ログバケットが Log Analytics を使用するようにアップグレードされていること</li>
+          <li>ログバケットにリンク済み BigQuery データセットが作成されていること</li>
+        </ul>
+      </div>
+
+      <!-- Setup flow -->
+      <div class="flow-diagram" style="margin: 24px 0;">
+        <div class="flow-step">&#128193; Log Analytics<br>アップグレード確認</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">&#128279; リンク済み<br>データセット作成</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">&#128270; Log Analytics で<br>クエリ実行</div>
+      </div>
+
+      <h3>Step 1: ログバケットの Log Analytics アップグレード確認</h3>
+      <p style="margin-bottom: 8px;">Google Cloud Console の Logs Storage ページ (<code>https://console.cloud.google.com/logs/storage</code>) で、対象のログバケットの Log Analytics 列を確認する。</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">Console で確認</span>
+        </div>
+        <pre><code class="language-bash"># Google Cloud Console で Logs Storage ページに移動
+# Log Analytics available 列が "Open" であることを確認
+# "Upgrade" と表示されている場合はクリックしてアップグレード</code></pre>
+      </div>
+
+      <h3>Step 2: リンク済み BigQuery データセットの作成</h3>
+      <p style="margin-bottom: 8px;"><code>LINK_ID</code> は BigQuery データセット名として使用される。プロジェクト内で一意である必要がある。コマンドの完了には数分かかる。</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">gcloud CLI でリンク済みデータセットを作成</span>
+        </div>
+        <pre><code class="language-bash"># gcloud CLI でリンク済みデータセットを作成
+gcloud logging links create LINK_ID \
+  --bucket=BUCKET_ID \
+  --location=LOCATION</code></pre>
+      </div>
+
+      <h3>Step 3: Log Analytics でクエリを実行</h3>
+      <p style="margin-bottom: 8px;">ツールバーの「Run on BigQuery」ボタンをクリックしてクエリを実行する。リザベーション割り当てがない場合でも、オンデマンドスロットが自動的に使用される。</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">Log Analytics クエリ例</span>
+        </div>
+        <pre><code class="language-sql">-- リザベーション割り当てがなくても、オンデマンドスロットで自動的に実行される
+SELECT
+  severity,
+  COUNT(*) as count
+FROM
+  `PROJECT_ID.DATASET_NAME._AllLogs`
+WHERE
+  timestamp > TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 HOUR)
+GROUP BY severity
+ORDER BY count DESC</code></pre>
+      </div>
+    </div>
+
+    <!-- Merits -->
+    <div class="section">
+      <h2>&#127942; メリット</h2>
+      <div class="merit-grid">
+        <div class="merit-section">
+          <h3>&#128188; ビジネス面</h3>
+          <div class="card card-green">
+            <div class="icon-text"><span class="arrow">&rarr;</span><span><strong>導入障壁の低減</strong>: BigQuery リザベーションの事前購入が不要になり、Log Analytics の導入コストが実質ゼロに。小規模チームや PoC フェーズでの利用が容易に</span></div>
+          </div>
+          <div class="card card-green">
+            <div class="icon-text"><span class="arrow">&rarr;</span><span><strong>迅速な価値実現</strong>: 設定ステップの削減により、ログ分析の価値をより早く実現。リンク済みデータセットの作成だけで SQL ベースの高度なログ分析が開始可能</span></div>
+          </div>
+          <div class="card card-green">
+            <div class="icon-text"><span class="arrow">&rarr;</span><span><strong>コスト最適化の選択肢</strong>: 少量のクエリにはオンデマンド、大量の定常ワークロードにはリザベーションと、使用量に応じた最適なコストモデルを選択可能</span></div>
+          </div>
+        </div>
+        <div class="merit-section">
+          <h3>&#128187; 技術面</h3>
+          <div class="card card-green">
+            <div class="icon-text"><span class="arrow">&rarr;</span><span><strong>設定の簡素化</strong>: リザベーション作成 + プロジェクト割り当てという 2 段階の設定が不要になり、構成エラーのリスクが低減</span></div>
+          </div>
+          <div class="card card-green">
+            <div class="icon-text"><span class="arrow">&rarr;</span><span><strong>フォールバック動作</strong>: リザベーションが存在する場合はそれを使用し、存在しない場合はオンデマンドにフォールバックする自動判定</span></div>
+          </div>
+          <div class="card card-green">
+            <div class="icon-text"><span class="arrow">&rarr;</span><span><strong>アラートポリシーの即時利用</strong>: SQL ベースのアラートポリシーをリザベーション構成なしで即座にデプロイ可能</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>&#9888;&#65039; デメリット・制約事項</h2>
+
+      <h3>制限事項</h3>
+      <div class="warning-box">
+        <ul style="margin: 0; padding-left: 20px;">
+          <li>オンデマンドスロットにはプロジェクトあたり<strong>最大 2,000 スロット</strong>のソフトキャップがある (バーストにより超過する場合があるが保証はない)</li>
+          <li>オンデマンドモデルではクエリの処理データ量に応じた課金となるため、大量のクエリを実行する場合はリザベーションの方がコスト効率が良い可能性がある</li>
+          <li>SQL ベースのアラートポリシーのクエリ実行時間は<strong>最大 5 分</strong>に制限されている</li>
+        </ul>
+      </div>
+
+      <h3>考慮すべき点</h3>
+      <div class="card card-yellow">
+        <div class="icon-text"><span>&#128161;</span><span>オンデマンドスロットは共有リソースであるため、他のユーザーのワークロードとスロットを共有する。クエリ実行の遅延が発生する可能性がある</span></div>
+      </div>
+      <div class="card card-yellow">
+        <div class="icon-text"><span>&#128161;</span><span>リザベーションによるワークロード分離が不要かどうか、運用要件を踏まえて判断する必要がある</span></div>
+      </div>
+      <div class="card card-yellow">
+        <div class="icon-text"><span>&#128161;</span><span>予測不能なクエリコストを避けるために、プロジェクトレベルまたはユーザーレベルの日次クォータの設定を検討すべき</span></div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>&#127919; ユースケース</h2>
+
+      <div class="usecase-card">
+        <h3>&#128272; ユースケース 1: セキュリティイベントの SQL ベースアラート</h3>
+        <p class="scenario">セキュリティチームが、ログデータに基づく高度なアラートポリシーを迅速に設定したい。従来は BigQuery リザベーションの準備に時間がかかっていた。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">エラーログ急増検出アラートクエリ</span>
+          </div>
+          <pre><code class="language-sql">-- 直近 1 時間のエラーログの急増を検出するアラートクエリ
+SELECT
+  resource.type,
+  COUNT(*) as error_count,
+  COUNT(*) > 100 as notify
+FROM
+  `PROJECT_ID.DATASET_NAME._AllLogs`
+WHERE
+  severity >= 'ERROR'
+GROUP BY resource.type</code></pre>
+        </div>
+        <div class="effect"><strong>効果:</strong> リザベーション構成なしで即座に SQL ベースのアラートポリシーを作成でき、セキュリティ監視の立ち上げ時間を大幅に短縮</div>
+      </div>
+
+      <div class="usecase-card">
+        <h3>&#128187; ユースケース 2: 小規模プロジェクトでの Log Analytics 導入</h3>
+        <p class="scenario">開発チームが新規プロジェクトで Cloud Logging のログを SQL で分析したいが、リザベーションの購入コストが障壁になっていた。</p>
+        <div class="effect"><strong>効果:</strong> オンデマンドスロットにより、小規模な使用量であれば BigQuery リザベーションを購入せずにログ分析を開始でき、処理データ量に応じた従量課金でコストを最小限に抑えられる</div>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>&#128176; 料金</h2>
+      <p>今回のアップデートにより、Log Analytics クエリの料金モデルに以下の 2 つの選択肢が生じる。</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>モデル</th>
+            <th>課金方式</th>
+            <th>参考価格</th>
+            <th>適するケース</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>オンデマンド</strong></td>
+            <td>処理データ量 (TiB) 単位</td>
+            <td>$6.25/TiB (US マルチリージョン)</td>
+            <td>不定期・少量のクエリ</td>
+          </tr>
+          <tr>
+            <td><strong>容量ベース (リザベーション)</strong></td>
+            <td>スロット時間単位</td>
+            <td>エディションにより異なる</td>
+            <td>定常的な大量クエリ</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="note-box">
+        <strong>&#128161; 注意:</strong>
+        <ul style="margin: 8px 0 0 20px;">
+          <li>Cloud Logging 自体のログ取り込み料金は今回のアップデートとは独立して発生する</li>
+          <li>BigQuery のオンデマンド課金には、クエリあたり最小 10 MiB の課金が適用される</li>
+          <li>詳細は <a href="https://cloud.google.com/bigquery/pricing" target="_blank" class="gc-link">BigQuery 料金ページ</a> および <a href="https://cloud.google.com/products/observability/pricing" target="_blank" class="gc-link">Cloud Logging 料金ページ</a> を参照</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#128279; 関連サービス・機能</h2>
+      <div class="related-grid">
+        <div class="related-card">
+          <strong>&#128202; BigQuery</strong>
+          <p>Log Analytics のクエリエンジンとして使用される。スロットモデル (オンデマンド / リザベーション) がクエリの実行基盤</p>
+        </div>
+        <div class="related-card">
+          <strong>&#128276; Cloud Monitoring</strong>
+          <p>SQL ベースのアラートポリシーのインシデント管理と通知チャネルを提供</p>
+        </div>
+        <div class="related-card">
+          <strong>&#9881;&#65039; BigQuery リザベーション</strong>
+          <p>引き続きリザベーションを使用することで、専用スロットによるパフォーマンス保証とワークロード分離が可能</p>
+        </div>
+        <div class="related-card">
+          <strong>&#128200; Looker Studio</strong>
+          <p>リンク済み BigQuery データセットを使用してログデータの可視化が可能</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section" style="background: var(--gc-blue-tint); border: 1px solid var(--gc-blue-200);">
+      <h2>&#128221; まとめ</h2>
+      <p>Cloud Logging の Log Analytics におけるオンデマンドスロット対応は、BigQuery リザベーションの事前構成という導入障壁を取り除き、すべてのユーザーが即座に SQL ベースのログ分析とアラート機能を活用できるようにする GA アップデートである。</p>
+      <p style="margin-top: 12px;">既に Log Analytics を利用しているユーザーにとっては変更不要であるが、これから導入を検討しているチームにとっては、<span class="highlight">リンク済み BigQuery データセットを作成するだけ</span>で SQL ベースの高度なログ分析を開始できるようになったため、導入の検討を推奨する。</p>
+      <p style="margin-top: 12px;">大量のクエリを定常的に実行する場合は、引き続き BigQuery リザベーションの利用がコスト面で有利である可能性があるため、ワークロードに応じた料金モデルの選択を推奨する。</p>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>出典:</strong></p>
+      <ul>
+        <li>&#128206; <a href="https://cloud.google.com/release-notes#February_12_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li>&#128206; <a href="https://cloud.google.com/logging/docs/analyze/query-linked-dataset" target="_blank" rel="noopener noreferrer">リンク済み BigQuery データセットのクエリ</a></li>
+        <li>&#128206; <a href="https://cloud.google.com/logging/docs/analyze/sql-in-alerting" target="_blank" rel="noopener noreferrer">SQL ベースのアラートポリシー</a></li>
+        <li>&#128206; <a href="https://cloud.google.com/bigquery/docs/slots" target="_blank" rel="noopener noreferrer">BigQuery スロットの概要</a></li>
+        <li>&#128206; <a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer">BigQuery 料金</a></li>
+        <li>&#128206; <a href="https://cloud.google.com/products/observability/pricing" target="_blank" rel="noopener noreferrer">Cloud Logging 料金</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline);">Cloud Logging | Log Analytics | BigQuery | オンデマンドスロット | SQL アラート | GA</p>
+    </footer>
+
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>
