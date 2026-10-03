@@ -5,10 +5,14 @@
 
 ## 2026 年
 
+- [2026-10-02 - Gemini Enterprise: Data Cloud コネクタのフェデレーテッドクエリモードと Knowledge Catalog 統合 (Preview)](2026/2026-10-02-gemini-enterprise-data-cloud-federated-query-mode.md)
 - [2026-10-02 - BigQuery: Data Engineering Agent が gemini-3.7-flash モデルをサポート](2026/2026-10-02-bigquery-data-engineering-agent-gemini-3-7-flash.md)
+- [2026-10-02 - Google Kubernetes Engine (GKE): バージョンアップデート 2026-R42](2026/2026-10-02-gke-2026-r42-version-updates.md)
 - [2026-10-02 - BigQuery: Rust SDK が一般提供 (GA) 開始](2026/2026-10-02-bigquery-rust-sdk-ga.md)
 - [2026-10-02 - Network Connectivity Center: サイト間データ転送がポーランドをサポート](2026/2026-10-02-network-connectivity-center-site-to-site-data-transfer-poland.md)
 - [2026-10-02 - Google Kubernetes Engine: Cloud Storage FUSE CSI driver (gcsfusecsi-node) Pod が特定ノードプールで起動に失敗する既知の問題](2026/2026-10-02-gke-gcsfuse-csi-driver-pod-startup-issue.md)
+- [2026-10-02 - Apigee X: 1-18-0-apigee-6 セキュリティアップデートとバグ修正](2026/2026-10-02-apigee-x-1-18-0-apigee-6-security-update.md)
+- [2026-10-02 - Google Cloud CCaaS: バージョン 6.17 リリース - ウォーム転送の自動保留解除 (Auto-Resume)](2026/2026-10-02-ccaas-6-17-warm-transfer-auto-resume.md)
 - [2026-10-02 - Cloud NAT: Private NAT の NAT64 (IPv6 から IPv4 への変換) が GA](2026/2026-10-02-cloud-nat-private-nat-nat64-ga.md)
 - [2026-10-02 - Google Kubernetes Engine: VPA と HPA の併用による HPA ワークロードのライトサイジング (Public Preview)](2026/2026-10-02-gke-vpa-hpa-rightsizing-preview.md)
 - [2026-10-01 - BigQuery: Conversational Analytics の「グラフとのチャット」が GA](2026/2026-10-01-bigquery-conversational-analytics-graph-chat.md)
