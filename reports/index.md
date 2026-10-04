@@ -5,6 +5,8 @@
 
 ## 2026 年
 
+- [2026-10-04 - Google SecOps SOAR: Release 6.3.102 第 1 フェーズリージョンへの段階的ロールアウト開始](2026/2026-10-04-google-secops-soar-6-3-102.md)
+- [2026-10-03 - Google SecOps SOAR: Release 6.3.101 が全リージョンで利用可能に](2026/2026-10-03-google-secops-soar-6-3-101.md)
 - [2026-10-02 - Gemini Enterprise: Data Cloud コネクタのフェデレーテッドクエリモードと Knowledge Catalog 統合 (Preview)](2026/2026-10-02-gemini-enterprise-data-cloud-federated-query-mode.md)
 - [2026-10-02 - BigQuery: Data Engineering Agent が gemini-3.7-flash モデルをサポート](2026/2026-10-02-bigquery-data-engineering-agent-gemini-3-7-flash.md)
 - [2026-10-02 - Google Kubernetes Engine (GKE): バージョンアップデート 2026-R42](2026/2026-10-02-gke-2026-r42-version-updates.md)
