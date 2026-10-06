@@ -5,8 +5,15 @@
 
 ## 2026 年
 
+- [2026-10-05 - Google SecOps SIEM: Chronicle API 対応の Terraform プロバイダーとクライアントライブラリ](2026/2026-10-05-google-secops-siem-terraform-client-libraries.md)
+- [2026-10-05 - Gemini Enterprise Agent Platform: CodeMender v0.12.0 リリース (隠しファイルスキャン・スコープ制限付き修正など)](2026/2026-10-05-gemini-enterprise-agent-platform-codemender-v0-12-0.md)
+- [2026-10-05 - BigQuery: Iceberg テーブルで Flexible Column Names がデフォルトサポート (GA)](2026/2026-10-05-bigquery-iceberg-flexible-column-names.md)
+- [2026-10-05 - Compute Engine (Guest Environment): ゲストエージェント バージョン 20260921.00 リリース](2026/2026-10-05-compute-engine-guest-agent-20260921.md)
+- [2026-10-05 - BigQuery: gemini-embedding-2 マルチモーダル埋め込みモデルが GA](2026/2026-10-05-bigquery-gemini-embedding-2.md)
+- [2026-10-05 - Network Service Tiers: Standard Tier で外部 IPv6 アドレスをサポート (Preview)](2026/2026-10-05-network-service-tiers-standard-tier-external-ipv6.md)
 - [2026-10-04 - Google SecOps SOAR: Release 6.3.102 第 1 フェーズリージョンへの段階的ロールアウト開始](2026/2026-10-04-google-secops-soar-6-3-102.md)
 - [2026-10-03 - Google SecOps SOAR: Release 6.3.101 が全リージョンで利用可能に](2026/2026-10-03-google-secops-soar-6-3-101.md)
+- [2026-10-03 - Sensitive Data Protection: PERSON_NAME infoType 検出器の新バージョン (名前辞書更新) 提供開始](2026/2026-10-03-sensitive-data-protection-person-name-infotype-update.md)
 - [2026-10-02 - Gemini Enterprise: Data Cloud コネクタのフェデレーテッドクエリモードと Knowledge Catalog 統合 (Preview)](2026/2026-10-02-gemini-enterprise-data-cloud-federated-query-mode.md)
 - [2026-10-02 - BigQuery: Data Engineering Agent が gemini-3.7-flash モデルをサポート](2026/2026-10-02-bigquery-data-engineering-agent-gemini-3-7-flash.md)
 - [2026-10-02 - Google Kubernetes Engine (GKE): バージョンアップデート 2026-R42](2026/2026-10-02-gke-2026-r42-version-updates.md)
