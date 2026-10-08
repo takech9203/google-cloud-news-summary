@@ -5,10 +5,16 @@
 
 ## 2026 年
 
+- [2026-10-07 - Gemini Enterprise Agent Platform: CodeMender v0.13.0 リリース (検出結果の重複排除の一貫性向上とバグ修正)](2026/2026-10-07-gemini-enterprise-agent-platform-codemender-v0-13-0.md)
+- [2026-10-07 - Apigee hybrid: v1.14.9 パッチリリース (バグ修正とセキュリティ強化)](2026/2026-10-07-apigee-hybrid-v1-14-9.md)
+- [2026-10-07 - Gemini Enterprise Agent Platform (Model Garden): Anthropic Claude Haiku 5.5 が利用可能に](2026/2026-10-07-model-garden-claude-haiku-5-5.md)
+- [2026-10-06 - BigQuery: 会話型分析での AI.CAUSAL_EFFECT 関数サポート](2026/2026-10-06-bigquery-ai-causal-effect.md)
 - [2026-10-06 - Cloud Monitoring: App Hub アプリケーションへのサービス・ワークロード一括登録が GA](2026/2026-10-06-cloud-monitoring-app-hub-bulk-registration.md)
 - [2026-10-06 - Gemini Enterprise Agent Platform: Gemini Nano Banana 2.1 (gemini-nano-banana-2.1) が GA](2026/2026-10-06-gemini-nano-banana-2-1-ga.md)
+- [2026-10-06 - Cloud SDK (gcloud CLI): 588.0.0 リリース - Managed Flink Client コンポーネントの削除 (Breaking Change)](2026/2026-10-06-cloud-sdk-588-managed-flink-client-removal.md)
 - [2026-10-06 - Gemini Enterprise: Google Antigravity 機能へのアクセス制御が GA](2026/2026-10-06-gemini-enterprise-antigravity-access-control.md)
 - [2026-10-06 - Security Command Center: Artifact guard (CI/CD 統合) の非推奨化](2026/2026-10-06-security-command-center-artifact-guard-deprecation.md)
+- [2026-10-06 - Compute Engine / AI Hypercomputer: アカウントチーム経由の容量予約で Hyperdisk プールの同時予約が GA](2026/2026-10-06-compute-engine-hyperdisk-pool-reservations.md)
 - [2026-10-05 - Network Intelligence Center: Flow Analyzer パケットドロップ表示モード](2026/2026-10-05-network-intelligence-center-flow-analyzer-packet-drops.md)
 - [2026-10-05 - Google SecOps SIEM: Chronicle API 対応の Terraform プロバイダーとクライアントライブラリ](2026/2026-10-05-google-secops-siem-terraform-client-libraries.md)
 - [2026-10-05 - Gemini Enterprise Agent Platform: CodeMender v0.12.0 リリース (隠しファイルスキャン・スコープ制限付き修正など)](2026/2026-10-05-gemini-enterprise-agent-platform-codemender-v0-12-0.md)
@@ -16,6 +22,7 @@
 - [2026-10-05 - Google Kubernetes Engine: Identity Service for GKE の非推奨化と Workforce Identity Federation への移行](2026/2026-10-05-gke-identity-service-deprecation.md)
 - [2026-10-05 - Google Kubernetes Engine: Confidential GKE Nodes での C4 マシンタイプ (Intel TDX) サポートが GA](2026/2026-10-05-gke-confidential-nodes-c4-intel-tdx.md)
 - [2026-10-05 - BigQuery: Iceberg テーブルで Flexible Column Names がデフォルトサポート (GA)](2026/2026-10-05-bigquery-iceberg-flexible-column-names.md)
+- [2026-10-05 - Knowledge Catalog: データプロダクトの Looker (Google Cloud core) アセット対応 (GA)](2026/2026-10-05-knowledge-catalog-looker-data-products.md)
 - [2026-10-05 - Compute Engine (Guest Environment): ゲストエージェント バージョン 20260921.00 リリース](2026/2026-10-05-compute-engine-guest-agent-20260921.md)
 - [2026-10-05 - Confidential Space: 新イメージ 260900 の提供開始](2026/2026-10-05-confidential-space-image-260900.md)
 - [2026-10-05 - Compute Engine: Z3 マシンタイプで Hyperdisk Balanced High Availability が GA](2026/2026-10-05-compute-engine-z3-hyperdisk-balanced-ha.md)
