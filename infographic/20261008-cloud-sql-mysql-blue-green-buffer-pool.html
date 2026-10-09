@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cloud SQL for MySQL: Blue-Green デプロイメント (Preview) とマネージドバッファプール新フラグ</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+:root {
+  --gc-blue: #4285F4;
+  --gc-red: #EA4335;
+  --gc-yellow: #FBBC04;
+  --gc-green: #34A853;
+  --gc-blue-900: #174EA6;
+  --gc-blue-800: #185ABC;
+  --gc-blue-700: #1967D2;
+  --gc-blue-600: #1A73E8;
+  --gc-blue-500: #4285F4;
+  --gc-blue-300: #669DF6;
+  --gc-blue-200: #8AB4F8;
+  --gc-blue-100: #AECBFA;
+  --gc-blue-50: #E8F0FE;
+  --gc-on-surface: #202124;
+  --gc-on-surface-variant: #5F6368;
+  --gc-outline: #80868B;
+  --gc-surface: #FFFFFF;
+  --gc-surface-container-lowest: #F8F9FA;
+  --gc-surface-container-low: #F1F3F4;
+  --gc-surface-container: #E8EAED;
+  --gc-outline-variant: #DADCE0;
+  --gc-blue-tint: #E8F0FE;
+  --gc-green-tint: #E6F4EA;
+  --gc-red-tint: #FCE8E6;
+  --gc-yellow-tint: #FEF7E0;
+  --gc-purple-tint: #F3E8FD;
+  --gc-teal-tint: #E0F7FA;
+  --gc-purple: #A142F4;
+  --gc-teal: #00BCD4;
+  --gc-orange: #FF6D00;
+}
+
+body {
+  background-color: var(--gc-surface);
+  font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+  color: var(--gc-on-surface-variant);
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 20px;
+  margin: 0;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 16px;
+  border-bottom: 3px solid var(--gc-blue-600);
+}
+
+h1, .title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--gc-on-surface);
+  margin: 0;
+  line-height: 1.4;
+}
+
+h2, .section-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 20px 0 8px 0;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: var(--gc-outline);
+}
+
+.section {
+  background: var(--gc-surface-container-low);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid var(--gc-outline-variant);
+}
+
+.highlight {
+  background-color: var(--gc-blue-50);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--gc-blue-800);
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+.card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border-left: 4px solid var(--gc-blue-600);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+}
+
+.card h3 {
+  margin-top: 0;
+}
+
+.icon-text {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+  color: var(--gc-on-surface-variant);
+}
+
+.arrow {
+  color: var(--gc-blue-600);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.gc-link {
+  color: var(--gc-blue-600);
+  text-decoration: none;
+}
+
+.gc-link:hover {
+  color: var(--gc-blue-800);
+  text-decoration: underline;
+}
+
+.badge,
+.badge-ga,
+.badge-preview,
+.badge-deprecated {
+  display: inline-block;
+  color: #FFFFFF;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+  margin: 4px 8px 4px 0;
+}
+
+.badge {
+  background: var(--gc-blue-600);
+}
+
+.badge-ga {
+  background: var(--gc-green);
+  color: #FFFFFF;
+}
+
+.badge-preview {
+  background: var(--gc-orange);
+  color: #FFFFFF;
+}
+
+.flow-diagram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 24px 0;
+}
+
+.flow-step {
+  background: var(--gc-surface);
+  border: 2px solid var(--gc-blue-600);
+  border-radius: 12px;
+  padding: 12px 20px;
+  text-align: center;
+  min-width: 100px;
+  color: var(--gc-on-surface);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+  font-size: 14px;
+}
+
+.flow-arrow {
+  color: var(--gc-blue-600);
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.check-icon {
+  color: var(--gc-green);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.cross-icon {
+  color: var(--gc-red);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+/* コードブロック (Mermaid の pre を除外) */
+.code-block,
+pre:not(.mermaid) {
+  background: #1E1E1E;
+  border-radius: 8px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: #E8E8E8;
+  margin: 16px 0;
+}
+
+.code-block {
+  overflow: hidden;
+}
+
+.code-header {
+  background: #2D2D2D;
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+}
+
+.code-lang {
+  color: #9CDCFE;
+  font-weight: bold;
+}
+
+.code-title {
+  color: #AAAAAA;
+}
+
+.code-block pre {
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+}
+
+.code-block code {
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 16px !important;
+  display: block;
+}
+
+pre code {
+  background: none;
+  border: none;
+  font-size: inherit;
+}
+
+code:not(pre code) {
+  background: var(--gc-surface-container-low);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 0.85em;
+  color: var(--gc-blue-900);
+  word-break: break-all;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--gc-outline-variant);
+  background: var(--gc-surface);
+}
+
+th {
+  background: var(--gc-blue-50);
+  color: var(--gc-blue-900);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 2px solid var(--gc-blue-200);
+}
+
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--gc-outline-variant);
+  font-size: 14px;
+}
+
+tr:nth-child(even) {
+  background: var(--gc-surface-container-lowest);
+}
+
+tr:hover {
+  background: var(--gc-blue-50);
+}
+
+.note-box {
+  background: var(--gc-blue-tint);
+  border-left: 4px solid var(--gc-blue-600);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.warning-box {
+  background: var(--gc-yellow-tint);
+  border-left: 4px solid var(--gc-yellow);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.error-box {
+  background: var(--gc-red-tint);
+  border-left: 4px solid var(--gc-red);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.success-box {
+  background: var(--gc-green-tint);
+  border-left: 4px solid var(--gc-green);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+/* Before/After 比較 */
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.before-col {
+  background: var(--gc-red-tint);
+  border: 1px solid rgba(234, 67, 53, 0.3);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.after-col {
+  background: var(--gc-green-tint);
+  border: 1px solid rgba(52, 168, 83, 0.3);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.before-col h3, .after-col h3 {
+  margin-top: 0;
+  font-size: 16px;
+}
+
+.before-col h3 { color: #C5221F; }
+.after-col h3 { color: #188038; }
+
+.before-after ul {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 14px;
+}
+
+.before-after li {
+  margin-bottom: 10px;
+}
+
+@media (max-width: 720px) {
+  .before-after { grid-template-columns: 1fr; }
+  .stat-grid { grid-template-columns: 1fr 1fr !important; }
+  h1 { font-size: 24px; }
+}
+
+/* 統計カード */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.stat-card {
+  background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+  color: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px 12px;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 30px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  line-height: 1.2;
+}
+
+.stat-label {
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+/* ユースケース */
+.usecase {
+  background: var(--gc-blue-tint);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border: 1px solid rgba(26, 115, 232, 0.25);
+}
+
+.usecase h3 {
+  margin-top: 0;
+  color: var(--gc-blue-900);
+}
+
+/* Mermaid コンテナ */
+.mermaid-container {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 20px 0;
+  border: 2px solid rgba(66, 133, 244, 0.3);
+  overflow-x: auto;
+}
+
+.mermaid {
+  display: flex;
+  justify-content: center;
+}
+
+/* ライフサイクル状態フロー */
+.lifecycle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+
+.lifecycle .state {
+  background: var(--gc-surface);
+  border: 2px solid var(--gc-blue-300);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-family: 'Roboto Mono', monospace;
+  font-size: 12px;
+  color: var(--gc-blue-900);
+  font-weight: 600;
+}
+
+.lifecycle .state.ready { border-color: var(--gc-green); color: #188038; }
+.lifecycle .state.done { background: var(--gc-green-tint); border-color: var(--gc-green); color: #188038; }
+
+footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gc-outline-variant);
+  font-size: 12px;
+  color: var(--gc-outline);
+}
+
+footer a {
+  word-break: break-all;
+}
+
+footer ul {
+  padding-left: 20px;
+  margin: 8px 0;
+}
+
+ul.compact {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+ul.compact li {
+  margin-bottom: 6px;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ヘッダー -->
+  <div class="header">
+    <div>
+      <h1>🗄️ Cloud SQL for MySQL<br>Blue-Green デプロイメント &amp; マネージドバッファプール新フラグ</h1>
+      <div style="margin-top: 12px;">
+        <span class="badge">Cloud SQL for MySQL</span>
+        <span class="badge badge-preview">Blue-Green デプロイメント: Preview</span>
+        <span class="badge badge-ga">バッファプール新フラグ: GA</span>
+      </div>
+    </div>
+    <div class="subtitle">📅 リリース日: 2026-10-08</div>
+  </div>
+
+  <!-- 概要 -->
+  <div class="section">
+    <h2>📌 概要</h2>
+    <p>Cloud SQL for MySQL に運用性を大きく向上させる <span class="highlight">2 つの機能が同日発表</span>されました。</p>
+    <div class="card">
+      <h3>🔵🟢 1. Blue-Green デプロイメント (Preview)</h3>
+      <p style="margin-bottom: 0;">本番環境 (Blue) をミラーリングした独立のステージング環境 (Green) を自動作成し、<span class="highlight">継続的な論理レプリケーション</span>を維持。Green 環境で本番に影響なくテストし、準備ができたらスイッチオーバーで<span class="highlight">最小限のダウンタイム (Enterprise Plus で通常 1 秒未満)</span> により切り替え。MySQL 8.0 → 8.4 のメジャーバージョンアップグレードや構成変更のステージングに利用できます。</p>
+    </div>
+    <div class="card">
+      <h3>🧠 2. <code>innodb_cloudsql_managed_buffer_pool_tuneup_pct</code> フラグ (GA)</h3>
+      <p style="margin-bottom: 0;">マネージドバッファプール (InnoDB バッファプールの自動調整で OOM を削減する機能) において、縮小後にバッファプールを<span class="highlight">元のサイズへ復元するメモリ使用率しきい値 (デフォルト 70%)</span> を変更できる新しいデータベースフラグ。ワークロード特性に合わせたメモリ管理のチューニングが可能になります。</p>
+    </div>
+    <p>いずれも、Cloud SQL for MySQL を本番運用するデータベース管理者・SRE にとって、<strong>計画メンテナンスの安全性</strong>と<strong>メモリ管理の柔軟性</strong>を高める重要なアップデートです。</p>
+
+    <h3>🔄 Before / After</h3>
+    <div class="before-after">
+      <div class="before-col">
+        <h3>❌ アップデート前の課題</h3>
+        <ul>
+          <li>メジャーバージョンアップグレード (インプレース) は本番に直接適用が必要で、事前検証には<strong>手動でクローン/レプリカを構築・同期</strong>する必要があった</li>
+          <li>ハードウェア変更やフラグ変更を本番適用前に検証する<strong>自動化されたワークフローがなく</strong>、切り替え時のダウンタイムも長くなりがち</li>
+          <li>バッファプール復元のしきい値は <strong>70% に固定</strong>。ベースライン使用率が 70% 超だと縮小後に復元されず、スパイクが多い環境では復元が早すぎて RAM の余裕を確保できない</li>
+        </ul>
+      </div>
+      <div class="after-col">
+        <h3>✅ アップデート後の改善</h3>
+        <ul>
+          <li>Green 環境の作成 → 継続的論理レプリケーション → テスト → スイッチオーバーまで<strong>自動化されたワークフロー</strong>として提供。8.0 → 8.4 を最小限のダウンタイムで実行可能</li>
+          <li>「意図 (intent) なし」のデプロイメント作成で、<strong>マシンタイプ変更やフラグ変更も同一バージョンのままステージング・検証</strong>可能に</li>
+          <li>新フラグで復元しきい値 (デフォルト 70%) を<strong>ワークロードに合わせて調整</strong>可能 (上げて復元を可能に / 下げて RAM の余裕を確保)</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-value">&lt; 1 秒</div>
+        <div class="stat-label">スイッチオーバー時ダウンタイム<br>(Enterprise Plus・通常時)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">8.0 → 8.4</div>
+        <div class="stat-label">対応メジャーバージョン<br>アップグレード</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">70%</div>
+        <div class="stat-label">バッファプール復元しきい値<br>(デフォルト・変更可能に)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">¥0</div>
+        <div class="stat-label">機能自体の追加料金<br>(Green インスタンスは標準料金)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- アーキテクチャ図 -->
+  <div class="section">
+    <h2>🏗️ アーキテクチャ図</h2>
+    <div class="mermaid-container">
+      <pre class="mermaid">
+flowchart LR
+    subgraph Prod["🔵 Blue 環境 (本番)"]
+        B[("🗄️ Blue インスタンス<br/>MySQL 8.0")]
+    end
+    subgraph Stage["🟢 Green 環境 (ステージング)"]
+        G[("🗄️ Green インスタンス<br/>MySQL 8.4")]
+    end
+    App([👥 アプリケーション]) -->|"① 本番トラフィック"| B
+    B -->|"② 継続的<br/>論理レプリケーション"| G
+    Test([🧪 テストクライアント]) -.->|"③ 互換性・性能テスト<br/>(本番に影響なし)"| G
+    App -.->|"④ スイッチオーバー後<br/>(ダウンタイム数秒〜サブ秒)"| G
+      </pre>
+    </div>
+    <p>Blue-Green デプロイメントのフロー。Cloud SQL が本番 (Blue) のミラーとして Green 環境を作成し継続的に論理レプリケーションを維持、Green でテスト完了後にスイッチオーバーで接続エンドポイントを入れ替えます。</p>
+    <div class="lifecycle">
+      <span class="state">SWITCHOVER_NOT_READY</span>
+      <span class="flow-arrow">→</span>
+      <span class="state ready">SWITCHOVER_READY</span>
+      <span class="flow-arrow">→</span>
+      <span class="state">SWITCHOVER_IN_PROGRESS</span>
+      <span class="flow-arrow">→</span>
+      <span class="state done">SWITCHOVER_COMPLETED</span>
+    </div>
+    <p style="text-align: center; font-size: 13px; color: var(--gc-outline); margin-top: 4px;">デプロイメントのライフサイクル状態</p>
+  </div>
+
+  <!-- 主要機能 -->
+  <div class="section">
+    <h2>⚙️ 主要機能</h2>
+    <div class="card">
+      <h3>🔵🟢 Blue-Green デプロイメント (Preview)</h3>
+      <div class="icon-text"><span class="arrow">→</span><span>本番環境 (Blue) のクローンとしてステージング環境 (Green) を自動作成し、Blue → Green の継続的な論理レプリケーションを維持</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>Green インスタンスは <code>{BLUE_INSTANCE_NAME}-green-{UNIQUE_ID}</code> という命名パターンで自動作成</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span><strong>意図 (intent) ありの作成</strong>: メジャーバージョンアップグレード用 (MySQL 8.0 → 8.4)。作成時に<span class="highlight">アップグレード事前チェック API を自動実行</span>して互換性を検証</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span><strong>意図なしの作成</strong>: 現行バージョンのまま構成変更をステージング。マシンタイプ変更 (CPU/RAM)、データベースフラグのテスト、ストレージ変更の評価などに使用</span></div>
+    </div>
+    <div class="card">
+      <h3>🔁 スイッチオーバーの自動化ワークフロー</h3>
+      <div class="flow-diagram">
+        <div class="flow-step">🔍 事前検証<br><span style="font-size: 12px; color: var(--gc-outline);">レプリケーション健全性<br>構成チェック</span></div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">⚙️ ワークフロー実行</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🔌 接続エンドポイント<br>入れ替え</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🚀 ロール変換<br><span style="font-size: 12px; color: var(--gc-outline);">Green が本番 R/W に昇格</span></div>
+      </div>
+      <div class="icon-text"><span class="check-icon">✓</span><span><strong>安全設計</strong>: レプリケーションラグが大きい場合やアクティブなトランザクションがブロックする場合はスイッチオーバーが失敗し、Blue 本番環境はオンラインのまま維持</span></div>
+      <div class="icon-text"><span class="check-icon">✓</span><span>アプリケーション側の接続文字列や構成の変更は<strong>不要</strong></span></div>
+    </div>
+    <div class="card">
+      <h3>🧠 <code>innodb_cloudsql_managed_buffer_pool_tuneup_pct</code> フラグ</h3>
+      <div class="icon-text"><span class="arrow">→</span><span>マネージドバッファプール (<code>innodb_cloudsql_managed_buffer_pool=on</code>) は、メモリ使用率が高い場合に <code>innodb_buffer_pool_size</code> を反復的・動的に縮小して <span class="highlight">OOM イベントを防止</span></span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>縮小後、メモリ使用率が 70% 以下で 10 分以上安定すると、バッファプールサイズを段階的に元の値まで増加</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>新フラグでこの復元しきい値 (デフォルト 70%) を変更可能に。<strong>上げる</strong> → ベースライン使用率が高い環境でも復元を可能に / <strong>下げる</strong> → メモリスパイクに備えて RAM を確保</span></div>
+      <div class="icon-text"><span class="check-icon">✓</span><span>フラグ変更にインスタンスの<strong>再起動は不要</strong></span></div>
+    </div>
+  </div>
+
+  <!-- 技術仕様 -->
+  <div class="section">
+    <h2>🔬 技術仕様</h2>
+    <h3>🔵🟢 Blue-Green デプロイメント</h3>
+    <table>
+      <tr><th>項目</th><th>詳細</th></tr>
+      <tr><td>ステータス</td><td><span class="badge badge-preview">Preview</span></td></tr>
+      <tr><td>対応エンジン</td><td>Cloud SQL for MySQL のみ (PostgreSQL / SQL Server は非対応)</td></tr>
+      <tr><td>構成ステージング (意図なし)</td><td>MySQL 5.7 以降</td></tr>
+      <tr><td>メジャーバージョンアップグレード (意図あり)</td><td>MySQL 8.0 → 8.4 (MySQL 8.0.18 は非対応)</td></tr>
+      <tr><td>スイッチオーバーのダウンタイム</td><td>Enterprise Plus: 通常サブ秒 / Enterprise: 通常 60 秒未満 (ワークロードとレプリケーションラグに依存)</td></tr>
+      <tr><td>レプリケーション方式</td><td>Blue → Green の継続的な論理レプリケーション</td></tr>
+      <tr><td>前提条件</td><td>自動バックアップとバイナリログの有効化、新ネットワークアーキテクチャ、最新メンテナンスバージョン</td></tr>
+      <tr><td>操作インターフェース</td><td>Google Cloud コンソール、<code>gcloud beta sql blue-green-deployments</code>、Cloud SQL Admin API (<code>blueGreenDeployments</code>)</td></tr>
+    </table>
+
+    <h3>🧠 マネージドバッファプール関連フラグ</h3>
+    <table>
+      <tr><th>フラグ</th><th>用途</th><th>デフォルト / 範囲</th></tr>
+      <tr><td><code>innodb_cloudsql_managed_buffer_pool</code></td><td>マネージドバッファプールの有効化 (再起動不要)</td><td>off / on</td></tr>
+      <tr><td><code>innodb_cloudsql_managed_buffer_pool_threshold_pct</code></td><td>バッファプール縮小を開始するメモリ使用率しきい値</td><td>デフォルト 90〜97% (RAM 容量に依存) / 50〜99 の整数</td></tr>
+      <tr><td><code>innodb_cloudsql_managed_buffer_pool_tuneup_pct</code> <span class="badge badge-ga" style="font-size: 11px; padding: 2px 8px;">新規</span></td><td>バッファプール復元 (増加) をトリガーするメモリ使用率しきい値</td><td>デフォルト 70% / メンテナンスバージョン <code>MYSQL_VERSION.R20260726.00_05</code> 以降が必要</td></tr>
+    </table>
+    <div class="note-box">
+      <strong>💡 補足:</strong> マネージドバッファプールは共有コアインスタンス (f1-micro、g1-small) および MySQL 5.6 / 5.7 では有効化できません。また、調整された <code>innodb_buffer_pool_size</code> の現在値は Google Cloud コンソールには反映されないため、MySQL クライアントで <code>show global variables like 'innodb_buffer_pool_size';</code> を実行して確認します。
+    </div>
+  </div>
+
+  <!-- 設定方法 -->
+  <div class="section">
+    <h2>🛠️ 設定方法</h2>
+    <h3>📋 前提条件</h3>
+    <div class="icon-text"><span class="check-icon">✓</span><span><strong>Blue-Green デプロイメント</strong>: 自動バックアップとバイナリログが有効であること、インスタンスが新ネットワークアーキテクチャを使用していること、Blue ソースインスタンスが最新メンテナンスバージョンで稼働していること、リードレプリカが存在しないこと</span></div>
+    <div class="icon-text"><span class="check-icon">✓</span><span><strong><code>tuneup_pct</code> フラグ</strong>: メンテナンスバージョン <code>MYSQL_VERSION.R20260726.00_05</code> 以降、マネージドバッファプールが有効であること</span></div>
+
+    <h3>ステップ 1: Blue-Green デプロイメントの作成</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Bash</span>
+        <span class="code-title">デプロイメント作成 (意図あり / 意図なし)</span>
+      </div>
+      <pre><code class="language-bash"># 意図あり (メジャーバージョンアップグレード: MySQL 8.0 → 8.4)
+gcloud beta sql blue-green-deployments create DEPLOYMENT_NAME \
+  --source-instance=SOURCE_INSTANCE_ID \
+  --target-database-version=MYSQL_8_4 \
+  --region=REGION \
+  --async
+
+# 意図なし (ハードウェア・構成変更のステージング)
+gcloud beta sql blue-green-deployments create DEPLOYMENT_NAME \
+  --source-instance=SOURCE_INSTANCE_ID \
+  --region=REGION \
+  --async</code></pre>
+    </div>
+    <p>意図ありの場合、Cloud SQL は Green インスタンス作成前にメジャーバージョンアップグレードの事前チェックを自動実行します。</p>
+
+    <h3>ステップ 2: デプロイメント状態の確認とスイッチオーバー</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Bash</span>
+        <span class="code-title">状態確認 → スイッチオーバー → クリーンアップ</span>
+      </div>
+      <pre><code class="language-bash"># 状態確認 (SWITCHOVER_READY になるまで待機)
+gcloud beta sql blue-green-deployments describe DEPLOYMENT_NAME \
+  --region=REGION
+
+# Green 環境でのテスト完了後、スイッチオーバーを実行
+gcloud beta sql blue-green-deployments switchover DEPLOYMENT_NAME \
+  --region=REGION \
+  --async
+
+# スイッチオーバー後、検証が済んだら旧 Blue インスタンスを削除して課金を停止
+gcloud beta sql blue-green-deployments delete DEPLOYMENT_NAME \
+  --region=REGION \
+  --delete-old-source</code></pre>
+    </div>
+
+    <h3>ステップ 3: マネージドバッファプールの復元しきい値の調整</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Bash</span>
+        <span class="code-title">復元しきい値を 80% に変更 (再起動不要)</span>
+      </div>
+      <pre><code class="language-bash"># マネージドバッファプールを有効化し、復元しきい値を 80% に変更 (再起動不要)
+gcloud sql instances patch INSTANCE_NAME \
+  --database-flags=EXISTING_FLAGS,innodb_cloudsql_managed_buffer_pool=on,\
+innodb_cloudsql_managed_buffer_pool_tuneup_pct=80</code></pre>
+    </div>
+    <p>ベースラインのメモリ使用率が 70% を超える環境ではしきい値を引き上げてバッファプールの復元を可能にし、メモリスパイクが頻発する環境では引き下げて RAM の余裕を維持します。</p>
+  </div>
+
+  <!-- メリット -->
+  <div class="section">
+    <h2>✨ メリット</h2>
+    <h3>💼 ビジネス面</h3>
+    <div class="check-item"><span class="check-icon">✓</span><span><strong>計画メンテナンスのリスク低減</strong>: 本番と同期された Green 環境で事前にフルテストできるため、メジャーバージョンアップグレードの失敗リスクと切り戻しコストを大幅に削減</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span><strong>ダウンタイムの最小化</strong>: スイッチオーバーのダウンタイムは Enterprise Plus で通常サブ秒、Enterprise で通常 60 秒未満。SLA の厳しいサービスでもアップグレードを計画しやすい</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span><strong>追加機能料金なし</strong>: Blue-Green デプロイメント自体に追加料金はない (Green インスタンス分の標準料金は発生)</span></div>
+    <h3>🔧 技術面</h3>
+    <div class="check-item"><span class="check-icon">✓</span><span><strong>自動化されたワークフロー</strong>: 環境複製、論理レプリケーション、アップグレード事前チェック、エンドポイント入れ替えまで Cloud SQL が自動実行。手動でのレプリカ構築・DNS/接続先変更が不要</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span><strong>アプリケーション変更不要</strong>: スイッチオーバー時に接続エンドポイントが入れ替わるため、接続文字列の変更が不要</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span><strong>安全なフェイルセーフ</strong>: レプリケーション異常やラグ過大時はスイッチオーバーが失敗し、Blue 本番環境は影響を受けない</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span><strong>メモリ管理の柔軟性</strong>: OOM 対策 (バッファプール縮小) と性能回復 (バッファプール復元) のバランスをワークロードに合わせてチューニング可能</span></div>
+  </div>
+
+  <!-- デメリット・制約事項 -->
+  <div class="section">
+    <h2>⚠️ デメリット・制約事項</h2>
+    <h3>🚧 制限事項</h3>
+    <div class="check-item"><span class="cross-icon">✗</span><span>Blue-Green デプロイメントは <strong>Preview</strong> であり、Pre-GA 利用規約が適用される (サポートが限定される可能性あり)</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span>対応は <strong>Cloud SQL for MySQL のみ</strong> (PostgreSQL / SQL Server は非対応)。メジャーバージョンアップグレードの対象は MySQL 8.0 → 8.4 のみで、MySQL 8.0.18 は非対応</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span><strong>リードレプリカを持つインスタンス</strong>、Private Service Connect アウトバウンド構成、旧ネットワークアーキテクチャのインスタンスは非対応</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span>MySQL の <strong>IAM グループ認証とは互換性がなく</strong>、スイッチオーバー失敗の原因となる</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span>Green インスタンスは<strong>計画的スイッチオーバー専用</strong>であり、予期しない障害時のフェイルオーバー先としては使用できない (障害対策には高可用性構成または DR レプリカを使用)</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span><code>tuneup_pct</code> フラグはメンテナンスバージョン <code>MYSQL_VERSION.R20260726.00_05</code> 以降が必要。マネージドバッファプール自体は共有コアインスタンスと MySQL 5.6 / 5.7 では利用不可</span></div>
+    <h3>🤔 考慮すべき点</h3>
+    <div class="warning-box">
+      <strong>⚠️ 注意:</strong>
+      <ul class="compact" style="margin-bottom: 0;">
+        <li>Blue と Green の両環境が存在する期間は<strong>両インスタンス分の標準料金が課金</strong>される。検証完了後は速やかにデプロイメント (と旧 Blue インスタンス) を削除する</li>
+        <li>スイッチオーバーは書き込みの少ない時間帯に実施し、事前にレプリケーションラグ (Cloud Monitoring の <code>replica_lag</code> など) と長時間実行トランザクション・DDL の完了を確認する</li>
+        <li><code>SWITCHOVER_READY</code> 状態は<strong>レプリケーションの健全性のみ</strong>を示し、レプリケーションラグは評価されない点に注意</li>
+        <li>マネージドバッファプールによる <code>innodb_buffer_pool_size</code> の調整値はコンソールに反映されないため、実値は MySQL クライアントで確認する</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ユースケース -->
+  <div class="section">
+    <h2>🎯 ユースケース</h2>
+    <div class="usecase">
+      <h3>1️⃣ MySQL 8.0 から 8.4 へのメジャーバージョンアップグレード</h3>
+      <p><strong>シナリオ</strong>: EC サイトの本番 Cloud SQL for MySQL 8.0 インスタンスを 8.4 にアップグレードしたいが、アプリケーション互換性の懸念があり、長時間の停止も許容できない。</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">実装例</span>
+        </div>
+        <pre><code class="language-bash">gcloud beta sql blue-green-deployments create upgrade-to-84 \
+  --source-instance=prod-mysql \
+  --target-database-version=MYSQL_8_4 \
+  --region=asia-northeast1 \
+  --async
+# Green 環境 (MySQL 8.4) でアプリの互換性・性能テストを実施
+# 問題なければオフピーク時間帯にスイッチオーバー
+gcloud beta sql blue-green-deployments switchover upgrade-to-84 \
+  --region=asia-northeast1</code></pre>
+      </div>
+      <p style="margin-bottom: 0;"><strong>効果</strong>: 本番トラフィックに影響を与えずに 8.4 での動作検証を完了し、数秒程度のダウンタイムでアップグレードを完了できる。事前チェック API により互換性問題を作成時点で検出できる。</p>
+    </div>
+    <div class="usecase">
+      <h3>2️⃣ マシンタイプ変更・フラグ変更の事前検証</h3>
+      <p><strong>シナリオ</strong>: 本番インスタンスのマシンタイプ変更 (スケールアップ) や性能関連フラグの変更を、本番適用前に実トラフィック相当のデータで検証したい。</p>
+      <p style="margin-bottom: 0;"><strong>効果</strong>: 意図なしの Blue-Green デプロイメントで現行バージョンのまま Green 環境を作成し、構成変更を安全にステージング・テストした上で最小ダウンタイムで切り替えられる。</p>
+    </div>
+    <div class="usecase">
+      <h3>3️⃣ OOM 頻発インスタンスのメモリチューニング</h3>
+      <p><strong>シナリオ</strong>: ベースラインのメモリ使用率が常時 75% 前後のインスタンスでマネージドバッファプールを有効化したところ、一度縮小されたバッファプールが復元されず性能が低下したままになる。</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">実装例</span>
+        </div>
+        <pre><code class="language-bash">gcloud sql instances patch prod-mysql \
+  --database-flags=innodb_cloudsql_managed_buffer_pool=on,\
+innodb_cloudsql_managed_buffer_pool_tuneup_pct=85</code></pre>
+      </div>
+      <p style="margin-bottom: 0;"><strong>効果</strong>: 復元しきい値を 85% に引き上げることで、ベースライン使用率が高い環境でもバッファプールが元のサイズに復元され、OOM 防止と読み取り性能の両立が可能になる。</p>
+    </div>
+  </div>
+
+  <!-- 料金 -->
+  <div class="section">
+    <h2>💰 料金</h2>
+    <div class="check-item"><span class="check-icon">✓</span><span><strong>Blue-Green デプロイメント</strong>: 機能自体の追加料金はなし。ただし、デプロイメント期間中は Blue と Green の<strong>両インスタンスに標準料金が課金</strong>される。スイッチオーバー前にキャンセルする場合はデプロイメントを削除して Green の課金を停止し、スイッチオーバー後は検証完了後に <code>--delete-old-source</code> フラグで旧 Blue インスタンスを削除しないと両方のインスタンスに課金が継続する</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span><strong>マネージドバッファプールフラグ</strong>: データベースフラグの設定に追加料金はなし</span></div>
+    <p>詳細は <a href="https://cloud.google.com/sql/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud SQL 料金ページ</a> を参照してください。</p>
+  </div>
+
+  <!-- 利用可能リージョン -->
+  <div class="section">
+    <h2>🌏 利用可能リージョン</h2>
+    <p>公式ドキュメントにリージョン制限の記載はありません。最新情報は <a href="https://docs.cloud.google.com/sql/docs/mysql/about-blue-green-deployments" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud SQL のドキュメント</a> を参照してください。なお、Green インスタンスの作成はリージョン・ゾーンのコンピュートリソース制約の影響を受ける可能性があります。</p>
+  </div>
+
+  <!-- 関連サービス -->
+  <div class="section">
+    <h2>🔗 関連サービス・機能</h2>
+    <div class="icon-text"><span class="arrow">→</span><span><strong>Cloud SQL 高可用性 (HA) / DR レプリカ</strong>: Blue-Green は計画的な変更管理用であり、予期しない障害への自動復旧には HA 構成や DR レプリカを使用する (補完関係)</span></div>
+    <div class="icon-text"><span class="arrow">→</span><span><strong>Cloud SQL メジャーバージョンインプレースアップグレード</strong>: 従来のアップグレード方式。Blue-Green は事前検証とダウンタイム最小化の点でこれを補完する</span></div>
+    <div class="icon-text"><span class="arrow">→</span><span><strong>Cloud Monitoring</strong>: スイッチオーバー前のレプリケーションラグ監視 (<code>replica_lag</code> メトリクス) や、マネージドバッファプール利用時のメモリ使用率監視に使用</span></div>
+    <div class="icon-text"><span class="arrow">→</span><span><strong>Cloud SQL Admin API (<code>blueGreenDeployments</code>)</strong>: Blue-Green デプロイメントのライフサイクル (create / describe / list / switchover / delete) を API で自動化可能</span></div>
+    <div class="icon-text"><span class="arrow">→</span><span><strong>Cloud SQL セルフサービスメンテナンス</strong>: Blue-Green の前提条件である最新メンテナンスバージョンへの更新、および新フラグに必要な <code>R20260726.00_05</code> への更新に使用</span></div>
+  </div>
+
+  <!-- まとめ -->
+  <div class="section">
+    <h2>📝 まとめ</h2>
+    <div class="success-box">
+      <p style="margin-top: 0;"><strong>✅ Blue-Green デプロイメント (Preview)</strong> により、Cloud SQL for MySQL のメジャーバージョンアップグレードや構成変更を、<span class="highlight">本番同期済みのステージング環境で検証した上で数秒程度のダウンタイム</span>で実行できるようになりました。MySQL 8.0 を運用中のチームは、8.4 へのアップグレード計画に本機能の活用を検討する価値があります。</p>
+      <p style="margin-bottom: 0;"><strong>✅ マネージドバッファプール</strong>を OOM 対策として利用している場合は、新しい <code>innodb_cloudsql_managed_buffer_pool_tuneup_pct</code> フラグでワークロードに合わせた復元しきい値のチューニングを検討してください (要メンテナンスバージョン <code>R20260726.00_05</code> 以降)。</p>
+    </div>
+  </div>
+
+  <!-- フッター -->
+  <footer>
+    <p>📎 出典:</p>
+    <ul>
+      <li><a href="https://docs.cloud.google.com/release-notes#October_08_2026" target="_blank" rel="noopener noreferrer" class="gc-link">Google Cloud 公式リリースノート (2026-10-08)</a></li>
+      <li><a href="https://docs.cloud.google.com/sql/docs/mysql/about-blue-green-deployments" target="_blank" rel="noopener noreferrer" class="gc-link">About blue-green deployments in Cloud SQL</a></li>
+      <li><a href="https://docs.cloud.google.com/sql/docs/mysql/create-blue-green-deployment" target="_blank" rel="noopener noreferrer" class="gc-link">Create and stage a blue-green deployment</a></li>
+      <li><a href="https://docs.cloud.google.com/sql/docs/mysql/switchover-blue-green-deployment" target="_blank" rel="noopener noreferrer" class="gc-link">Switchover a blue-green deployment</a></li>
+      <li><a href="https://docs.cloud.google.com/sql/docs/mysql/optimize-high-memory-usage#enable-managed-buffer-pool" target="_blank" rel="noopener noreferrer" class="gc-link">Enable managed buffer pool (Optimize high memory usage)</a></li>
+      <li><a href="https://docs.cloud.google.com/sql/docs/mysql/flags" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud SQL for MySQL database flags</a></li>
+      <li><a href="https://cloud.google.com/sql/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud SQL 料金ページ</a></li>
+    </ul>
+    <p>🏷️ タグ: Cloud SQL / MySQL / Blue-Green デプロイメント / メジャーバージョンアップグレード / MySQL 8.4 / InnoDB / バッファプール / OOM 対策 / データベースフラグ / Preview</p>
+    <p>本インフォグラフィックは Google Cloud News レポート (2026-10-08) をもとに生成されています。</p>
+  </footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#4285F4',
+      primaryTextColor: '#202124',
+      primaryBorderColor: '#4285F4',
+      lineColor: '#4285F4',
+      secondaryColor: '#F1F3F4',
+      tertiaryColor: '#FAFAFA',
+      background: '#FFFFFF',
+      mainBkg: '#E8F0FE',
+      nodeBorder: '#4285F4',
+      clusterBkg: '#E8F0FE',
+      clusterBorder: '#4285F4',
+      edgeLabelBackground: '#FFFFFF',
+      textColor: '#202124'
+    }
+  });
+</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

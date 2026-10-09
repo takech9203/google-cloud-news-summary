@@ -5,9 +5,19 @@
 
 ## 2026 年
 
+- [2026-10-08 - BigQuery: BigQuery Studio SQL エディタのインラインアクションボタンによる Gemini アシスタンスが GA](2026/2026-10-08-bigquery-gemini-sql-editor-inline-assist.md)
+- [2026-10-08 - Memorystore for Redis: RDB スナップショットがコンソールでのインスタンス作成時にデフォルトで有効化 (GA)](2026/2026-10-08-memorystore-redis-rdb-snapshots-default.md)
+- [2026-10-08 - Looker: Looker 26.20 リリースのロールアウト開始](2026/2026-10-08-looker-26-20-release.md)
+- [2026-10-08 - Cloud SQL for MySQL: Blue-Green デプロイメント (Preview) とマネージドバッファプール新フラグ](2026/2026-10-08-cloud-sql-mysql-blue-green-buffer-pool.md)
 - [2026-10-07 - Gemini Enterprise Agent Platform: CodeMender v0.13.0 リリース (検出結果の重複排除の一貫性向上とバグ修正)](2026/2026-10-07-gemini-enterprise-agent-platform-codemender-v0-13-0.md)
+- [2026-10-07 - Gemini Enterprise: Frontline / EDU / Emerging Market エディションでクォータ超過時の Pay-as-you-go 利用が可能に](2026/2026-10-07-gemini-enterprise-payg-overage-editions.md)
 - [2026-10-07 - Apigee hybrid: v1.14.9 パッチリリース (バグ修正とセキュリティ強化)](2026/2026-10-07-apigee-hybrid-v1-14-9.md)
 - [2026-10-07 - Gemini Enterprise Agent Platform (Model Garden): Anthropic Claude Haiku 5.5 が利用可能に](2026/2026-10-07-model-garden-claude-haiku-5-5.md)
+- [2026-10-07 - Google Distributed Cloud (software only) for VMware: 1.36.100-gke.144 パッチリリース](2026/2026-10-07-gdc-vmware-1-36-100.md)
+- [2026-10-07 - Google Kubernetes Engine: GKE Sandbox の microVM サンドボックスタイプが GA](2026/2026-10-07-gke-sandbox-microvm-ga.md)
+- [2026-10-07 - BigQuery: 組み込み時系列予測モデル TimesFM 3.0 (多変量予測対応) (Preview)](2026/2026-10-07-bigquery-timesfm-3-0-forecasting.md)
+- [2026-10-07 - Cloud Run: SSH サポート (Preview)](2026/2026-10-07-cloud-run-ssh-preview.md)
+- [2026-10-07 - Google Distributed Cloud (software only) for bare metal: バージョン 1.36.100-gke.144 リリース](2026/2026-10-07-gdc-bare-metal-1-36-100.md)
 - [2026-10-06 - BigQuery: 会話型分析での AI.CAUSAL_EFFECT 関数サポート](2026/2026-10-06-bigquery-ai-causal-effect.md)
 - [2026-10-06 - Cloud Monitoring: App Hub アプリケーションへのサービス・ワークロード一括登録が GA](2026/2026-10-06-cloud-monitoring-app-hub-bulk-registration.md)
 - [2026-10-06 - Gemini Enterprise Agent Platform: Gemini Nano Banana 2.1 (gemini-nano-banana-2.1) が GA](2026/2026-10-06-gemini-nano-banana-2-1-ga.md)
