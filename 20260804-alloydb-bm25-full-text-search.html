@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AlloyDB for PostgreSQL: BM25 インデックスによる全文検索 (Preview)</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+:root {
+  --gc-blue: #4285F4;
+  --gc-red: #EA4335;
+  --gc-yellow: #FBBC04;
+  --gc-green: #34A853;
+  --gc-blue-900: #174EA6;
+  --gc-blue-800: #185ABC;
+  --gc-blue-700: #1967D2;
+  --gc-blue-600: #1A73E8;
+  --gc-blue-500: #4285F4;
+  --gc-blue-300: #669DF6;
+  --gc-blue-200: #8AB4F8;
+  --gc-blue-100: #AECBFA;
+  --gc-blue-50: #E8F0FE;
+  --gc-on-surface: #202124;
+  --gc-on-surface-variant: #5F6368;
+  --gc-outline: #80868B;
+  --gc-surface: #FFFFFF;
+  --gc-surface-container-lowest: #F8F9FA;
+  --gc-surface-container-low: #F1F3F4;
+  --gc-surface-container: #E8EAED;
+  --gc-outline-variant: #DADCE0;
+  --gc-blue-tint: #E8F0FE;
+  --gc-green-tint: #E6F4EA;
+  --gc-red-tint: #FCE8E6;
+  --gc-yellow-tint: #FEF7E0;
+  --gc-purple-tint: #F3E8FD;
+  --gc-teal-tint: #E0F7FA;
+  --gc-purple: #A142F4;
+  --gc-teal: #00BCD4;
+  --gc-orange: #FF6D00;
+}
+
+body {
+  background-color: var(--gc-surface);
+  font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+  color: var(--gc-on-surface-variant);
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 20px;
+  margin: 0;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.header {
+  margin-bottom: 32px;
+  padding-bottom: 16px;
+  border-bottom: 3px solid var(--gc-blue-600);
+}
+
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+h1, .title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--gc-on-surface);
+  margin: 0 0 8px 0;
+  line-height: 1.4;
+}
+
+h2, .section-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 20px 0 8px 0;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: var(--gc-outline);
+}
+
+.section {
+  background: var(--gc-surface-container-low);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid var(--gc-outline-variant);
+}
+
+.highlight {
+  background-color: var(--gc-blue-50);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--gc-blue-800);
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+.card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border-left: 4px solid var(--gc-blue-600);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+}
+
+.card h3 {
+  margin-top: 0;
+}
+
+.gc-link {
+  color: var(--gc-blue-600);
+  text-decoration: none;
+}
+
+.gc-link:hover {
+  color: var(--gc-blue-800);
+  text-decoration: underline;
+}
+
+.badge,
+.badge-ga,
+.badge-preview,
+.badge-deprecated {
+  display: inline-block;
+  color: #FFFFFF;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+  margin: 4px 8px 4px 0;
+}
+
+.badge {
+  background: var(--gc-blue-600);
+}
+
+.badge-preview {
+  background: var(--gc-orange);
+  color: #FFFFFF;
+}
+
+/* Before/After 比較 */
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+@media (max-width: 720px) {
+  .before-after {
+    grid-template-columns: 1fr;
+  }
+}
+
+.before-box, .after-box {
+  border-radius: 12px;
+  padding: 16px 20px;
+}
+
+.before-box {
+  background: var(--gc-red-tint);
+  border: 1px solid rgba(234, 67, 53, 0.3);
+}
+
+.after-box {
+  background: var(--gc-green-tint);
+  border: 1px solid rgba(52, 168, 83, 0.3);
+}
+
+.before-box h3, .after-box h3 {
+  margin-top: 0;
+  font-size: 16px;
+}
+
+.before-box h3 { color: var(--gc-red); }
+.after-box h3 { color: var(--gc-green); }
+
+.before-box ul, .after-box ul {
+  margin: 8px 0 0 0;
+  padding-left: 20px;
+  font-size: 14px;
+}
+
+.before-box li, .after-box li {
+  margin-bottom: 8px;
+}
+
+/* BM25 3 要素カード */
+.bm25-factors {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin: 16px 0;
+}
+
+@media (max-width: 720px) {
+  .bm25-factors {
+    grid-template-columns: 1fr;
+  }
+}
+
+.factor-card {
+  background: var(--gc-surface);
+  border: 2px solid var(--gc-blue-300);
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+}
+
+.factor-card .factor-icon {
+  font-size: 28px;
+}
+
+.factor-card .factor-name {
+  font-weight: 700;
+  color: var(--gc-blue-800);
+  margin: 4px 0;
+}
+
+.factor-card .factor-desc {
+  font-size: 13px;
+  color: var(--gc-on-surface-variant);
+}
+
+/* 統計カード */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin: 16px 0;
+}
+
+@media (max-width: 720px) {
+  .stat-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.stat-card {
+  background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+  color: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 30px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+/* Mermaid コンテナ */
+.mermaid-container {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 20px 0;
+  border: 2px solid rgba(66, 133, 244, 0.3);
+  overflow-x: auto;
+}
+
+.mermaid {
+  display: flex;
+  justify-content: center;
+}
+
+/* コードブロック */
+.code-block {
+  background: #1E1E1E;
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 16px 0;
+}
+
+.code-header {
+  background: #2D2D2D;
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.code-lang {
+  color: #9CDCFE;
+  font-weight: bold;
+}
+
+.code-title {
+  color: #AAAAAA;
+}
+
+.code-block pre {
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+}
+
+pre:not(.mermaid) {
+  background: #1E1E1E;
+  border-radius: 8px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: #E8E8E8;
+  margin: 16px 0;
+}
+
+.code-block code {
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 16px !important;
+  display: block;
+}
+
+code:not(pre code) {
+  background: var(--gc-surface-container-low);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 0.9em;
+  color: var(--gc-blue-900);
+}
+
+/* テーブル */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--gc-outline-variant);
+  background: var(--gc-surface);
+}
+
+th {
+  background: var(--gc-blue-50);
+  color: var(--gc-blue-900);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 2px solid var(--gc-blue-200);
+}
+
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--gc-outline-variant);
+  font-size: 14px;
+}
+
+tr:nth-child(even) {
+  background: var(--gc-surface-container-lowest);
+}
+
+tr:hover {
+  background: var(--gc-blue-50);
+}
+
+/* ボックス */
+.note-box {
+  background: var(--gc-blue-tint);
+  border-left: 4px solid var(--gc-blue-600);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.warning-box {
+  background: var(--gc-yellow-tint);
+  border-left: 4px solid var(--gc-yellow);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.ai-box {
+  background: var(--gc-purple-tint);
+  border-left: 4px solid var(--gc-purple);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.success-box {
+  background: var(--gc-green-tint);
+  border-left: 4px solid var(--gc-green);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+/* チェックリスト */
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.check-icon {
+  color: var(--gc-green);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.cross-icon {
+  color: var(--gc-red);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+/* ユースケース */
+.usecase {
+  background: var(--gc-blue-tint);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 16px 0;
+  border: 1px solid var(--gc-blue-100);
+}
+
+.usecase h3 {
+  margin-top: 0;
+  color: var(--gc-blue-900);
+}
+
+/* ステップ番号 */
+.step-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 24px 0 8px 0;
+}
+
+.step-number {
+  background: var(--gc-blue-600);
+  color: #FFFFFF;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.step-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+}
+
+/* 関連サービス */
+.related-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+@media (max-width: 720px) {
+  .related-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.related-card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 16px 20px;
+  border-left: 4px solid var(--gc-teal);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+  font-size: 14px;
+}
+
+.related-card strong {
+  color: var(--gc-on-surface);
+  display: block;
+  margin-bottom: 4px;
+  font-size: 15px;
+}
+
+footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gc-outline-variant);
+  font-size: 12px;
+  color: var(--gc-outline);
+}
+
+footer ul {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+footer a {
+  word-break: break-all;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ヘッダー -->
+  <div class="header">
+    <div class="header-top">
+      <div>
+        <span class="badge">AlloyDB for PostgreSQL</span>
+        <span class="badge badge-preview">Preview</span>
+      </div>
+      <div class="subtitle">📅 リリース日: 2026-08-04</div>
+    </div>
+    <h1>🔍 BM25 インデックスによる全文検索</h1>
+    <div class="subtitle">pg_textsearch 拡張機能で、確率的ランキングをマネージド PostgreSQL 内で直接実行</div>
+  </div>
+
+  <!-- 概要 -->
+  <div class="section">
+    <h2>📝 概要</h2>
+    <p>
+      AlloyDB for PostgreSQL が、全文検索向けの <span class="highlight">Best Matching 25 (BM25) インデックス</span>を Preview として提供開始しました。
+      新しい <code>pg_textsearch</code> 拡張機能を有効化するだけで、Elasticsearch などの専用検索エンジンで標準的に使われている
+      <span class="highlight">確率的ランキングアルゴリズム</span>を SQL だけで利用できます。PostgreSQL <strong>17 / 18</strong> を実行する AlloyDB インスタンスでサポートされます。
+    </p>
+
+    <h3>🧮 BM25 が評価する 3 要素</h3>
+    <div class="bm25-factors">
+      <div class="factor-card">
+        <div class="factor-icon">📊</div>
+        <div class="factor-name">TF (単語頻度)</div>
+        <div class="factor-desc">クエリ語の出現頻度を評価。<code>k1</code> パラメータで飽和を制御</div>
+      </div>
+      <div class="factor-card">
+        <div class="factor-icon">📉</div>
+        <div class="factor-name">IDF (逆文書頻度)</div>
+        <div class="factor-desc">希少な単語ほど高く重み付けし、キーワードの重要度を反映</div>
+      </div>
+      <div class="factor-card">
+        <div class="factor-icon">📏</div>
+        <div class="factor-name">文書長の正規化</div>
+        <div class="factor-desc">長い文書が不当に有利/不利にならないよう <code>b</code> パラメータで調整</div>
+      </div>
+    </div>
+
+    <div class="before-after">
+      <div class="before-box">
+        <h3>❌ Before: アップデート前の課題</h3>
+        <ul>
+          <li>標準の全文検索は <code>ts_rank</code> / <code>ts_rank_cd</code> 依存で、TF-IDF ベースの確率的ランキング (頻度の飽和制御・文書長正規化) が使えなかった</li>
+          <li>高性能全文検索向けの RUM 拡張は <strong>PostgreSQL 17 以前のみ</strong>のサポートで、ランキング品質向上には追加の工夫が必要だった</li>
+          <li>BM25 相当の検索品質には Elasticsearch など<strong>外部検索基盤の構築・同期</strong>が必要で、運用コストとデータ整合性が課題だった</li>
+        </ul>
+      </div>
+      <div class="after-box">
+        <h3>✅ After: アップデート後の改善</h3>
+        <ul>
+          <li><code>CREATE INDEX ... USING bm25</code> という SQL だけで BM25 インデックスを作成し、確率的ランキングによる全文検索が可能に</li>
+          <li><code>k1</code> (頻度の飽和) と <code>b</code> (文書長の正規化) をインデックス作成時に調整でき、コレクション特性に合わせたチューニングが可能に</li>
+          <li><code>&lt;@&gt;</code> 演算子で関連度順検索を <code>ORDER BY ... LIMIT</code> で簡潔に記述</li>
+          <li>PostgreSQL 17 に加えて <strong>18 でもサポート</strong>され、最新バージョンの選択肢が拡充</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- アーキテクチャ図 -->
+  <div class="section">
+    <h2>🏗️ アーキテクチャ図</h2>
+    <div class="mermaid-container">
+      <pre class="mermaid">
+flowchart TD
+    User([👤 ユーザー / アプリケーション]) -->|検索クエリ| App[🖥️ アプリケーション]
+    App -->|"SELECT ... ORDER BY content <@> 'query' ASC"| AlloyDB
+
+    subgraph AlloyDB["🗄️ AlloyDB for PostgreSQL (PostgreSQL 17 / 18)"]
+        Ext[🧩 pg_textsearch 拡張機能]
+        Ext --> BM25[📇 BM25 インデックス]
+        BM25 --> TF[📊 TF: 単語頻度<br/>k1 で飽和を制御]
+        BM25 --> IDF[📉 IDF: 逆文書頻度]
+        BM25 --> Norm[📏 文書長の正規化<br/>b で重み付け]
+        Docs[(📚 documents テーブル)] -.->|インデックス構築| BM25
+    end
+
+    AlloyDB -->|関連度スコア順の検索結果| App
+      </pre>
+    </div>
+    <div class="note-box">
+      <strong>💡 ポイント:</strong> アプリケーションは <code>&lt;@&gt;</code> 演算子を使った SQL クエリを発行するだけで、
+      <code>pg_textsearch</code> 拡張の BM25 インデックスが TF・IDF・文書長正規化を評価した確率的ランキング結果を返します。
+    </div>
+  </div>
+
+  <!-- 主要機能 -->
+  <div class="section">
+    <h2>⚡ 主要機能</h2>
+    <div class="card">
+      <h3>🧩 1. pg_textsearch 拡張機能による BM25 インデックス</h3>
+      <p>
+        <code>CREATE EXTENSION pg_textsearch</code> で拡張機能を有効化し、<code>USING bm25</code> 構文でテキストカラムにインデックスを作成。
+        PostgreSQL 標準の全文検索 (GIN / GiST) では実現できなかった、<span class="highlight">TF-IDF ベースの確率的ランキング</span>をデータベース内で直接実行できます。
+      </p>
+    </div>
+    <div class="card">
+      <h3>🎯 2. &lt;@&gt; 演算子による関連度ランキング検索</h3>
+      <p>
+        <code>content &lt;@&gt; '検索語'</code> の形式で BM25 スコアを計算。スコアは<strong>負の値</strong>で返されます
+        (PostgreSQL のインデックススキャンが昇順 (ASC) のみをサポートするための仕様)。より小さい (より負の) スコアほど関連度が高く、
+        <code>ORDER BY ... ASC LIMIT N</code> で上位 N 件を効率的に取得できます。
+      </p>
+    </div>
+    <div class="card">
+      <h3>🎛️ 3. ランキングパラメータのチューニング</h3>
+      <p>
+        <strong><code>k1</code> (デフォルト 1.2)</strong>: 単語頻度の飽和パラメータ。大きくすると、クエリ語が繰り返し出現するドキュメントのスコアが上がりやすくなる。<br>
+        <strong><code>b</code> (デフォルト 0.75)</strong>: 文書長の正規化パラメータ。大きくすると、長いドキュメントへのペナルティが強くなる。<br>
+        <strong><code>text_config</code> (必須)</strong>: 使用する PostgreSQL テキスト検索設定 (例: <code>english</code>)。
+      </p>
+    </div>
+  </div>
+
+  <!-- 技術仕様 -->
+  <div class="section">
+    <h2>🔧 技術仕様</h2>
+    <table>
+      <tr><th>項目</th><th>詳細</th></tr>
+      <tr><td>拡張機能</td><td><code>pg_textsearch</code> (データベースごとに有効化が必要)</td></tr>
+      <tr><td>対応 PostgreSQL バージョン</td><td>17 または 18 (AlloyDB インスタンス)</td></tr>
+      <tr><td>必要なデータベースロール</td><td><code>alloydbsuperuser</code></td></tr>
+      <tr><td>インデックスタイプ</td><td><code>bm25</code></td></tr>
+      <tr><td>検索演算子</td><td><code>&lt;@&gt;</code> (負の BM25 スコアを返す)</td></tr>
+      <tr><td>インデックスパラメータ</td><td><code>text_config</code> (必須)、<code>k1</code> (デフォルト 1.2)、<code>b</code> (デフォルト 0.75)</td></tr>
+      <tr><td>リリースステージ</td><td>Preview (Pre-GA Offerings Terms が適用)</td></tr>
+    </table>
+  </div>
+
+  <!-- 設定方法 -->
+  <div class="section">
+    <h2>🛠️ 設定方法</h2>
+    <div class="note-box">
+      <strong>📋 前提条件:</strong> PostgreSQL 17 または 18 を実行する AlloyDB インスタンス / <code>alloydbsuperuser</code> データベースロールを持つユーザー
+    </div>
+
+    <div class="step-heading">
+      <div class="step-number">1</div>
+      <div class="step-title">pg_textsearch 拡張機能の有効化</div>
+    </div>
+    <p>psql などのクライアントで AlloyDB データベースに接続し、データベースごとに拡張機能を作成します。</p>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">SQL</span>
+        <span class="code-title">拡張機能の有効化</span>
+      </div>
+      <pre><code class="language-sql">CREATE EXTENSION IF NOT EXISTS pg_textsearch;</code></pre>
+    </div>
+
+    <div class="step-heading">
+      <div class="step-number">2</div>
+      <div class="step-title">BM25 インデックスの作成</div>
+    </div>
+    <p><code>WITH</code> 句では <code>text_config</code> (必須) に加えて、<code>k1</code> と <code>b</code> をオプションで指定できます。</p>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">SQL</span>
+        <span class="code-title">BM25 インデックスの作成</span>
+      </div>
+      <pre><code class="language-sql">-- サンプルテーブルの作成
+CREATE TABLE documents (
+  id SERIAL PRIMARY KEY,
+  title TEXT NOT NULL,
+  content TEXT NOT NULL
+);
+
+-- content カラムに BM25 インデックスを作成
+CREATE INDEX idx_docs_bm25
+ON documents
+USING bm25 (content)
+WITH (text_config = 'english');</code></pre>
+    </div>
+
+    <div class="step-heading">
+      <div class="step-number">3</div>
+      <div class="step-title">BM25 スコアによる検索</div>
+    </div>
+    <p><code>&lt;@&gt;</code> 演算子は負の BM25 スコアを返すため、昇順 (ASC) でソートすると関連度の高いドキュメントが先頭に来ます。</p>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">SQL</span>
+        <span class="code-title">関連度順の全文検索</span>
+      </div>
+      <pre><code class="language-sql">SELECT title, content, content &lt;@&gt; 'database system' AS score
+FROM documents
+ORDER BY content &lt;@&gt; 'database system' ASC
+LIMIT 5;</code></pre>
+    </div>
+
+    <div class="step-heading">
+      <div class="step-number">4</div>
+      <div class="step-title">ランキングパラメータのチューニング (任意)</div>
+    </div>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">SQL</span>
+        <span class="code-title">k1 / b パラメータの調整</span>
+      </div>
+      <pre><code class="language-sql">-- 短いドキュメント向けに単語頻度を重視する設定例
+CREATE INDEX idx_docs_bm25_tuned
+ON documents
+USING bm25 (content)
+WITH (text_config = 'english', k1 = 1.5, b = 0.8);</code></pre>
+    </div>
+  </div>
+
+  <!-- メリット -->
+  <div class="section">
+    <h2>✨ メリット</h2>
+    <h3>💼 ビジネス面</h3>
+    <div class="check-item">
+      <span class="check-icon">✓</span>
+      <span><strong>検索基盤の統合によるコスト削減</strong>: 外部検索エンジン (Elasticsearch など) を別途構築・運用する必要がなくなり、インフラコストとデータ同期の運用負荷を削減</span>
+    </div>
+    <div class="check-item">
+      <span class="check-icon">✓</span>
+      <span><strong>検索体験の向上</strong>: BM25 の確率的ランキングで検索結果の関連性が向上し、EC サイトやナレッジベースのユーザー体験改善に直結</span>
+    </div>
+    <h3>⚙️ 技術面</h3>
+    <div class="check-item">
+      <span class="check-icon">✓</span>
+      <span><strong>SQL ネイティブな実装</strong>: インデックス作成も検索も標準的な SQL 構文で完結し、既存の PostgreSQL アプリケーションに最小限の変更で導入可能</span>
+    </div>
+    <div class="check-item">
+      <span class="check-icon">✓</span>
+      <span><strong>データ整合性の維持</strong>: 検索インデックスがデータベース内にあるため、外部検索エンジンとの同期遅延や不整合が発生しない</span>
+    </div>
+    <div class="check-item">
+      <span class="check-icon">✓</span>
+      <span><strong>チューニング可能なランキング</strong>: <code>k1</code> と <code>b</code> により、文書長のばらつきや単語の繰り返し傾向に合わせた最適化が可能</span>
+    </div>
+    <div class="check-item">
+      <span class="check-icon">✓</span>
+      <span><strong>ハイブリッド検索との親和性</strong>: AlloyDB の ScaNN ベクトル検索と組み合わせ、キーワード検索とセマンティック検索を融合したハイブリッド検索を単一データベースで構築可能</span>
+    </div>
+  </div>
+
+  <!-- デメリット・制約事項 -->
+  <div class="section">
+    <h2>⚠️ デメリット・制約事項</h2>
+    <h3>🚧 制限事項</h3>
+    <div class="check-item">
+      <span class="cross-icon">✗</span>
+      <span>Preview 段階の機能であり、Pre-GA Offerings Terms が適用される (SLA 対象外、サポートが限定される可能性)</span>
+    </div>
+    <div class="check-item">
+      <span class="cross-icon">✗</span>
+      <span>PostgreSQL 17 または 18 を実行する AlloyDB インスタンスのみでサポート</span>
+    </div>
+    <div class="check-item">
+      <span class="cross-icon">✗</span>
+      <span>拡張機能の有効化に <code>alloydbsuperuser</code> データベースロールが必要</span>
+    </div>
+    <h3>🤔 考慮すべき点</h3>
+    <div class="warning-box">
+      <strong>⚠️ 注意:</strong>
+      <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+        <li><code>&lt;@&gt;</code> 演算子が返すスコアは<strong>負の値</strong> (PostgreSQL が昇順インデックススキャンのみをサポートするため)。アプリケーション側でスコアを表示する場合は符号の扱いに注意</li>
+        <li>従来の RUM 拡張は PostgreSQL 17 以前のみのサポート。<strong>PostgreSQL 18 で高機能な全文検索を行う場合は BM25 インデックスが主な選択肢</strong></li>
+        <li><code>k1</code> と <code>b</code> はインデックス作成時に指定するため、パラメータ変更には<strong>インデックスの再作成が必要</strong></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ユースケース -->
+  <div class="section">
+    <h2>🎯 ユースケース</h2>
+
+    <div class="usecase">
+      <h3>🛒 ユースケース 1: EC サイトの商品検索の関連度改善</h3>
+      <p>
+        <strong>シナリオ</strong>: AlloyDB 上で商品カタログを管理する EC サイトで、商品説明文に対するキーワード検索の関連度を改善したい。
+        従来の <code>ts_rank</code> ベースの検索では、説明文の長い商品が不当に低くランクされたり、キーワードの重要度が反映されにくいという課題があった。
+      </p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">商品検索の実装例</span>
+        </div>
+        <pre><code class="language-sql">CREATE EXTENSION IF NOT EXISTS pg_textsearch;
+
+CREATE INDEX idx_products_bm25
+ON products
+USING bm25 (description)
+WITH (text_config = 'english', k1 = 1.5, b = 0.8);
+
+SELECT name, description &lt;@&gt; 'wireless noise cancelling headphones' AS score
+FROM products
+ORDER BY description &lt;@&gt; 'wireless noise cancelling headphones' ASC
+LIMIT 20;</code></pre>
+      </div>
+      <p>
+        <strong>効果</strong>: TF-IDF と文書長正規化に基づく関連度ランキングにより、検索エンジン専用製品に近い検索品質を外部システムなしで実現。
+      </p>
+    </div>
+
+    <div class="usecase">
+      <h3>🤖 ユースケース 2: RAG アプリケーションのハイブリッド検索</h3>
+      <p>
+        <strong>シナリオ</strong>: AlloyDB AI のベクトル検索 (ScaNN インデックス) を使った RAG アプリケーションで、
+        セマンティック検索だけでは固有名詞や型番などの正確なキーワードマッチングが弱い。BM25 による全文検索を組み合わせて検索精度を高めたい。
+      </p>
+      <div class="flow-diagram" style="display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; margin: 16px 0;">
+        <div style="background: var(--gc-surface); border: 2px solid var(--gc-purple); border-radius: 12px; padding: 12px 20px; text-align: center; color: var(--gc-on-surface);">🧠 ScaNN ベクトル検索<br><small>意味的類似性</small></div>
+        <span style="color: var(--gc-blue-600); font-size: 24px; font-weight: bold;">＋</span>
+        <div style="background: var(--gc-surface); border: 2px solid var(--gc-blue-600); border-radius: 12px; padding: 12px 20px; text-align: center; color: var(--gc-on-surface);">📇 BM25 全文検索<br><small>キーワード関連度</small></div>
+        <span style="color: var(--gc-blue-600); font-size: 24px; font-weight: bold;">→</span>
+        <div style="background: var(--gc-surface); border: 2px solid var(--gc-green); border-radius: 12px; padding: 12px 20px; text-align: center; color: var(--gc-on-surface);">🔀 RRF で統合<br><small>ai.hybrid_search()</small></div>
+      </div>
+      <p>
+        <strong>効果</strong>: ベクトル検索 (意味的類似性) と BM25 全文検索 (キーワード関連度) を単一の AlloyDB 内で組み合わせるハイブリッド検索により、
+        LLM に渡すコンテキストの検索精度が向上。AlloyDB の <code>ai.hybrid_search()</code> 関数は複数の検索タイプの結果を
+        <span class="highlight">RRF (Reciprocal Rank Fusion)</span> アルゴリズムで統合できます。
+      </p>
+    </div>
+  </div>
+
+  <!-- 料金 -->
+  <div class="section">
+    <h2>💰 料金</h2>
+    <div class="success-box">
+      <strong>✅ 追加料金なし:</strong> BM25 インデックス機能自体に追加料金はありません。AlloyDB の通常の料金体系 (コンピュート、ストレージ、ネットワーク) が適用されます。
+      インデックスの構築・保持によりストレージ使用量とコンピュートリソースの消費が増える点は考慮が必要です。
+    </div>
+    <h3>📊 AlloyDB の基本料金 (参考)</h3>
+    <table>
+      <tr><th>項目</th><th>料金 (USD)</th></tr>
+      <tr><td>vCPU</td><td>$0.06608 / vCPU 時間 〜</td></tr>
+      <tr><td>メモリ</td><td>$0.0112 / GB 時間 〜</td></tr>
+      <tr><td>リージョナルクラスタストレージ</td><td>$0.0004109 / GB 時間 〜</td></tr>
+      <tr><td>バックアップストレージ</td><td>$0.000137 / GB 時間 〜</td></tr>
+    </table>
+    <p>
+      1 年 / 3 年の確約利用割引 (CUD) により、vCPU とメモリはそれぞれ <strong>25% / 52%</strong> の割引が適用可能です。
+      詳細は <a href="https://cloud.google.com/alloydb/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">AlloyDB 料金ページ</a> を参照してください。
+    </p>
+  </div>
+
+  <!-- 利用可能リージョン -->
+  <div class="section">
+    <h2>🌍 利用可能リージョン</h2>
+    <p>
+      リージョン固有の制限は Release Notes に記載されていません。PostgreSQL 17 または 18 を実行する AlloyDB インスタンスで利用できます。
+      最新のリージョン情報は <a href="https://docs.cloud.google.com/alloydb/docs" target="_blank" rel="noopener noreferrer" class="gc-link">AlloyDB のドキュメント</a> を参照してください。
+    </p>
+  </div>
+
+  <!-- 関連サービス・機能 -->
+  <div class="section">
+    <h2>🔗 関連サービス・機能</h2>
+    <div class="related-grid">
+      <div class="related-card">
+        <strong>🧠 AlloyDB AI (ScaNN インデックス)</strong>
+        ベクトル検索と BM25 全文検索を組み合わせたハイブリッド検索を構築可能。<code>ai.hybrid_search()</code> 関数が RRF アルゴリズムで結果を統合。
+      </div>
+      <div class="related-card">
+        <strong>📚 RUM 拡張機能</strong>
+        AlloyDB が従来提供してきた高性能全文検索向けインデックス。PostgreSQL 17 以前のみサポートで、位置情報をインデックスに保持しフレーズ検索やランキングを高速化。
+      </div>
+      <div class="related-card">
+        <strong>🔤 PostgreSQL 標準全文検索 (GIN / GiST)</strong>
+        <code>tsvector</code> / <code>tsquery</code> / <code>@@</code> 演算子による組み込みの全文検索。BM25 インデックスはこれらのランキング品質を補完。
+      </div>
+      <div class="related-card">
+        <strong>🤖 Vertex AI</strong>
+        AlloyDB AI 経由で埋め込み生成 (<code>embedding()</code> 関数) に利用でき、BM25 と組み合わせた RAG アーキテクチャを構成可能。
+      </div>
+    </div>
+  </div>
+
+  <!-- まとめ -->
+  <div class="section">
+    <h2>📌 まとめ</h2>
+    <div class="note-box">
+      <p style="margin: 0;">
+        AlloyDB の BM25 インデックスは、専用検索エンジンで標準的な<strong>確率的ランキングアルゴリズムをマネージド PostgreSQL 内で直接利用可能</strong>にする重要なアップデートです。
+        外部検索基盤なしで高品質な全文検索を実現でき、ScaNN ベクトル検索と組み合わせたハイブリッド検索により RAG アプリケーションの検索精度向上にも寄与します。
+        PostgreSQL 17 / 18 の AlloyDB インスタンスを利用中で検索機能を持つアプリケーションを運用している場合は、<span class="highlight">Preview 段階での評価を推奨</span>します。
+      </p>
+    </div>
+    <div>
+      <span class="badge">AlloyDB</span>
+      <span class="badge">PostgreSQL</span>
+      <span class="badge">BM25</span>
+      <span class="badge">全文検索</span>
+      <span class="badge">pg_textsearch</span>
+      <span class="badge">検索ランキング</span>
+      <span class="badge">ハイブリッド検索</span>
+      <span class="badge badge-preview">Preview</span>
+    </div>
+  </div>
+
+  <!-- フッター -->
+  <footer>
+    <p>📎 出典:</p>
+    <ul>
+      <li><a href="https://docs.cloud.google.com/release-notes#August_04_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026-08-04)</a></li>
+      <li><a href="https://docs.cloud.google.com/alloydb/docs/ai/create-bm25-index" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: Create and manage a BM25 index</a></li>
+      <li><a href="https://docs.cloud.google.com/alloydb/docs/ai/full-text-search-overview" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: 全文検索の概要</a></li>
+      <li><a href="https://docs.cloud.google.com/alloydb/docs/ai/run-hybrid-vector-similarity-search" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: ハイブリッドベクトル類似検索の実行</a></li>
+      <li><a href="https://cloud.google.com/alloydb/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">AlloyDB 料金ページ</a></li>
+    </ul>
+    <p>このインフォグラフィックは Google Cloud News レポート (2026-08-04) を基に生成されました。</p>
+  </footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#4285F4',
+      primaryTextColor: '#202124',
+      primaryBorderColor: '#4285F4',
+      lineColor: '#4285F4',
+      secondaryColor: '#F1F3F4',
+      tertiaryColor: '#FAFAFA',
+      background: '#FFFFFF',
+      mainBkg: '#E8F0FE',
+      nodeBorder: '#4285F4',
+      clusterBkg: '#E8F0FE',
+      clusterBorder: '#4285F4',
+      edgeLabelBackground: '#FFFFFF',
+      textColor: '#202124'
+    }
+  });
+</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

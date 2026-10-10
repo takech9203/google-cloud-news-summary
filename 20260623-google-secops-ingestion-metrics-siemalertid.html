@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Google SecOps: インジェスションメトリクス修正 + siemAlertId フィールド予約 (Breaking Change)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--gc-outline);
+      text-align: right;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-red {
+      border-left-color: var(--gc-red);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-yellow {
+      border-left-color: var(--gc-yellow);
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge-breaking {
+      background: var(--gc-red);
+      color: #FFFFFF;
+    }
+
+    .badge-service {
+      background: var(--gc-blue-600);
+      color: #FFFFFF;
+    }
+
+    .badge-fix {
+      background: var(--gc-yellow);
+      color: #202124;
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.red {
+      background: linear-gradient(135deg, var(--gc-red), #C62828);
+    }
+
+    .stat-card.yellow {
+      background: linear-gradient(135deg, #F9A825, #F57F17);
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before h4, .after h4 {
+      margin: 0 0 12px 0;
+      font-size: 16px;
+    }
+
+    .before h4 { color: var(--gc-red); }
+    .after h4 { color: var(--gc-green); }
+
+    .before li, .after li {
+      margin: 6px 0;
+      font-size: 14px;
+      color: var(--gc-on-surface-variant);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      background: #1E1E1E;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .timeline {
+      position: relative;
+      margin: 24px 0;
+      padding-left: 30px;
+    }
+
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 12px;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: var(--gc-blue-300);
+      border-radius: 2px;
+    }
+
+    .timeline-item {
+      position: relative;
+      margin-bottom: 20px;
+      padding: 12px 16px;
+      background: var(--gc-surface);
+      border-radius: 8px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .timeline-item::before {
+      content: '';
+      position: absolute;
+      left: -24px;
+      top: 18px;
+      width: 12px;
+      height: 12px;
+      background: var(--gc-blue-600);
+      border-radius: 50%;
+      border: 2px solid white;
+    }
+
+    .timeline-item.critical::before {
+      background: var(--gc-red);
+    }
+
+    .timeline-date {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--gc-blue-600);
+    }
+
+    .timeline-item.critical .timeline-date {
+      color: var(--gc-red);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-900);
+      margin: 0 0 8px 0;
+    }
+
+    .step-list {
+      counter-reset: step-counter;
+      list-style: none;
+      padding: 0;
+    }
+
+    .step-list li {
+      counter-increment: step-counter;
+      position: relative;
+      padding: 12px 12px 12px 48px;
+      margin: 8px 0;
+      background: var(--gc-surface);
+      border-radius: 8px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .step-list li::before {
+      content: counter(step-counter);
+      position: absolute;
+      left: 12px;
+      top: 12px;
+      width: 24px;
+      height: 24px;
+      background: var(--gc-blue-600);
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    footer {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      display: block;
+      margin: 4px 0;
+    }
+
+    @media (max-width: 768px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+      .stat-cards {
+        grid-template-columns: 1fr;
+      }
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; }
+      .subtitle { text-align: left; margin-top: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>🔒 Google SecOps: インジェスションメトリクス修正 + siemAlertId 予約化</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge badge-breaking">Breaking Change</span>
+          <span class="badge badge-service">Google SecOps</span>
+          <span class="badge badge-fix">メトリクス修正</span>
+        </div>
+      </div>
+      <div class="subtitle">
+        <div>2026-06-23</div>
+        <div>SIEM + SOAR</div>
+      </div>
+    </div>
+
+    <!-- Critical Alert -->
+    <div class="error-box">
+      <strong>🚨 緊急対応が必要:</strong> <code>siemAlertId</code> フィールドの予約化は <strong>2026年7月5日</strong> に適用開始。カスタムデータを格納している場合、期限までに移行しなければ<strong>不可逆的なデータ損失</strong>が発生します。
+    </div>
+
+    <!-- Key Stats -->
+    <div class="stat-cards">
+      <div class="stat-card red">
+        <div class="stat-value">7/5</div>
+        <div class="stat-label">siemAlertId 予約化<br>適用開始日</div>
+      </div>
+      <div class="stat-card yellow">
+        <div class="stat-value">6/29-7/10</div>
+        <div class="stat-label">メトリクス修正<br>段階適用期間</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">~12日間</div>
+        <div class="stat-label">移行対応に<br>残された期間</div>
+      </div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>Google Security Operations (SecOps) で 2 つの重要な変更が発表されました。</p>
+
+      <div class="card card-red">
+        <h3>1. siemAlertId フィールドの内部予約化 (Breaking Change)</h3>
+        <p>7月5日以降、<code>siemAlertId</code> は Chronicle SIEM 内部アラート ID 専用に厳密予約されます。カスタムデータを渡した場合、システムが<strong>自動的に上書き</strong>します。</p>
+      </div>
+
+      <div class="card card-yellow">
+        <h3>2. インジェスションメトリクスの過少報告修正</h3>
+        <p>ダッシュボードおよび Cloud Monitoring に表示されるインジェスションメトリクスの過少報告問題を解消。6/29-7/10 の間に段階適用されます。</p>
+      </div>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before">
+          <h4>❌ Before (現在の課題)</h4>
+          <ul>
+            <li>インジェスションメトリクスが一部過少報告されていた</li>
+            <li>siemAlertId にカスタムデータを格納して運用するユーザーが存在</li>
+            <li>siemAlertId の用途が明確に制限されず、内部/外部用途が混在</li>
+          </ul>
+        </div>
+        <div class="after">
+          <h4>✅ After (改善後)</h4>
+          <ul>
+            <li>メトリクスが正確に報告され、データ可視性が向上</li>
+            <li>siemAlertId の用途が明確化、アラート ID の一貫性保証</li>
+            <li>SOAR 連携のアラート同期が安定化</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>インジェスション経路における siemAlertId の自動上書きポイントと、メトリクス修正が適用される箇所を示しています。赤色が Breaking Change の影響範囲、黄色がメトリクス修正の適用箇所です。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph ingestion["データインジェスション経路"]
+        A[/"外部ログソース"/] --> B["Ingestion API"]
+        A --> C["Webhook フィード"]
+        A --> D["コネクタ"]
+    end
+
+    subgraph processing["Google SecOps 処理"]
+        B --> E["インジェスションパイプライン"]
+        C --> E
+        D --> E
+        E --> F{{"siemAlertId チェック"}}
+        F -->|"カスタム値検出"| G["自動上書き (7/5以降)"]
+        F -->|"内部 ID"| H["正常処理"]
+        G --> H
+        H --> I[("Chronicle SIEM\nアラートDB")]
+    end
+
+    subgraph metrics["メトリクス修正"]
+        E --> J["メトリクス集計\n(修正適用: 6/29-7/10)"]
+        J --> K["Cloud Monitoring"]
+        J --> L["SecOps ダッシュボード"]
+    end
+
+    style F fill:#ff6b6b,color:#fff
+    style G fill:#ff6b6b,color:#fff
+    style J fill:#ffd93d,color:#333
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features Detail -->
+    <div class="section">
+      <h2>⚡ 主要変更の詳細</h2>
+
+      <h3>1. インジェスションメトリクス修正</h3>
+      <div class="card">
+        <div class="icon-text"><span>📊</span><span>ダッシュボード (Data Ingestion and Health) および Cloud Monitoring のメトリクスが対象</span></div>
+        <div class="icon-text"><span>📅</span><span>2026年6月29日 - 7月10日の間に段階的に有効化</span></div>
+        <div class="icon-text"><span>📈</span><span>修正適用時に一時的な「見かけ上のスパイク」が表示される可能性</span></div>
+        <div class="icon-text"><span>💰</span><span>実際のログ取り込み量に変更なし、課金にも影響なし</span></div>
+        <div class="icon-text"><span>🕐</span><span>過去のメトリクスデータは修正されない (修正以降のデータのみ正確)</span></div>
+      </div>
+
+      <h3>2. siemAlertId 内部予約化 (Breaking Change)</h3>
+      <div class="card card-red">
+        <div class="icon-text"><span>📅</span><span>2026年7月5日に適用開始</span></div>
+        <div class="icon-text"><span>🔒</span><span>Chronicle SIEM 内部アラート ID 専用に厳密予約</span></div>
+        <div class="icon-text"><span>⚠️</span><span>カスタムデータはシステムにより自動上書きされる</span></div>
+        <div class="icon-text"><span>🌐</span><span>全インジェスション方法が影響: Ingestion API、Webhook、コネクタ</span></div>
+        <div class="icon-text"><span>🚨</span><span>7月5日前に別フィールドへの移行が必須</span></div>
+      </div>
+
+      <h3>3. siemAlertId の正しい用途</h3>
+      <div class="note-box">
+        <p style="margin:0;"><strong>システム内部管理用:</strong> Google Chronicle Alerts Creator ジョブがサードパーティアラートを SIEM に同期する際に自動付与され、SIEM で生成されたアラートがコネクタ経由で取得される際に自動設定されるフィールドです。ユーザーが手動で設定するものではありません。</p>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3>影響を受けるメトリクス</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>メトリクス</th>
+            <th>表示場所</th>
+            <th>影響</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Total ingested log count</td>
+            <td>Cloud Monitoring (Chronicle Collector > Ingestion)</td>
+            <td>修正後に数値増加の可能性</td>
+          </tr>
+          <tr>
+            <td>Total ingested log size</td>
+            <td>Cloud Monitoring (Chronicle Collector > Ingestion)</td>
+            <td>修正後に数値増加の可能性</td>
+          </tr>
+          <tr>
+            <td>log_count</td>
+            <td>BigQuery エクスポート (ingestion_metrics テーブル)</td>
+            <td>修正後に数値増加の可能性</td>
+          </tr>
+          <tr>
+            <td>log_volume</td>
+            <td>BigQuery エクスポート (ingestion_metrics テーブル)</td>
+            <td>修正後に数値増加の可能性</td>
+          </tr>
+          <tr>
+            <td>Ingested Events Count</td>
+            <td>SecOps Data Ingestion and Health ダッシュボード</td>
+            <td>修正後に数値増加の可能性</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>siemAlertId 移行仕様</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>対象フィールド</td>
+            <td><code>siemAlertId</code> (アラートオブジェクト内)</td>
+          </tr>
+          <tr>
+            <td>適用開始日</td>
+            <td>2026年7月5日</td>
+          </tr>
+          <tr>
+            <td>影響範囲</td>
+            <td>Ingestion API、Webhook、全コネクタ</td>
+          </tr>
+          <tr>
+            <td>動作変更</td>
+            <td>カスタム値がシステムにより自動上書き</td>
+          </tr>
+          <tr>
+            <td>推奨対応</td>
+            <td>別のカスタムフィールド (labels、UDM extensions 等) へ移行</td>
+          </tr>
+          <tr>
+            <td>移行期限</td>
+            <td>2026年7月5日まで (約12日間)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Migration Code Examples -->
+    <div class="section">
+      <h2>💻 移行先フィールドとコードサンプル</h2>
+
+      <h3>方法 1: UDM additional.fields に移行</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">JSON</span>
+          <span class="code-title">UDM additional.fields への移行例</span>
+        </div>
+        <pre><code class="language-json">{
+  "metadata": {
+    "event_timestamp": "2026-06-23T12:00:00Z",
+    "event_type": "GENERIC_EVENT"
+  },
+  "additional": {
+    "fields": {
+      "custom_alert_id": {
+        "string_value": "your-custom-alert-identifier"
+      }
+    }
+  }
+}</code></pre>
+      </div>
+
+      <h3>方法 2: Ingestion Labels に移行</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">JSON</span>
+          <span class="code-title">Ingestion Labels への移行例</span>
+        </div>
+        <pre><code class="language-json">{
+  "labels": [
+    {
+      "key": "custom_alert_id",
+      "value": "your-custom-alert-identifier"
+    }
+  ]
+}</code></pre>
+      </div>
+
+      <div class="note-box">
+        <strong>💡 移行先の選び方:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li><strong>検索・フィルタリング用途</strong>: UDM の <code>additional.fields</code> に移行</li>
+          <li><strong>ラベル・タグ用途</strong>: Ingestion labels (<code>labels[]</code>) に移行</li>
+          <li><strong>アラート関連メタデータ</strong>: <code>security_result</code> 内のカスタムフィールドに移行</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Migration Steps -->
+    <div class="section">
+      <h2>📝 移行手順</h2>
+      <ol class="step-list">
+        <li><strong>影響範囲の特定:</strong> siemAlertId にカスタムデータを渡しているインジェスション設定 (API スクリプト、Webhook フィード、SOAR コネクタ) を洗い出す</li>
+        <li><strong>移行先フィールドの選定:</strong> カスタムデータの用途に応じて <code>additional.fields</code>、<code>labels[]</code>、<code>security_result</code> から適切なフィールドを選択</li>
+        <li><strong>インジェスション設定の更新:</strong> 移行先フィールドを使用するようにコードまたは設定を更新</li>
+        <li><strong>検証:</strong> 更新後のデータが正しく取り込まれ、検索・検出ルールで参照可能か確認</li>
+        <li><strong>検出ルールの更新:</strong> siemAlertId を参照している YARA-L 検出ルールを移行先フィールド参照に更新</li>
+      </ol>
+    </div>
+
+    <!-- Timeline -->
+    <div class="section">
+      <h2>📅 タイムライン</h2>
+      <div class="timeline">
+        <div class="timeline-item">
+          <div class="timeline-date">2026年6月23日</div>
+          <div>変更発表日 - 移行作業の開始を推奨</div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-date">2026年6月29日</div>
+          <div>メトリクス修正の段階適用開始 (見かけ上のスパイク発生の可能性)</div>
+        </div>
+        <div class="timeline-item critical">
+          <div class="timeline-date">2026年7月5日 (期限)</div>
+          <div><strong>siemAlertId 予約化の適用開始</strong> - 以降カスタムデータは自動上書き</div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-date">2026年7月10日</div>
+          <div>メトリクス修正の段階適用完了 - 新しいベースラインの確認可能</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>🔗 ユースケース 1: サードパーティ SOAR 連携でカスタム ID を使用していた場合</h4>
+        <p><strong>シナリオ:</strong> Palo Alto XSOAR や ServiceNow ITSM から Google SecOps にアラートを取り込む際に、siemAlertId に独自識別子を格納していた。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">JSON</span>
+            <span class="code-title">移行後の対応例</span>
+          </div>
+          <pre><code class="language-json">{
+  "additional": {
+    "fields": {
+      "external_soar_alert_id": {
+        "string_value": "XSOAR-INCIDENT-12345"
+      },
+      "source_platform": {
+        "string_value": "PaloAlto_XSOAR"
+      }
+    }
+  }
+}</code></pre>
+        </div>
+        <p><strong>効果:</strong> 7月5日以降もカスタム識別子が保持され、クロスプラットフォームのアラート追跡が継続可能。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>📈 ユースケース 2: メトリクススパイクへの対応</h4>
+        <p><strong>シナリオ:</strong> Cloud Monitoring でインジェスション量の閾値ベースアラートを設定しており、メトリクス修正による誤アラートが懸念される。</p>
+        <div class="flow-diagram">
+          <div class="flow-step">6/29前<br>閾値引上げ</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">7/10以降<br>ベースライン確認</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">閾値<br>再設定</div>
+        </div>
+        <p><strong>効果:</strong> 不要なインシデント対応を回避しつつ、修正後の正確なベースラインに基づく監視体制を構築。</p>
+      </div>
+    </div>
+
+    <!-- Merits and Demerits -->
+    <div class="section">
+      <h2>⚖️ メリット・デメリット</h2>
+
+      <h3>メリット</h3>
+      <div class="card card-green">
+        <h4 style="margin-top:0; color: var(--gc-green);">ビジネス面</h4>
+        <div class="icon-text"><span>✅</span><span><strong>正確なキャパシティプランニング:</strong> 実際のインジェスション量を正確に把握でき、計画精度が向上</span></div>
+        <div class="icon-text"><span>✅</span><span><strong>アラート管理の信頼性向上:</strong> siemAlertId の一意性保証で SIEM-SOAR 間の同期が安定</span></div>
+      </div>
+      <div class="card card-green">
+        <h4 style="margin-top:0; color: var(--gc-green);">技術面</h4>
+        <div class="icon-text"><span>✅</span><span><strong>メトリクス整合性:</strong> ダッシュボード、Cloud Monitoring、BigQuery エクスポート全てで一貫した正確なメトリクス</span></div>
+        <div class="icon-text"><span>✅</span><span><strong>システム内部 ID の保護:</strong> アラートライフサイクル管理の安定化</span></div>
+      </div>
+
+      <h3>デメリット・制約事項</h3>
+      <div class="card card-red">
+        <div class="icon-text"><span>⚠️</span><span>メトリクス修正適用時 (6/29-7/10) にアラートポリシーが誤発報する可能性</span></div>
+        <div class="icon-text"><span>⚠️</span><span>過去のメトリクスは遡及修正されないため、前後比較に注意が必要</span></div>
+        <div class="icon-text"><span>⚠️</span><span>既存の検出ルール・ダッシュボード・レポートの更新作業が必要</span></div>
+        <div class="icon-text"><span>🚨</span><span><strong>移行期限が約12日間と短い</strong> - 即座のアクションが必要</span></div>
+        <div class="icon-text"><span>🚨</span><span><strong>データ損失リスク:</strong> 期限までに移行しないと不可逆的にデータが失われる</span></div>
+      </div>
+
+      <div class="warning-box">
+        <strong>⚠️ アラートポリシーの一時調整推奨:</strong> 6/29-7/10 の期間はメトリクススパイクによる誤アラートを防ぐため、アラート閾値の一時的な調整を検討してください。
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス</h2>
+      <div class="card">
+        <div class="icon-text"><span>📊</span><span><strong>Cloud Monitoring:</strong> Chronicle Collector メトリクス (Total ingested log count/size) が修正対象。アラートポリシーの閾値調整が必要な場合あり。</span></div>
+      </div>
+      <div class="card">
+        <div class="icon-text"><span>🗄️</span><span><strong>BigQuery:</strong> ingestion_metrics テーブルへのエクスポートで修正後のメトリクスが正確に反映。SQL 分析が可能。</span></div>
+      </div>
+      <div class="card">
+        <div class="icon-text"><span>🤖</span><span><strong>Google SecOps SOAR:</strong> Chronicle Alerts Creator ジョブが siemAlertId を使用してアラート同期を管理。今回の変更で信頼性が向上。</span></div>
+      </div>
+      <div class="card">
+        <div class="icon-text"><span>🏥</span><span><strong>SecOps Health Hub:</strong> Data Ingestion and Health ダッシュボードでインジェスション状態を一元監視。メトリクス修正の主要表示先。</span></div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>📌 まとめ</h2>
+      <div class="error-box">
+        <p style="margin:0;"><strong>最優先アクション:</strong> 2026年7月5日までに <code>siemAlertId</code> フィールドにカスタムデータを格納しているインジェスション設定を監査し、<code>additional.fields</code> または <code>labels[]</code> へ移行する。対応しなければ不可逆的なデータ損失が発生。</p>
+      </div>
+      <div class="warning-box">
+        <p style="margin:0;"><strong>推奨アクション:</strong> 6月29日 - 7月10日のメトリクス修正に備え、Cloud Monitoring のアラートポリシー閾値を事前に調整する。見かけ上のスパイクが発生しても実際のログ量や課金に影響はない。</p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>出典・参考リンク:</strong></p>
+      <a href="https://docs.google.com/release-notes#June_23_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート</a>
+      <a href="https://docs.cloud.google.com/chronicle/docs/reference/ingestion-api" target="_blank" rel="noopener noreferrer" class="gc-link">Ingestion API リファレンス</a>
+      <a href="https://docs.cloud.google.com/chronicle/docs/ingestion/understand-ingestion-metrics" target="_blank" rel="noopener noreferrer" class="gc-link">インジェスションメトリクスの理解</a>
+      <a href="https://docs.cloud.google.com/chronicle/docs/reference/ingestion-metrics-schema" target="_blank" rel="noopener noreferrer" class="gc-link">インジェスションメトリクススキーマ</a>
+      <a href="https://docs.cloud.google.com/chronicle/docs/ingestion/ingestion-notifications-for-health-metrics" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud Monitoring でのインジェスション通知設定</a>
+      <a href="https://docs.cloud.google.com/chronicle/docs/ingestion/setup-siem-webhook" target="_blank" rel="noopener noreferrer" class="gc-link">SIEM Webhook フィードの設定</a>
+      <a href="https://docs.cloud.google.com/chronicle/docs/soar/marketplace-integrations/google-chronicle" target="_blank" rel="noopener noreferrer" class="gc-link">Google Chronicle SOAR 統合</a>
+      <p style="margin-top: 12px; font-size: 11px; color: #9AA0A6;">Generated by Claude Code - Google Cloud News Infographic</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

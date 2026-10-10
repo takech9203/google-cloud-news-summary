@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Build: 汎用アーティファクトの Artifact Registry 直接アップロード & 依存関係ダウンロード</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.3;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+      text-align: right;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card.green { border-left-color: var(--gc-green); }
+    .card.orange { border-left-color: var(--gc-orange); }
+    .card.purple { border-left-color: var(--gc-purple); }
+    .card.teal { border-left-color: var(--gc-teal); }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+    .badge { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); color: #FFFFFF; }
+    .badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+    .badge-deprecated { background: var(--gc-red); color: #FFFFFF; }
+    .badge-devops { background: var(--gc-orange); color: #FFFFFF; }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+    .check-icon { color: var(--gc-green); font-size: 18px; }
+    .cross-icon { color: var(--gc-red); font-size: 18px; }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      border-radius: 8px 8px 0 0;
+    }
+    .code-lang { color: #9CDCFE; font-weight: bold; }
+    .code-title { color: #AAAAAA; }
+    .code-block pre { margin: 0; padding: 0; overflow-x: auto; border-radius: 0 0 8px 8px; }
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+    .stat-card.green { background: linear-gradient(135deg, var(--gc-green), #1B8A3A); }
+    .stat-card.orange { background: linear-gradient(135deg, var(--gc-orange), #E65100); }
+    .stat-value { font-size: 36px; font-weight: 700; margin-bottom: 4px; }
+    .stat-label { font-size: 14px; opacity: 0.9; }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+    .before-card {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .after-card {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .before-card h3 { color: var(--gc-red); margin-top: 0; }
+    .after-card h3 { color: var(--gc-green); margin-top: 0; }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+    .usecase-card h3 { color: var(--gc-blue-800); margin-top: 0; }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+
+    .pricing-table td:first-child { font-weight: 600; }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+    footer a { color: var(--gc-blue-600); text-decoration: underline; word-break: break-all; }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; align-items: flex-start; }
+      .subtitle { text-align: left; margin-top: 8px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stat-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>🔧 Cloud Build: 汎用アーティファクトの<br>Artifact Registry 直接アップロード & 依存関係ダウンロード</h1>
+        <div style="margin-top: 12px;">
+          <span class="badge-devops" style="display:inline-block;color:#FFFFFF;padding:4px 12px;border-radius:16px;font-size:13px;font-weight:500;letter-spacing:0.25px;margin:4px 8px 4px 0;">Cloud Build</span>
+          <span class="badge" style="background:var(--gc-blue-600);">Artifact Registry</span>
+          <span class="badge" style="background:var(--gc-blue-300);">Feature</span>
+        </div>
+      </div>
+      <div class="subtitle">
+        2026-03-30<br>
+        Google Cloud Update
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        Cloud Build のビルド構成ファイルに <span class="highlight">genericArtifacts</span> スタンザを追加することで、ビルド成果物を Artifact Registry の汎用 (generic) リポジトリに<strong>直接アップロード</strong>できるようになりました。また、<span class="highlight">dependencies</span> スタンザで汎用リポジトリのアーティファクトを<strong>ビルド依存関係として自動ダウンロード</strong>することも可能になりました。
+      </p>
+      <p>
+        Docker イメージや言語固有のパッケージに限らず、<strong>あらゆる形式のファイル</strong> (バイナリ、設定ファイル、アーカイブ等) を Cloud Build の CI/CD パイプラインに宣言的に統合できます。
+      </p>
+    </div>
+
+    <!-- Before / After -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-card">
+          <h3>❌ Before</h3>
+          <div class="check-item"><span class="cross-icon">✗</span><span>ビルドステップで <code>gcloud artifacts generic upload</code> を手動実行が必要</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>依存関係ダウンロードにカスタムスクリプトが必要</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>Docker/Maven/npm には専用フィールドがあるが、汎用フォーマットには宣言的サポートなし</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>ビルド構成が冗長で保守性が低い</span></div>
+        </div>
+        <div class="after-card">
+          <h3>✅ After</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><code>genericArtifacts</code> フィールドで宣言的にアップロード指定</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><code>dependencies</code> スタンザでビルド開始時に自動ダウンロード</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>Docker/Maven/npm/Python と同等の宣言的サポート</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>カスタムステップ不要で可読性・保守性が向上</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>Cloud Build からの双方向フロー: アップロード (<code>genericArtifacts</code>) とダウンロード (<code>dependencies</code>)</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    subgraph CB["Cloud Build"]
+        BC["cloudbuild.yaml"]
+        BS["ビルドステップ"]
+        GA["genericArtifacts"]
+        DEP["dependencies"]
+    end
+
+    subgraph AR["Artifact Registry"]
+        GR["汎用リポジトリ\n(Generic Repository)"]
+        PKG["パッケージ / バージョン"]
+    end
+
+    subgraph SRC["ソース"]
+        REPO["ソースリポジトリ"]
+        FILES["ビルド成果物\n(バイナリ, 設定ファイル,\nアーカイブ等)"]
+    end
+
+    REPO --> BC
+    BC --> BS
+    BS --> FILES
+    FILES -->|アップロード| GA
+    GA -->|genericArtifacts| GR
+    GR --> PKG
+    PKG -->|依存関係として\nダウンロード| DEP
+    DEP --> BS
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h3>📤 1. genericArtifacts によるアップロード</h3>
+          <div class="icon-text"><span class="arrow">→</span><span>ビルド構成ファイルのトップレベルに <code>genericArtifacts</code> スタンザを追加</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>パッケージ名、バージョン、ファイルパスを宣言的に指定</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>圧縮ファイル (tar, zip)、設定ファイル (YAML, TOML)、バイナリ、PDF など任意の形式に対応</span></div>
+        </div>
+        <div class="card green">
+          <h3>📥 2. 汎用アーティファクトの依存関係指定</h3>
+          <div class="icon-text"><span class="arrow">→</span><span><code>dependencies</code> スタンザで汎用リポジトリのアーティファクトを参照可能</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>ビルド開始時に <code>/workspace</code> 配下に自動ダウンロード</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>他のビルドで生成されたバイナリや設定ファイルをビルド間で共有可能</span></div>
+        </div>
+        <div class="card orange">
+          <h3>🔗 3. 既存のアーティファクト管理との統合</h3>
+          <div class="icon-text"><span class="arrow">→</span><span>Docker イメージ、Maven、npm、Python パッケージに加え、汎用フォーマットを追加</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>Artifact Registry の IAM、VPC Service Controls、脆弱性スキャンをそのまま利用可能</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>Cloud Build のサブスティテューション変数による動的設定にも対応</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>📐 技術仕様</h2>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>設定場所</td><td>ビルド構成ファイル (cloudbuild.yaml / cloudbuild.json) のトップレベル</td></tr>
+          <tr><td>リポジトリ形式</td><td>Artifact Registry の generic フォーマット</td></tr>
+          <tr><td>パッケージ名制約</td><td>英数字で始まり終わる、英数字・ハイフン・アンダースコア・ピリオドのみ、256 文字以内</td></tr>
+          <tr><td>バージョン制約</td><td>英数字で始まり終わる、小文字英数字と <code>-.+~:</code> のみ、128 文字以内、<code>latest</code> は使用不可</td></tr>
+          <tr><td>対応ファイル形式</td><td>任意 (圧縮ファイル、設定ファイル、バイナリ、PDF、メディアファイル等)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Code Examples -->
+    <div class="section">
+      <h2>💻 設定例</h2>
+
+      <h3>アップロード設定 (genericArtifacts)</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">YAML</span>
+          <span class="code-title">cloudbuild.yaml - アーティファクトのアップロード</span>
+        </div>
+        <pre><code class="language-yaml">steps:
+  - name: 'gcr.io/cloud-builders/go'
+    args: ['build', '-o', 'output/my-app', '.']
+
+genericArtifacts:
+  location: 'us-central1'
+  repository: 'my-generic-repo'
+  package: 'my-app'
+  version: '$BUILD_ID'
+  files:
+    - 'output/my-app'</code></pre>
+      </div>
+
+      <h3>依存関係ダウンロード設定 (dependencies)</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">YAML</span>
+          <span class="code-title">cloudbuild.yaml - 依存関係として使用</span>
+        </div>
+        <pre><code class="language-yaml">dependencies:
+  genericArtifact:
+    repository: 'projects/my-project/locations/us-central1/repositories/my-generic-repo'
+    package: 'my-app'
+    version: '1.0.0'
+    destPath: 'deps/my-app'
+
+steps:
+  - name: 'ubuntu'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - 'chmod +x /workspace/deps/my-app/my-app && /workspace/deps/my-app/my-app'</code></pre>
+      </div>
+    </div>
+
+    <!-- Setup Steps -->
+    <div class="section">
+      <h2>🛠️ セットアップ手順</h2>
+
+      <div class="note-box">
+        <strong>📌 前提条件:</strong> Artifact Registry に汎用フォーマットのリポジトリが作成済みであること。Cloud Build サービスアカウントに <code>roles/artifactregistry.writer</code> が付与されていること (同一プロジェクトではデフォルトで付与済み)。
+      </div>
+
+      <div class="flow-diagram">
+        <div class="flow-step">📦 Step 1<br>汎用リポジトリ<br>作成</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">📝 Step 2<br>genericArtifacts<br>設定追加</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🚀 Step 3<br>ビルド実行</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🔗 Step 4<br>依存関係として<br>利用</div>
+      </div>
+
+      <h3>Step 1: 汎用リポジトリの作成</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">gcloud CLI</span>
+        </div>
+        <pre><code class="language-bash">gcloud artifacts repositories create my-generic-repo \
+  --repository-format=generic \
+  --location=us-central1 \
+  --description="Generic artifact repository for Cloud Build"</code></pre>
+      </div>
+
+      <h3>Step 2: ビルド構成ファイルに genericArtifacts を追加</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">YAML</span>
+          <span class="code-title">cloudbuild.yaml</span>
+        </div>
+        <pre><code class="language-yaml">steps:
+  - name: 'gcr.io/cloud-builders/go'
+    args: ['build', '-o', 'output/my-binary', '.']
+
+genericArtifacts:
+  location: 'us-central1'
+  repository: 'my-generic-repo'
+  package: 'my-binary'
+  version: '${SHORT_SHA}'
+  files:
+    - 'output/my-binary'</code></pre>
+      </div>
+
+      <h3>Step 3: ビルドの実行</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">ビルド実行コマンド</span>
+        </div>
+        <pre><code class="language-bash">gcloud builds submit --config=cloudbuild.yaml .</code></pre>
+      </div>
+
+      <h3>Step 4: 別のビルドで依存関係として使用</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">YAML</span>
+          <span class="code-title">cloudbuild-deploy.yaml</span>
+        </div>
+        <pre><code class="language-yaml">dependencies:
+  genericArtifact:
+    repository: 'projects/my-project/locations/us-central1/repositories/my-generic-repo'
+    package: 'my-binary'
+    version: '1.0.0'
+    destPath: 'bin'
+
+steps:
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - './bin/my-binary --deploy'</code></pre>
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div>
+          <h3>💼 ビジネス面</h3>
+          <div class="card green">
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>CI/CD パイプラインの簡素化</strong>: 宣言的な記述だけでアーティファクト管理が完結し、構築・保守コストが削減</span></div>
+          </div>
+          <div class="card green">
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>ビルド間のアーティファクト共有</strong>: 異なるパイプライン間でバイナリや設定ファイルを安全に共有、マイクロサービスや複雑なリリースフローに対応</span></div>
+          </div>
+        </div>
+        <div>
+          <h3>🔧 技術面</h3>
+          <div class="card">
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>宣言的な構成</strong>: カスタムビルドステップ不要、可読性と再現性が向上</span></div>
+          </div>
+          <div class="card">
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>Artifact Registry 統合</strong>: IAM、VPC Service Controls、脆弱性スキャンをそのまま活用</span></div>
+          </div>
+          <div class="card">
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>バージョン管理の一元化</strong>: パッケージ名 + バージョンによるトレーサビリティ向上</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <div class="warning-box">
+        <strong>⚠️ 制限事項:</strong>
+        <ul style="margin:8px 0 0 0;padding-left:20px;">
+          <li>汎用リポジトリのアーティファクトは<strong>不変 (immutable)</strong> -- 同一パッケージ名・同一バージョンのファイルを上書き不可</li>
+          <li>バージョン名として <code>latest</code> は使用不可</li>
+          <li>パッケージ名は 256 文字以内、バージョン名は 128 文字以内</li>
+        </ul>
+      </div>
+      <div class="note-box">
+        <strong>💡 考慮すべき点:</strong>
+        <ul style="margin:8px 0 0 0;padding-left:20px;">
+          <li>汎用リポジトリはパッケージマネージャー (Docker, Maven, npm 等) によるネイティブ操作には非対応。必要な場合は専用形式のリポジトリを使用</li>
+          <li>大量ファイルのアップロードはディレクトリ単位の指定を検討</li>
+          <li>クロスプロジェクト利用には Cloud Build サービスアカウントへの明示的な IAM ロール付与が必要</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h3>📦 ユースケース 1: Go バイナリのクロスコンパイルと配布</h3>
+        <p><strong>シナリオ:</strong> 複数プラットフォーム向けに Go バイナリをクロスコンパイルし、各環境のデプロイパイプラインで利用</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">YAML</span>
+            <span class="code-title">クロスコンパイル + アップロード</span>
+          </div>
+          <pre><code class="language-yaml">steps:
+  - name: 'golang'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        GOOS=linux GOARCH=amd64 go build -o output/my-app-linux-amd64 .
+        GOOS=darwin GOARCH=arm64 go build -o output/my-app-darwin-arm64 .
+
+genericArtifacts:
+  location: 'us-central1'
+  repository: 'release-binaries'
+  package: 'my-app'
+  version: '$TAG_NAME'
+  files:
+    - 'output/my-app-linux-amd64'
+    - 'output/my-app-darwin-arm64'</code></pre>
+        </div>
+        <div class="success-box">
+          <strong>✅ 効果:</strong> 複数プラットフォームのバイナリが自動的にバージョン管理され、デプロイパイプラインから依存関係として安全にダウンロード可能。
+        </div>
+      </div>
+
+      <div class="usecase-card">
+        <h3>🏗️ ユースケース 2: Terraform プランファイルのビルド間共有</h3>
+        <p><strong>シナリオ:</strong> CI パイプラインで <code>terraform plan</code> の結果を保存し、承認後のデプロイパイプラインで <code>terraform apply</code> に使用</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div>
+            <div class="code-block">
+              <div class="code-header">
+                <span class="code-lang">YAML</span>
+                <span class="code-title">Plan ステージ</span>
+              </div>
+              <pre><code class="language-yaml">steps:
+  - name: 'hashicorp/terraform'
+    args: ['plan', '-out=tfplan']
+
+genericArtifacts:
+  location: 'us-central1'
+  repository: 'terraform-plans'
+  package: 'infra-plan'
+  version: '$BUILD_ID'
+  files:
+    - 'tfplan'</code></pre>
+            </div>
+          </div>
+          <div>
+            <div class="code-block">
+              <div class="code-header">
+                <span class="code-lang">YAML</span>
+                <span class="code-title">Apply ステージ</span>
+              </div>
+              <pre><code class="language-yaml">dependencies:
+  genericArtifact:
+    repository: 'projects/.../terraform-plans'
+    package: 'infra-plan'
+    version: '&lt;plan-build-id&gt;'
+    destPath: 'plan'
+
+steps:
+  - name: 'hashicorp/terraform'
+    args: ['apply', '/workspace/plan/tfplan']</code></pre>
+            </div>
+          </div>
+        </div>
+        <div class="success-box">
+          <strong>✅ 効果:</strong> プランファイルが Artifact Registry で不変かつバージョン管理された状態で保存され、承認プロセスを挟んだ安全なデプロイフローを実現。
+        </div>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金情報</h2>
+      <p>Cloud Build の汎用アーティファクト機能自体に<strong>追加料金は発生しません</strong>。以下の関連サービスの料金が適用されます。</p>
+      <table class="pricing-table">
+        <thead>
+          <tr><th>項目</th><th>料金 (概算)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Cloud Build ビルド時間 (デフォルトマシンタイプ)</td><td>最初の 120 分/日は無料、以降 $0.003/ビルド分</td></tr>
+          <tr><td>Artifact Registry ストレージ</td><td>$0.10/GB/月</td></tr>
+          <tr><td>Artifact Registry ネットワーク (同一リージョン)</td><td>無料</td></tr>
+          <tr><td>Artifact Registry ネットワーク (リージョン間)</td><td>標準のネットワーク料金が適用</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Regions -->
+    <div class="section">
+      <h2>🌐 利用可能リージョン</h2>
+      <p>Artifact Registry の汎用リポジトリが利用可能な<strong>全リージョン</strong>で使用可能です。</p>
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">🇺🇸</div>
+          <div class="stat-label">us-central1, us-east1<br>マルチリージョン: us</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-value">🇪🇺</div>
+          <div class="stat-label">europe-west1<br>マルチリージョン: europe</div>
+        </div>
+        <div class="stat-card orange">
+          <div class="stat-value">🇯🇵</div>
+          <div class="stat-label">asia-northeast1 (東京)<br>マルチリージョン: asia</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <strong>📦 Artifact Registry</strong>: 汎用アーティファクトの保存先。Docker、Maven、npm、Python、Go など複数パッケージ形式をサポートし、汎用フォーマットも同一プラットフォームで管理。
+      </div>
+      <div class="card purple">
+        <strong>⚡ Cloud Build トリガー</strong>: ソースリポジトリの変更を検知して自動ビルドを実行。genericArtifacts と組み合わせてコード変更から成果物保存まで自動化。
+      </div>
+      <div class="card teal">
+        <strong>🔍 Artifact Analysis</strong>: Artifact Registry に保存されたアーティファクトの脆弱性スキャンやメタデータ管理を提供。
+      </div>
+      <div class="card orange">
+        <strong>🔒 VPC Service Controls</strong>: Artifact Registry リポジトリをセキュリティ境界内に配置し、データ流出を防止。
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section" style="background: linear-gradient(135deg, var(--gc-blue-50), var(--gc-surface-container-lowest)); border: 2px solid var(--gc-blue-200);">
+      <h2>📝 まとめ</h2>
+      <p>
+        今回のアップデートにより、Cloud Build のビルド構成ファイルから Artifact Registry の汎用リポジトリへのアーティファクトの<strong>アップロード</strong>と、汎用リポジトリからの<strong>依存関係としてのダウンロード</strong>が宣言的に行えるようになりました。
+      </p>
+      <p>
+        Docker イメージや言語固有パッケージ以外のビルド成果物を扱う CI/CD パイプラインを構築している組織は、この機能を活用して<strong>パイプラインの簡素化</strong>と<strong>アーティファクト管理の一元化</strong>を進めることを推奨します。
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>タグ:</strong> #CloudBuild #ArtifactRegistry #GenericArtifacts #CI/CD #DevOps</p>
+      <p>📎 出典:</p>
+      <ul style="margin:4px 0;padding-left:20px;">
+        <li><a href="https://cloud.google.com/release-notes#March_30_2026" target="_blank" rel="noopener noreferrer">Google Cloud Release Notes - March 30, 2026</a></li>
+        <li><a href="https://cloud.google.com/build/docs/building/store-artifacts-in-artifact-registry" target="_blank" rel="noopener noreferrer">Cloud Build - Artifact Registry へのアーティファクト保存</a></li>
+        <li><a href="https://cloud.google.com/artifact-registry/docs/generic" target="_blank" rel="noopener noreferrer">Artifact Registry - 汎用アーティファクトの管理</a></li>
+        <li><a href="https://cloud.google.com/artifact-registry/docs/generic/store-generic" target="_blank" rel="noopener noreferrer">Artifact Registry - 汎用リポジトリのクイックスタート</a></li>
+        <li><a href="https://cloud.google.com/build/docs/building/manage-dependencies" target="_blank" rel="noopener noreferrer">Cloud Build - 依存関係の管理</a></li>
+        <li><a href="https://cloud.google.com/artifact-registry/pricing" target="_blank" rel="noopener noreferrer">Artifact Registry 料金</a></li>
+      </ul>
+      <p style="margin-top:12px;font-size:11px;color:#999;">Generated on 2026-03-31 | Google Cloud News Infographic</p>
+    </footer>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

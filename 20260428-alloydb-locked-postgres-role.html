@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AlloyDB for PostgreSQL: ロックされた postgres ロール動作変更</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left {
+      flex: 1;
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-change {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .badge-security {
+      background: var(--gc-red);
+      color: #FFFFFF;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin: 0 0 8px 0;
+      color: var(--gc-on-surface);
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .card p {
+      margin: 0;
+      font-size: 14px;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 600px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h4 {
+      color: var(--gc-red);
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box h4 {
+      color: var(--gc-green);
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .before-box ul, .after-box ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin-bottom: 4px;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+    }
+
+    .usecase-card h3 {
+      margin: 0 0 8px 0;
+      color: var(--gc-blue-900);
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .usecase-card p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    .usecase-card .scenario {
+      color: var(--gc-on-surface-variant);
+    }
+
+    .usecase-card .effect {
+      color: var(--gc-green);
+      font-weight: 500;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .merit-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .merit-list li {
+      padding: 8px 0;
+      padding-left: 28px;
+      position: relative;
+      font-size: 14px;
+    }
+
+    .merit-list li::before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: var(--gc-green);
+      font-weight: bold;
+      font-size: 16px;
+    }
+
+    .demerit-list li::before {
+      content: "!";
+      color: var(--gc-orange);
+    }
+
+    .related-services {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    @media (max-width: 600px) {
+      .related-services {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .related-service-item {
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 14px;
+    }
+
+    .related-service-item strong {
+      color: var(--gc-on-surface);
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 0 0 16px 0;
+    }
+
+    .code-label + pre:not(.mermaid) {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .summary-box {
+      background: linear-gradient(135deg, var(--gc-blue-50), var(--gc-surface));
+      border: 2px solid var(--gc-blue-300);
+      border-radius: 12px;
+      padding: 24px;
+      margin: 24px 0;
+    }
+
+    .summary-box p {
+      margin: 8px 0;
+      font-size: 15px;
+      color: var(--gc-on-surface);
+    }
+
+    footer {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    footer ul {
+      list-style: none;
+      padding: 0;
+      margin: 8px 0;
+    }
+
+    footer li {
+      margin: 4px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>🔒 AlloyDB for PostgreSQL: ロックされた postgres ロール動作変更</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">AlloyDB for PostgreSQL</span>
+          <span class="badge badge-change">Change (動作変更)</span>
+          <span class="badge badge-security">Security</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-04-28</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>AlloyDB for PostgreSQL において、クラスター作成時に初期ユーザーまたはパスワードが指定されなかった場合の動作が変更されました。<span class="highlight">null パスワードを持つロックされた postgres ロール</span>が自動的に作成されるようになり、意図しないアクセスが発生するリスクを排除します。</p>
+      <p>postgres ロールは AlloyDB における最上位の管理ユーザーロール (<code>alloydbsuperuser</code> グループのメンバー) であり、<code>CREATEROLE</code>、<code>CREATEDB</code>、<code>LOGIN</code> の権限を持つため、このロールが保護されていないことは重大なセキュリティリスクとなります。</p>
+
+      <div class="note-box">
+        <strong>💡 重要:</strong> Infrastructure as Code やオートメーションを使用してクラスターをプロビジョニングする場合に特に重要な変更です。パスワード設定の省略が意図的であっても偶発的であっても、安全なデフォルト動作が保証されます。
+      </div>
+
+      <!-- Before/After -->
+      <div class="before-after">
+        <div class="before-box">
+          <h4>❌ Before (変更前)</h4>
+          <ul>
+            <li>パスワード未設定時の postgres ロール状態が不明確</li>
+            <li>パスワード未設定でログイン可能な恐れ</li>
+            <li>自動化スクリプトでのフェイルセーフが不十分</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h4>✅ After (変更後)</h4>
+          <ul>
+            <li>null パスワードのロック状態でログイン不可</li>
+            <li>「デフォルトで拒否」原則に沿った動作</li>
+            <li>明示的なパスワード設定/ユーザー作成が必須</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>クラスター作成時のパスワード指定有無による postgres ロールの状態分岐と、ロック状態からの復旧方法を示します。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph クラスター作成フロー
+        A["👤 ユーザー: AlloyDB クラスター作成リクエスト"] --> B{"初期ユーザー/パスワード 指定あり?"}
+        B -->|はい| C["🔓 postgres ロール作成 指定パスワード設定 LOGIN 可能"]
+        B -->|いいえ| D["🔒 postgres ロール作成 null パスワード ロック状態"]
+    end
+
+    subgraph アクセス復旧手順
+        D --> E["📋 パスワード設定 gcloud alloydb users set-password"]
+        D --> F["👥 別ユーザー作成 gcloud alloydb users create"]
+        D --> G["🔑 IAM 認証有効化 alloydb.iam_authentication = on"]
+    end
+
+    C --> H["✅ クラスターにログイン可能"]
+    E --> H
+    F --> H
+    G --> H
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h3>🔒 ロックされた postgres ロールの自動作成</h3>
+          <p>クラスター作成 API で初期ユーザーまたはパスワードが未指定の場合に適用。postgres ロールは null パスワード状態で作成され、パスワード認証によるログインが不可能になります。</p>
+        </div>
+        <div class="card">
+          <h3>👑 alloydbsuperuser 権限の保持</h3>
+          <p>ロックされた状態であっても、postgres ロール自体は alloydbsuperuser グループのメンバーとして作成されます。CREATEROLE、CREATEDB、LOGIN の権限属性は保持され、パスワード設定後は通常通りすべての管理操作が可能です。</p>
+        </div>
+        <div class="card">
+          <h3>🔑 明示的なアクセス復旧パス</h3>
+          <p><code>gcloud alloydb users set-password</code> でパスワードを後から設定、<code>gcloud alloydb users create</code> で別の管理ユーザーを作成、または IAM 認証を有効化して IAM ベースのユーザーでアクセスする方法が利用可能です。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>🔧 技術仕様: postgres ロールの状態比較</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>パスワード指定あり</th>
+            <th>パスワード未指定 (新動作)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ロール名</td>
+            <td>postgres</td>
+            <td>postgres</td>
+          </tr>
+          <tr>
+            <td>グループ</td>
+            <td>alloydbsuperuser</td>
+            <td>alloydbsuperuser</td>
+          </tr>
+          <tr>
+            <td>権限属性</td>
+            <td>CREATEROLE, CREATEDB, LOGIN</td>
+            <td>CREATEROLE, CREATEDB, LOGIN</td>
+          </tr>
+          <tr>
+            <td>パスワード</td>
+            <td>ユーザー指定値</td>
+            <td><strong>null</strong></td>
+          </tr>
+          <tr>
+            <td>ログイン</td>
+            <td style="color: var(--gc-green); font-weight: 600;">可能</td>
+            <td style="color: var(--gc-red); font-weight: 600;">不可 (ロック状態)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Access Recovery -->
+    <div class="section">
+      <h2>🛠️ アクセス復旧方法</h2>
+      <p>ロック状態の postgres ロールからアクセスを復旧する 3 つの方法です。</p>
+
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># 方法 1: postgres ユーザーにパスワードを設定
+gcloud alloydb users set-password postgres \
+  --password=NEW_PASSWORD \
+  --cluster=CLUSTER_ID \
+  --region=REGION_ID
+
+# 方法 2: 新しい管理ユーザーを作成
+gcloud alloydb users create NEW_USERNAME \
+  --password=PASSWORD \
+  --cluster=CLUSTER_ID \
+  --region=REGION_ID \
+  --db-roles=alloydbsuperuser
+
+# 方法 3: IAM 認証を有効化して IAM ユーザーを追加
+gcloud alloydb users create user@example.com \
+  --cluster=CLUSTER_ID \
+  --region=REGION_ID \
+  --type=IAM_BASED</code></pre>
+    </div>
+
+    <!-- Merits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div>
+          <h3 style="color: var(--gc-on-surface); font-size: 16px; margin-bottom: 12px;">🔐 セキュリティ面</h3>
+          <ul class="merit-list">
+            <li><strong>デフォルトで安全な状態</strong>: パスワード未設定時にロックされたロールが作成され、意図しないアクセスを防止</li>
+            <li><strong>攻撃対象面の削減</strong>: ブルートフォース攻撃やデフォルトクレデンシャル攻撃が無効化</li>
+            <li><strong>コンプライアンス対応</strong>: CIS ベンチマークやセキュリティ監査基準における「デフォルトアカウントの保護」要件に適合</li>
+          </ul>
+        </div>
+        <div>
+          <h3 style="color: var(--gc-on-surface); font-size: 16px; margin-bottom: 12px;">⚙️ 運用面</h3>
+          <ul class="merit-list">
+            <li><strong>ヒューマンエラーの防止</strong>: IaC パイプラインでのパスワード設定忘れによるセキュリティインシデントを防止</li>
+            <li><strong>明示的な意思決定の強制</strong>: クラスターへのアクセスに必ず意図的なユーザー/パスワード設定が必要</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Demerits / Constraints -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <div class="warning-box">
+        <strong>考慮すべき点:</strong>
+        <ul class="merit-list demerit-list" style="margin-top: 8px;">
+          <li>既存のクラスター作成スクリプトや IaC テンプレートで、パスワードを後から設定する前提のワークフローが影響を受ける可能性がある</li>
+          <li>Terraform や gcloud CLI を使用した自動化で、クラスター作成後すぐにデータベース操作を行うパイプラインは、明示的なパスワード指定を追加する必要がある</li>
+          <li>クラスター作成後にパスワード設定を行わない限り、psql 等のクライアントからパスワード認証で接続できない</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💼 ユースケース</h2>
+      <div class="usecase-card">
+        <h3>📦 ユースケース 1: IaC パイプラインでのセキュアなクラスタープロビジョニング</h3>
+        <p class="scenario"><strong>シナリオ:</strong> Terraform で AlloyDB クラスターを作成する際に、シークレットマネージャーからパスワードを取得する処理が設定されているが、シークレットの設定忘れにより空値が渡されるケース</p>
+        <p class="effect"><strong>効果:</strong> 従来はパスワードなしでアクセス可能なクラスターが作成される恐れがあったが、今回の変更によりロック状態で作成されるため、セキュリティインシデントの発生が防止される</p>
+      </div>
+      <div class="usecase-card">
+        <h3>🔑 ユースケース 2: IAM 認証のみを使用する環境</h3>
+        <p class="scenario"><strong>シナリオ:</strong> IAM データベース認証のみを使用し、パスワードベースの認証を一切使用しないセキュリティポリシーの環境</p>
+        <p class="effect"><strong>効果:</strong> postgres ロールをロック状態のまま維持し、IAM 認証ユーザーのみでデータベースを管理するワークフローが自然に成立する</p>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="related-services">
+        <div class="related-service-item">
+          <strong>🔐 AlloyDB IAM 認証</strong>
+          IAM ベースのデータベース認証により、パスワード管理を IAM に委任可能
+        </div>
+        <div class="related-service-item">
+          <strong>🗝️ Secret Manager</strong>
+          クラスター作成時のパスワードをセキュアに管理するために推奨
+        </div>
+        <div class="related-service-item">
+          <strong>📝 Cloud Audit Logs</strong>
+          postgres ロールへのパスワード設定やロール変更操作を監査可能
+        </div>
+        <div class="related-service-item">
+          <strong>🔌 AlloyDB Auth Proxy</strong>
+          IAM 認証使用時の接続プロキシとして機能
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="summary-box">
+      <h2 style="border-bottom: none; padding-bottom: 0;">📝 まとめ</h2>
+      <p>今回の変更は AlloyDB for PostgreSQL のセキュリティデフォルトを強化する重要なアップデートです。既存のクラスター作成ワークフローでパスワードを明示的に指定していない場合は、デプロイメントパイプラインの見直しを推奨します。</p>
+      <p>特に Terraform や gcloud CLI を使用した自動化において、<span class="highlight">--password パラメータの明示的な設定</span>、または <span class="highlight">IAM 認証への移行</span>を検討すべきです。</p>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>出典:</strong></p>
+      <ul>
+        <li>📎 <a href="https://cloud.google.com/release-notes#April_28_2026" target="_blank" rel="noopener noreferrer">Google Cloud 公式リリースノート (2026-04-28)</a></li>
+        <li>📎 <a href="https://cloud.google.com/alloydb/docs/database-users/overview#postgres-user" target="_blank" rel="noopener noreferrer">AlloyDB postgres ユーザードキュメント</a></li>
+        <li>📎 <a href="https://cloud.google.com/alloydb/docs/database-users/manage-roles" target="_blank" rel="noopener noreferrer">AlloyDB データベースユーザー管理</a></li>
+        <li>📎 <a href="https://cloud.google.com/alloydb/docs/database-users/manage-iam-auth" target="_blank" rel="noopener noreferrer">AlloyDB IAM 認証</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline);">Generated on 2026-04-29 | Google Cloud News Infographic</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

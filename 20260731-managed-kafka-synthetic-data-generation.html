@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Managed Service for Apache Kafka: Dataflow による合成データ生成</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+:root {
+  --gc-blue: #4285F4;
+  --gc-red: #EA4335;
+  --gc-yellow: #FBBC04;
+  --gc-green: #34A853;
+  --gc-blue-900: #174EA6;
+  --gc-blue-800: #185ABC;
+  --gc-blue-700: #1967D2;
+  --gc-blue-600: #1A73E8;
+  --gc-blue-500: #4285F4;
+  --gc-blue-300: #669DF6;
+  --gc-blue-200: #8AB4F8;
+  --gc-blue-100: #AECBFA;
+  --gc-blue-50: #E8F0FE;
+  --gc-on-surface: #202124;
+  --gc-on-surface-variant: #5F6368;
+  --gc-outline: #80868B;
+  --gc-surface: #FFFFFF;
+  --gc-surface-container-lowest: #F8F9FA;
+  --gc-surface-container-low: #F1F3F4;
+  --gc-surface-container: #E8EAED;
+  --gc-outline-variant: #DADCE0;
+  --gc-blue-tint: #E8F0FE;
+  --gc-green-tint: #E6F4EA;
+  --gc-red-tint: #FCE8E6;
+  --gc-yellow-tint: #FEF7E0;
+  --gc-purple-tint: #F3E8FD;
+  --gc-teal-tint: #E0F7FA;
+  --gc-purple: #A142F4;
+  --gc-teal: #00BCD4;
+  --gc-orange: #FF6D00;
+}
+
+body {
+  background-color: var(--gc-surface);
+  font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+  color: var(--gc-on-surface-variant);
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 20px;
+  margin: 0;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 16px;
+  border-bottom: 3px solid var(--gc-blue-600);
+}
+
+h1, .title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--gc-on-surface);
+  margin: 0;
+  line-height: 1.4;
+}
+
+h2, .section-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 16px 0 8px 0;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: var(--gc-outline);
+}
+
+.section {
+  background: var(--gc-surface-container-low);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid var(--gc-outline-variant);
+}
+
+.highlight {
+  background-color: var(--gc-blue-50);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--gc-blue-800);
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+.card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border-left: 4px solid var(--gc-blue-600);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+}
+
+.card h3 {
+  margin-top: 0;
+}
+
+.gc-link {
+  color: var(--gc-blue-600);
+  text-decoration: none;
+}
+
+.gc-link:hover {
+  color: var(--gc-blue-800);
+  text-decoration: underline;
+}
+
+.badge,
+.badge-ga,
+.badge-preview,
+.badge-deprecated {
+  display: inline-block;
+  color: #FFFFFF;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+  margin: 4px 8px 4px 0;
+}
+
+.badge {
+  background: var(--gc-blue-600);
+}
+
+.badge-ga {
+  background: var(--gc-green);
+}
+
+/* Before / After 比較 */
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.before-box, .after-box {
+  border-radius: 12px;
+  padding: 16px 20px;
+}
+
+.before-box {
+  background: var(--gc-red-tint);
+  border: 1px solid rgba(234, 67, 53, 0.35);
+}
+
+.after-box {
+  background: var(--gc-green-tint);
+  border: 1px solid rgba(52, 168, 83, 0.35);
+}
+
+.before-box h3, .after-box h3 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+}
+
+.before-box h3 { color: var(--gc-red); }
+.after-box h3 { color: var(--gc-green); }
+
+.before-box ul, .after-box ul {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 14px;
+}
+
+.before-box li, .after-box li {
+  margin: 6px 0;
+}
+
+@media (max-width: 700px) {
+  .before-after { grid-template-columns: 1fr; }
+  .feature-grid { grid-template-columns: 1fr; }
+  h1 { font-size: 26px; }
+}
+
+/* フロー図 */
+.flow-diagram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 24px 0;
+}
+
+.flow-step {
+  background: var(--gc-surface);
+  border: 2px solid var(--gc-blue-600);
+  border-radius: 12px;
+  padding: 12px 20px;
+  text-align: center;
+  min-width: 100px;
+  color: var(--gc-on-surface);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+  font-size: 14px;
+}
+
+.flow-arrow {
+  color: var(--gc-blue-600);
+  font-size: 24px;
+  font-weight: bold;
+}
+
+/* 機能カードグリッド */
+.feature-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.feature-card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  border-left: 4px solid var(--gc-blue-600);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+}
+
+.feature-card h3 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  color: var(--gc-on-surface);
+}
+
+.feature-card p {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* チェックリスト */
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.check-icon {
+  color: var(--gc-green);
+  font-size: 18px;
+}
+
+.cross-icon {
+  color: var(--gc-red);
+  font-size: 18px;
+}
+
+/* コードブロック */
+.code-block,
+pre:not(.mermaid) {
+  background: #1E1E1E;
+  border-radius: 8px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: #E8E8E8;
+  margin: 16px 0;
+}
+
+.code-block {
+  overflow: hidden;
+  padding: 0;
+}
+
+.code-header {
+  background: #2D2D2D;
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.code-lang {
+  color: #9CDCFE;
+  font-weight: bold;
+  font-family: 'Roboto Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.code-title {
+  color: #AAAAAA;
+}
+
+.code-block pre {
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+}
+
+.code-block code {
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 16px !important;
+  display: block;
+}
+
+pre code {
+  background: none;
+  border: none;
+  font-size: inherit;
+}
+
+/* インラインコード */
+code:not(pre code) {
+  background: var(--gc-surface-container-low);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 0.9em;
+  color: var(--gc-blue-900);
+}
+
+.section code:not(pre code) {
+  background: var(--gc-surface);
+}
+
+/* テーブル */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--gc-outline-variant);
+  background: var(--gc-surface);
+}
+
+th {
+  background: var(--gc-blue-50);
+  color: var(--gc-blue-900);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 2px solid var(--gc-blue-200);
+}
+
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--gc-outline-variant);
+  font-size: 14px;
+}
+
+tr:nth-child(even) {
+  background: var(--gc-surface-container-lowest);
+}
+
+tr:hover {
+  background: var(--gc-blue-50);
+}
+
+/* 注意・情報ボックス */
+.note-box {
+  background: var(--gc-blue-tint);
+  border-left: 4px solid var(--gc-blue-600);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.warning-box {
+  background: var(--gc-yellow-tint);
+  border-left: 4px solid var(--gc-yellow);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.success-box {
+  background: var(--gc-green-tint);
+  border-left: 4px solid var(--gc-green);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+/* ステップリスト */
+.step-list {
+  counter-reset: step;
+  list-style: none;
+  padding: 0;
+  margin: 16px 0;
+}
+
+.step-list > li {
+  position: relative;
+  padding: 0 0 0 52px;
+  margin-bottom: 16px;
+  counter-increment: step;
+}
+
+.step-list > li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 36px;
+  height: 36px;
+  background: var(--gc-blue-600);
+  color: #FFFFFF;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.step-list > li strong.step-title {
+  display: block;
+  color: var(--gc-on-surface);
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.step-list > li ul {
+  margin: 4px 0 0 0;
+  padding-left: 18px;
+  font-size: 14px;
+}
+
+/* ユースケース */
+.usecase {
+  background: var(--gc-blue-tint);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border: 1px solid var(--gc-blue-100);
+}
+
+.usecase h3 {
+  margin: 0 0 8px 0;
+  color: var(--gc-blue-800);
+  font-size: 16px;
+}
+
+.usecase p {
+  margin: 6px 0;
+  font-size: 14px;
+}
+
+/* Mermaid コンテナ */
+.mermaid-container {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 20px 0;
+  border: 2px solid rgba(66, 133, 244, 0.3);
+  overflow-x: auto;
+}
+
+.mermaid {
+  display: flex;
+  justify-content: center;
+  background: #FFFFFF;
+}
+
+/* 関連サービス */
+.related-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--gc-surface);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 8px 0;
+  font-size: 14px;
+}
+
+.meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gc-outline-variant);
+  font-size: 12px;
+  color: var(--gc-outline);
+}
+
+footer a {
+  color: var(--gc-blue-600);
+  word-break: break-all;
+}
+
+footer ul {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <h1>☁️ Managed Service for Apache Kafka<br>Dataflow による合成データ生成</h1>
+    <div class="subtitle">リリース日: 2026-07-31</div>
+  </div>
+
+  <div class="meta-row">
+    <span class="badge">Managed Service for Apache Kafka</span>
+    <span class="badge">Dataflow</span>
+    <span class="badge-ga badge">Feature</span>
+  </div>
+
+  <!-- 概要 -->
+  <div class="section">
+    <h2>📌 概要</h2>
+    <p>
+      Managed Service for Apache Kafka で、<span class="highlight">Dataflow を使用してクラスタに合成 (synthetic) データを生成</span>できるようになりました。
+      Google Cloud コンソールのクラスタ画面 (<strong>Sources タブ</strong>) から、Dataflow の
+      <span class="highlight">Streaming Data Generator</span> テンプレートを利用したジョブを直接作成し、
+      サンプルのゲームテレメトリーデータを指定した Kafka トピックへ自動的にパブリッシュできます。
+    </p>
+    <p>
+      Streaming Data Generator は、指定したスキーマに基づく合成テストレコードを<strong>設定可能なレート (QPS)</strong> で生成する Dataflow テンプレートです。
+      ローカルに Kafka クライアントをインストールしたり、カスタムのプロデューサーコードを書いたりすることなく、
+      <strong>クラスタのアクティビティ観察・負荷テスト・モニタリング指標の検証</strong>が可能になります。
+      新規クラスタの動作確認や、BigQuery Sink コネクタなどダウンストリーム連携の検証を行う開発者・データエンジニアに有用なアップデートです。
+    </p>
+
+    <div class="before-after">
+      <div class="before-box">
+        <h3>❌ Before: アップデート前の課題</h3>
+        <ul>
+          <li>動作確認や負荷テストには、ローカルに Kafka クライアントをインストールするか、カスタムプロデューサーコードを作成してテストデータを送信する必要があった</li>
+          <li>クラスタ構築直後にモニタリング指標 (スループットなど) を検証するための手軽なデータソースがなかった</li>
+        </ul>
+      </div>
+      <div class="after-box">
+        <h3>✅ After: アップデート後の改善</h3>
+        <ul>
+          <li>コンソールのクラスタ画面 (Sources タブ) から<strong>数クリック</strong>で合成データ生成用の Dataflow ジョブを起動可能に</li>
+          <li>Output rate (QPS) の指定で、異なる負荷に対するクラスタの処理をテスト可能に</li>
+          <li>IAM ロール不足を検出し「Grant」ボタンでその場で付与可能に</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- アーキテクチャ図 -->
+  <div class="section">
+    <h2>🏗️ アーキテクチャ図</h2>
+    <div class="mermaid-container">
+      <pre class="mermaid">
+flowchart LR
+    subgraph Dataflow ["🔄 Dataflow"]
+        GEN["⚙️ Streaming Data Generator<br>(合成データ生成ジョブ / QPS 指定)"]
+    end
+    subgraph MSK ["Managed Service for Apache Kafka"]
+        TOPIC[("📨 Kafka トピック<br>test-topic")]
+        MON["📊 Monitoring タブ<br>(Byte rates / Top 5 topics)"]
+    end
+    subgraph Consumers ["コンシューマ"]
+        CONNECT["🔌 BigQuery Sink コネクタ<br>(Kafka Connect)"]
+        BQ[("🗄️ BigQuery テーブル")]
+    end
+
+    GEN -- "サンプルゲーム<br>テレメトリーデータ" --> TOPIC
+    TOPIC -.->|"指標の可視化"| MON
+    TOPIC --> CONNECT
+    CONNECT --> BQ
+      </pre>
+    </div>
+    <p>
+      Dataflow の Streaming Data Generator テンプレートが指定 QPS で合成データを Kafka トピックへパブリッシュし、
+      クラスタのモニタリング指標で確認したり、BigQuery Sink コネクタ経由でダウンストリームへ流したりできます。
+    </p>
+  </div>
+
+  <!-- 主要機能 -->
+  <div class="section">
+    <h2>⚡ 主要機能</h2>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <h3>🖱️ コンソールからの Dataflow ジョブ作成</h3>
+        <p>クラスタ詳細画面の「Sources」タブにある「Generate Synthetic Data」カードから「Create a Dataflow job」をクリックしてジョブを作成。「Produce Data」ペインで対象の Kafka トピックを選択 (存在しない場合はその場で作成可能)。</p>
+      </div>
+      <div class="feature-card">
+        <h3>📈 出力レート (QPS) 指定による負荷テスト</h3>
+        <p>Output rate (QPS) フィールドで 1 秒あたりの生成レートを指定 (例: 100)。異なる負荷に対するクラスタの処理能力をテストできる。</p>
+      </div>
+      <div class="feature-card">
+        <h3>🎮 サンプルゲームテレメトリーデータの自動生成</h3>
+        <p>Streaming Data Generator テンプレートが指定スキーマに基づく合成テストレコードを生成。eventId、eventTimestamp、ipv4/ipv6、country、username、quest、score、completed などのフィールドを含む JSON 形式。</p>
+      </div>
+      <div class="feature-card">
+        <h3>🔐 IAM 権限の自動付与サポート</h3>
+        <p>Dataflow サービスアカウントに必要な権限が不足している場合、警告が表示され「Grant」クリックで Dataflow Worker と Managed Kafka Client ロールを付与できる。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 技術仕様 -->
+  <div class="section">
+    <h2>🔧 技術仕様</h2>
+
+    <h3>必要な IAM ロール</h3>
+    <table>
+      <tr><th>プリンシパル</th><th>必要なロール</th></tr>
+      <tr>
+        <td>操作するユーザー</td>
+        <td>Dataflow Developer (<code>roles/dataflow.developer</code>)、Project IAM Admin (<code>roles/resourcemanager.projectIamAdmin</code>)</td>
+      </tr>
+      <tr>
+        <td>Compute Engine デフォルトサービスアカウント</td>
+        <td>Dataflow Worker (<code>roles/dataflow.worker</code>)、Managed Kafka Client (<code>roles/managedkafka.client</code>)</td>
+      </tr>
+    </table>
+    <p style="font-size: 14px;">
+      ユーザーに必要な主な権限: <code>dataflow.jobs.create</code>、<code>dataflow.jobs.get</code>、<code>managedkafka.clusters.get</code>、<code>managedkafka.topics.get</code>、<code>managedkafka.topics.create</code>、<code>managedkafka.topics.publish</code>、<code>resourcemanager.projects.setIamPolicy</code>
+    </p>
+    <div class="warning-box">
+      <strong>⚠️ 注意:</strong> Dataflow Worker と Managed Kafka Client のロールは、ユーザーアカウントではなく <strong>Compute Engine デフォルトサービスアカウント</strong>に付与する必要があります。
+    </div>
+
+    <h3>生成されるデータのスキーマ (BigQuery 連携時のテーブル定義例)</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">JSON</span>
+        <span class="code-title">BigQuery テーブルスキーマ</span>
+      </div>
+      <pre><code class="language-json">[
+  {"name": "eventId", "type": "STRING"},
+  {"name": "eventTimestamp", "type": "INTEGER"},
+  {"name": "ipv4", "type": "STRING"},
+  {"name": "ipv6", "type": "STRING"},
+  {"name": "country", "type": "STRING"},
+  {"name": "username", "type": "STRING"},
+  {"name": "quest", "type": "STRING"},
+  {"name": "score", "type": "INTEGER"},
+  {"name": "completed", "type": "BOOLEAN"}
+]</code></pre>
+    </div>
+  </div>
+
+  <!-- 設定方法 -->
+  <div class="section">
+    <h2>📝 設定方法</h2>
+
+    <h3>前提条件</h3>
+    <div class="check-item"><span class="check-icon">✓</span><span>Managed Service for Apache Kafka クラスタが作成済みであること</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span>必要な IAM ロール (上記「技術仕様」参照) が付与されていること</span></div>
+
+    <h3>手順</h3>
+    <div class="flow-diagram">
+      <div class="flow-step">🖱️ Sources タブ<br>ジョブ作成開始</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">⚙️ トピックと<br>QPS を設定</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">🚀 Dataflow<br>ジョブ起動</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">📊 メトリクス<br>確認</div>
+    </div>
+
+    <ol class="step-list">
+      <li>
+        <strong class="step-title">クラスタの Sources タブからジョブ作成を開始</strong>
+        <ul>
+          <li>コンソールで「Managed Service for Apache Kafka &gt; Clusters」ページに移動</li>
+          <li>クラスタ名 (例: <code>test-cluster</code>) をクリックし、「Sources」タブを選択</li>
+          <li>「Generate Synthetic Data」カードの「Create a Dataflow job」をクリック</li>
+        </ul>
+      </li>
+      <li>
+        <strong class="step-title">トピックと出力レートを設定</strong>
+        <ul>
+          <li>「Produce Data」ペインで Kafka トピック (例: <code>test-topic</code>) を選択。存在しない場合は「Create topic」からパーティション数 3、レプリケーション係数 3 (デフォルト) で作成</li>
+          <li>「Output rate (QPS)」に生成レート (例: <code>100</code>) を入力</li>
+          <li>権限不足の警告が表示された場合は「Grant」をクリックしてロールを付与</li>
+          <li>「Create」をクリックして Dataflow ジョブを起動</li>
+        </ul>
+      </li>
+      <li>
+        <strong class="step-title">データフローとメトリクスを確認</strong>
+        <ul>
+          <li>通知の「View job」から Dataflow の Job details ページを開き、ジョブグラフ・ステータス・実行メトリクスを確認</li>
+          <li>クラスタ詳細ページの「Monitoring」タブで「Byte rates」と「Top 5 topics by produce throughput」チャートを確認し、データ生成を検証</li>
+        </ul>
+      </li>
+    </ol>
+  </div>
+
+  <!-- メリット -->
+  <div class="section">
+    <h2>💡 メリット</h2>
+    <div class="feature-grid">
+      <div class="feature-card" style="border-left-color: var(--gc-green);">
+        <h3>💼 ビジネス面</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>検証の高速化</strong>: プロデューサーコードの開発なしで動作確認・負荷テストを開始でき、PoC や本番導入前の評価期間を短縮</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>学習コストの低減</strong>: Kafka クライアントのセットアップが不要で、Kafka に不慣れなチームでも評価を始めやすい</span></div>
+      </div>
+      <div class="feature-card" style="border-left-color: var(--gc-green);">
+        <h3>⚙️ 技術面</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>コード不要のテストデータ生成</strong>: ローカル Kafka クライアントやカスタムプロデューサーの実装が不要</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>負荷レートの制御</strong>: QPS を指定して異なる負荷条件でのクラスタ挙動を再現・検証</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>モニタリング検証</strong>: 実データ投入前に指標やダウンストリーム連携 (BigQuery Sink など) を確認</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- デメリット・制約事項 -->
+  <div class="section">
+    <h2>⚠️ デメリット・制約事項</h2>
+    <div class="check-item"><span class="cross-icon">✗</span><span>合成データ生成は Dataflow ジョブとして実行されるため、ジョブ実行中は <strong>Dataflow の料金が発生</strong>。検証終了後はジョブを停止 (Cancel) する必要がある</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span>生成されるのはテンプレートに基づくサンプルデータ (ゲームテレメトリー) であり、生の JSON 形式のため、BigQuery へ連携する場合は<strong>事前にスキーマを定義したテーブルを手動で作成</strong>する必要がある</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span>Dataflow ワーカー用に Compute Engine デフォルトサービスアカウントへの適切なロール付与が必要 (<strong>付与先を誤ると権限エラー</strong>になる)</span></div>
+  </div>
+
+  <!-- ユースケース -->
+  <div class="section">
+    <h2>🎯 ユースケース</h2>
+    <div class="usecase">
+      <h3>1️⃣ 新規クラスタの動作確認とモニタリング検証</h3>
+      <p><strong>シナリオ</strong>: クラスタを新規作成し、本番データを流す前にクラスタとモニタリングが正しく機能することを確認したい。</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Text</span>
+          <span class="code-title">実装例</span>
+        </div>
+        <pre><code class="language-text">1. クラスタの Sources タブ → Generate Synthetic Data → Create a Dataflow job
+2. トピック test-topic を選択し、QPS に 100 を指定して Create
+3. Monitoring タブで Byte rates / Top 5 topics by produce throughput を確認</code></pre>
+      </div>
+      <p><strong>効果</strong>: プロデューサーコードを書かずに、クラスタへのデータ流入とメトリクスの可視化を数分で検証できる。</p>
+    </div>
+    <div class="usecase">
+      <h3>2️⃣ BigQuery Sink コネクタを使ったパイプラインのエンドツーエンドテスト</h3>
+      <p><strong>シナリオ</strong>: Kafka Connect の BigQuery Sink コネクタでトピックのメッセージを BigQuery にストリーミングする構成を、本番データ投入前に検証したい。</p>
+      <p><strong>効果</strong>: 合成データをトピックに流し込みながら、BigQuery テーブルへのストリーミングとクエリによるデータ確認まで、パイプライン全体をエンドツーエンドでテストできる。</p>
+    </div>
+    <div class="usecase">
+      <h3>3️⃣ 負荷テスト</h3>
+      <p><strong>シナリオ</strong>: クラスタ構成 (vCPU、メモリなど) が想定スループットに耐えられるか確認したい。</p>
+      <p><strong>効果</strong>: QPS を段階的に変えて合成データを生成することで、異なる負荷条件でのクラスタの挙動をメトリクスで比較検証できる。</p>
+    </div>
+  </div>
+
+  <!-- 料金 -->
+  <div class="section">
+    <h2>💰 料金</h2>
+    <p>
+      この機能自体は Managed Service for Apache Kafka のコンソール機能ですが、合成データ生成は <strong>Dataflow ジョブとして実行される</strong>ため、
+      ジョブ実行中は Dataflow の料金が発生します。また、クラスタ側では Managed Service for Apache Kafka の料金が通常どおり適用されます。
+    </p>
+    <div class="note-box">
+      <strong>💡 ヒント:</strong> 検証終了後は Dataflow ジョブの停止と不要なクラスタの削除を推奨します。
+    </div>
+    <ul>
+      <li><a class="gc-link" href="https://cloud.google.com/dataflow/pricing" target="_blank" rel="noopener noreferrer">Dataflow の料金</a></li>
+      <li><a class="gc-link" href="https://cloud.google.com/managed-service-for-apache-kafka/pricing" target="_blank" rel="noopener noreferrer">Managed Service for Apache Kafka の料金</a></li>
+    </ul>
+  </div>
+
+  <!-- 関連サービス -->
+  <div class="section">
+    <h2>🔗 関連サービス・機能</h2>
+    <div class="related-item"><span>🔄</span><span><strong>Dataflow (Streaming Data Generator テンプレート)</strong>: 本機能の実行基盤。指定スキーマに基づく合成レコードを設定可能なレートで生成する Flex テンプレート</span></div>
+    <div class="related-item"><span>🔌</span><span><strong>Kafka Connect (BigQuery Sink コネクタ)</strong>: 生成した合成データをトピックから BigQuery テーブルへストリーミングし、エンドツーエンドの検証に利用可能</span></div>
+    <div class="related-item"><span>🗄️</span><span><strong>BigQuery</strong>: 合成データのストリーミング先。ストリーミングされたレコードをプレビューや SQL クエリで確認できる</span></div>
+    <div class="related-item"><span>📊</span><span><strong>Cloud Monitoring</strong>: クラスタの Monitoring タブでバイトレートやトピック別プロデューススループットを確認</span></div>
+  </div>
+
+  <!-- まとめ -->
+  <div class="section">
+    <h2>✅ まとめ</h2>
+    <div class="success-box">
+      <p style="margin: 0 0 8px 0;">
+        コンソールから<strong>数クリック</strong>で Dataflow ベースの合成データ生成ジョブを起動できるようになり、
+        Kafka クライアントのセットアップやプロデューサーコードの実装なしに<strong>動作確認・負荷テスト・モニタリング検証</strong>が可能になりました。
+      </p>
+      <p style="margin: 0;">
+        新規クラスタの評価やダウンストリーム連携 (BigQuery Sink など) のエンドツーエンドテストでは、まずこの機能でデータを流して検証するのがおすすめです。
+        <strong>検証後は Dataflow の課金を避けるためジョブの停止を忘れずに。</strong>
+      </p>
+    </div>
+  </div>
+
+  <footer>
+    <p>📎 出典:</p>
+    <ul>
+      <li><a href="https://docs.cloud.google.com/release-notes#July_31_2026" target="_blank" rel="noopener noreferrer">公式リリースノート (2026-07-31)</a></li>
+      <li><a href="https://docs.cloud.google.com/managed-service-for-apache-kafka/docs/quickstart-synthetic-data" target="_blank" rel="noopener noreferrer">Generate synthetic data for a Managed Service for Apache Kafka cluster</a></li>
+      <li><a href="https://docs.cloud.google.com/dataflow/docs/guides/templates/provided/streaming-data-generator" target="_blank" rel="noopener noreferrer">Dataflow Streaming Data Generator template</a></li>
+      <li><a href="https://docs.cloud.google.com/managed-service-for-apache-kafka/docs/release-notes" target="_blank" rel="noopener noreferrer">Managed Service for Apache Kafka リリースノート</a></li>
+      <li><a href="https://cloud.google.com/dataflow/pricing" target="_blank" rel="noopener noreferrer">Dataflow の料金</a></li>
+    </ul>
+    <p>本インフォグラフィックは Google Cloud News レポート (2026-07-31) を基に生成されています。</p>
+  </footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+    mermaid.initialize({
+        startOnLoad: true,
+        theme: 'base',
+        themeVariables: {
+            primaryColor: '#4285F4',
+            primaryTextColor: '#202124',
+            primaryBorderColor: '#4285F4',
+            lineColor: '#4285F4',
+            secondaryColor: '#F1F3F4',
+            tertiaryColor: '#FAFAFA',
+            background: '#FFFFFF',
+            mainBkg: '#E8F0FE',
+            nodeBorder: '#4285F4',
+            clusterBkg: '#E8F0FE',
+            clusterBorder: '#4285F4',
+            edgeLabelBackground: '#FFFFFF',
+            textColor: '#202124'
+        }
+    });
+</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

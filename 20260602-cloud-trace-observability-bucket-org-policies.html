@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Trace: Observability バケット作成フローにおける組織ポリシーの適用</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 12px 0;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--gc-outline);
+      text-align: right;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge-service { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green { border-left-color: var(--gc-green); }
+    .card-red { border-left-color: var(--gc-red); }
+    .card-yellow { border-left-color: var(--gc-yellow); }
+    .card-purple { border-left-color: var(--gc-purple); }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .before-box h4, .after-box h4 {
+      margin: 0 0 8px 0;
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .before-box h4 { color: var(--gc-red); }
+    .after-box h4 { color: var(--gc-green); }
+
+    .before-box ul, .after-box ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li { margin: 4px 0; }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-800);
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .usecase-card p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 13px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 13px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid) {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.85em;
+      color: var(--gc-blue-900);
+    }
+
+    .region-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    .region-tag {
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 12px;
+      text-align: center;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .region-category {
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      margin: 12px 0 8px;
+      font-size: 14px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .links-list {
+      list-style: none;
+      padding: 0;
+      margin: 12px 0;
+    }
+
+    .links-list li {
+      margin: 8px 0;
+      padding: 8px 12px;
+      background: var(--gc-surface);
+      border-radius: 8px;
+      border: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+      word-break: break-all;
+    }
+
+    footer {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; }
+      .subtitle { text-align: left; margin-top: 8px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stat-grid { grid-template-columns: 1fr; }
+      .region-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>🔒 Cloud Trace: Observability バケット作成フローにおける組織ポリシーの適用</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge badge-service">Cloud Trace</span>
+          <span class="badge badge-ga">GA</span>
+          <span class="badge badge-service">Organization Policy</span>
+          <span class="badge badge-service">CMEK</span>
+        </div>
+      </div>
+      <div class="subtitle">
+        リリース日: 2026-06-02
+      </div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        Cloud Trace の Observability バケット (<code>_Trace</code>) 作成フローにおいて、<span class="highlight">組織ポリシーの適用</span>が開始されました。リソースロケーション制約、CMEK (顧客管理暗号鍵) の使用要求ポリシー、および暗号鍵プロジェクト制限ポリシーが、バケット作成時に強制されるようになります。
+      </p>
+      <p>
+        これにより、コンプライアンス要件やデータ主権要件を持つ組織が、トレースデータの保存場所と暗号化方式を<strong>組織全体で統一的に管理</strong>できるようになりました。規制産業 (金融、医療、政府機関) や GDPR、HIPAA、PCI DSS などのコンプライアンス基準に対応する組織に特に重要なアップデートです。
+      </p>
+
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">3</div>
+          <div class="stat-label">適用される組織ポリシー制約</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">40+</div>
+          <div class="stat-label">サポートリージョン</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-green), #1B5E20);">
+          <div class="stat-value">$0</div>
+          <div class="stat-label">組織ポリシー適用の追加料金</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Before/After Section -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h4>❌ Before (アップデート前)</h4>
+          <ul>
+            <li>Observability バケット作成時に組織ポリシーが適用されなかった</li>
+            <li>意図しないリージョンにトレースデータが保存される可能性</li>
+            <li>CMEK ポリシーがバケットに適用されず、暗号化制御の対象外</li>
+            <li>組織全体のセキュリティポリシーと一貫性がない</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h4>✅ After (アップデート後)</h4>
+          <ul>
+            <li><code>resourceLocations</code> 制約で許可リージョンのみにデータ保存</li>
+            <li><code>restrictNonCmekServices</code> で CMEK なしのバケット作成をブロック</li>
+            <li><code>restrictCmekCryptoKeyProjects</code> で承認プロジェクトの KMS 鍵のみ使用</li>
+            <li>組織レベルで統一的なセキュリティガバナンスを実現</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>トレースデータ送信時に Observability バケットの作成フローが組織ポリシーを評価し、準拠した場合にのみバケットを作成する流れを示しています。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    A[アプリケーション / GCP サービス] -->|トレースデータ送信| B[Cloud Trace API / Telemetry API]
+    B --> C{Observability バケット<br/>_Trace が存在?}
+    C -->|存在する| D[既存バケットにデータ保存]
+    C -->|存在しない| E[バケット作成フロー開始]
+
+    E --> F{組織ポリシー評価}
+
+    F --> G[constraints/gcp.resourceLocations<br/>リソースロケーション制約チェック]
+    F --> H[constraints/gcp.restrictNonCmekServices<br/>CMEK 要求ポリシーチェック]
+    F --> I[constraints/gcp.restrictCmekCryptoKeyProjects<br/>KMS 鍵プロジェクト制限チェック]
+
+    G --> J{全ポリシー準拠?}
+    H --> J
+    I --> J
+
+    J -->|準拠| K[デフォルト設定の適用]
+    K --> L[Observability バケット作成]
+    L --> M[トレースデータ保存開始]
+
+    J -->|非準拠| N[バケット作成失敗]
+    N --> O[エラー: プロビジョニング失敗]
+
+    subgraph defaults ["デフォルト設定 (組織/フォルダ/プロジェクト)"]
+        P[デフォルトストレージロケーション]
+        Q[デフォルト Cloud KMS 鍵]
+    end
+
+    K --> P
+    K --> Q
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features Section -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h3>🌍 リソースロケーション制約の適用</h3>
+          <p><code>constraints/gcp.resourceLocations</code> 制約に基づき、許可されたロケーションにのみ Observability バケットが作成されます。</p>
+          <ul>
+            <li>マルチリージョン (eu, us) および 40 以上のリージョンをサポート</li>
+            <li>組織ポリシーで許可されたロケーションとバケットがサポートするロケーションの交差集合から自動選択</li>
+          </ul>
+        </div>
+        <div class="card card-green">
+          <h3>🔐 CMEK ポリシーの強制</h3>
+          <p><code>constraints/gcp.restrictNonCmekServices</code> Deny ポリシーにより、新規リソースへの CMEK 暗号化が強制されます。</p>
+          <ul>
+            <li>CMEK ポリシー設定時は、デフォルト設定で Cloud KMS 鍵の指定が必須</li>
+            <li>デフォルト設定が未構成の場合、バケットのプロビジョニングが失敗</li>
+          </ul>
+        </div>
+        <div class="card card-purple">
+          <h3>🗝️ KMS 鍵プロジェクト制限</h3>
+          <p><code>constraints/gcp.restrictCmekCryptoKeyProjects</code> ポリシーにより、暗号化に使用できる KMS 鍵のプロジェクトを制限できます。</p>
+          <ul>
+            <li>承認されたプロジェクトの鍵のみが暗号化に使用される</li>
+            <li>組織全体の鍵管理ガバナンスを実現</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>📐 技術仕様</h2>
+
+      <h3>組織ポリシー制約一覧</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>制約 ID</th>
+            <th>目的</th>
+            <th>適用レベル</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>constraints/gcp.resourceLocations</code></td>
+            <td>リソース作成可能なロケーションを制限</td>
+            <td>組織、フォルダ、プロジェクト</td>
+          </tr>
+          <tr>
+            <td><code>constraints/gcp.restrictNonCmekServices</code></td>
+            <td>CMEK を使用しないリソース作成をブロック</td>
+            <td>組織、フォルダ、プロジェクト</td>
+          </tr>
+          <tr>
+            <td><code>constraints/gcp.restrictCmekCryptoKeyProjects</code></td>
+            <td>暗号化に使用可能な KMS 鍵プロジェクトを制限</td>
+            <td>組織、フォルダ、プロジェクト</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>ロケーション決定ルール</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>組織ポリシーでロケーション制限</th>
+            <th>デフォルトストレージロケーション設定</th>
+            <th>バケットロケーションの決定方法</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>なし</td>
+            <td>なし</td>
+            <td>サポートされるロケーションからシステムが選択</td>
+          </tr>
+          <tr>
+            <td>あり</td>
+            <td>なし</td>
+            <td>組織ポリシー許可ロケーションとサポートロケーションの交差集合から選択</td>
+          </tr>
+          <tr>
+            <td>なし</td>
+            <td>あり</td>
+            <td>デフォルト設定のストレージロケーションを使用</td>
+          </tr>
+          <tr>
+            <td>あり</td>
+            <td>あり</td>
+            <td>デフォルト設定のロケーションを使用 (ポリシー非許可の場合は作成失敗)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>必要な IAM ロール</h3>
+      <span class="code-label">JSON</span>
+      <pre><code class="language-json">{
+  "required_roles": [
+    {
+      "role": "roles/observability.editor",
+      "purpose": "Observability バケットのデフォルト設定の表示・更新"
+    },
+    {
+      "role": "roles/cloudkms.admin",
+      "purpose": "Cloud KMS 鍵の管理および IAM ポリシー設定"
+    }
+  ],
+  "required_permissions": [
+    "observability.settings.get",
+    "observability.settings.update",
+    "cloudkms.cryptoKeys.getIamPolicy",
+    "cloudkms.cryptoKeys.setIamPolicy"
+  ]
+}</code></pre>
+    </div>
+
+    <!-- Setup Guide -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <div class="note-box">
+        <strong>💡 前提条件:</strong>
+        <ul style="margin: 8px 0 0; padding-left: 20px; font-size: 14px;">
+          <li>組織レベルのリソース管理者ロール (<code>roles/resourcemanager.organizationAdmin</code>)</li>
+          <li>Cloud KMS API が有効化されていること</li>
+          <li><code>roles/observability.editor</code> および <code>roles/cloudkms.admin</code> が付与されていること</li>
+          <li>CMEK 使用時: 対象ロケーションに Cloud KMS キーリングと鍵が作成済み</li>
+        </ul>
+      </div>
+
+      <h3>Step 1: 組織ポリシーでリソースロケーションを制限</h3>
+      <span class="code-label">YAML</span>
+      <pre><code class="language-yaml">constraint: constraints/gcp.resourceLocations
+listPolicy:
+  allowedValues:
+    - in:asia-northeast1-locations
+    - in:us-central1-locations</code></pre>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud resource-manager org-policies set-policy \
+  --organization=ORGANIZATION_ID \
+  policy.yaml</code></pre>
+
+      <h3>Step 2: CMEK ポリシーを設定</h3>
+      <span class="code-label">YAML</span>
+      <pre><code class="language-yaml">constraint: constraints/gcp.restrictNonCmekServices
+listPolicy:
+  deniedValues:
+    - observability.googleapis.com</code></pre>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud org-policies set-policy cmek-policy.yaml \
+  --organization=ORGANIZATION_ID</code></pre>
+
+      <h3>Step 3: KMS 鍵プロジェクトを制限</h3>
+      <span class="code-label">YAML</span>
+      <pre><code class="language-yaml">constraint: constraints/gcp.restrictCmekCryptoKeyProjects
+listPolicy:
+  allowedValues:
+    - projects/my-kms-project</code></pre>
+
+      <h3>Step 4: Observability バケットのデフォルト設定を構成</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># デフォルト KMS 鍵を設定 (組織レベル、asia-northeast1)
+gcloud beta observability settings update \
+  --organization=ORGANIZATION_ID \
+  --location=asia-northeast1 \
+  --kms-key-name=projects/my-kms-project/locations/asia-northeast1/keyRings/my-keyring/cryptoKeys/my-key
+
+# デフォルトストレージロケーションを設定
+gcloud beta observability settings update \
+  --organization=ORGANIZATION_ID \
+  --location=global \
+  --storage-location=asia-northeast1</code></pre>
+
+      <h3>Step 5: 設定を確認</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud beta observability settings describe \
+  --organization=ORGANIZATION_ID \
+  --location=asia-northeast1</code></pre>
+    </div>
+
+    <!-- Benefits and Drawbacks -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div>
+          <h3>ビジネス面</h3>
+          <div class="success-box">
+            <ul style="margin: 0; padding-left: 20px; font-size: 14px;">
+              <li><strong>コンプライアンス自動化</strong>: GDPR、HIPAA、PCI DSS の要件を組織ポリシーで自動担保</li>
+              <li><strong>データ主権の確保</strong>: 特定の国や地域にトレースデータを閉じ込め可能</li>
+              <li><strong>ガバナンスの統一</strong>: ログ・メトリクス・トレース全てに統一的ポリシー適用</li>
+            </ul>
+          </div>
+        </div>
+        <div>
+          <h3>技術面</h3>
+          <div class="success-box">
+            <ul style="margin: 0; padding-left: 20px; font-size: 14px;">
+              <li><strong>自動適用</strong>: 個別プロジェクトでの設定漏れがなくなる</li>
+              <li><strong>階層的継承</strong>: 組織 > フォルダ > プロジェクトで管理負荷軽減</li>
+              <li><strong>既存バケットへの影響なし</strong>: 新規バケット作成時にのみ適用</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <div class="warning-box">
+        <h4 style="margin: 0 0 8px; color: #E65100;">制限事項</h4>
+        <ul style="margin: 0; padding-left: 20px; font-size: 14px;">
+          <li>組織ポリシーは遡及的に適用されないため、既存バケットが不適切なロケーションにある場合は手動移行が必要</li>
+          <li>CMEK ポリシー設定時、デフォルト設定を事前に構成しないとバケットのプロビジョニングが失敗し、トレースデータが収集不能に</li>
+          <li>許可ロケーションとサポートロケーションに重複がない場合、バケット作成不可</li>
+        </ul>
+      </div>
+      <div class="warning-box">
+        <h4 style="margin: 0 0 8px; color: #E65100;">考慮すべき点</h4>
+        <ul style="margin: 0; padding-left: 20px; font-size: 14px;">
+          <li>Cloud KMS 鍵のローテーション・無効化・削除がトレースデータへのアクセスに影響 (鍵ライフサイクル管理に注意)</li>
+          <li>Cloud Run functions、Cloud Run、App Engine のトレースデータは、バケット未存在時に保存不可 (ポリシー違反時にデータロス発生の可能性)</li>
+          <li>デフォルト設定の変更は新規バケットにのみ適用 (既存バケットの暗号化設定は変更されない)</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+      <div class="usecase-card">
+        <h4>🇪🇺 ユースケース 1: EU データ主権要件への対応</h4>
+        <p><strong>シナリオ:</strong> GDPR に基づきトレースデータを EU 内にのみ保存する必要がある場合</p>
+        <span class="code-label">YAML</span>
+        <pre><code class="language-yaml"># 組織ポリシー: EU リージョンのみ許可
+constraint: constraints/gcp.resourceLocations
+listPolicy:
+  allowedValues:
+    - in:eu-locations</code></pre>
+        <span class="code-label">Bash</span>
+        <pre><code class="language-bash"># デフォルトストレージロケーションを EU に設定
+gcloud beta observability settings update \
+  --folder=EU_FOLDER_ID \
+  --location=global \
+  --storage-location=europe-west3</code></pre>
+        <p><strong>効果:</strong> EU フォルダ配下のプロジェクトで自動作成される Observability バケットが必ず EU リージョン内に配置され、GDPR のデータ越境規制に自動準拠。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>🏦 ユースケース 2: 金融機関における暗号化制御</h4>
+        <p><strong>シナリオ:</strong> すべてのオブザーバビリティデータに自社管理の暗号鍵を使用し、鍵管理を特定セキュリティプロジェクトに集約する場合</p>
+        <span class="code-label">Bash</span>
+        <pre><code class="language-bash"># CMEK を強制
+gcloud org-policies set-policy cmek-policy.yaml \
+  --organization=ORGANIZATION_ID
+
+# KMS 鍵プロジェクトを制限
+gcloud org-policies set-policy kms-project-policy.yaml \
+  --organization=ORGANIZATION_ID
+
+# デフォルト KMS 鍵を設定
+gcloud beta observability settings update \
+  --organization=ORGANIZATION_ID \
+  --location=asia-northeast1 \
+  --kms-key-name=projects/security-kms-project/locations/asia-northeast1/keyRings/observability/cryptoKeys/trace-key</code></pre>
+        <p><strong>効果:</strong> トレースデータを含む全オブザーバビリティデータが承認済み KMS 鍵で暗号化され、暗号鍵アクセス監査ログによる不正アクセス検知も実現。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金情報</h2>
+      <p>Observability バケットの組織ポリシー適用自体には<span class="highlight">追加料金は発生しません</span>。Cloud Trace の料金はトレースデータの取り込み量に基づきます。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>月額料金 (概算)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Cloud Trace 取り込み (最初の 250 万スパン)</td>
+            <td><strong style="color: var(--gc-green);">無料</strong></td>
+          </tr>
+          <tr>
+            <td>Cloud Trace 取り込み (250 万スパン超過分)</td>
+            <td>$0.20 / 100 万スパン</td>
+          </tr>
+          <tr>
+            <td>Cloud KMS 鍵 (CMEK 使用時)</td>
+            <td>$0.06 / 鍵バージョン / 月</td>
+          </tr>
+          <tr>
+            <td>Cloud KMS 鍵操作 (CMEK 使用時)</td>
+            <td>$0.03 / 10,000 操作</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="note-box">
+        <strong>💡 注:</strong> CMEK を使用する場合、Cloud KMS の料金が別途発生します。組織ポリシーの設定・適用自体は無料です。
+      </div>
+    </div>
+
+    <!-- Available Regions -->
+    <div class="section">
+      <h2>🌐 利用可能リージョン</h2>
+
+      <div class="region-category">マルチリージョン</div>
+      <div class="region-grid">
+        <div class="region-tag"><strong>eu</strong></div>
+        <div class="region-tag"><strong>us</strong></div>
+      </div>
+
+      <div class="region-category">アジア太平洋</div>
+      <div class="region-grid">
+        <div class="region-tag">asia-east1 (台湾)</div>
+        <div class="region-tag">asia-east2 (香港)</div>
+        <div class="region-tag">asia-northeast1 (東京)</div>
+        <div class="region-tag">asia-northeast2 (大阪)</div>
+        <div class="region-tag">asia-northeast3 (ソウル)</div>
+        <div class="region-tag">asia-south1 (ムンバイ)</div>
+        <div class="region-tag">asia-south2 (デリー)</div>
+        <div class="region-tag">asia-southeast1 (シンガポール)</div>
+        <div class="region-tag">asia-southeast2 (ジャカルタ)</div>
+        <div class="region-tag">asia-southeast3 (バンコク)</div>
+        <div class="region-tag">australia-southeast1 (シドニー)</div>
+        <div class="region-tag">australia-southeast2 (メルボルン)</div>
+      </div>
+
+      <div class="region-category">アメリカ</div>
+      <div class="region-grid">
+        <div class="region-tag">northamerica-northeast1</div>
+        <div class="region-tag">northamerica-northeast2</div>
+        <div class="region-tag">northamerica-south1</div>
+        <div class="region-tag">southamerica-east1</div>
+        <div class="region-tag">southamerica-west1</div>
+        <div class="region-tag">us-central1</div>
+        <div class="region-tag">us-east1</div>
+        <div class="region-tag">us-east4</div>
+        <div class="region-tag">us-east5</div>
+        <div class="region-tag">us-south1</div>
+        <div class="region-tag">us-west1</div>
+        <div class="region-tag">us-west2</div>
+        <div class="region-tag">us-west3</div>
+        <div class="region-tag">us-west4</div>
+      </div>
+
+      <div class="region-category">ヨーロッパ</div>
+      <div class="region-grid">
+        <div class="region-tag">europe-central2</div>
+        <div class="region-tag">europe-north1</div>
+        <div class="region-tag">europe-north2</div>
+        <div class="region-tag">europe-southwest1</div>
+        <div class="region-tag">europe-west1</div>
+        <div class="region-tag">europe-west2</div>
+        <div class="region-tag">europe-west3</div>
+        <div class="region-tag">europe-west4</div>
+        <div class="region-tag">europe-west6</div>
+        <div class="region-tag">europe-west8</div>
+        <div class="region-tag">europe-west10</div>
+        <div class="region-tag">europe-west12</div>
+      </div>
+
+      <div class="region-category">中東・アフリカ</div>
+      <div class="region-grid">
+        <div class="region-tag">me-central1 (ドーハ)</div>
+        <div class="region-tag">me-central2 (ダンマーム)</div>
+        <div class="region-tag">me-west1 (テルアビブ)</div>
+        <div class="region-tag">africa-south1 (ヨハネスブルグ)</div>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <strong>Cloud Logging</strong> - ログバケットでも同様の組織ポリシーとデフォルトリソース設定によるロケーション・CMEK 制御が可能
+        </div>
+        <div class="card card-yellow">
+          <strong>Cloud KMS</strong> - Observability バケットの暗号化に使用する顧客管理暗号鍵を提供
+        </div>
+        <div class="card card-red">
+          <strong>Organization Policy Service</strong> - リソース作成を制限する組織全体のポリシーを定義・適用
+        </div>
+        <div class="card card-green">
+          <strong>Cloud Monitoring</strong> - 同じ Google Cloud Observability プラットフォームの一部としてメトリクスデータを管理
+        </div>
+        <div class="card card-purple">
+          <strong>Telemetry API</strong> - トレースデータの取り込みに使用される API (2026年3月30日以降、新規プロジェクトで自動有効化)
+        </div>
+      </div>
+    </div>
+
+    <!-- References -->
+    <div class="section">
+      <h2>📚 参考リンク</h2>
+      <ul class="links-list">
+        <li>📄 <a href="https://docs.cloud.google.com/release-notes#June_02_2026" target="_blank" class="gc-link">公式リリースノート</a></li>
+        <li>📘 <a href="https://docs.google.com/stackdriver/docs/observability/set-defaults-for-observability-buckets" target="_blank" class="gc-link">Observability バケットのデフォルト設定</a></li>
+        <li>🔐 <a href="https://docs.cloud.google.com/stackdriver/docs/observability/cmek" target="_blank" class="gc-link">Observability バケットの CMEK サポート</a></li>
+        <li>🌍 <a href="https://docs.cloud.google.com/stackdriver/docs/observability/observability-bucket-locations" target="_blank" class="gc-link">Observability バケットのロケーション</a></li>
+        <li>📊 <a href="https://docs.cloud.google.com/trace/docs/storage-overview" target="_blank" class="gc-link">Cloud Trace ストレージ概要</a></li>
+        <li>💰 <a href="https://cloud.google.com/products/observability/pricing" target="_blank" class="gc-link">Cloud Observability 料金</a></li>
+      </ul>
+    </div>
+
+    <!-- Summary -->
+    <div class="section" style="background: var(--gc-blue-tint); border-color: var(--gc-blue-300);">
+      <h2>📝 まとめ</h2>
+      <p>
+        今回のアップデートにより、Cloud Trace の Observability バケット作成フローが<span class="highlight">組織ポリシーを完全にサポート</span>し、トレースデータのロケーション制御と暗号化管理が組織レベルで統一的に行えるようになりました。
+      </p>
+      <div class="note-box">
+        <strong>推奨アクション:</strong>
+        <ul style="margin: 8px 0 0; padding-left: 20px; font-size: 14px;">
+          <li>コンプライアンス/データ主権要件がある組織は、Observability バケットのデフォルト設定と組織ポリシーを組み合わせて構成</li>
+          <li>CMEK ポリシー適用時は、<strong>事前にデフォルト設定で KMS 鍵を指定</strong>してからポリシーを有効化</li>
+          <li>既存バケットについてはポリシー遡及適用されないため、必要に応じて手動で確認・移行</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>📎 出典: <a href="https://docs.cloud.google.com/release-notes#June_02_2026" target="_blank" class="gc-link" style="word-break: break-all;">https://docs.cloud.google.com/release-notes#June_02_2026</a></p>
+      <p style="margin-top: 8px;">生成日: 2026-06-02 | Cloud Trace Observability Bucket Organization Policies</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

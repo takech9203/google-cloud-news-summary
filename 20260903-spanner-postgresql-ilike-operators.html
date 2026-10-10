@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spanner: PostgreSQL 方言で ILIKE / NOT ILIKE 演算子をサポート</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+      --gc-database: #F4B400;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      margin-bottom: 32px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 12px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h4 {
+      margin: 0 0 8px 0;
+      color: var(--gc-on-surface);
+      font-size: 16px;
+    }
+
+    .card p {
+      margin: 4px 0;
+      font-size: 14.5px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-database {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+    }
+
+    .badge-database {
+      background: var(--gc-database);
+    }
+
+    /* Before / After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 720px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .before-box, .after-box {
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 2px solid rgba(234, 67, 53, 0.4);
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 2px solid rgba(52, 168, 83, 0.4);
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-box h3 { color: #C5221F; }
+    .after-box h3 { color: #188038; }
+
+    .before-box ul, .after-box ul {
+      margin: 8px 0 0 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin-bottom: 8px;
+    }
+
+    /* チェックリスト */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    /* コードブロック (pre:not(.mermaid) で Mermaid 図を除外) */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14.5px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 0;
+      padding: 0;
+    }
+
+    .code-block pre:not(.mermaid) {
+      border-radius: 0;
+    }
+
+    pre:not(.mermaid) code {
+      display: block;
+      background: none;
+      border: none;
+      padding: 16px !important;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-lowest);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* テーブル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* 注意・情報ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+      border: 1px solid var(--gc-blue-100);
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+      font-size: 17px;
+    }
+
+    .usecase p {
+      font-size: 14.5px;
+      margin: 8px 0;
+    }
+
+    /* 演算子タイル */
+    .operator-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .operator-tile {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-300);
+      border-radius: 12px;
+      padding: 14px;
+      text-align: center;
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .operator-tile .op-syntax {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--gc-blue-800);
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .operator-tile .op-desc {
+      font-size: 13px;
+      color: var(--gc-on-surface-variant);
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* 2 カラムグリッド (メリット) */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 720px) {
+      .two-col {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* リンクリスト */
+    .link-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .link-list li {
+      margin: 8px 0;
+      padding-left: 4px;
+      word-break: break-all;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div class="header-top">
+        <div>
+          <span class="badge badge-database">🗄️ Spanner</span>
+          <span class="badge">PostgreSQL 方言</span>
+          <span class="badge badge-ga">Feature (提供開始)</span>
+        </div>
+        <div class="subtitle">📅 リリース日: 2026-09-03</div>
+      </div>
+      <h1>🔍 Spanner: PostgreSQL 方言で ILIKE / NOT ILIKE 演算子をサポート</h1>
+      <div class="subtitle">大文字小文字を区別しないパターンマッチングを標準構文で — <code>~~*</code> / <code>!~~*</code> 表記と <code>pg.ilike</code> / <code>pg.not_ilike</code> 関数も同時提供</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📌 概要</h2>
+      <p>
+        Spanner の <span class="highlight">PostgreSQL 方言データベース</span>で、大文字小文字を区別しないパターンマッチング演算子
+        <code>ILIKE</code> (<code>~~*</code>) と <code>NOT ILIKE</code> (<code>!~~*</code>) がサポートされました。
+        あわせて、同等の機能を提供する関数 <code>pg.ilike</code> / <code>pg.not_ilike</code> も利用可能です。
+      </p>
+      <p>
+        <code>ILIKE</code> は PostgreSQL で広く使われている <code>LIKE</code> のケースインセンシティブ版であり、今回のサポートにより
+        <span class="highlight">オープンソース PostgreSQL からの移行</span>や、既存アプリケーション・ORM が生成するクエリとの互換性がさらに向上します。
+      </p>
+      <p>
+        さらに、対象カラムに <code>LOWER(column)</code> や <code>UPPER(column)</code> の
+        <span class="highlight">ケースフォールディング式インデックス</span>を作成すると、クエリオプティマイザが
+        <code>ILIKE</code> をフルテーブルスキャンではなく<strong>インデックススキャン</strong>に書き換えて最適化できます。
+        2026 年 8 月 28 日発表の式インデックス (expression index) サポートとの組み合わせで、実用的なパフォーマンスを実現できます。
+      </p>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>🔴 Before: アップデート前の課題</h3>
+          <ul>
+            <li><code>ILIKE</code> / <code>NOT ILIKE</code> が使えず、<code>LOWER(column) LIKE LOWER(pattern)</code> のような書き換えが必要だった</li>
+            <li>オープンソース PostgreSQL の既存アプリや ORM 生成クエリを、Spanner 移行時に修正する必要があった</li>
+            <li><code>~~*</code> / <code>!~~*</code> の演算子表記も使用できなかった</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>🟢 After: アップデート後の改善</h3>
+          <ul>
+            <li><code>ILIKE</code> / <code>NOT ILIKE</code> (および <code>~~*</code> / <code>!~~*</code>) をそのまま使用可能に</li>
+            <li>関数形式の <code>pg.ilike(string, pattern)</code> / <code>pg.not_ilike(string, pattern)</code> も利用可能に</li>
+            <li>ケースフォールディング式インデックスにより、オプティマイザがインデックススキャンへ書き換えて最適化</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Before["🔴 Before: ILIKE 非サポート"]
+        A1([👤 アプリケーション / ORM]) -->|"ILIKE を含むクエリ"| B1["✍️ クエリの書き換えが必要<br/>LOWER(name) LIKE LOWER('ap%')"]
+        B1 --> C1[("🗄️ Spanner<br/>(PostgreSQL 方言)")]
+    end
+
+    subgraph After["🟢 After: ILIKE ネイティブサポート"]
+        A2([👤 アプリケーション / ORM]) -->|"name ILIKE 'ap%'<br/>そのまま実行可能"| C2[("🗄️ Spanner<br/>(PostgreSQL 方言)")]
+        C2 -.->|"式インデックス LOWER(name) があれば<br/>インデックススキャンに最適化"| D2["⚡ クエリオプティマイザ"]
+    end
+
+    Before ==>|今回のアップデート| After
+        </pre>
+      </div>
+      <p>
+        従来はケースインセンシティブ検索のためにクエリを <code>LOWER()</code> + <code>LIKE</code> に書き換える必要がありましたが、
+        今回のアップデートで <code>ILIKE</code> をそのまま実行でき、ケースフォールディング式インデックスによるインデックススキャン最適化も可能になりました。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚙️ 主要機能</h2>
+
+      <div class="card">
+        <h4>1️⃣ ILIKE / NOT ILIKE 演算子のサポート</h4>
+        <p>→ <code>string ILIKE pattern</code>: パターンにマッチする場合に TRUE。大文字小文字を区別しない<br>
+        <span style="font-size: 13px;">例: <code>'Apple' ILIKE 'ap%'</code> → true、<code>'Apple' ILIKE 'APpLe'</code> → true</span></p>
+        <p>→ <code>string NOT ILIKE pattern</code>: パターンにマッチしない場合に TRUE<br>
+        <span style="font-size: 13px;">例: <code>'Apple' NOT ILIKE 'banana%'</code> → true</span></p>
+      </div>
+
+      <div class="card">
+        <h4>2️⃣ PostgreSQL 演算子表記 (~~* / !~~*) のサポート</h4>
+        <p>→ <code>string ~~* pattern</code>: <code>ILIKE</code> と等価 (例: <code>'Apple' ~~* 'ap%'</code> → true)</p>
+        <p>→ <code>string !~~* pattern</code>: <code>NOT ILIKE</code> と等価 (例: <code>'Apple' !~~* 'banana%'</code> → true)</p>
+      </div>
+
+      <div class="card">
+        <h4>3️⃣ pg.ilike / pg.not_ilike 関数のサポート</h4>
+        <p>→ <code>pg.ilike(string text, pattern text)</code>: Boolean を返す。ケースインセンシティブ<br>
+        <span style="font-size: 13px;">例: <code>pg.ilike('Apple', 'aPp%')</code> → true</span></p>
+        <p>→ <code>pg.not_ilike(string text, pattern text)</code>: マッチしない場合に true<br>
+        <span style="font-size: 13px;">例: <code>pg.not_ilike('Apple', 'aPp%')</code> → false</span></p>
+      </div>
+
+      <div class="card">
+        <h4>4️⃣ 式インデックスによるクエリ最適化</h4>
+        <p>→ <code>LOWER(column)</code> / <code>UPPER(column)</code> のケースフォールディング式インデックスを作成すると、クエリオプティマイザが <code>ILIKE</code> をフルテーブルスキャンではなく<strong>インデックススキャン</strong>に書き換え可能</p>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔬 技術仕様</h2>
+
+      <h3>📋 サポートされる演算子・関数</h3>
+      <div class="operator-grid">
+        <div class="operator-tile">
+          <span class="op-syntax">ILIKE</span>
+          <span class="op-desc">ケースインセンシティブなパターンマッチ演算子</span>
+        </div>
+        <div class="operator-tile">
+          <span class="op-syntax">NOT ILIKE</span>
+          <span class="op-desc">ケースインセンシティブな否定パターンマッチ</span>
+        </div>
+        <div class="operator-tile">
+          <span class="op-syntax">~~* / !~~*</span>
+          <span class="op-desc">ILIKE / NOT ILIKE と等価の記号表記</span>
+        </div>
+        <div class="operator-tile">
+          <span class="op-syntax">pg.ilike / pg.not_ilike</span>
+          <span class="op-desc">Boolean を返す関数形式</span>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>種類</th>
+            <th>構文</th>
+            <th>説明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>演算子</td>
+            <td><code>string ILIKE pattern</code></td>
+            <td>ケースインセンシティブなパターンマッチ</td>
+          </tr>
+          <tr>
+            <td>演算子</td>
+            <td><code>string NOT ILIKE pattern</code></td>
+            <td>ケースインセンシティブな否定パターンマッチ</td>
+          </tr>
+          <tr>
+            <td>演算子 (記号表記)</td>
+            <td><code>string ~~* pattern</code></td>
+            <td><code>ILIKE</code> と等価</td>
+          </tr>
+          <tr>
+            <td>演算子 (記号表記)</td>
+            <td><code>string !~~* pattern</code></td>
+            <td><code>NOT ILIKE</code> と等価</td>
+          </tr>
+          <tr>
+            <td>関数</td>
+            <td><code>pg.ilike(string, pattern)</code></td>
+            <td>Boolean を返す。ケースインセンシティブ</td>
+          </tr>
+          <tr>
+            <td>関数</td>
+            <td><code>pg.not_ilike(string, pattern)</code></td>
+            <td>Boolean を返す。ケースインセンシティブの否定</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>🔤 ESCAPE 句</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><code>LIKE</code> / <code>NOT LIKE</code> / <code>ILIKE</code> / <code>NOT ILIKE</code> はオプションの <code>ESCAPE</code> 句をサポート (例: <code>string LIKE pattern ESCAPE escape_character</code>)</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>エスケープ文字のデフォルトはバックスラッシュ (<code>\</code>)</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>明示的に指定する場合もバックスラッシュ (<code>\</code>) のみサポート</span></div>
+
+      <h3>📐 演算子の優先順位</h3>
+      <div class="note-box">
+        <strong>💡 ポイント:</strong> PostgreSQL の演算子優先順位テーブルにおいて、<code>ILIKE</code> は
+        <code>BETWEEN</code> / <code>LIKE</code> / <code>IN</code> と同じ優先順位 (範囲包含、文字列マッチング、集合メンバーシップ) に位置付けられ、
+        比較演算子 (<code>&lt;</code>, <code>&gt;</code>, <code>=</code> など) より高い優先順位を持ちます。
+      </div>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>✅ 前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>PostgreSQL 方言で作成された Spanner データベースを使用していること</span></div>
+
+      <div class="flow-diagram" style="display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; margin: 24px 0;">
+        <div style="background: var(--gc-surface); border: 2px solid var(--gc-blue-600); border-radius: 12px; padding: 12px 20px; text-align: center; color: var(--gc-on-surface); box-shadow: 0 1px 3px rgba(60,64,67,0.12);">1️⃣ ILIKE クエリを<br>そのまま実行</div>
+        <span style="color: var(--gc-blue-600); font-size: 24px; font-weight: bold;">→</span>
+        <div style="background: var(--gc-surface); border: 2px solid var(--gc-blue-600); border-radius: 12px; padding: 12px 20px; text-align: center; color: var(--gc-on-surface); box-shadow: 0 1px 3px rgba(60,64,67,0.12);">2️⃣ (推奨) 式インデックス<br>を作成して最適化</div>
+      </div>
+
+      <h3>ステップ 1: ILIKE 演算子を使用したクエリの実行</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">ILIKE / ~~* / pg.ilike の使用例</span>
+        </div>
+        <pre><code class="language-sql">-- 大文字小文字を区別しない前方一致検索
+SELECT * FROM products WHERE name ILIKE 'ap%';
+
+-- 記号表記 (~~*) も同じ意味
+SELECT * FROM products WHERE name ~~* 'ap%';
+
+-- 関数形式
+SELECT * FROM products WHERE pg.ilike(name, 'ap%');</code></pre>
+      </div>
+      <p>追加の設定は不要で、PostgreSQL 方言データベースに対してそのままクエリを実行できます。</p>
+
+      <h3>ステップ 2: (推奨) ケースフォールディング式インデックスによる最適化</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">式インデックスの作成</span>
+        </div>
+        <pre><code class="language-sql">-- LOWER() ベースの式インデックスを作成
+CREATE INDEX products_by_lower_name ON products (LOWER(name));</code></pre>
+      </div>
+      <p>
+        対象カラムに <code>LOWER(column)</code> または <code>UPPER(column)</code> の式インデックスを作成しておくと、
+        クエリオプティマイザが <code>ILIKE</code> クエリを<span class="highlight">インデックススキャンに書き換え</span>、フルテーブルスキャンを回避できます。
+      </p>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>💪 メリット</h2>
+      <div class="two-col">
+        <div class="card" style="border-left-color: var(--gc-green);">
+          <h4>💼 ビジネス面</h4>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>PostgreSQL からの移行コスト削減</strong>: <code>ILIKE</code> を使用する既存アプリや ORM 生成クエリを書き換えずに移行でき、移行工数とリスクが低減</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>開発生産性の向上</strong>: ケースインセンシティブ検索を標準構文で簡潔に記述でき、独自の書き換えパターンの周知・レビューが不要に</span></div>
+        </div>
+        <div class="card" style="border-left-color: var(--gc-blue-600);">
+          <h4>🔧 技術面</h4>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>PostgreSQL 互換性の向上</strong>: 演算子表記 (<code>~~*</code> / <code>!~~*</code>) まで含めてオープンソース PostgreSQL の構文と互換性を確保</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>インデックスによる最適化</strong>: ケースフォールディング式インデックスとの組み合わせで、大規模テーブルでも実用的な検索性能を実現</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>🚫 制限事項</h3>
+      <div class="check-item"><span class="cross-icon">✗</span><span>本機能は PostgreSQL 方言データベース向けであり、GoogleSQL 方言データベースの構文とは異なる</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span><code>ESCAPE</code> 句で指定できるエスケープ文字はバックスラッシュ (<code>\</code>) のみ</span></div>
+
+      <h3>🤔 考慮すべき点</h3>
+      <div class="warning-box">
+        <strong>⚠️ 注意:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>式インデックスを作成しない場合、<code>ILIKE</code> クエリは<strong>フルテーブルスキャン</strong>になる可能性があるため、大規模テーブルでは <code>LOWER(column)</code> / <code>UPPER(column)</code> の式インデックス作成を検討する</li>
+          <li>式インデックスは<strong>ストレージと書き込みコスト</strong>を追加するため、検索頻度とのバランスを考慮する</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>📦 ユースケース 1: PostgreSQL からの移行アプリケーションの互換性確保</h3>
+        <p><strong>シナリオ:</strong> オープンソース PostgreSQL で稼働している SaaS アプリケーションを Spanner (PostgreSQL 方言) へ移行する。ユーザー検索機能では ORM が <code>ILIKE</code> を含むクエリを生成している。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">ORM が生成する既存クエリ</span>
+          </div>
+          <pre><code class="language-sql">-- ORM が生成する既存クエリをそのまま実行可能
+SELECT id, email FROM users WHERE email ILIKE '%@example.com';</code></pre>
+        </div>
+        <p><strong>✨ 効果:</strong> クエリの書き換えやアプリケーションコードの修正なしで移行でき、移行工数とデグレードのリスクを削減できる。</p>
+      </div>
+
+      <div class="usecase">
+        <h3>🛒 ユースケース 2: 商品カタログのケースインセンシティブ検索</h3>
+        <p><strong>シナリオ:</strong> EC サイトの商品検索で、ユーザー入力の大文字小文字にかかわらず商品名を部分一致検索したい。商品テーブルは大規模なため、フルテーブルスキャンは避けたい。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">式インデックス + ILIKE 検索</span>
+          </div>
+          <pre><code class="language-sql">-- ケースフォールディング式インデックスを作成
+CREATE INDEX products_by_lower_name ON products (LOWER(name));
+
+-- ILIKE による検索 (オプティマイザがインデックススキャンに書き換え可能)
+SELECT product_id, name, price FROM products WHERE name ILIKE 'pixel%';</code></pre>
+        </div>
+        <p><strong>✨ 効果:</strong> 標準的な構文でケースインセンシティブ検索を実装しつつ、式インデックスにより大規模テーブルでも高速な検索が可能になる。</p>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>
+        本アップデートは SQL 機能の追加であり、機能自体に固有の追加料金に関する記載はありません。
+        通常の Spanner の料金体系 (コンピュート容量、ストレージ、ネットワーク) が適用されます。
+      </p>
+      <div class="note-box">
+        <strong>💡 ヒント:</strong> 最適化のために式インデックスを作成する場合は、インデックス分の<strong>ストレージ料金</strong>が発生します。
+        詳細は <a href="https://cloud.google.com/spanner/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Spanner の料金ページ</a> を参照してください。
+      </div>
+    </div>
+
+    <!-- 関連サービス・機能 -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card" style="border-left-color: var(--gc-database);">
+        <h4>🗂️ Spanner 式インデックス (Expression Index)</h4>
+        <p>2026 年 8 月 28 日に発表された、スカラー式に基づくセカンダリインデックス作成機能。<code>LOWER(column)</code> などのケースフォールディング式インデックスを作成することで、<code>ILIKE</code> クエリの最適化に直接活用できる。</p>
+      </div>
+      <div class="card" style="border-left-color: var(--gc-database);">
+        <h4>🗄️ Spanner GoogleSQL 方言</h4>
+        <p>GoogleSQL 方言では正規表現関数など別の構文でケースインセンシティブ検索を実現する。本アップデートは PostgreSQL 方言固有の機能。</p>
+      </div>
+      <div class="card" style="border-left-color: var(--gc-teal);">
+        <h4>🚚 Database Migration Service</h4>
+        <p>PostgreSQL から Spanner への移行を支援するサービス。<code>ILIKE</code> サポートにより移行後のクエリ互換性が向上する。</p>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="success-box">
+        <strong>✅ ポイント:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>Spanner の PostgreSQL 方言で <code>ILIKE</code> / <code>NOT ILIKE</code> 演算子と <code>pg.ilike</code> / <code>pg.not_ilike</code> 関数がサポートされ、オープンソース PostgreSQL との構文互換性がさらに向上</li>
+          <li>PostgreSQL からの移行を検討しているチームは、クエリ書き換えの要否を再評価する価値がある</li>
+          <li>大規模テーブルでの <code>ILIKE</code> 検索には、<code>LOWER(column)</code> などのケースフォールディング式インデックスの作成を推奨</li>
+        </ul>
+      </div>
+      <p style="margin-top: 16px;">
+        <span class="badge">#Spanner</span>
+        <span class="badge">#PostgreSQL</span>
+        <span class="badge">#ILIKE</span>
+        <span class="badge">#SQL</span>
+        <span class="badge">#PatternMatching</span>
+        <span class="badge">#Database</span>
+      </p>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p><strong>📎 出典:</strong></p>
+      <ul class="link-list">
+        <li>📰 <a href="https://docs.cloud.google.com/release-notes#September_03_2026" target="_blank" rel="noopener noreferrer" class="gc-link">Google Cloud 公式リリースノート (2026-09-03)</a></li>
+        <li>📖 <a href="https://docs.cloud.google.com/spanner/docs/reference/postgresql/operators#pattern-matching-operators" target="_blank" rel="noopener noreferrer" class="gc-link">パターンマッチング演算子のドキュメント</a></li>
+        <li>📖 <a href="https://docs.cloud.google.com/spanner/docs/reference/postgresql/functions" target="_blank" rel="noopener noreferrer" class="gc-link">PostgreSQL 方言の関数ドキュメント</a></li>
+        <li>💰 <a href="https://cloud.google.com/spanner/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Spanner 料金ページ</a></li>
+      </ul>
+      <p style="margin-top: 12px;">レポート: reports/2026/2026-09-03-spanner-postgresql-ilike-operators.md | 生成日: 2026-09-04</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Trace: Cloud Trace API の上限引き上げ (OTLP 準拠の Telemetry API と整合)</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 12px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h4 {
+      margin: 0 0 8px;
+      color: var(--gc-on-surface);
+      font-size: 16px;
+    }
+
+    .card p, .card ul {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* バッジ */
+    .badge,
+    .badge-ga,
+    .badge-feature {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+    }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 700px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid rgba(234, 67, 53, 0.3);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid rgba(52, 168, 83, 0.3);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-box h3 { color: #C5221F; }
+    .after-box h3 { color: #188038; }
+
+    .before-box ul, .after-box ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin-bottom: 8px;
+    }
+
+    /* 統計カード */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px 12px;
+      text-align: center;
+    }
+
+    .stat-old {
+      font-size: 14px;
+      opacity: 0.85;
+      text-decoration: line-through;
+    }
+
+    .stat-value {
+      font-size: 30px;
+      font-weight: 700;
+      margin: 4px 0;
+      line-height: 1.2;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    .stat-multiplier {
+      display: inline-block;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 12px;
+      padding: 2px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 6px;
+    }
+
+    /* 注意・情報ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+      border: 1px solid var(--gc-blue-100);
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+      font-size: 17px;
+    }
+
+    .usecase p {
+      font-size: 14px;
+      margin: 8px 0;
+    }
+
+    /* テーブル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .old-limit {
+      color: #C5221F;
+      font-weight: 600;
+    }
+
+    .new-limit {
+      color: #188038;
+      font-weight: 700;
+    }
+
+    /* コードブロック (pre:not(.mermaid) で Mermaid を除外) */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block {
+      overflow: hidden;
+      padding: 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+      background: #FFFFFF;
+    }
+
+    /* チェックリスト */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 10px 0;
+      font-size: 15px;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    /* 関連サービスグリッド */
+    .related-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .related-card {
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 12px;
+      padding: 16px;
+      font-size: 14px;
+    }
+
+    .related-card strong {
+      color: var(--gc-on-surface);
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    ul.link-list {
+      padding-left: 0;
+      list-style: none;
+      margin: 8px 0;
+    }
+
+    ul.link-list li {
+      margin: 8px 0;
+      word-break: break-all;
+      font-size: 14px;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <div style="margin-bottom: 8px;">
+          <span class="badge">☁️ Cloud Trace</span>
+          <span class="badge badge-ga">Feature</span>
+        </div>
+        <h1>📊 Cloud Trace API の上限引き上げ<br><span style="font-size: 22px; font-weight: 600; color: var(--gc-on-surface-variant);">OTLP 準拠の Telemetry API と整合</span></h1>
+      </div>
+      <div class="subtitle">リリース日: 2026-08-17</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📌 概要</h2>
+      <p>
+        Cloud Trace API (<code>cloudtrace.googleapis.com</code>) に関連する複数の上限が<span class="highlight">大幅に引き上げ</span>られました。
+        新しい上限は <span class="highlight">OpenTelemetry Protocol (OTLP) を実装する Telemetry API と整合</span>するように設定されており、
+        どちらの取り込み経路を使用してもスパンに付与できるメタデータの量に実質的な差がなくなります。
+        OpenTelemetry SDK で計装されたアプリケーションのトレースデータを<strong>情報の欠落なく</strong> Cloud Trace に送信しやすくなりました。
+      </p>
+      <p style="font-size: 14px;">
+        分散トレーシングでマイクロサービスやサーバーレスアプリケーションの可観測性を高めているユーザー、
+        特にリッチな属性 (HTTP ヘッダー、SQL ステートメント、カスタムビジネスコンテキストなど) をスパンに付与しているユーザーにとって重要なアップデートです。
+      </p>
+
+      <!-- 統計カード: 数字で見る新上限 -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-old">32 個</div>
+          <div class="stat-value">1,024 個</div>
+          <div class="stat-label">スパンあたりの最大属性数</div>
+          <div class="stat-multiplier">32 倍</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-old">256 bytes</div>
+          <div class="stat-value">65,532 bytes</div>
+          <div class="stat-label">属性値の最大サイズ</div>
+          <div class="stat-multiplier">約 256 倍</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-old">128 bytes</div>
+          <div class="stat-value">512 bytes</div>
+          <div class="stat-label">属性キーの最大サイズ</div>
+          <div class="stat-multiplier">4 倍</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-old">128 bytes</div>
+          <div class="stat-value">1,024 bytes</div>
+          <div class="stat-label">スパン名の最大長</div>
+          <div class="stat-multiplier">8 倍</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-old">128 個</div>
+          <div class="stat-value">256 個</div>
+          <div class="stat-label">スパンあたりの最大イベント数</div>
+          <div class="stat-multiplier">2 倍</div>
+        </div>
+      </div>
+
+      <!-- Before / After -->
+      <div class="before-after">
+        <div class="before-box">
+          <h3>🕰️ Before: アップデート前の課題</h3>
+          <ul>
+            <li>スパンあたりの属性数は<strong>最大 32 個</strong>。超過分は<strong>非決定的なアルゴリズム</strong>で 32 個が選択され、残りは破棄されていた</li>
+            <li>属性値は最大 <strong>256 bytes</strong>、属性キーは最大 <strong>128 bytes</strong> に制限され、長い URL や SQL ステートメントが切り捨てられる可能性があった</li>
+            <li>スパン名は最大 <strong>128 bytes</strong>、イベント数は最大 <strong>128 個/スパン</strong>に制限されていた</li>
+            <li>OTLP 準拠の Telemetry API と上限が大きく異なり、<strong>取り込み経路によってデータ保持内容に差</strong>が生じていた</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✨ After: アップデート後の改善</h3>
+          <ul>
+            <li>属性数が <strong>32 → 1,024 個</strong>に大幅増加。OpenTelemetry のセマンティック規約に沿った多数の属性をそのまま保持可能</li>
+            <li>属性値が <strong>256 → 65,532 bytes</strong>、属性キーが <strong>128 → 512 bytes</strong> に拡大。長いペイロードやコンテキストの切り捨てが大幅減</li>
+            <li>スパン名が <strong>128 → 1,024 bytes</strong>、イベント数が <strong>128 → 256 個/スパン</strong>に増加</li>
+            <li>Cloud Trace API と Telemetry API (OTLP) の上限が整合し、<strong>取り込み経路によるデータ保持の差異を意識不要</strong>に</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Before["🕰️ Before: 上限が小さく OTLP と不整合"]
+        A1["📱 OpenTelemetry SDK<br/>計装済みアプリ"] --> B1["🔌 Cloud Trace API<br/>属性: 32 個 / 値: 256 bytes<br/>スパン名: 128 bytes / イベント: 128 個"]
+        B1 -->|"⚠️ 超過分の属性は破棄"| C1[("🗄️ Cloud Trace")]
+    end
+
+    subgraph After["✨ After: Telemetry API (OTLP) と整合した上限"]
+        A2["📱 OpenTelemetry SDK<br/>計装済みアプリ"] --> B2["🔌 Cloud Trace API<br/>属性: 1,024 個 / 値: 65,532 bytes<br/>スパン名: 1,024 bytes / イベント: 256 個"]
+        A2 --> B3["🛰️ Telemetry API (OTLP)<br/>属性: 1,024 個 / 値: 64 KiB<br/>スパン名: 1,024 bytes / イベント: 256 個"]
+        B2 -->|"✅ リッチな属性を保持"| C2[("🗄️ Cloud Trace")]
+        B3 -->|"✅ リッチな属性を保持"| C2
+    end
+
+    Before -.->|"上限引き上げ"| After
+        </pre>
+      </div>
+      <p style="font-size: 14px;">
+        Cloud Trace API の上限が OTLP を実装する Telemetry API と整合するレベルまで引き上げられ、
+        どちらの取り込み経路でもリッチなスパンメタデータを欠落なく保持できるようになりました。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>🚀 主要機能</h2>
+      <div class="card">
+        <h4>1️⃣ スパンあたりの最大属性数の引き上げ (32 → 1,024)</h4>
+        <ul>
+          <li>OpenTelemetry のセマンティック規約 (HTTP、DB、メッセージングなど) に沿った多数の属性をそのまま保持可能</li>
+          <li>従来は上限超過時に非決定的なアルゴリズムで 32 個が選択され、残りは破棄されていた</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>2️⃣ 属性のサイズ上限の拡大 (値: 256 bytes → 65,532 bytes、キー: 128 bytes → 512 bytes)</h4>
+        <ul>
+          <li>長い URL、SQL ステートメント、スタックトレースの断片などを属性値として保持しやすくなった</li>
+          <li>名前空間付きの長い属性キー (例: <code>myorg.myteam.myservice.detail</code>) も切り捨てなく使用可能</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>3️⃣ スパン名とイベント数の上限拡大 (スパン名: 128 → 1,024 bytes、イベント: 128 → 256 個/スパン)</h4>
+        <ul>
+          <li>詳細なオペレーション名や、スパン内の多数のタイムスタンプ付きイベント (ログポイント) を保持可能</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>4️⃣ Telemetry API (OTLP) との整合</h4>
+        <ul>
+          <li>新しい上限は、OpenTelemetry Protocol (OTLP) を実装する Telemetry API がサポートする上限と一致</li>
+          <li>取り込み経路 (Cloud Trace API / Telemetry API) の違いによるデータ保持の差異が解消</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>⚙️ 技術仕様</h2>
+
+      <h3>📐 上限の Before/After 比較</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>旧上限</th>
+            <th>新上限</th>
+            <th>Telemetry API (OTLP)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>スパンあたりの最大属性数</td>
+            <td class="old-limit">32</td>
+            <td class="new-limit">1,024</td>
+            <td>1,024</td>
+          </tr>
+          <tr>
+            <td>属性値の最大サイズ</td>
+            <td class="old-limit">256 bytes</td>
+            <td class="new-limit">65,532 bytes</td>
+            <td>64 KiB</td>
+          </tr>
+          <tr>
+            <td>属性キーの最大サイズ</td>
+            <td class="old-limit">128 bytes</td>
+            <td class="new-limit">512 bytes</td>
+            <td>512 bytes</td>
+          </tr>
+          <tr>
+            <td>スパン名の最大長</td>
+            <td class="old-limit">128 bytes</td>
+            <td class="new-limit">1,024 bytes</td>
+            <td>1,024 bytes</td>
+          </tr>
+          <tr>
+            <td>スパンあたりの最大イベント数</td>
+            <td class="old-limit">128</td>
+            <td class="new-limit">256</td>
+            <td>256</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>🔒 変更されない主な上限・クォータ (Cloud Trace API)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>値</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>読み取りオペレーション</td>
+            <td>300 クォータユニット / 60 秒</td>
+          </tr>
+          <tr>
+            <td>書き込みオペレーション</td>
+            <td>4,800 クォータユニット / 60 秒</td>
+          </tr>
+          <tr>
+            <td>取り込みスパン数 (日次)</td>
+            <td>3,000,000〜5,000,000,000 / 日 (課金アカウント履歴・クォータ増加リクエストに依存)</td>
+          </tr>
+          <tr>
+            <td>GetTrace 呼び出しあたりの最大スパン数</td>
+            <td>10,000</td>
+          </tr>
+          <tr>
+            <td>PatchTraces 呼び出しあたりの最大スパン数</td>
+            <td>25,000</td>
+          </tr>
+          <tr>
+            <td>スパン取り込み可能なタイムスタンプ</td>
+            <td>過去 14 日〜未来 3 日</td>
+          </tr>
+          <tr>
+            <td>スパンデータの保持期間</td>
+            <td>30 日</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="note-box">
+        <strong>💡 補足:</strong> 日次スパン取り込みクォータは Cloud Trace API 経由の取り込みのみに適用され、Telemetry API 経由の取り込みには制限がありません。
+      </div>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>💪 メリット</h2>
+      <h3>💼 ビジネス面</h3>
+      <div class="check-item">
+        <span class="check-icon">✓</span>
+        <span><strong>トラブルシューティングの精度向上</strong>: 属性の破棄・切り捨てがなくなることで、障害調査時に必要なコンテキスト情報が確実に残り、MTTR (平均復旧時間) 短縮に寄与</span>
+      </div>
+      <div class="check-item">
+        <span class="check-icon">✓</span>
+        <span><strong>OpenTelemetry 標準への準拠</strong>: OTLP と整合した上限により、ベンダーニュートラルな計装をそのまま活用でき、可観測性基盤の移行・併用が容易になる</span>
+      </div>
+
+      <h3>🔧 技術面</h3>
+      <div class="check-item">
+        <span class="check-icon">✓</span>
+        <span><strong>属性の暗黙的な破棄リスクの解消</strong>: 従来は 32 個超過分が非決定的に破棄されていたが、1,024 個までそのまま取り込まれるため、SDK 側での属性削減ロジックが実質不要になる</span>
+      </div>
+      <div class="check-item">
+        <span class="check-icon">✓</span>
+        <span><strong>取り込み経路の統一的な設計</strong>: Cloud Trace API (BatchWrite) と Telemetry API (OTLP) のどちらを使用しても同等のメタデータを保持でき、エクスポーターの選択が柔軟になる</span>
+      </div>
+      <div class="check-item">
+        <span class="check-icon">✓</span>
+        <span><strong>リッチなイベント記録</strong>: スパンあたり 256 イベントまで記録できるため、スパン内の詳細なタイムライン (リトライ、キャッシュヒット/ミスなど) を表現しやすい</span>
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <h3>🚧 制限事項</h3>
+      <div class="check-item">
+        <span class="cross-icon">✗</span>
+        <span>上限を超過してもエラーにならない場合がある (例: 属性数超過時は一部の属性が選択されて残りが破棄される) ため、上限内に収まるように計装する必要がある</span>
+      </div>
+      <div class="check-item">
+        <span class="cross-icon">✗</span>
+        <span>日次スパン取り込みクォータ (Cloud Trace API 経由) は引き続き適用される</span>
+      </div>
+
+      <h3>🤔 考慮すべき点</h3>
+      <div class="warning-box">
+        <strong>⚠️ データ量とコストへの影響:</strong>
+        属性数・サイズの上限拡大に伴い、スパンあたりのデータ量を増やすと、トレースデータの取り込み量が増加します。
+        Cloud Trace の課金はスパン数ベース ($0.20/100 万スパン) のため属性追加自体で直接課金は増えませんが、
+        BigQuery へのエクスポートを行う場合はエクスポート先のストレージ・取り込みコストに影響しえます。
+      </div>
+      <div class="warning-box">
+        <strong>⚠️ サンプリングの継続推奨:</strong>
+        高トラフィックシステムではサンプリングレートの調整 (例: 1/1,000〜1/10,000) によるスパン取り込み量の制御が引き続き推奨されます。
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>📦 ユースケース 1: OpenTelemetry セマンティック規約に沿ったリッチな計装</h3>
+        <p><strong>シナリオ:</strong> マイクロサービス群を OpenTelemetry SDK で計装し、HTTP・gRPC・DB アクセスの標準属性に加えて、テナント ID や注文 ID などのビジネス属性を多数付与している。従来は 32 個の属性上限により一部が非決定的に破棄されていた。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Python</span>
+            <span class="code-title">OpenTelemetry SDK によるリッチな計装例</span>
+          </div>
+          <pre><code class="language-python">from opentelemetry import trace
+
+tracer = trace.get_tracer(__name__)
+
+with tracer.start_as_current_span("checkout.process-order") as span:
+    # 標準のセマンティック規約属性 + ビジネス属性を多数付与しても
+    # 1,024 個まで破棄されずに Cloud Trace に取り込まれる
+    span.set_attribute("http.request.method", "POST")
+    span.set_attribute("db.query.text", long_sql_statement)  # 最大 65,532 bytes
+    span.set_attribute("myorg.commerce.tenant_id", tenant_id)
+    span.set_attribute("myorg.commerce.order_id", order_id)
+    span.add_event("cache.miss", {"cache.key": cache_key})   # 最大 256 イベント/スパン</code></pre>
+        </div>
+        <p><strong>✅ 効果:</strong> 属性の破棄を回避するためのカスタム属性削減ロジックが不要になり、障害調査時に必要なコンテキストが確実に保持される。</p>
+      </div>
+
+      <div class="usecase">
+        <h3>📝 ユースケース 2: 長い SQL ステートメントや URL の完全な記録</h3>
+        <p><strong>シナリオ:</strong> データ分析基盤のクエリ実行をトレースしており、SQL ステートメント全文をスパン属性に記録したいが、従来の 256 bytes 上限では切り捨てられ、遅いクエリの特定に支障があった。</p>
+        <p><strong>✅ 効果:</strong> 属性値の上限が 65,532 bytes に拡大されたことで、長い SQL ステートメントやリクエスト URL をほぼ全文記録でき、パフォーマンス分析の精度が向上する。</p>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>Cloud Trace の課金はスパンの取り込み数に基づきます。<span class="highlight">今回の上限引き上げによる料金体系の変更はありません</span>。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>料金</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>トレース取り込み</td>
+            <td>$0.20 / 100 万スパン</td>
+          </tr>
+          <tr>
+            <td>無料枠</td>
+            <td>月間 250 万スパンまで無料</td>
+          </tr>
+        </tbody>
+      </table>
+      <p style="font-size: 14px;">詳細は <a href="https://cloud.google.com/stackdriver/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Google Cloud Observability の料金ページ</a> を参照してください。</p>
+    </div>
+
+    <!-- 関連サービス・機能 -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="related-grid">
+        <div class="related-card">
+          <strong>🛰️ Telemetry API (OTLP)</strong>
+          OpenTelemetry Protocol を実装するトレース取り込み API。今回の Cloud Trace API の新上限はこの API と整合しており、OpenTelemetry SDK で計装されたアプリケーションからの取り込みに最適。
+        </div>
+        <div class="related-card">
+          <strong>📈 Cloud Monitoring</strong>
+          月間スパン取り込み数 (<code>Monthly trace spans ingested</code>) に対するアラートポリシーを作成し、クォータ超過や想定外のコスト増を検知可能。
+        </div>
+        <div class="related-card">
+          <strong>📜 Cloud Logging</strong>
+          トレースとログを関連付けることで、スパンに紐づく詳細なログを横断的に調査可能。
+        </div>
+        <div class="related-card">
+          <strong>🗃️ BigQuery</strong>
+          トレースデータのエクスポート先として利用可能。エクスポート自体に Cloud Trace の課金は発生しないが、BigQuery 側の料金が発生しうる。
+        </div>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="success-box">
+        <p style="margin: 0 0 8px;">
+          Cloud Trace API の<strong>属性数・属性サイズ・スパン名長・イベント数の上限</strong>が、OTLP 準拠の Telemetry API と整合するレベルまで大幅に引き上げられ、
+          リッチなスパンメタデータを<strong>欠落なく保持</strong>できるようになりました。
+        </p>
+        <p style="margin: 0;">
+          <strong>🎯 推奨アクション:</strong> OpenTelemetry SDK で計装済みのアプリケーションを運用しているチームは、
+          属性の切り捨てを回避するために実装していた<strong>削減ロジックの見直し</strong>と、
+          セマンティック規約に沿った<strong>より詳細な計装への移行</strong>を検討することを推奨します。
+        </p>
+      </div>
+    </div>
+
+    <!-- 参考リンク -->
+    <div class="section">
+      <h2>📚 参考リンク</h2>
+      <ul class="link-list">
+        <li>🔗 <a href="https://docs.cloud.google.com/release-notes#August_17_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026-08-17)</a></li>
+        <li>🔗 <a href="https://docs.cloud.google.com/trace/docs/quotas#trace-api-quotas-and-limits" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud Trace API quotas and limits</a></li>
+        <li>🔗 <a href="https://docs.cloud.google.com/stackdriver/docs/reference/telemetry/overview" target="_blank" rel="noopener noreferrer" class="gc-link">Telemetry API の概要</a></li>
+        <li>🔗 <a href="https://cloud.google.com/stackdriver/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">料金ページ (Google Cloud Observability)</a></li>
+      </ul>
+      <p style="font-size: 13px; margin-top: 12px;">
+        <strong>🏷️ タグ:</strong> Cloud Trace / OpenTelemetry / OTLP / Observability / Telemetry API / 分散トレーシング / クォータ
+      </p>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="padding-left: 20px; margin: 4px 0;">
+        <li><a href="https://docs.cloud.google.com/release-notes#August_17_2026" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/release-notes#August_17_2026</a></li>
+        <li><a href="https://docs.cloud.google.com/trace/docs/quotas#trace-api-quotas-and-limits" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/trace/docs/quotas#trace-api-quotas-and-limits</a></li>
+        <li><a href="https://docs.cloud.google.com/stackdriver/docs/reference/telemetry/overview" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/stackdriver/docs/reference/telemetry/overview</a></li>
+      </ul>
+      <p>このインフォグラフィックは Google Cloud News レポート (2026-08-17) を基に生成されました。</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

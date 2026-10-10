@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud NAT: Private NAT で IPv6 to IPv4 (NAT64) アドレス変換をサポート</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin: 0 0 8px 0;
+      color: var(--gc-on-surface);
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .card p {
+      margin: 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-red);
+    }
+
+    .before-card h4 {
+      color: var(--gc-red);
+      margin: 0 0 12px 0;
+      font-size: 16px;
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-green);
+    }
+
+    .after-card h4 {
+      color: var(--gc-green);
+      margin: 0 0 12px 0;
+      font-size: 16px;
+    }
+
+    .before-card ul, .after-card ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-card li, .after-card li {
+      margin-bottom: 8px;
+    }
+
+    .usecase-card {
+      background: var(--gc-teal-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-teal);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .usecase-card p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .pricing-table {
+      margin: 16px 0;
+    }
+
+    .related-links {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .related-link-card {
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 8px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      color: var(--gc-on-surface-variant);
+      transition: box-shadow 0.2s, border-color 0.2s;
+    }
+
+    .related-link-card:hover {
+      border-color: var(--gc-blue-600);
+      box-shadow: 0 2px 8px rgba(66, 133, 244, 0.15);
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 24px;
+      }
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+      .related-links {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>🌐 Cloud NAT: Private NAT で NAT64 サポート</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Cloud NAT</span>
+          <span class="badge badge-preview">Preview</span>
+          <span class="badge" style="background: var(--gc-teal);">Networking</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-06-30</div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        Cloud NAT の <span class="highlight">Private NAT ゲートウェイ</span> が <span class="highlight">IPv6 to IPv4 (NAT64)</span> ネットワークアドレス変換をサポート。IPv6 専用 VM が Private NAT 経由で接続先ネットワーク内の IPv4 宛先と通信可能に。
+      </p>
+      <div class="note-box">
+        <strong>💡 ポイント:</strong> 従来 Public NAT (インターネット経由) でのみ可能だった NAT64 が、プライベートネットワーク (NCC スポーク間、Hybrid NAT) でも利用可能に。IPv6 移行を段階的に進める組織にとって重要な機能追加。
+      </div>
+    </div>
+
+    <!-- Before/After Section -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-card">
+          <h4>❌ Before (従来)</h4>
+          <ul>
+            <li>Private NAT は IPv4 to IPv4 (NAT44) のみ対応</li>
+            <li>NAT64 は Public NAT (インターネット経由) でのみ利用可能</li>
+            <li>IPv6 専用 VM はプライベートネットワーク経由で IPv4 宛先にアクセス不可</li>
+            <li>IPv6 移行中も IPv4 アドレスの維持が必須</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>✅ After (新機能)</h4>
+          <ul>
+            <li>Private NAT ゲートウェイで NAT64 をサポート</li>
+            <li>IPv6 専用 VM が NCC スポーク経由で IPv4 宛先に到達可能</li>
+            <li>Public NAT (インターネット経由) を使う必要なし</li>
+            <li>プライベートネットワーク内で IPv6/IPv4 混在環境を管理可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>IPv6 専用 VM が Private NAT ゲートウェイの NAT64 機能を使用して、NCC Hub 経由で接続された IPv4 ネットワークと通信するフロー:</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    subgraph VPC_A["VPC Network A (IPv6-only)"]
+        VM_v6["VM\nIPv6-only\n2001:db8::1/96"]
+    end
+
+    subgraph NAT_GW["Private NAT Gateway"]
+        NAT64["NAT64\nIPv6 -> IPv4 変換"]
+    end
+
+    subgraph NCC["Network Connectivity Center Hub"]
+        HUB["NCC Hub"]
+    end
+
+    subgraph VPC_B["VPC Network B (IPv4)"]
+        VM_v4["VM\nIPv4\n192.168.1.0/24"]
+    end
+
+    subgraph OnPrem["オンプレミス (IPv4)"]
+        Server["Server\n10.0.0.0/8"]
+    end
+
+    VM_v6 -->|"IPv6 パケット"| NAT64
+    NAT64 -->|"IPv4 変換済み"| HUB
+    HUB -->|"VPC スポーク"| VM_v4
+    HUB -->|"Hybrid スポーク\nCloud Interconnect/VPN"| Server
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="card">
+        <h3>🔁 Private NAT での NAT64 サポート</h3>
+        <p>IPv6 専用ネットワークインターフェースを持つ VM から、接続先の IPv4 宛先への通信を Private NAT ゲートウェイが変換。Public NAT のような外部 IP アドレスではなく、Private NAT サブネット (purpose: PRIVATE_NAT) から割り当てられた内部 IPv4 アドレスを使用。</p>
+      </div>
+      <div class="card">
+        <h3>🔗 NCC スポーク間での NAT64</h3>
+        <p>NCC Hub に接続された VPC スポーク間で IPv6 to IPv4 変換が可能。IPv6 専用の VPC ネットワークと IPv4 のみの VPC ネットワーク間の通信を実現。</p>
+      </div>
+      <div class="card" style="border-left-color: var(--gc-teal);">
+        <h3>🏢 Hybrid NAT での NAT64</h3>
+        <p>Cloud Interconnect または Cloud VPN 経由で接続されたオンプレミスネットワークへの IPv6 to IPv4 変換。IPv6 移行中のワークロードがオンプレミスの IPv4 リソースにアクセス可能。</p>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>📐 技術仕様</h2>
+      <h3 style="font-size: 18px; color: var(--gc-on-surface); margin: 16px 0 8px;">Private NAT NAT64 仕様</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>NAT タイプ</td>
+            <td><code>type=PRIVATE</code></td>
+          </tr>
+          <tr>
+            <td>変換方向</td>
+            <td>IPv6 to IPv4 (NAT64)</td>
+          </tr>
+          <tr>
+            <td>ステータス</td>
+            <td><span class="badge badge-preview" style="margin: 0;">Preview</span></td>
+          </tr>
+          <tr>
+            <td>サポートプロトコル</td>
+            <td>TCP, UDP</td>
+          </tr>
+          <tr>
+            <td>最大同時接続数</td>
+            <td>64,000 (エンドポイントごと)</td>
+          </tr>
+          <tr>
+            <td>Well-Known Prefix</td>
+            <td><code>64:ff9b::/96</code></td>
+          </tr>
+          <tr>
+            <td>NAT IP ソース</td>
+            <td>PRIVATE_NAT purpose のサブネット</td>
+          </tr>
+          <tr>
+            <td>VPC ネットワークタイプ</td>
+            <td>カスタムモードのみ (自動モード非対応)</td>
+          </tr>
+          <tr>
+            <td>ポート割り当て</td>
+            <td>動的 (デフォルト) または静的</td>
+          </tr>
+          <tr>
+            <td>SLA</td>
+            <td>99.99%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Statistics -->
+    <div class="section">
+      <h2>📊 数字で見るポイント</h2>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value">64,000</div>
+          <div class="stat-label">最大同時接続数/エンドポイント</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-green), #2E7D32);">
+          <div class="stat-value">99.99%</div>
+          <div class="stat-label">SLA</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-teal), #006064);">
+          <div class="stat-value">NAT64</div>
+          <div class="stat-label">IPv6 to IPv4 変換</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Setup Guide -->
+    <div class="section">
+      <h2>🔧 設定方法</h2>
+      <p><strong>前提条件:</strong></p>
+      <div class="check-item"><span class="check-icon">✓</span><span>カスタムモードの VPC ネットワーク (IPv6 サブネットを含む)</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>Cloud Router の作成</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>NCC Hub の作成と VPC スポークの設定</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>PRIVATE_NAT purpose のサブネットの作成</span></div>
+
+      <h3 style="font-size: 16px; color: var(--gc-on-surface); margin: 20px 0 8px;">Step 1: Cloud Router の作成</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud compute routers create ROUTER_NAME \
+  --network=NETWORK \
+  --region=REGION</code></pre>
+
+      <h3 style="font-size: 16px; color: var(--gc-on-surface); margin: 20px 0 8px;">Step 2: Private NAT ゲートウェイの作成 (NAT64 対応)</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud compute routers nats create NAT_CONFIG \
+  --router=ROUTER_NAME \
+  --type=PRIVATE \
+  --region=REGION \
+  --nat-custom-subnet-ip-ranges=SUBNETWORK:ALL</code></pre>
+
+      <h3 style="font-size: 16px; color: var(--gc-on-surface); margin: 20px 0 8px;">Step 3: NAT ルールの作成 (NCC スポーク向け)</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud compute routers nats rules create NAT_RULE_PRIORITY \
+  --router=ROUTER_NAME \
+  --region=REGION \
+  --nat=NAT_CONFIG \
+  --match='nexthop.hub == "//networkconnectivity.googleapis.com/projects/PROJECT_ID/locations/global/hubs/HUB"' \
+  --source-nat-active-ranges=NAT_SUBNET</code></pre>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div>
+          <h3 style="font-size: 18px; color: var(--gc-on-surface); margin: 0 0 12px;">💼 ビジネス面</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>IPv6 移行の加速</strong> - IPv4 リソースとの通信を維持しながら段階的移行</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>コスト最適化</strong> - Public NAT やインターネット経由を使わずプライベートネットワーク内で完結、Egress コスト削減</span></div>
+        </div>
+        <div>
+          <h3 style="font-size: 18px; color: var(--gc-on-surface); margin: 0 0 12px;">🔧 技術面</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>ネットワーク設計の簡素化</strong> - IPv6/IPv4 共存をプライベートネットワーク内で実現</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>セキュリティ向上</strong> - インターネット非経由で攻撃面を削減</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>既存 Private NAT との一貫性</strong> - 同じゲートウェイ管理モデルで NAT64 を追加</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ 制約事項・注意点</h2>
+      <div class="warning-box">
+        <strong>⚠️ 制限事項:</strong>
+        <ul style="margin: 8px 0 0; padding-left: 20px;">
+          <li>Preview ステータスのため、本番環境での使用には SLA が適用されない可能性</li>
+          <li>自動モード VPC ネットワークは非サポート</li>
+          <li>TCP と UDP のみサポート (ICMP 等は非対応)</li>
+          <li>最大 64,000 同時接続/エンドポイントの制限</li>
+        </ul>
+      </div>
+      <div class="note-box">
+        <strong>💡 考慮すべき点:</strong>
+        <ul style="margin: 8px 0 0; padding-left: 20px;">
+          <li>DNS64 の設定が合わせて必要な場合がある (IPv6 クライアントが IPv4 宛先を名前解決する場合)</li>
+          <li>Private NAT サブネット (purpose: PRIVATE_NAT) の事前作成が必要</li>
+          <li>NCC Hub と VPC スポークの設定が前提 - ネットワーク設計の事前計画が重要</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+      <div class="usecase-card">
+        <h4>🏢 ユースケース 1: IPv6 移行中のマルチ VPC 環境</h4>
+        <p><strong>シナリオ:</strong> 新規ワークロードを IPv6 専用 VPC に配置し、既存の IPv4 VPC 内のデータベースやサービスにアクセスする必要がある。両方の VPC は NCC Hub に VPC スポークとして接続。</p>
+        <p><strong>効果:</strong> IPv6 専用の新規 VPC 内の VM が、Private NAT NAT64 を通じて既存 IPv4 VPC 内のリソースにシームレスにアクセス可能。IPv4 アドレスの追加割り当てが不要。</p>
+      </div>
+      <div class="usecase-card">
+        <h4>🌍 ユースケース 2: IPv6 ワークロードからオンプレミス IPv4 システムへの接続</h4>
+        <p><strong>シナリオ:</strong> クラウド上の IPv6 専用ワークロードが、Cloud Interconnect 経由で接続されたオンプレミスの IPv4 データセンター内のレガシーシステムにアクセスする必要がある。</p>
+        <p><strong>効果:</strong> Hybrid NAT + NAT64 により、プライベート接続 (Cloud Interconnect/Cloud VPN) 経由でオンプレミスの IPv4 リソースに安全にアクセスでき、インターネット経由のルーティングが不要。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>Cloud NAT の料金体系に基づく:</p>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>料金 (USD)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>NAT ゲートウェイ (32 VM 以下)</td>
+            <td>$0.0014 x VM 数/時間</td>
+          </tr>
+          <tr>
+            <td>NAT ゲートウェイ (32 VM 超)</td>
+            <td>$0.044/時間</td>
+          </tr>
+          <tr>
+            <td>データ処理 (送受信)</td>
+            <td>$0.045/GiB</td>
+          </tr>
+        </tbody>
+      </table>
+      <p style="font-size: 13px; color: var(--gc-outline);">Private NAT の NAT64 固有の追加料金については <a href="https://cloud.google.com/nat/pricing" target="_blank" class="gc-link">Cloud NAT 料金ページ</a> を参照。</p>
+    </div>
+
+    <!-- Region Info -->
+    <div class="section">
+      <h2>🌏 利用可能リージョン</h2>
+      <div class="success-box">
+        <strong>✅ Cloud NAT は Google Cloud の全リージョンで利用可能。</strong><br>
+        Private NAT NAT64 (Preview) の利用可能リージョンの詳細については、<a href="https://docs.cloud.google.com/nat/docs/private-nat#nat64" target="_blank" class="gc-link">公式ドキュメント</a> を参照。
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス</h2>
+      <div class="related-links">
+        <a href="https://cloud.google.com/nat/docs" target="_blank" class="related-link-card">
+          <span>☁️</span> <span><strong>Cloud NAT (Public NAT)</strong> - インターネット上の IPv4 宛先への NAT64</span>
+        </a>
+        <a href="https://cloud.google.com/network-connectivity/docs/network-connectivity-center" target="_blank" class="related-link-card">
+          <span>🔗</span> <span><strong>Network Connectivity Center</strong> - VPC/Hybrid スポークを Hub で接続</span>
+        </a>
+        <a href="https://cloud.google.com/dns/docs" target="_blank" class="related-link-card">
+          <span>🌐</span> <span><strong>Cloud DNS (DNS64)</strong> - IPv4 宛先に合成 IPv6 アドレスを返す</span>
+        </a>
+        <a href="https://cloud.google.com/network-connectivity/docs/interconnect" target="_blank" class="related-link-card">
+          <span>🔌</span> <span><strong>Cloud Interconnect / Cloud VPN</strong> - オンプレミス接続基盤</span>
+        </a>
+        <a href="https://cloud.google.com/network-connectivity/docs/router" target="_blank" class="related-link-card">
+          <span>🛜</span> <span><strong>Cloud Router</strong> - Private NAT ゲートウェイの管理</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <p>
+        Cloud NAT の Private NAT における NAT64 サポート (Preview) は、IPv6 移行を進める組織にとって重要な機能追加。従来 Public NAT (インターネット経由) でのみ可能だった IPv6 to IPv4 変換が、プライベートネットワーク (NCC スポーク間、Hybrid NAT) で利用可能になったことで、セキュリティを維持しつつ IPv6/IPv4 混在環境での段階的な移行が容易に。
+      </p>
+      <div class="flow-diagram">
+        <div class="flow-step">🌐 IPv6 専用<br>ワークロード導入</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🔁 Private NAT<br>NAT64 設定</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🔗 NCC Hub 経由<br>IPv4 リソース接続</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">✅ 段階的<br>IPv6 移行完了</div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>📎 出典:</strong></p>
+      <ul style="list-style: none; padding: 0; margin: 8px 0;">
+        <li style="margin-bottom: 4px;">- <a href="https://cloud.google.com/release-notes#June_30_2026" target="_blank" rel="noopener noreferrer">Google Cloud Release Notes (June 30, 2026)</a></li>
+        <li style="margin-bottom: 4px;">- <a href="https://cloud.google.com/nat/docs/private-nat#nat64" target="_blank" rel="noopener noreferrer">NAT64 in Private NAT ドキュメント</a></li>
+        <li style="margin-bottom: 4px;">- <a href="https://cloud.google.com/nat/docs/private-nat" target="_blank" rel="noopener noreferrer">Private NAT 概要</a></li>
+        <li style="margin-bottom: 4px;">- <a href="https://cloud.google.com/nat/docs/set-up-private-nat" target="_blank" rel="noopener noreferrer">Private NAT セットアップガイド</a></li>
+        <li style="margin-bottom: 4px;">- <a href="https://cloud.google.com/vpc/docs/ipv6-to-ipv4-overview" target="_blank" rel="noopener noreferrer">DNS64 と NAT64 による 6to4 接続</a></li>
+        <li style="margin-bottom: 4px;">- <a href="https://cloud.google.com/nat/pricing" target="_blank" rel="noopener noreferrer">Cloud NAT 料金</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline);">Generated: 2026-06-30 | Cloud NAT Private NAT NAT64 Infographic</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

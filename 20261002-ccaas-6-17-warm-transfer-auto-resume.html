@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Google Cloud CCaaS 6.17: ウォーム転送の自動保留解除 (Auto-Resume)</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Google Brand Colors */
+  --gc-blue: #4285F4;
+  --gc-red: #EA4335;
+  --gc-yellow: #FBBC04;
+  --gc-green: #34A853;
+
+  /* Google Cloud UI Blue Scale */
+  --gc-blue-900: #174EA6;
+  --gc-blue-800: #185ABC;
+  --gc-blue-700: #1967D2;
+  --gc-blue-600: #1A73E8;
+  --gc-blue-500: #4285F4;
+  --gc-blue-300: #669DF6;
+  --gc-blue-200: #8AB4F8;
+  --gc-blue-100: #AECBFA;
+  --gc-blue-50: #E8F0FE;
+
+  /* Text Colors */
+  --gc-on-surface: #202124;
+  --gc-on-surface-variant: #5F6368;
+  --gc-outline: #80868B;
+
+  /* Surface Colors */
+  --gc-surface: #FFFFFF;
+  --gc-surface-container-lowest: #F8F9FA;
+  --gc-surface-container-low: #F1F3F4;
+  --gc-surface-container: #E8EAED;
+  --gc-outline-variant: #DADCE0;
+
+  /* Semantic Tints */
+  --gc-blue-tint: #E8F0FE;
+  --gc-green-tint: #E6F4EA;
+  --gc-red-tint: #FCE8E6;
+  --gc-yellow-tint: #FEF7E0;
+  --gc-purple-tint: #F3E8FD;
+  --gc-teal-tint: #E0F7FA;
+
+  /* Extended Colors */
+  --gc-purple: #A142F4;
+  --gc-teal: #00BCD4;
+  --gc-orange: #FF6D00;
+}
+
+body {
+  background-color: var(--gc-surface);
+  font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+  color: var(--gc-on-surface-variant);
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 20px;
+  margin: 0;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 16px;
+  border-bottom: 3px solid var(--gc-blue-600);
+}
+
+h1, .title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--gc-on-surface);
+  margin: 0;
+  line-height: 1.4;
+}
+
+h2, .section-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin-top: 0;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 20px 0 8px;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: var(--gc-outline);
+}
+
+.section {
+  background: var(--gc-surface-container-low);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid var(--gc-outline-variant);
+}
+
+.highlight {
+  background-color: var(--gc-blue-50);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--gc-blue-800);
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+.card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border-left: 4px solid var(--gc-blue-600);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+}
+
+.card h3 {
+  margin-top: 0;
+}
+
+.icon-text {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+  color: var(--gc-on-surface-variant);
+}
+
+.arrow {
+  color: var(--gc-blue-600);
+  font-size: 20px;
+}
+
+.gc-link {
+  color: var(--gc-blue-600);
+  text-decoration: none;
+}
+
+.gc-link:hover {
+  color: var(--gc-blue-800);
+  text-decoration: underline;
+}
+
+/* サービスバッジ */
+.badge,
+.badge-ga,
+.badge-preview,
+.badge-deprecated {
+  display: inline-block;
+  color: #FFFFFF;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+  margin: 4px 8px 4px 0;
+}
+
+.badge {
+  background: var(--gc-blue-600);
+}
+
+.badge-ga {
+  background: var(--gc-green);
+  color: #FFFFFF;
+}
+
+.badge-preview {
+  background: var(--gc-orange);
+  color: #FFFFFF;
+}
+
+.badge-deprecated {
+  background: var(--gc-red);
+  color: #FFFFFF;
+}
+
+/* フロー図スタイル */
+.flow-diagram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 24px 0;
+}
+
+.flow-step {
+  background: var(--gc-surface);
+  border: 2px solid var(--gc-blue-600);
+  border-radius: 12px;
+  padding: 12px 20px;
+  text-align: center;
+  min-width: 100px;
+  color: var(--gc-on-surface);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+}
+
+.flow-arrow {
+  color: var(--gc-blue-600);
+  font-size: 24px;
+  font-weight: bold;
+}
+
+/* チェックリストスタイル */
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.check-icon {
+  color: var(--gc-green);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.cross-icon {
+  color: var(--gc-red);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+/* Before/After 比較 */
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.before-card {
+  background: var(--gc-red-tint);
+  border: 1px solid rgba(234, 67, 53, 0.3);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.after-card {
+  background: var(--gc-green-tint);
+  border: 1px solid rgba(52, 168, 83, 0.3);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.before-card h3, .after-card h3 {
+  margin-top: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.before-card h3 { color: #C5221F; }
+.after-card h3 { color: #188038; }
+
+.before-card ul, .after-card ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.before-card li, .after-card li {
+  margin: 8px 0;
+  font-size: 14px;
+}
+
+@media (max-width: 720px) {
+  .before-after { grid-template-columns: 1fr; }
+  h1, .title { font-size: 26px; }
+}
+
+/* Mermaid コンテナ */
+.mermaid-container {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 20px 0;
+  border: 2px solid rgba(66, 133, 244, 0.3);
+  overflow-x: auto;
+}
+
+.mermaid {
+  display: flex;
+  justify-content: center;
+}
+
+/* テーブルスタイル */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--gc-outline-variant);
+  background: var(--gc-surface);
+}
+
+th {
+  background: var(--gc-blue-50);
+  color: var(--gc-blue-900);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 2px solid var(--gc-blue-200);
+}
+
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--gc-outline-variant);
+  font-size: 14px;
+}
+
+tr:nth-child(even) {
+  background: var(--gc-surface-container-lowest);
+}
+
+tr:hover {
+  background: var(--gc-blue-50);
+}
+
+/* 注意・警告ボックス */
+.note-box {
+  background: var(--gc-blue-tint);
+  border-left: 4px solid var(--gc-blue-600);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.warning-box {
+  background: var(--gc-yellow-tint);
+  border-left: 4px solid var(--gc-yellow);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.error-box {
+  background: var(--gc-red-tint);
+  border-left: 4px solid var(--gc-red);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.success-box {
+  background: var(--gc-green-tint);
+  border-left: 4px solid var(--gc-green);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+/* ユースケースカード */
+.usecase-card {
+  background: var(--gc-blue-tint);
+  border: 1px solid var(--gc-blue-100);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+}
+
+.usecase-card h3 {
+  margin-top: 0;
+  color: var(--gc-blue-900);
+}
+
+.usecase-card .effect {
+  background: var(--gc-surface);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-top: 12px;
+  font-size: 14px;
+  border-left: 4px solid var(--gc-green);
+}
+
+/* ステップカード */
+.step-list {
+  counter-reset: step;
+  list-style: none;
+  padding: 0;
+  margin: 16px 0;
+}
+
+.step-list > li {
+  counter-increment: step;
+  position: relative;
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 16px 20px 16px 64px;
+  margin: 12px 0;
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+}
+
+.step-list > li::before {
+  content: counter(step);
+  position: absolute;
+  left: 16px;
+  top: 16px;
+  width: 32px;
+  height: 32px;
+  background: var(--gc-blue-600);
+  color: #FFFFFF;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.step-list strong.step-title {
+  color: var(--gc-on-surface);
+  display: block;
+  margin-bottom: 4px;
+}
+
+/* 2 カラムグリッド (メリットなど) */
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 720px) {
+  .grid-2 { grid-template-columns: 1fr; }
+}
+
+/* 関連サービスカード */
+.related-card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin: 12px 0;
+  border-left: 4px solid var(--gc-purple);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+  font-size: 14px;
+}
+
+.related-card strong {
+  color: var(--gc-on-surface);
+}
+
+/* インラインコード */
+code:not(pre code) {
+  background: var(--gc-surface-container-low);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 0.9em;
+  color: var(--gc-blue-900);
+}
+
+footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gc-outline-variant);
+  font-size: 12px;
+  color: var(--gc-outline);
+}
+
+footer a {
+  color: var(--gc-blue-600);
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+footer ul {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ヘッダー -->
+  <div class="header">
+    <div>
+      <div style="margin-bottom: 8px;">
+        <span class="badge">☁️ Google Cloud CCaaS / CCAI Platform</span>
+        <span class="badge badge-ga">リリース済み (6.17)</span>
+      </div>
+      <h1>📞 CCaaS 6.17 リリース<br>ウォーム転送の自動保留解除 (Auto-Resume)</h1>
+    </div>
+    <div class="subtitle">📅 リリース日: 2026-10-02</div>
+  </div>
+
+  <!-- 概要 -->
+  <div class="section">
+    <h2>📝 概要</h2>
+    <p>
+      Google Cloud <span class="highlight">Contact Center as a Service (CCaaS)</span> のバージョン <span class="highlight">6.17</span> がリリースされました。
+      目玉機能は <span class="highlight">ウォーム転送の自動保留解除 (Warm transfers auto-resume)</span> です。
+      転送元エージェントが通話から退出すると同時に顧客の保留が自動解除され、転送先エージェントとの双方向音声が <strong>手動操作なし</strong> で確立されます。
+    </p>
+    <p>
+      エージェント間の相談中は顧客は保留状態のままとなるため、<strong>会話のプライバシーは引き続き確保</strong>されます。
+      この動作はキュー経由のウォーム転送と、特定エージェントへの直接ウォーム転送の両方に適用されます。
+      さらに、通話時間の 00:00 誤表示やダッシュボードの滞留通話など <strong>20 件近い不具合修正</strong> が含まれ、運用の安定性が全般的に向上しています。
+    </p>
+
+    <div class="before-after">
+      <div class="before-card">
+        <h3>❌ Before (アップデート前の課題)</h3>
+        <ul>
+          <li>転送元エージェントの退出後も顧客は<strong>保留のまま</strong>残り、転送先が手動で保留解除するまで<strong>無音 (保留音) の時間</strong>が発生</li>
+          <li>保留解除を忘れたり遅れたりすると、顧客体験の低下や「電話が切れたのでは」という不安につながる</li>
+          <li>通話時間の 00:00 誤表示、エージェントの Unresponsive 誤判定など、運用・レポーティング上の不具合が複数存在</li>
+        </ul>
+      </div>
+      <div class="after-card">
+        <h3>✅ After (6.17 での改善)</h3>
+        <ul>
+          <li>転送元エージェントの退出と同時に保留が<strong>自動解除</strong>され、双方向音声が手動操作なしで確立 (<strong>無音時間を排除</strong>)</li>
+          <li>相談中は顧客が保留のまま維持され、<strong>相談内容のプライバシーは従来どおり確保</strong></li>
+          <li>キュー経由・エージェント直接指定の両方で<strong>一貫した動作</strong>となり、トレーニング・運用手順を簡素化</li>
+          <li>通話ライフサイクル関連の多数の不具合修正により、ダッシュボード・メトリクスの正確性が向上</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="note-box">
+      <strong>💡 適用時期:</strong> 各インスタンスへの 6.17 の適用タイミングは、選択しているデプロイスケジュール (Rapid / Regular / Critical) に依存します。
+    </div>
+  </div>
+
+  <!-- アーキテクチャ図 -->
+  <div class="section">
+    <h2>🏗️ アーキテクチャ図: ウォーム転送の Before/After</h2>
+    <p>ウォーム転送のシーケンスを Before/After で比較した図です。6.17 では転送元エージェントの退出をトリガーに CCaaS が自動で保留を解除し、転送先エージェントと顧客の会話が途切れなく開始されます。</p>
+    <div class="mermaid-container">
+      <pre class="mermaid">
+sequenceDiagram
+    actor Caller as 📞 顧客 (発信者)
+    participant AgentA as 🧑‍💼 転送元エージェント A
+    participant CCaaS as ☁️ CCaaS (キュー/ルーティング)
+    participant AgentB as 🧑‍💼 転送先エージェント B
+
+    Caller->>AgentA: 通話中
+    AgentA->>Caller: 保留 (保留音を再生)
+    AgentA->>CCaaS: ウォーム転送を開始<br/>(キュー経由 or エージェント直接指定)
+    CCaaS->>AgentB: 転送通話を接続
+    AgentA->>AgentB: 相談 (顧客は保留のまま・会話は非公開)
+    AgentA->>CCaaS: 通話から退出 (引き継ぎ完了)
+
+    rect rgb(255, 235, 235)
+        Note over Caller,AgentB: 【Before】顧客は保留のまま残り、<br/>エージェント B が手動で保留解除するまで無音が発生
+    end
+
+    rect rgb(230, 245, 230)
+        Note over Caller,AgentB: 【After (6.17)】退出と同時に保留を自動解除
+        CCaaS-->>Caller: 保留を自動解除
+        Caller->>AgentB: 双方向音声を即時確立 (手動操作不要)
+    end
+      </pre>
+    </div>
+  </div>
+
+  <!-- 主要機能 -->
+  <div class="section">
+    <h2>⚡ サービスアップデートの詳細 (主要機能)</h2>
+
+    <div class="card">
+      <h3>🔄 1. ウォーム転送の自動保留解除 (Warm transfers auto-resume)</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>転送元エージェントの<strong>通話退出をトリガー</strong>に顧客の保留を自動解除し、転送先エージェントとの双方向音声を確立</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>エージェント間の相談中は顧客が保留状態に保たれ、相談内容は顧客に聞こえない</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>キュー経由</strong>のウォーム転送と、<strong>特定エージェントへの直接</strong>ウォーム転送の両方に適用</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>従来発生していた「引き継ぎ後に顧客が保留のまま放置される無音時間」を解消</span></div>
+    </div>
+
+    <div class="card" style="border-left-color: var(--gc-green);">
+      <h3>📞 2. 通話ライフサイクル・ルーティング関連の修正 (代表例)</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>仮想エージェントからキューへの遷移中に発信者が切断した通話が、<strong>ライブダッシュボードに残り続ける問題</strong>を修正</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>仮想エージェントからのエスカレーション通話が、タイムアウト時に<strong>元のキューのボイスメールへ誤ってディフレクト</strong>される問題を修正</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>過剰容量ディフレクション時に発信者がルートなしで接続されたままになる問題、直接内線へのコールド転送時の無期限保留を修正</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>発信者切断後も仮想エージェントの音声セッションが残り続ける問題、ラップアップイベント欠落による会話の開きっぱなしを修正</span></div>
+    </div>
+
+    <div class="card" style="border-left-color: var(--gc-yellow);">
+      <h3>🖥️ 3. エージェントデスクトップ・ステータス管理の修正 (代表例)</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>「Call ended」カードで通話時間が <strong>00:00 と誤表示</strong>される問題を修正</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>複数チーム所属エージェントに<strong>すべてのチャネルへのアクセス権が誤って付与</strong>される問題を修正</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>自動ラップアップタイマーがエージェントを解放しない問題、Wrap-up ステータス固定の問題を修正</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>通話遷移の完了前にコールオファーが送信され、エージェントが誤って <strong>Unresponsive と判定</strong>される問題を修正</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>クレジットカードのトークン化ハンドバック成功後に「Virtual Agent Session Variables」が表示されない問題を修正</span></div>
+    </div>
+
+    <div class="card" style="border-left-color: var(--gc-purple);">
+      <h3>🧩 4. インテグレーション・UI の改善 (代表例)</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>Salesforce CRM 連携</strong>に、エージェント割り当て時のチケット所有者更新を無視するチェックボックスを追加</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>特定の書式を含むメールで全画面ローディングが表示され、デスクトップ操作ができなくなる問題を修正</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>Agent Assist のステータスが誤って「Off」や「Not Configured」と表示される問題を修正</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>フランス語 (カナダ) ロケールでマイク許可エラーが誤訳されていた問題を修正</span></div>
+    </div>
+  </div>
+
+  <!-- 技術仕様 -->
+  <div class="section">
+    <h2>🔧 技術仕様</h2>
+
+    <h3>📋 ウォーム転送の仕様 (6.17 時点)</h3>
+    <table>
+      <thead>
+        <tr><th>項目</th><th>詳細</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>自動保留解除のトリガー</td><td>転送元エージェントの通話退出</td></tr>
+        <tr><td>適用対象</td><td>キュー経由のウォーム転送、特定エージェントへの直接ウォーム転送</td></tr>
+        <tr><td>相談中の顧客の状態</td><td>保留 (保留音)。エージェント間の会話は顧客に聞こえない</td></tr>
+        <tr><td>過剰容量ディフレクション</td><td>ウォーム転送はトリガーしない (コールド転送のみ対象)</td></tr>
+        <tr><td>通話時間のカウント</td><td>最初の通話応答時点から継続 (転送でリセットされない)</td></tr>
+        <tr><td>転送先の指定</td><td>エージェント、マネージャー、キュー (チームへの直接転送は非サポート)</td></tr>
+      </tbody>
+    </table>
+
+    <h3>🗓️ デプロイスケジュール (6.17 の適用タイミング)</h3>
+    <table>
+      <thead>
+        <tr><th>スケジュール</th><th>適用タイミング</th><th>推奨環境</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Rapid</strong></td><td>最も早く更新を受領</td><td>開発・テストなどの非本番環境</td></tr>
+        <tr><td><strong>Regular</strong></td><td>Rapid の少なくとも 2 日後</td><td>-</td></tr>
+        <tr><td><strong>Critical</strong></td><td>Rapid の少なくとも 2 日後、ピーク営業時間外に適用 (通常 1 週間以内)</td><td>本番環境</td></tr>
+      </tbody>
+    </table>
+    <div class="note-box">
+      <strong>💡 補足:</strong> セキュリティパッチは Regular / Critical でも遅延なく即時適用されます。リリースはおよそ 3 週間ごとに行われます。
+    </div>
+  </div>
+
+  <!-- 設定方法 -->
+  <div class="section">
+    <h2>⚙️ 設定方法</h2>
+    <p>ウォーム転送の自動保留解除は 6.17 の適用に伴い有効になる<span class="highlight">動作変更であり、個別の設定作業は不要</span>です。適用時期の確認・制御は以下の手順で行います。</p>
+
+    <h3>✅ 前提条件</h3>
+    <div class="check-item"><span class="check-icon">✓</span><span>Google Cloud プロジェクトで CCAI Platform API が有効化されていること</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span>CCAI Platform インスタンスが作成済みであること</span></div>
+
+    <h3>🚀 手順</h3>
+    <ol class="step-list">
+      <li>
+        <strong class="step-title">インスタンスのバージョンを確認する</strong>
+        Google Cloud コンソールのナビゲーションメニューで「CCAI Platform」を開き、インスタンス一覧の <strong>Version</strong> 列で現在のバージョンを確認します。6.17 が適用済みであれば本機能が利用できます。
+      </li>
+      <li>
+        <strong class="step-title">デプロイスケジュールを確認・変更する</strong>
+        インスタンス一覧の <strong>Schedule</strong> 列で現在のデプロイスケジュールを確認できます。変更する場合は「More options」→「Edit」→「Configure deployments」から Rapid / Regular / Critical を選択します。Critical を選択する場合はピーク営業時間 (UTC) のスケジュール定義が必要です。
+      </li>
+      <li>
+        <strong class="step-title">エージェントの運用手順を更新する</strong>
+        6.17 適用後は、ウォーム転送の引き継ぎ時に転送先エージェントが手動で保留解除する必要がなくなります。従来「転送完了後に Hold ボタンで保留解除する」と案内していたトレーニング資料や運用手順を更新してください。
+      </li>
+    </ol>
+  </div>
+
+  <!-- メリット -->
+  <div class="section">
+    <h2>💪 メリット</h2>
+    <div class="grid-2">
+      <div class="card" style="border-left-color: var(--gc-green); margin: 0;">
+        <h3>💼 ビジネス面</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>顧客体験の向上</strong>: 引き継ぎ直後の無音時間がなくなり、顧客が「切断されたのでは」と不安になる場面を排除</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>ハンドリングタイムの短縮</strong>: 保留解除の操作待ちがなくなり、平均処理時間 (AHT) の改善に寄与</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>運用品質の均一化</strong>: 保留解除忘れという人的ミスの余地がなくなり、スキルに依存しない一貫した転送体験を提供</span></div>
+      </div>
+      <div class="card" style="border-left-color: var(--gc-blue-600); margin: 0;">
+        <h3>🔬 技術面</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>手動操作の自動化</strong>: 退出イベントをトリガーとした自動処理により、転送先エージェント側の操作が不要</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>プライバシーの維持</strong>: 相談中は従来どおり顧客を保留に保ち、相談内容の秘匿性を確保</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>ダッシュボード・メトリクスの正確性向上</strong>: 滞留通話、通話時間の誤表示、キュー滞在時間メトリクス欠落などの修正でレポーティングの信頼性が向上</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- デメリット・制約事項 -->
+  <div class="section">
+    <h2>⚠️ デメリット・制約事項</h2>
+
+    <h3>🚫 制限事項</h3>
+    <div class="check-item"><span class="cross-icon">✗</span><span>6.17 の適用タイミングはデプロイスケジュールに依存し、全インスタンスで同時に有効になるわけではない (Critical では Rapid の最大 1 週間以上後になる場合がある)</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span>自動保留解除は<strong>ウォーム転送が対象</strong>。転送先が応答する前に退出するコールド転送は別の動作となる</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span>チームへの直接転送は引き続き非サポート (チーム単位の割り当てが必要な場合はチーム専用キューを構成する)</span></div>
+
+    <h3>🤔 考慮すべき点</h3>
+    <div class="warning-box">
+      <div class="check-item"><span>⚠️</span><span>退出直後に即座に顧客と接続されるため、「相談終了後にひと呼吸おいてから保留解除する」といった従来運用前提のトークスクリプトは見直しが必要</span></div>
+      <div class="check-item"><span>⚠️</span><span>デプロイスケジュールが異なる複数インスタンス (開発/本番など) では、一時的にインスタンス間で転送の挙動が異なる期間が発生</span></div>
+      <div class="check-item"><span>⚠️</span><span>特別なイベント期間中のアップグレード回避は Google Cloud サポートへのリクエストでブロック可能だが、1 リリース分 (最大約 6 週間) までに制限される</span></div>
+    </div>
+  </div>
+
+  <!-- ユースケース -->
+  <div class="section">
+    <h2>🎯 ユースケース</h2>
+
+    <div class="usecase-card">
+      <h3>📈 ユースケース 1: 一次受付から専門チームへのエスカレーション</h3>
+      <p><strong>シナリオ</strong>: 一次受付のエージェントが技術的な問い合わせを受け、専門チームのキューへウォーム転送する。転送元エージェントは専門エージェントに問い合わせ内容を口頭で引き継いでから退出する。</p>
+      <div class="effect">
+        <strong>✅ 効果</strong>: 従来は退出後に専門エージェントが保留解除するまで顧客に無音時間が発生していたが、6.17 以降は退出と同時に顧客と専門エージェントの会話が自動的に開始され、スムーズなエスカレーション体験を提供できる。
+      </div>
+    </div>
+
+    <div class="usecase-card">
+      <h3>🤖 ユースケース 2: 仮想エージェントから人間のエージェントへの引き継ぎを含む運用</h3>
+      <p><strong>シナリオ</strong>: 仮想エージェント (Virtual Agent) で一次対応を行い、解決できない問い合わせを人間のエージェントのキューへエスカレーションするコンタクトセンター。</p>
+      <div class="effect">
+        <strong>✅ 効果</strong>: エスカレーションがタイムアウト時に誤ってボイスメールへディフレクトされる問題、遷移中の切断通話がダッシュボードに残る問題、スケジュールされたコールバックのキュー滞在時間メトリクス欠落などが修正され、仮想エージェントと人間のエージェントを組み合わせたハイブリッド運用の信頼性が向上する。
+      </div>
+    </div>
+  </div>
+
+  <!-- 料金・リージョン -->
+  <div class="section">
+    <h2>💰 料金・利用可能リージョン</h2>
+    <div class="success-box">
+      <strong>✅ 追加料金なし:</strong> CCaaS 6.17 へのアップデート自体に追加料金は発生しません。
+    </div>
+    <p>
+      CCAI Platform インスタンスは月次課金で、インスタンスに割り当てられた課金モデル (<strong>同時接続エージェント数 / 指名エージェント数 / 利用分数</strong>) に基づいて請求されます。テレフォニー料金は従量課金です。
+    </p>
+    <div class="icon-text"><span class="arrow">→</span><span><a class="gc-link" href="https://docs.cloud.google.com/contact-center/ccai-platform/docs/get-started" target="_blank" rel="noopener noreferrer">CCAI Platform の課金モデル</a></span></div>
+    <div class="icon-text"><span class="arrow">→</span><span>利用可能な国・リージョンの一覧: <a class="gc-link" href="https://docs.cloud.google.com/contact-center/ccai-platform/docs/localities" target="_blank" rel="noopener noreferrer">Locations ページ</a></span></div>
+  </div>
+
+  <!-- 関連サービス -->
+  <div class="section">
+    <h2>🔗 関連サービス・機能</h2>
+    <div class="related-card">
+      <strong>🤝 Agent Assist</strong>: 通話・チャット中のエージェントをリアルタイム支援する機能。本リリースではステータス誤表示やメッセージ分析ジョブの過剰リトライが修正された。
+    </div>
+    <div class="related-card">
+      <strong>🤖 Dialogflow / Virtual Agent</strong>: 仮想エージェントによる一次対応と人間のエージェントへのエスカレーション。本リリースで引き継ぎ時のライフサイクル関連の問題が複数修正された。
+    </div>
+    <div class="related-card">
+      <strong>📇 Salesforce などの CRM 連携</strong>: CCAI Platform は CRM と連携して動作するよう設計されており、本リリースで Salesforce 連携にチケット所有者更新を無視するオプションが追加された。
+    </div>
+  </div>
+
+  <!-- まとめ -->
+  <div class="section">
+    <h2>📌 まとめ</h2>
+    <div class="note-box">
+      <p style="margin-top: 0;">
+        CCaaS 6.17 は、ウォーム転送の引き継ぎ時に顧客の保留を自動解除する機能により、コンタクトセンターで日常的に発生する<span class="highlight">「転送直後の無音時間」という顧客体験上の課題を解消</span>するリリースです。あわせて通話ライフサイクルやステータス管理に関する多数の不具合修正が含まれており、運用の安定性とレポーティングの正確性が向上します。
+      </p>
+      <p style="margin-bottom: 0;">
+        CCaaS を利用中の場合は、インスタンスのデプロイスケジュールから 6.17 の適用時期を確認し、<strong>転送時の保留解除操作を前提としたエージェントの運用手順・トレーニング資料を更新する</strong>ことを推奨します。
+      </p>
+    </div>
+    <div style="margin-top: 12px;">
+      <span class="badge">#GoogleCloud</span>
+      <span class="badge">#CCaaS</span>
+      <span class="badge">#CCAIPlatform</span>
+      <span class="badge">#ContactCenter</span>
+      <span class="badge">#WarmTransfer</span>
+      <span class="badge">#コンタクトセンター</span>
+    </div>
+  </div>
+
+  <!-- フッター -->
+  <footer>
+    <p>📎 出典:</p>
+    <ul>
+      <li><a href="https://docs.cloud.google.com/release-notes#October_02_2026" target="_blank" rel="noopener noreferrer">公式リリースノート (2026-10-02)</a></li>
+      <li><a href="https://docs.cloud.google.com/contact-center/ccai-platform/docs/call-adapter-transfer#warm-transfer" target="_blank" rel="noopener noreferrer">ウォーム転送のドキュメント</a></li>
+      <li><a href="https://docs.cloud.google.com/contact-center/ccai-platform/docs/deployment-schedules" target="_blank" rel="noopener noreferrer">デプロイスケジュール</a></li>
+      <li><a href="https://docs.cloud.google.com/contact-center/ccai-platform/docs" target="_blank" rel="noopener noreferrer">CCAI Platform の概要</a></li>
+    </ul>
+    <p>このインフォグラフィックは Google Cloud News レポート (2026-10-02) をもとに生成されました。</p>
+  </footer>
+
+</div>
+
+<!-- Mermaid.js -->
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#4285F4',
+      primaryTextColor: '#202124',
+      primaryBorderColor: '#4285F4',
+      lineColor: '#4285F4',
+      secondaryColor: '#F1F3F4',
+      tertiaryColor: '#FAFAFA',
+      background: '#FFFFFF',
+      mainBkg: '#E8F0FE',
+      nodeBorder: '#4285F4',
+      clusterBkg: '#E8F0FE',
+      clusterBorder: '#4285F4',
+      edgeLabelBackground: '#FFFFFF',
+      textColor: '#202124'
+    }
+  });
+</script>
+</body>
+</html>

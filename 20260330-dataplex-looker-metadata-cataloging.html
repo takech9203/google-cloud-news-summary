@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dataplex: Looker メタデータの自動カタログ化と BigQuery データリネージ取り込み</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; min-width: 280px; }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 12px;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--gc-outline);
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge-service { background: var(--gc-blue-600); }
+    .badge-preview { background: var(--gc-orange); }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green { border-left-color: var(--gc-green); }
+    .card-purple { border-left-color: var(--gc-purple); }
+    .card-teal { border-left-color: var(--gc-teal); }
+    .card-orange { border-left-color: var(--gc-orange); }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .before-box strong, .after-box strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 15px;
+    }
+
+    .before-box ul, .after-box ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin-bottom: 6px;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-900);
+      font-size: 16px;
+      margin-bottom: 8px;
+    }
+
+    .usecase-card p {
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid) {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .region-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    .region-tag {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .region-tag.jp {
+      background: var(--gc-green-tint);
+      color: #1B5E20;
+      border-color: var(--gc-green);
+    }
+
+    .merit-demerit {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .merit-section, .demerit-section {
+      padding: 0;
+    }
+
+    .merit-section h4 {
+      color: var(--gc-green);
+      margin-bottom: 12px;
+      font-size: 16px;
+    }
+
+    .demerit-section h4 {
+      color: var(--gc-orange);
+      margin-bottom: 12px;
+      font-size: 16px;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      font-size: 14px;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; }
+      .subtitle { text-align: left; margin-top: 8px; }
+      .before-after { grid-template-columns: 1fr; }
+      .merit-demerit { grid-template-columns: 1fr; }
+      .stat-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>📊 Dataplex: Looker メタデータの自動カタログ化と BigQuery データリネージ取り込み</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge badge-service">Dataplex Universal Catalog</span>
+          <span class="badge badge-service">Looker</span>
+          <span class="badge badge-service">BigQuery</span>
+          <span class="badge badge-preview">Preview</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-03-30</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>☁️ 概要</h2>
+      <p>Dataplex Universal Catalog に <span class="highlight">Looker (Google Cloud core) のメタデータ自動カタログ化</span>と<span class="highlight">BigQuery ソースからのデータリネージ自動取り込み</span>機能がプレビューとして追加されました。これにより、BI レイヤーからデータウェアハウスまでのエンドツーエンドのデータガバナンスが実現します。</p>
+
+      <div class="note-box" style="margin-top: 16px;">
+        <strong>💡 ポイント:</strong> Looker で定義された Explore、View、Dashboard などの BI メタデータが Dataplex Universal Catalog に自動登録され、組織全体のデータカタログから一元的に検索・管理が可能に。BigQuery から Looker へのデータフローも自動追跡されます。
+      </div>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <strong>❌ Before (これまでの課題)</strong>
+          <ul>
+            <li>Looker のメタデータは Looker 内部でのみ管理され、Dataplex から検索不可</li>
+            <li>BigQuery → Looker のリネージ情報を手動で追跡・文書化する必要があった</li>
+            <li>BI レイヤーとデータウェアハウスのメタデータが分断、組織横断的なガバナンスが困難</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <strong>✅ After (改善後)</strong>
+          <ul>
+            <li>Looker メタデータが Dataplex Universal Catalog に自動カタログ化、統合検索で発見可能に</li>
+            <li>BigQuery → Looker のデータリネージが自動取り込み、エンドツーエンドの可視化</li>
+            <li>データウェアハウスから BI ダッシュボードまでの完全なメタデータ管理とガバナンスを実現</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>Looker のメタデータが Dataplex Universal Catalog に自動的に取り込まれ、BigQuery から Looker へのデータリネージが記録される全体フローを示しています。破線はメタデータとリネージの自動取り込みを、実線はデータの流れを表しています。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    subgraph BigQuery["BigQuery"]
+        BQ_DS["データセット"]
+        BQ_TBL["テーブル / ビュー"]
+    end
+
+    subgraph Looker["Looker (Google Cloud core)"]
+        LKR_MODEL["LookML モデル"]
+        LKR_EXPLORE["Explore"]
+        LKR_VIEW["View"]
+        LKR_DASH["ダッシュボード"]
+    end
+
+    subgraph Dataplex["Dataplex Universal Catalog"]
+        CAT["メタデータカタログ"]
+        LIN["データリネージ"]
+        SEARCH["統合検索"]
+    end
+
+    BQ_TBL --> LKR_MODEL
+    LKR_MODEL --> LKR_EXPLORE
+    LKR_EXPLORE --> LKR_VIEW
+    LKR_VIEW --> LKR_DASH
+
+    LKR_MODEL -.->|メタデータ自動取り込み| CAT
+    LKR_EXPLORE -.->|メタデータ自動取り込み| CAT
+    LKR_DASH -.->|メタデータ自動取り込み| CAT
+
+    BQ_TBL -.->|リネージ自動記録| LIN
+    LKR_MODEL -.->|リネージ自動記録| LIN
+
+    CAT --> SEARCH
+    LIN --> SEARCH
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Stats -->
+    <div class="section">
+      <h2>📈 主要な数値</h2>
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">30 日</div>
+          <div class="stat-label">リネージ情報保持期間</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">20 レベル</div>
+          <div class="stat-label">リネージグラフトラバーサル深度</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-green), #1B5E20);">
+          <div class="stat-value">10,000</div>
+          <div class="stat-label">各方向の最大リンク数</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h3>🗂️ Looker メタデータの自動カタログ化</h3>
+          <div class="check-item"><span style="color: var(--gc-green);">✓</span> LookML モデル、Explore、View、ダッシュボードのメタデータを自動登録</div>
+          <div class="check-item"><span style="color: var(--gc-green);">✓</span> Dataplex の統合検索 (キーワード / 自然言語) で発見可能に</div>
+          <div class="check-item"><span style="color: var(--gc-green);">✓</span> ビジネスコンテキスト (アスペクト、ビジネス用語集) を付与してメタデータ拡充</div>
+        </div>
+        <div class="card card-green">
+          <h3>🔗 BigQuery ソースからのデータリネージ取り込み</h3>
+          <div class="check-item"><span style="color: var(--gc-green);">✓</span> BigQuery テーブル参照の Looker モデルでデータの流れを自動記録</div>
+          <div class="check-item"><span style="color: var(--gc-green);">✓</span> テーブルレベルのリネージ追跡 (上流 BigQuery → 下流 Looker ダッシュボード)</div>
+          <div class="check-item"><span style="color: var(--gc-green);">✓</span> Google Cloud コンソールのリネージグラフ機能で視覚的に確認可能</div>
+        </div>
+        <div class="card card-purple">
+          <h3>🛡️ 統合データガバナンス</h3>
+          <div class="check-item"><span style="color: var(--gc-green);">✓</span> Dataplex の既存ガバナンス機能 (IAM、データ品質、メタデータ変更フィード) が Looker にも適用</div>
+          <div class="check-item"><span style="color: var(--gc-green);">✓</span> インパクト分析: BigQuery テーブルの変更が Looker ダッシュボードに与える影響を事前評価</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Supported Metadata Types -->
+    <div class="section">
+      <h2>📋 技術仕様</h2>
+      <h3 style="margin-top: 8px;">対応するメタデータタイプ</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>メタデータタイプ</th>
+            <th>説明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>LookML モデル</td><td>Looker のデータモデル定義</td></tr>
+          <tr><td>Explore</td><td>ユーザーがクエリを構築するためのインターフェース定義</td></tr>
+          <tr><td>View</td><td>LookML のビュー定義 (ディメンション、メジャーを含む)</td></tr>
+          <tr><td>ダッシュボード</td><td>Looker ダッシュボードのメタデータ</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top: 24px;">必要な IAM ロール</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>ロール</th>
+            <th>用途</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>roles/datacatalog.viewer</code></td><td>カタログ化されたメタデータの閲覧</td></tr>
+          <tr><td><code>roles/datalineage.viewer</code></td><td>データリネージ情報の閲覧</td></tr>
+          <tr><td><code>roles/dataplex.catalogEditor</code></td><td>メタデータの編集・拡充</td></tr>
+          <tr><td><code>roles/looker.viewer</code></td><td>Looker リソースへのアクセス</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup Steps -->
+    <div class="section">
+      <h2>🔧 設定方法</h2>
+
+      <div class="note-box" style="margin-bottom: 16px;">
+        <strong>前提条件:</strong>
+        <div class="check-item"><span style="color: var(--gc-blue-600);">1.</span> Looker (Google Cloud core) インスタンスが設定済みであること</div>
+        <div class="check-item"><span style="color: var(--gc-blue-600);">2.</span> Dataplex API および Data Lineage API が有効化されていること</div>
+        <div class="check-item"><span style="color: var(--gc-blue-600);">3.</span> 適切な IAM ロールが付与されていること</div>
+      </div>
+
+      <h3>Step 1: API の有効化</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># Dataplex API と Data Lineage API を有効化
+gcloud services enable dataplex.googleapis.com
+gcloud services enable datalineage.googleapis.com</code></pre>
+
+      <h3 style="margin-top: 20px;">Step 2: Looker メタデータカタログ化の確認</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># Dataplex Catalog で Looker エントリを検索
+gcloud dataplex entries search "system=looker" \
+  --project=PROJECT_ID \
+  --location=LOCATION</code></pre>
+
+      <h3 style="margin-top: 20px;">Step 3: データリネージの確認</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># BigQuery テーブルのリネージ情報を確認
+gcloud dataplex lineage search-links \
+  --project=PROJECT_ID \
+  --location=LOCATION \
+  --target="bigquery:PROJECT_ID.DATASET.TABLE"</code></pre>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>🏦 ユースケース 1: 規制対応のためのデータリネージ追跡</h4>
+        <p><strong>シナリオ:</strong> 金融機関のデータガバナンスチームが、個人情報を含む BigQuery テーブルのデータが最終的にどの Looker ダッシュボードで表示されているかを追跡する必要がある。</p>
+        <span class="code-label">Bash</span>
+        <pre><code class="language-bash"># 個人情報テーブルから下流のリネージを検索
+gcloud dataplex lineage search-links \
+  --project=my-project \
+  --location=us-central1 \
+  --source="bigquery:my-project.customer_data.pii_table"</code></pre>
+        <p style="margin-top: 12px;"><strong>効果:</strong> 個人情報の流れをエンドツーエンドで可視化し、GDPR やプライバシー規制への対応を効率化。データ侵害時のインパクト範囲を迅速に特定可能。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>🔍 ユースケース 2: BI アセットの発見と再利用</h4>
+        <p><strong>シナリオ:</strong> 新規プロジェクトのアナリストが、既存の Looker ダッシュボードや Explore を検索して、類似の分析要件に対して既存リソースを再利用したい。</p>
+        <p><strong>効果:</strong> Dataplex Universal Catalog の自然言語検索を使用して「売上分析」のような検索クエリで関連する Looker アセットを即座に発見でき、ゼロからの構築を回避して開発時間を大幅に短縮。</p>
+      </div>
+    </div>
+
+    <!-- Merits and Demerits -->
+    <div class="section">
+      <h2>⚖️ メリット / デメリット</h2>
+      <div class="merit-demerit">
+        <div class="merit-section">
+          <h4>✅ メリット</h4>
+          <div class="card card-green" style="margin-top: 8px;">
+            <strong>ビジネス面</strong>
+            <div class="check-item"><span style="color: var(--gc-green);">✓</span> エンドツーエンドのデータガバナンス強化</div>
+            <div class="check-item"><span style="color: var(--gc-green);">✓</span> セルフサービス分析の促進</div>
+            <div class="check-item"><span style="color: var(--gc-green);">✓</span> インパクト分析の効率化</div>
+          </div>
+          <div class="card card-green" style="margin-top: 8px;">
+            <strong>技術面</strong>
+            <div class="check-item"><span style="color: var(--gc-green);">✓</span> 自動化によるメンテナンス負荷軽減</div>
+            <div class="check-item"><span style="color: var(--gc-green);">✓</span> 統合メタデータ管理</div>
+            <div class="check-item"><span style="color: var(--gc-green);">✓</span> 既存ワークフロー (Pub/Sub) との統合</div>
+          </div>
+        </div>
+        <div class="demerit-section">
+          <h4>⚠️ 制約事項 / 考慮点</h4>
+          <div class="card card-orange" style="margin-top: 8px;">
+            <strong>制限事項</strong>
+            <div class="check-item"><span style="color: var(--gc-orange);">!</span> プレビュー段階のため SLA 適用対象外</div>
+            <div class="check-item"><span style="color: var(--gc-orange);">!</span> Looker (Google Cloud core) のみ対象 (Looker original は非対応)</div>
+            <div class="check-item"><span style="color: var(--gc-orange);">!</span> リネージ情報は 30 日間のみ保持</div>
+            <div class="check-item"><span style="color: var(--gc-orange);">!</span> リネージグラフは深さ 20 レベル、各方向 10,000 リンクに制限</div>
+          </div>
+          <div class="card card-orange" style="margin-top: 8px;">
+            <strong>考慮すべき点</strong>
+            <div class="check-item"><span style="color: var(--gc-orange);">!</span> Data Lineage API 有効化で追加コストの可能性</div>
+            <div class="check-item"><span style="color: var(--gc-orange);">!</span> プレビュー → GA 移行時の仕様変更リスク</div>
+            <div class="check-item"><span style="color: var(--gc-orange);">!</span> 大規模 Looker 環境では初回同期に時間がかかる場合あり</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>Dataplex Universal Catalog のメタデータストレージ SKU およびデータリネージのプレミアム処理 SKU に基づいて課金されます。プレビュー期間中の料金については、Google Cloud の営業担当者にお問い合わせください。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>月額料金 (概算)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>メタデータストレージ</td><td>Dataplex Universal Catalog 料金に準拠</td></tr>
+          <tr><td>データリネージ処理</td><td>プレミアム処理 SKU に準拠</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size: 14px; margin-top: 8px;">詳細は <a href="https://cloud.google.com/dataplex/pricing" target="_blank" class="gc-link">Dataplex 料金ページ</a> を参照してください。</p>
+    </div>
+
+    <!-- Regions -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <p>Dataplex Universal Catalog および Data Lineage が利用可能な全リージョンでサポートされます。</p>
+      <div class="region-tags">
+        <span class="region-tag">us-central1</span>
+        <span class="region-tag">us-east1</span>
+        <span class="region-tag">us-west1</span>
+        <span class="region-tag">europe-west1</span>
+        <span class="region-tag">europe-west2</span>
+        <span class="region-tag">europe-west3</span>
+        <span class="region-tag">europe-west10</span>
+        <span class="region-tag">europe-west12</span>
+        <span class="region-tag jp">asia-northeast1 (東京)</span>
+        <span class="region-tag jp">asia-northeast2 (大阪)</span>
+        <span class="region-tag">asia-southeast1</span>
+        <span class="region-tag">me-central1</span>
+        <span class="region-tag">me-central2</span>
+        <span class="region-tag">africa-south1</span>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス</h2>
+      <div class="flow-diagram">
+        <div class="flow-step">🗄️ BigQuery<br/><small>データウェアハウス</small></div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">📊 Looker<br/><small>BI プラットフォーム</small></div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">📚 Dataplex<br/><small>Universal Catalog</small></div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">📡 Pub/Sub<br/><small>変更通知</small></div>
+      </div>
+      <div style="margin-top: 16px;">
+        <div class="check-item"><span style="color: var(--gc-blue-600);">→</span> <strong>Dataplex Universal Catalog</strong>: メタデータの統合管理基盤。Looker メタデータの格納先</div>
+        <div class="check-item"><span style="color: var(--gc-blue-600);">→</span> <strong>Data Lineage API</strong>: データリネージ情報の記録と検索を提供する API</div>
+        <div class="check-item"><span style="color: var(--gc-blue-600);">→</span> <strong>Looker (Google Cloud core)</strong>: BI プラットフォーム。メタデータソースとなるサービス</div>
+        <div class="check-item"><span style="color: var(--gc-blue-600);">→</span> <strong>BigQuery</strong>: データウェアハウス。Looker のデータソースとしてリネージの起点</div>
+        <div class="check-item"><span style="color: var(--gc-blue-600);">→</span> <strong>Pub/Sub</strong>: メタデータ変更フィードの通知先として活用可能</div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section" style="background: var(--gc-blue-tint); border-color: var(--gc-blue-200);">
+      <h2>📝 まとめ</h2>
+      <p>今回のアップデートにより、Dataplex Universal Catalog が Looker (Google Cloud core) のメタデータを自動的にカタログ化し、BigQuery から Looker へのデータリネージを追跡できるようになりました。これは、データウェアハウスから BI レイヤーまでの<span class="highlight">エンドツーエンドのデータガバナンス</span>を実現する重要な一歩です。</p>
+      <div class="warning-box" style="margin-top: 16px;">
+        <strong>💡 推奨アクション:</strong> プレビュー段階ではありますが、データガバナンスの強化を検討している組織は早期に検証を開始し、GA 時にスムーズに導入できるよう準備することを推奨します。
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="list-style: none; padding: 0; margin: 4px 0 0 0;">
+        <li><a href="https://cloud.google.com/release-notes#March_30_2026" target="_blank" rel="noopener noreferrer">Google Cloud Release Notes (March 30, 2026)</a></li>
+        <li><a href="https://cloud.google.com/dataplex/docs/catalog-overview" target="_blank" rel="noopener noreferrer">Dataplex Universal Catalog ドキュメント</a></li>
+        <li><a href="https://cloud.google.com/dataplex/docs/about-data-lineage" target="_blank" rel="noopener noreferrer">データリネージについて</a></li>
+        <li><a href="https://cloud.google.com/looker/docs" target="_blank" rel="noopener noreferrer">Looker (Google Cloud core) ドキュメント</a></li>
+        <li><a href="https://cloud.google.com/dataplex/pricing" target="_blank" rel="noopener noreferrer">Dataplex 料金ページ</a></li>
+      </ul>
+      <p style="margin-top: 8px; color: var(--gc-outline);">#Dataplex #Looker #DataLineage #BigQuery #UniversalCatalog #Preview</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

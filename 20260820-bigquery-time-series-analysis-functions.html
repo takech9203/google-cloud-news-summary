@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BigQuery: 時系列分析用テーブル値関数 (ML.TREND / ML.SEASONALITY / ML.DETECT_CHANGE_POINTS)</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      margin-bottom: 32px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 12px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .card.green { border-left-color: var(--gc-green); }
+    .card.purple { border-left-color: var(--gc-purple); }
+    .card.orange { border-left-color: var(--gc-orange); }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); color: #FFFFFF; }
+    .badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+    .badge-deprecated { background: var(--gc-red); color: #FFFFFF; }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 720px) {
+      .before-after { grid-template-columns: 1fr; }
+    }
+
+    .before-box, .after-box {
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid rgba(234, 67, 53, 0.3);
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid rgba(52, 168, 83, 0.3);
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-box h3 { color: #C5221F; }
+    .after-box h3 { color: #188038; }
+
+    .before-box ul, .after-box ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li { margin: 6px 0; }
+
+    /* 3 関数カードグリッド */
+    .func-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 820px) {
+      .func-grid { grid-template-columns: 1fr; }
+    }
+
+    .func-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      border-top: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+      text-align: center;
+    }
+
+    .func-card.seasonality { border-top-color: var(--gc-green); }
+    .func-card.changepoints { border-top-color: var(--gc-orange); }
+
+    .func-card .func-icon { font-size: 32px; }
+
+    .func-card .func-name {
+      font-family: 'Roboto Mono', 'Source Code Pro', monospace;
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--gc-blue-900);
+      margin: 8px 0 4px;
+      word-break: break-all;
+    }
+
+    .func-card .func-desc {
+      font-size: 13px;
+      color: var(--gc-on-surface-variant);
+    }
+
+    /* チェックリストスタイル */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon { color: var(--gc-green); font-size: 18px; flex-shrink: 0; }
+    .cross-icon { color: var(--gc-red); font-size: 18px; flex-shrink: 0; }
+
+    /* コードブロック */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block {
+      overflow: hidden;
+      padding: 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang { color: #9CDCFE; font-weight: bold; }
+    .code-title { color: #AAAAAA; }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブルスタイル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .ai-box {
+      background: var(--gc-purple-tint);
+      border-left: 4px solid var(--gc-purple);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    ul { padding-left: 22px; }
+    li { margin: 6px 0; }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer ul {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    footer li { margin: 4px 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div class="header-meta">
+        <div>
+          <span class="badge">📊 BigQuery</span>
+          <span class="badge badge-preview">Preview</span>
+        </div>
+        <div class="subtitle">リリース日: 2026-08-20</div>
+      </div>
+      <h1>⏱️ BigQuery 時系列分析用テーブル値関数</h1>
+      <div class="subtitle" style="margin-top: 8px;">ML.TREND / ML.SEASONALITY / ML.DETECT_CHANGE_POINTS — モデル作成不要で SQL 1 文の時系列分析</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>💡 概要</h2>
+      <p>
+        BigQuery に、時系列データの分析を支援する <span class="highlight">3 つのテーブル値関数 (TVF)</span> が Preview として追加されました。
+        <code>ML.TREND</code> はデータの方向性 (トレンド) の把握、<code>ML.SEASONALITY</code> は繰り返しパターン (季節性) の特定、
+        <code>ML.DETECT_CHANGE_POINTS</code> は構造的な変化が発生した区間の検出を行います。
+        クエリエディタで直接利用できるほか、<span class="highlight">会話型分析 (conversational analytics)</span> の一部としても利用できます。
+      </p>
+      <p>
+        3 つの関数は BigQuery ML の <span class="highlight">ARIMA_PLUS モデルと同じアルゴリズム</span>をベースに構築されていますが、
+        <strong>モデルの作成や管理は不要</strong>です。売上データやアクセスログなどの時系列メトリクスから、データアナリストやビジネスユーザーが素早くインサイトを得るためのツールです。
+      </p>
+
+      <div class="func-grid">
+        <div class="func-card">
+          <div class="func-icon">📈</div>
+          <div class="func-name">ML.TREND</div>
+          <div class="func-desc">ノイズを除いた方向性<br>(トレンド成分) を抽出</div>
+        </div>
+        <div class="func-card seasonality">
+          <div class="func-icon">🔄</div>
+          <div class="func-name">ML.SEASONALITY</div>
+          <div class="func-desc">年・月・週・日などの<br>繰り返しパターンを抽出</div>
+        </div>
+        <div class="func-card changepoints">
+          <div class="func-icon">⚡</div>
+          <div class="func-name">ML.DETECT_CHANGE_POINTS</div>
+          <div class="func-desc">構造変化が起きた区間<br>(変化点) を検出</div>
+        </div>
+      </div>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before (アップデート前の課題)</h3>
+          <ul>
+            <li>トレンドや季節性の分析には <code>CREATE MODEL</code> で ARIMA_PLUS などの時系列モデルを作成・管理する必要があった</li>
+            <li>モデル学習を伴うため、アドホックな探索的分析には手間とオーバーヘッドが大きかった</li>
+            <li>変化点検出 (レベルシフトの特定) には異常検知モデルの構築や外部ツールが必要だった</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After (アップデート後の改善)</h3>
+          <ul>
+            <li>モデルの作成・管理なしで、SQL 関数 1 つでトレンド・季節性・変化点の分析が可能に</li>
+            <li>クエリエディタから直接実行でき、探索的な時系列分析のハードルが大幅に低下</li>
+            <li>会話型分析の一部として、自然言語ベースの分析ワークフローにも組み込める</li>
+            <li><code>id_cols</code> 引数により、1 つのクエリで複数の時系列を同時に分析可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    A[(📊 時系列データ<br>BigQuery テーブル / クエリ結果)] --> B{{"📈 ML.TREND<br>トレンド抽出"}}
+    A --> C{{"🔄 ML.SEASONALITY<br>季節性抽出"}}
+    A --> D{{"⚡ ML.DETECT_CHANGE_POINTS<br>変化点検出"}}
+    B --> E[💡 方向性・軌跡の把握]
+    C --> F[💡 繰り返しパターンの特定]
+    D --> G[💡 構造変化区間の特定]
+    E --> H([👤 アナリスト<br>クエリエディタ / 会話型分析])
+    F --> H
+    G --> H
+        </pre>
+      </div>
+      <p>
+        時系列データ (テーブルまたはクエリ結果) を 3 つの TVF に入力するだけで、<strong>モデル作成なし</strong>にトレンド・季節性・変化点のインサイトを得られるデータパイプラインです。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>🚀 主要機能</h2>
+
+      <div class="card">
+        <h3>📈 ML.TREND: トレンド (方向性) の抽出</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>短期的な変動やノイズを除いた、メトリクスの経時的な方向性 (トレンド成分) を算出</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>smoothing_window_size</code> (デフォルト: 5) による中心移動平均のスムージングに対応</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>adjust_step_changes</code> を有効にすると、ステップ変化 (段差) の自動検出・調整を実行</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>horizon</code> (1〜10,000) を指定すると、将来のトレンドの予測値も出力可能 (デフォルト 0 は履歴データのみ)</span></div>
+      </div>
+
+      <div class="card green">
+        <h3>🔄 ML.SEASONALITY: 季節性 (繰り返しパターン) の抽出</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>年・四半期・月・週・日など、固定期間で繰り返されるパターンを抽出</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>seasonalities</code> 引数で <code>YEARLY</code> / <code>QUARTERLY</code> / <code>MONTHLY</code> / <code>WEEKLY</code> / <code>DAILY</code> を指定可能。省略時はすべての季節性を自動検出</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>horizon</code> の指定により将来の季節性成分の予測にも対応</span></div>
+      </div>
+
+      <div class="card orange">
+        <h3>⚡ ML.DETECT_CHANGE_POINTS: 変化点 (構造変化) の検出</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>時系列データの統計的な性質が変化した区間 (変化点) を検出</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>一時的なスパイクや外れ値ではなく、緩やかに現れる変化や持続的な構造シフトの検出に最適化</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>検出された変化点は開始・終了タイムスタンプで定義される時間ウィンドウとして表現</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>各変化点について統計メトリクス (<code>avg</code> / <code>min</code> / <code>max</code> / <code>stddev</code> / <code>count</code>) を出力</span></div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>⚙️ 技術仕様</h2>
+
+      <h3>📥 共通の入力仕様</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>入力</td><td>テーブル名 (<code>TABLE table_name</code>) または GoogleSQL クエリ</td></tr>
+          <tr><td><code>data_col</code></td><td>分析対象データの列名。<code>INT64</code> / <code>NUMERIC</code> / <code>BIGNUMERIC</code> / <code>FLOAT64</code> に対応</td></tr>
+          <tr><td><code>timestamp_col</code></td><td>タイムスタンプ列名。<code>TIMESTAMP</code> / <code>DATE</code> / <code>DATETIME</code> に対応</td></tr>
+          <tr><td><code>id_cols</code></td><td>複数時系列を識別する ID 列 (<code>ARRAY&lt;STRING&gt;</code>)。1 クエリで複数系列を分析可能</td></tr>
+          <tr><td>ベースアルゴリズム</td><td>ARIMA_PLUS モデルと同じアルゴリズム</td></tr>
+        </tbody>
+      </table>
+
+      <h3>📝 各関数の構文</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">3 つの TVF の構文</span>
+        </div>
+        <pre><code class="language-sql">-- トレンド抽出
+ML.TREND(
+  { TABLE table_name | (query_statement) },
+  data_col => 'DATA_COL',
+  timestamp_col => 'TIMESTAMP_COL'
+  [, id_cols => [ID_COLS]]
+  [, horizon => HORIZON]                        -- 1〜10000、デフォルト 0
+  [, smoothing_window_size => WINDOW_SIZE]      -- デフォルト 5
+  [, adjust_step_changes => BOOL]               -- デフォルト FALSE
+)
+
+-- 季節性抽出
+ML.SEASONALITY(
+  { TABLE table_name | (query_statement) },
+  data_col => 'DATA_COL',
+  timestamp_col => 'TIMESTAMP_COL'
+  [, id_cols => [ID_COLS]]
+  [, seasonalities => [SEASONALITIES]]          -- YEARLY/QUARTERLY/MONTHLY/WEEKLY/DAILY
+  [, horizon => HORIZON]
+)
+
+-- 変化点検出
+ML.DETECT_CHANGE_POINTS(
+  { TABLE table_name | (query_statement) },
+  data_col => 'DATA_COL',
+  timestamp_col => 'TIMESTAMP_COL'
+  [, id_cols => ID_COLS]
+)</code></pre>
+      </div>
+
+      <h3>📤 出力列 (主なもの)</h3>
+      <table>
+        <thead>
+          <tr><th>関数</th><th>出力列</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>ML.TREND</code></td><td>ID 列、タイムスタンプ列、<code>time_series_type</code> (history / forecast)、データ列、<code>trend</code> (FLOAT64)、<code>status</code></td></tr>
+          <tr><td><code>ML.DETECT_CHANGE_POINTS</code></td><td>ID 列、<code>begin_timestamp</code>、<code>end_timestamp</code>、<code>metrics</code> (avg / min / max / stddev / count の STRUCT)、<code>status</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="card">
+        <h3>1️⃣ Web サイト訪問数のトレンド把握</h3>
+        <p><strong>シナリオ</strong>: 日次のサイト訪問数から、ノイズを除いた中長期的な成長トレンドを確認したい。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">実装例 (公式ドキュメントの例)</span>
+          </div>
+          <pre><code class="language-sql">WITH DailyVisits AS (
+  SELECT
+    PARSE_TIMESTAMP('%Y%m%d', date) AS visit_timestamp,
+    SUM(totals.visits) AS total_visits
+  FROM `bigquery-public-data.google_analytics_sample.ga_sessions_*`
+  GROUP BY visit_timestamp
+)
+SELECT *
+FROM ML.TREND(
+  TABLE DailyVisits,
+  data_col => 'total_visits',
+  timestamp_col => 'visit_timestamp')
+ORDER BY visit_timestamp;</code></pre>
+        </div>
+        <div class="success-box">
+          <strong>✅ 効果:</strong> モデルを作らずに、履歴データに対するトレンド成分 (<code>trend</code> 列) を即座に取得できる。
+        </div>
+      </div>
+
+      <div class="card orange">
+        <h3>2️⃣ マーケティング施策後の売上レベル変化の検出</h3>
+        <p><strong>シナリオ</strong>: マーケティングキャンペーン実施後に、日次売上の水準が構造的に変化したかどうかを確認したい。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">実装例 (公式ドキュメントのタクシー乗車数の例を応用)</span>
+          </div>
+          <pre><code class="language-sql">WITH daily_trips AS (
+  SELECT
+    EXTRACT(DATE FROM pickup_datetime) AS trip_date,
+    COUNT(*) AS total_trips
+  FROM `bigquery-public-data.new_york_taxi_trips.tlc_yellow_trips_20*`
+  WHERE _TABLE_SUFFIX BETWEEN '19' AND '20'
+  GROUP BY trip_date
+)
+SELECT *
+FROM ML.DETECT_CHANGE_POINTS(
+  TABLE daily_trips,
+  data_col => 'total_trips',
+  timestamp_col => 'trip_date');</code></pre>
+        </div>
+        <div class="success-box">
+          <strong>✅ 効果:</strong> 構造変化が起きた区間 (開始・終了タイムスタンプ) と、その区間の統計値 (平均・最小・最大・標準偏差) が得られ、施策効果や外部要因の影響を定量的に把握できる。
+        </div>
+      </div>
+
+      <div class="card green">
+        <h3>3️⃣ 売上の季節性パターンの特定</h3>
+        <p><strong>シナリオ</strong>: 週末の小さな売上スパイクや、特定の休暇シーズンの大きなスパイクなど、繰り返しパターンを可視化したい。</p>
+        <div class="success-box">
+          <strong>✅ 効果:</strong> <code>ML.SEASONALITY</code> で週次・年次などの季節性成分を分解でき、需要計画や在庫計画に活用できる。
+        </div>
+      </div>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>👍 メリット</h2>
+
+      <h3>💼 ビジネス面</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>分析の民主化</strong>: モデル構築の専門知識がなくても、SQL だけで時系列インサイトを取得可能。会話型分析経由ではビジネスユーザーにも門戸が開かれる</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>意思決定の迅速化</strong>: キャンペーン効果や市場変化 (変化点) を素早く定量的に把握できる</span></div>
+
+      <h3>🔧 技術面</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>モデル管理のオーバーヘッド排除</strong>: <code>CREATE MODEL</code> によるモデルの作成・保守・再学習の管理が不要</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>ARIMA_PLUS 品質のアルゴリズム</strong>: 実績ある ARIMA_PLUS モデルと同じアルゴリズムをベースにしており、信頼性の高い分解結果が期待できる</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>複数系列の一括分析</strong>: <code>id_cols</code> により、商品別・地域別など多数の時系列を 1 クエリで処理できる</span></div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>🚧 制限事項</h3>
+      <div class="check-item"><span class="cross-icon">✗</span><span>Preview 段階のため、Pre-GA Offerings Terms が適用され、サポートが限定される可能性がある</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>分析対象のデータ列は <code>INT64</code> / <code>NUMERIC</code> / <code>BIGNUMERIC</code> / <code>FLOAT64</code>、タイムスタンプ列は <code>TIMESTAMP</code> / <code>DATE</code> / <code>DATETIME</code> に限定される</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span><code>ML.TREND</code> / <code>ML.SEASONALITY</code> の <code>horizon</code> の有効範囲は 1〜10,000</span></div>
+
+      <h3>🤔 考慮すべき点</h3>
+      <div class="warning-box">
+        <strong>⚠️ 使い分けのポイント:</strong>
+        <ul style="margin: 8px 0 0;">
+          <li>これらの関数は<strong>探索的な分析向け</strong>。継続的な高精度予測が必要な場合は、ARIMA_PLUS モデルや TimesFM を使った <code>AI.FORECAST</code> の利用を検討する</li>
+          <li><code>ML.DETECT_CHANGE_POINTS</code> は持続的な構造変化の検出に最適化されており、突発的なスパイクや外れ値の検出には <code>ML.DETECT_ANOMALIES</code> / <code>AI.DETECT_ANOMALIES</code> が適している</li>
+          <li>フィードバックやサポート依頼は bqml-feedback@google.com 宛てとされている</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>
+        これらの関数固有の料金情報は現時点で確認できませんでした。BigQuery ML の関数実行は<span class="highlight">クエリとして課金</span>されるため、詳細は BigQuery の料金ページを参照してください。
+      </p>
+      <div class="icon-text">
+        <span class="arrow">→</span>
+        <a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">BigQuery 料金ページ</a>
+      </div>
+    </div>
+
+    <!-- 関連サービス・機能 -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <h3>🧮 BigQuery ML ARIMA_PLUS</h3>
+        <p style="margin: 0;">今回の 3 関数のベースとなるアルゴリズムを提供する時系列予測モデル。モデルとして作成すれば <code>ML.FORECAST</code> や <code>ML.DETECT_ANOMALIES</code> が利用可能。</p>
+      </div>
+      <div class="card purple">
+        <h3>🤖 AI.FORECAST / AI.DETECT_ANOMALIES (TimesFM)</h3>
+        <p style="margin: 0;">BigQuery ML 組み込みの TimesFM モデルを使った、モデル管理不要の予測・異常検知関数。今回の TVF と同様の「モデルレス」アプローチ。</p>
+      </div>
+      <div class="card green">
+        <h3>💬 会話型分析 (Conversational Analytics)</h3>
+        <p style="margin: 0;">今回の 3 関数は会話型分析の一部としても利用可能で、自然言語での時系列分析を支援する。</p>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📋 まとめ</h2>
+      <div class="note-box">
+        <p style="margin: 0 0 8px;">
+          BigQuery に、<strong>モデル作成不要</strong>で時系列データのトレンド・季節性・変化点を分析できる 3 つのテーブル値関数が Preview として追加されました。
+          ARIMA_PLUS と同じアルゴリズムに基づく信頼性の高い分析を <span class="highlight">SQL 1 文で実行</span>できるため、探索的な時系列分析のハードルが大きく下がります。
+        </p>
+        <p style="margin: 0;">
+          売上やアクセスログなどの時系列データを扱うチームは、まずクエリエディタでこれらの関数を試し、既存の ARIMA_PLUS / TimesFM ベースのワークフローとの使い分けを検討することを推奨します。
+        </p>
+      </div>
+      <div class="flow-diagram" style="display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; margin: 24px 0;">
+        <div class="flow-step" style="background: var(--gc-surface); border: 2px solid var(--gc-blue-600); border-radius: 12px; padding: 12px 20px; text-align: center; color: var(--gc-on-surface);">🧪 クエリエディタで<br>TVF を試す</div>
+        <span class="flow-arrow" style="color: var(--gc-blue-600); font-size: 24px; font-weight: bold;">→</span>
+        <div class="flow-step" style="background: var(--gc-surface); border: 2px solid var(--gc-blue-600); border-radius: 12px; padding: 12px 20px; text-align: center; color: var(--gc-on-surface);">🔍 トレンド・季節性・<br>変化点を確認</div>
+        <span class="flow-arrow" style="color: var(--gc-blue-600); font-size: 24px; font-weight: bold;">→</span>
+        <div class="flow-step" style="background: var(--gc-surface); border: 2px solid var(--gc-blue-600); border-radius: 12px; padding: 12px 20px; text-align: center; color: var(--gc-on-surface);">⚖️ ARIMA_PLUS / TimesFM<br>との使い分けを検討</div>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p><strong>📎 出典:</strong></p>
+      <ul>
+        <li>→ <a href="https://docs.cloud.google.com/release-notes#August_20_2026" target="_blank" rel="noopener noreferrer" class="gc-link">Google Cloud 公式リリースノート (2026-08-20)</a></li>
+        <li>→ <a href="https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-trend" target="_blank" rel="noopener noreferrer" class="gc-link">ML.TREND 関数ドキュメント</a></li>
+        <li>→ <a href="https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-seasonality" target="_blank" rel="noopener noreferrer" class="gc-link">ML.SEASONALITY 関数ドキュメント</a></li>
+        <li>→ <a href="https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-detect-change-points" target="_blank" rel="noopener noreferrer" class="gc-link">ML.DETECT_CHANGE_POINTS 関数ドキュメント</a></li>
+        <li>→ <a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">BigQuery 料金ページ</a></li>
+      </ul>
+      <p style="margin-top: 12px;">🏷️ タグ: BigQuery / BigQuery ML / 時系列分析 / ML.TREND / ML.SEASONALITY / ML.DETECT_CHANGE_POINTS / Preview / テーブル値関数</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>
