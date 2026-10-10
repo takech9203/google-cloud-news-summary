@@ -5,11 +5,15 @@
 
 ## 2026 年
 
+- [2026-10-10 - Cloud SQL for MySQL: MySQL 8.0.46 がデフォルトマイナーバージョンに](2026/2026-10-10-cloud-sql-mysql-8-0-46-default.md)
 - [2026-10-09 - Security Command Center: データ保持ポリシーによる Finding 削除時の通知機能](2026/2026-10-09-security-command-center-deleted-findings-notifications.md)
 - [2026-10-09 - Gemini Code Assist: Standard / Enterprise サブスクリプションの新規販売終了](2026/2026-10-09-gemini-code-assist-subscription-sale-ending.md)
 - [2026-10-09 - Google Cloud Managed Service for Apache Kafka: ブートストラップアドレスとブローカー URL のフォーマット変更](2026/2026-10-09-managed-kafka-bootstrap-address-format-change.md)
 - [2026-10-09 - Datastream: SQL Server の GEOMETRY / GEOGRAPHY 空間データ型のレプリケーションをサポート](2026/2026-10-09-datastream-sqlserver-spatial-data-types.md)
+- [2026-10-09 - Looker: Looker 26.18 向け新機能の自動有効化 (Diagnose & Repair、CI Style Validator、Data Apps など)](2026/2026-10-09-looker-26-18-auto-enabled-features.md)
+- [2026-10-09 - BigQuery: Data Engineering Agent が東京リージョン (asia-northeast1) エンドポイントと gemini-3.5-flash をサポート (GA)](2026/2026-10-09-bigquery-data-engineering-agent-tokyo-gemini-3-5-flash.md)
 - [2026-10-09 - Model Armor: Workspace データ向けプロンプトインジェクション / ジェイルブレイク保護の強化](2026/2026-10-09-model-armor-workspace-prompt-injection-protection.md)
+- [2026-10-09 - Cloud SQL for MySQL / PostgreSQL: 既存インスタンスの Knowledge Catalog ニアリアルタイム同期対応](2026/2026-10-09-cloud-sql-knowledge-catalog-near-real-time-sync.md)
 - [2026-10-08 - BigQuery: BigQuery Studio SQL エディタのインラインアクションボタンによる Gemini アシスタンスが GA](2026/2026-10-08-bigquery-gemini-sql-editor-inline-assist.md)
 - [2026-10-08 - Gemini Enterprise: Gemini 3.8 Flash がシンガポールリージョンで GA](2026/2026-10-08-gemini-enterprise-gemini-3-8-flash-singapore.md)
 - [2026-10-08 - Memorystore for Redis: RDB スナップショットがコンソールでのインスタンス作成時にデフォルトで有効化 (GA)](2026/2026-10-08-memorystore-redis-rdb-snapshots-default.md)
@@ -18,6 +22,7 @@
 - [2026-10-08 - Google Cloud Contact Center as a Service (CCaaS): バージョン 6.19 リリース](2026/2026-10-08-ccaas-6-19-release.md)
 - [2026-10-08 - Gemini Enterprise: AI developer tools で Anthropic Claude Opus 5.5 / Claude Sonnet 5.5 が利用可能に](2026/2026-10-08-gemini-enterprise-claude-opus-sonnet-5-5.md)
 - [2026-10-08 - VPC Service Controls: 違反アナライザーの自動修復提案 (Remediation Suggestions)](2026/2026-10-08-vpc-service-controls-remediation-suggestions.md)
+- [2026-10-08 - Compute Engine: 高精度時刻同期 (Accurate Time) が GA](2026/2026-10-08-compute-engine-accurate-time-sync-ga.md)
 - [2026-10-08 - Google Kubernetes Engine (GKE): バージョンアップデート 2026-R43](2026/2026-10-08-gke-2026-r43-version-updates.md)
 - [2026-10-07 - Virtual Private Cloud (Private Service Connect): サービスアタッチメントへの追加 NAT IP アドレス設定による最大接続数の拡張](2026/2026-10-07-private-service-connect-additional-nat-ip.md)
 - [2026-10-07 - Google SecOps Marketplace: Google Chronicle 統合 v97.0 / GitSync v53.0 アップデート](2026/2026-10-07-google-secops-marketplace-chronicle-gitsync-updates.md)
