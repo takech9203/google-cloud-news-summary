@@ -5,6 +5,18 @@
 
 ## 2026 年
 
+- [2026-10-12 - Looker (Google Cloud core): Workforce Identity Federation サポート (Preview)](2026/2026-10-12-looker-workforce-identity-federation.md)
+- [2026-10-12 - Google SecOps / Google SecOps SOAR: SOAR API から Chronicle API への移行期限が 2027 年 3 月 31 日に延長](2026/2026-10-12-google-secops-soar-api-migration-deadline.md)
+- [2026-10-12 - Cloud Service Mesh: in-cluster 向け 1.31.1-asm.16 リリースとセキュリティパッチ (1.30 / 1.29 / 1.28)](2026/2026-10-12-cloud-service-mesh-security-patch-releases.md)
+- [2026-10-12 - Cloud DNS: Outbound Endpoints (Preview)](2026/2026-10-12-cloud-dns-outbound-endpoints.md)
+- [2026-10-12 - Google SecOps: Response Health Hub によるレスポンスとプレイブックの健全性モニタリング](2026/2026-10-12-google-secops-response-health-hub.md)
+- [2026-10-12 - Google Distributed Cloud (software only): VMware 版 / ベアメタル版 1.35.600-gke.140 リリース](2026/2026-10-12-google-distributed-cloud-1-35-600.md)
+- [2026-10-12 - Cloud Build: ビルド環境のリリースチャンネル選択機能](2026/2026-10-12-cloud-build-release-channels.md)
+- [2026-10-12 - Network Connectivity Center: プロデューサー VPC スポークの課金問題修正と時間課金の開始](2026/2026-10-12-network-connectivity-center-producer-vpc-spoke-billing.md)
+- [2026-10-12 - Google Cloud Managed Service for Apache Kafka: SLA が Produce API をカバー対象に追加](2026/2026-10-12-managed-kafka-produce-api-sla.md)
+- [2026-10-12 - BigQuery: Data Transfer Service の PostgreSQL / ServiceNow 向け増分データ転送が GA](2026/2026-10-12-bigquery-dts-incremental-transfers.md)
+- [2026-10-12 - Cloud Run: Budget spend caps によるワークロード一時停止が GA に](2026/2026-10-12-cloud-run-budget-spend-caps.md)
+- [2026-10-12 - Cloud Load Balancing: URL マップのホストルール・ルートルールにおける正規表現マッチャーが GA](2026/2026-10-12-cloud-load-balancing-url-map-regex-matchers.md)
 - [2026-10-10 - Cloud SQL for MySQL: MySQL 8.0.46 がデフォルトマイナーバージョンに](2026/2026-10-10-cloud-sql-mysql-8-0-46-default.md)
 - [2026-10-09 - Security Command Center: データ保持ポリシーによる Finding 削除時の通知機能](2026/2026-10-09-security-command-center-deleted-findings-notifications.md)
 - [2026-10-09 - Gemini Code Assist: Standard / Enterprise サブスクリプションの新規販売終了](2026/2026-10-09-gemini-code-assist-subscription-sale-ending.md)
