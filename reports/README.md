@@ -5,12 +5,20 @@
 
 ## 2026 年
 
+- [2026-10-16 - Vertex AI Search: Agent Search の回答生成 stable モデルが gemini-3.5-flash に更新](2026/2026-10-16-vertex-ai-search-agent-search-stable-model-update.md)
+- [2026-10-16 - Dialogflow: gemini-3.5-flash-lite が一般提供 (GA) 開始](2026/2026-10-16-dialogflow-gemini-3-5-flash-lite-ga.md)
+- [2026-10-16 - Gemini Enterprise: Workflow Builder のワークフローが Confluence Data Center / Jira Data Center に接続可能に](2026/2026-10-16-gemini-enterprise-workflow-builder-confluence-jira.md)
 - [2026-10-15 - BigQuery: クロスリージョンテーブルコピー / GoogleSQL 列エイリアス / 会話型分析エクスポートが GA](2026/2026-10-15-bigquery-cross-region-copy-column-aliases.md)
 - [2026-10-15 - Dataflow: Auto VM Selection が第 4 世代 Compute Engine マシンシリーズをサポート](2026/2026-10-15-dataflow-auto-vm-selection-gen4.md)
 - [2026-10-15 - Apigee Edge for Public Cloud / Apigee Integrated Portal: SSO アップデートと Portal SSO エンドポイントの TLS 1.2+ 強制化](2026/2026-10-15-apigee-edge-portal-sso-tls-update.md)
 - [2026-10-15 - Security Command Center: Risk Engine 攻撃パスシミュレーションが EXTERNALLY_EXPOSED_VM_INSTANCE 検出カテゴリに対応 (Preview)](2026/2026-10-15-security-command-center-external-exposure-attack-path.md)
+- [2026-10-15 - Apigee Edge for Private Cloud: 4.54.00 リリース (LTS)](2026/2026-10-15-apigee-edge-private-cloud-4-54-00.md)
 - [2026-10-15 - Compute Engine: ゾーンブートディスクのクローンによるリージョナルディスク作成 (Preview) / 予約キャパシティ上限エラーの追加](2026/2026-10-15-compute-engine-regional-disk-clone-reservation-limit.md)
+- [2026-10-15 - Apigee X: MIG スタートアップスクリプトの IP フォワーディング設定永続化の修正](2026/2026-10-15-apigee-x-mig-ip-forward-fix.md)
+- [2026-10-15 - Gemini Enterprise: Anthropic Claude モデル (Claude Opus 5.5 / Claude Sonnet 5.5) が利用可能に](2026/2026-10-15-gemini-enterprise-anthropic-claude-models.md)
 - [2026-10-15 - Google Cloud NetApp Volumes: Flex Unified サービスレベルが europe-west8 (ミラノ) で利用可能に](2026/2026-10-15-netapp-volumes-flex-unified-europe-west8.md)
+- [2026-10-15 - Cloud Vision API / Video Intelligence API: 感情ラベルレスポンスの非推奨化](2026/2026-10-15-cloud-vision-video-intelligence-emotion-label-deprecation.md)
+- [2026-10-15 - Looker (Google Cloud core): Looker 26.18 機能の有効化開始](2026/2026-10-15-looker-26-18-rollout.md)
 - [2026-10-14 - VPC Service Controls: Workload Identity Federation for GKE のイングレス/エグレスルール対応 (Preview)](2026/2026-10-14-vpc-service-controls-wif-gke.md)
 - [2026-10-14 - Cloud SQL for MySQL / PostgreSQL: Knowledge Catalog 統合有効化時に 1 日 1 回更新となる既知の問題](2026/2026-10-14-cloud-sql-knowledge-catalog-integration-issue.md)
 - [2026-10-14 - Apigee hybrid: v1.16.11 パッチリリース (VerifyJWT JWKS キャッシュ修正・セキュリティ修正)](2026/2026-10-14-apigee-hybrid-v1-16-11.md)
