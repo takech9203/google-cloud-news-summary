@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Google SecOps: プレビュー機能管理のロールバック</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-red {
+      border-left-color: var(--gc-red);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-yellow {
+      border-left-color: var(--gc-yellow);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .badge-deprecated {
+      background: var(--gc-red);
+      color: #FFFFFF;
+    }
+
+    .badge-rollback {
+      background: var(--gc-red);
+      color: #FFFFFF;
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-card h4 {
+      color: var(--gc-red);
+      margin: 0 0 12px 0;
+      font-size: 16px;
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-card h4 {
+      color: var(--gc-green);
+      margin: 0 0 12px 0;
+      font-size: 16px;
+    }
+
+    .before-card ul,
+    .after-card ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+      line-height: 1.8;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-800);
+      margin: 0 0 8px 0;
+    }
+
+    .usecase-card p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    .timeline {
+      position: relative;
+      padding-left: 30px;
+      margin: 16px 0;
+    }
+
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 8px;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: var(--gc-blue-300);
+      border-radius: 2px;
+    }
+
+    .timeline-item {
+      position: relative;
+      margin-bottom: 20px;
+      padding: 12px 16px;
+      background: var(--gc-surface);
+      border-radius: 8px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .timeline-item::before {
+      content: '';
+      position: absolute;
+      left: -26px;
+      top: 18px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--gc-blue-600);
+      border: 2px solid var(--gc-surface);
+    }
+
+    .timeline-item.rollback::before {
+      background: var(--gc-red);
+    }
+
+    .timeline-item.future::before {
+      background: var(--gc-outline);
+      border: 2px dashed var(--gc-outline);
+    }
+
+    .timeline-date {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      margin-bottom: 4px;
+    }
+
+    .timeline-item.rollback .timeline-date {
+      color: var(--gc-red);
+    }
+
+    .timeline-item.future .timeline-date {
+      color: var(--gc-outline);
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 28px;
+      }
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>🔒 Google SecOps: プレビュー機能管理のロールバック</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Google SecOps</span>
+          <span class="badge-rollback">Rolled Back</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-06-01</div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        2026 年 6 月 1 日、Google は Google SecOps (Google Security Operations) の
+        <span class="highlight">Manage access to preview features</span> (プレビュー機能へのアクセス管理) 機能を
+        <strong>ロールバック</strong>したことを発表した。この機能は 2026 年 5 月 28 日にリリースされたが、
+        わずか <span class="highlight">4 日後</span>にロールバックが実施された。
+      </p>
+      <p>
+        この機能は、SOC マネージャーやセキュリティエンジニアがパブリックプレビュー機能の有効化・無効化を
+        管理者が自律的にコントロールできるようにするもので、サポートチャネルを経由せずにプレビュー機能の
+        オン・オフを切り替えられることが主要な価値提案だった。
+      </p>
+
+      <div class="warning-box">
+        <strong>⚠️ 注意:</strong> ロールバックの具体的な理由は公式には明示されていないが、リリース後に発見された問題に対処するための措置と考えられる。
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value">4 日</div>
+        <div class="stat-label">リリースからロールバックまでの期間</div>
+      </div>
+      <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-red), #C62828);">
+        <div class="stat-value">Rolled Back</div>
+        <div class="stat-label">現在のステータス</div>
+      </div>
+      <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-orange), #E65100);">
+        <div class="stat-value">未定</div>
+        <div class="stat-label">再リリース予定</div>
+      </div>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-card">
+          <h4>❌ ロールバック後 (6月1日以降)</h4>
+          <ul>
+            <li>セルフサービス管理機能が巻き戻された</li>
+            <li>プレビュー機能の管理が以前の状態に戻る</li>
+            <li>サポート経由での有効化/無効化が必要</li>
+            <li>再リリース時期は未定</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>✅ 5月28日リリース時 (ロールバック前)</h4>
+          <ul>
+            <li>SIEM Settings > Public Preview からアクセス</li>
+            <li>管理者がトグルで機能のオン・オフを即座に切替可能</li>
+            <li>サポートチャネル不要でセルフサービス制御</li>
+            <li>プレビュー機能一覧・ステータス・GA 日を表示</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>5 月 28 日にリリースされたセルフサービス管理機能がロールバックされ、プレビュー機能の管理が従来のサポート経由に戻った状態を示す。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph released["5月28日リリース (ロールバック対象)"]
+        A["👤 SecOps 管理者"] -->|"SIEM Settings"| B["📋 Public Preview Features ページ"]
+        B -->|"On/Off トグル"| C["🔧 プレビュー機能 A"]
+        B -->|"On/Off トグル"| D["🔧 プレビュー機能 B"]
+        B -->|"On/Off トグル"| E["🔧 プレビュー機能 N"]
+    end
+
+    subgraph rolledback["6月1日ロールバック後"]
+        F["👤 SecOps 管理者"] -->|"従来の方法"| G["📞 Google SecOps サポート"]
+        G -->|"リクエスト処理"| H["🔧 プレビュー機能の有効化/無効化"]
+    end
+
+    style B fill:#ffcccc,stroke:#cc0000
+    style G fill:#ccffcc,stroke:#00cc00
+        </pre>
+      </div>
+    </div>
+
+    <!-- Timeline -->
+    <div class="section">
+      <h2>📅 タイムライン</h2>
+      <div class="timeline">
+        <div class="timeline-item">
+          <div class="timeline-date">2026-05-28</div>
+          <div>「Manage access to preview features」機能リリース</div>
+        </div>
+        <div class="timeline-item rollback">
+          <div class="timeline-date">2026-06-01</div>
+          <div>同機能のロールバック発表</div>
+        </div>
+        <div class="timeline-item future">
+          <div class="timeline-date">未定</div>
+          <div>修正後の再リリース (予想)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Feature Details -->
+    <div class="section">
+      <h2>🔧 ロールバック対象機能の詳細</h2>
+
+      <div class="card">
+        <h3>📋 Public Preview Features ページ</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>Settings > SIEM Settings > Public Preview からアクセス</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>テナント内で利用可能な全パブリックプレビュー機能の一覧を表示</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>有効化済み機能数 / 全体数 (例: "Features enabled for public preview (27 of 35)") を表示</span></div>
+      </div>
+
+      <div class="card">
+        <h3>🎛️ 管理者によるセルフサービス制御</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>Administrator ロールを持つユーザーがトグルで機能のオン・オフを即座に切り替え可能</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>依存関係のある機能については、両方を有効化するよう通知される仕組み</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>無効化時には理由の入力を求めるダイアログが表示</span></div>
+      </div>
+
+      <div class="card">
+        <h3>👁️ 閲覧権限</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>すべての Google SecOps ユーザーがプレビュー機能一覧を閲覧可能</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>各機能の Feature Name、Preview Status、Expected GA Date、Documentation リンクを確認可能</span></div>
+      </div>
+    </div>
+
+    <!-- Technical Specs -->
+    <div class="section">
+      <h2>⚙️ 技術仕様</h2>
+
+      <h3>関連する権限とロール</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>必要なロール</td>
+            <td>Administrator ロール (Google SecOps 内)</td>
+          </tr>
+          <tr>
+            <td>閲覧権限</td>
+            <td>すべての Google SecOps ユーザー</td>
+          </tr>
+          <tr>
+            <td>アクセスパス</td>
+            <td><code>Settings > SIEM Settings > Public Preview</code></td>
+          </tr>
+          <tr>
+            <td>対象</td>
+            <td>パブリックプレビュー機能のみ (プライベートプレビューは対象外)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Impact -->
+    <div class="section">
+      <h2>💥 ロールバックの影響</h2>
+
+      <div class="card card-red">
+        <h3>🏢 コンプライアンス制御テナントへの影響</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>FedRAMP や HIPAA などの特別なコンプライアンス制御があるテナントでは、元々この機能は利用不可だった</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>これらのテナントは引き続きサポート経由でプレビュー機能を有効化する必要がある</span></div>
+      </div>
+
+      <div class="card card-yellow">
+        <h3>🏗️ 一般テナントへの影響</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>5 月 28 日以降にセルフサービスで有効化したプレビュー機能の状態がどうなるかは公式発表で明確にされていない</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>管理者は、有効化済みのプレビュー機能が期待通り動作しているか確認することを推奨</span></div>
+      </div>
+    </div>
+
+    <!-- Constraints and Recommended Actions -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>ロールバックによる影響</h3>
+      <div class="icon-text"><span class="cross-icon">✗</span><span>セルフサービスでプレビュー機能を制御する手段が一時的に利用不可</span></div>
+      <div class="icon-text"><span class="cross-icon">✗</span><span>5 月 28 日〜6 月 1 日の間に変更したプレビュー機能設定の状態確認が必要</span></div>
+      <div class="icon-text"><span class="cross-icon">✗</span><span>機能の再リリース時期が未定</span></div>
+
+      <h3 style="margin-top: 24px;">推奨アクション</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>現在有効化しているプレビュー機能の動作を確認する</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>プレビュー機能の有効化・無効化が必要な場合は Google SecOps サポートに問い合わせる</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>公式リリースノートで再リリースのアナウンスを監視する</span></div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>🔹 ユースケース 1: プレビュー機能を有効化済みの環境</h4>
+        <p><strong>シナリオ:</strong> 5 月 28 日のリリース後にセルフサービスでプレビュー機能を有効化した SOC チーム</p>
+        <p><strong>推奨対応:</strong></p>
+        <div class="check-item"><span class="arrow">→</span><span>有効化したプレビュー機能が正常に動作しているか確認する</span></div>
+        <div class="check-item"><span class="arrow">→</span><span>問題が発生している場合は Google SecOps サポートに連絡する</span></div>
+        <div class="check-item"><span class="arrow">→</span><span>ロールバックにより機能の状態が変更されていないか検証する</span></div>
+        <p><strong>効果:</strong> 環境の安定性を確保し、ロールバックによる予期せぬ影響を最小化できる</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>🔹 ユースケース 2: 今後プレビュー機能の利用を計画している環境</h4>
+        <p><strong>シナリオ:</strong> 新しいプレビュー機能のテストを予定していた管理者</p>
+        <p><strong>推奨対応:</strong></p>
+        <div class="check-item"><span class="arrow">→</span><span>機能の再リリースを待つか、サポートチャネルを通じて有効化をリクエストする</span></div>
+        <div class="check-item"><span class="arrow">→</span><span>コンプライアンス制御テナントの場合は従来通りサポート経由で対応</span></div>
+        <p><strong>効果:</strong> 不安定な機能を利用するリスクを回避しつつ、必要な機能へのアクセスを確保</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <div class="note-box">
+        <strong>💡 情報:</strong> Google SecOps のプレビュー機能管理自体に追加料金は発生しない。プレビュー機能の利用は Pre-GA Offerings Terms に基づく。
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <div class="icon-text"><span>🔐</span><span><strong>Google SecOps IAM 統合</strong> - プレビュー機能の管理権限は IAM のロールベースアクセス制御と連携</span></div>
+      </div>
+      <div class="card">
+        <div class="icon-text"><span>🤖</span><span><strong>Google SecOps SOAR</strong> - SOAR 側のプレビュー機能は別のリリースサイクルで管理される</span></div>
+      </div>
+      <div class="card">
+        <div class="icon-text"><span>🛡️</span><span><strong>Assured Workloads</strong> - コンプライアンス制御テナントではプレビュー機能管理に制限あり</span></div>
+      </div>
+      <div class="card">
+        <div class="icon-text"><span>📝</span><span><strong>Cloud Audit Logs</strong> - Feature RBAC への移行後、プレビュー機能の変更操作は監査ログに記録される</span></div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <p>
+        Google SecOps の「Manage access to preview features」機能が 5 月 28 日のリリースからわずか 4 日でロールバックされた。
+        管理者がセルフサービスでプレビュー機能を制御できる有用な機能であるだけに、早期の修正と再リリースが期待される。
+      </p>
+      <div class="error-box">
+        <strong>📌 影響を受けるユーザーへ:</strong> 有効化済みのプレビュー機能の動作確認を行い、必要に応じてサポートに問い合わせることを推奨する。
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>📎 出典:</strong></p>
+      <ul style="list-style: none; padding-left: 0; margin: 8px 0;">
+        <li style="margin: 4px 0;">- <a href="https://docs.cloud.google.com/release-notes#June_01_2026" target="_blank" rel="noopener noreferrer">公式リリースノート (6 月 1 日)</a></li>
+        <li style="margin: 4px 0;">- <a href="https://docs.cloud.google.com/chronicle/docs/secops/release-notes#May_28_2026" target="_blank" rel="noopener noreferrer">関連リリースノート (5 月 28 日)</a></li>
+        <li style="margin: 4px 0;">- <a href="https://docs.cloud.google.com/chronicle/docs/secops/preview-features-manage" target="_blank" rel="noopener noreferrer">プレビュー機能管理ドキュメント</a></li>
+        <li style="margin: 4px 0;">- <a href="https://docs.cloud.google.com/chronicle/docs/secops/secops-overview" target="_blank" rel="noopener noreferrer">Google SecOps 概要</a></li>
+        <li style="margin: 4px 0;">- <a href="https://docs.cloud.google.com/chronicle/docs/onboard/configure-feature-access" target="_blank" rel="noopener noreferrer">Feature RBAC の設定 (IAM)</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline);">Generated: 2026-06-03 | #GoogleSecOps #Chronicle #SIEM #PreviewFeatures #Rollback #SecurityOperations</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+</body>
+</html>

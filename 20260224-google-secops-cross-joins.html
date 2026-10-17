@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Google SecOps: YARA-L 2.0 Cross Joins in Multi-stage Queries</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left {
+      flex: 1;
+      min-width: 280px;
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+      text-align: right;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge-service {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .badge-security {
+      background: var(--gc-red);
+      color: #FFFFFF;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-red {
+      border-left-color: var(--gc-red);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h3 {
+      color: var(--gc-red);
+      margin-top: 0;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box h3 {
+      color: var(--gc-green);
+      margin-top: 0;
+    }
+
+    .before-box ul, .after-box ul {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    .stat-card.green {
+      background: linear-gradient(135deg, var(--gc-green), #2D8E47);
+    }
+
+    .stat-card.orange {
+      background: linear-gradient(135deg, var(--gc-orange), #E56200);
+    }
+
+    .stat-card.purple {
+      background: linear-gradient(135deg, var(--gc-purple), #8430CC);
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h3 {
+      color: var(--gc-blue-900);
+      margin-top: 0;
+    }
+
+    .usecase-card p {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .steps-list {
+      counter-reset: step-counter;
+      list-style: none;
+      padding: 0;
+    }
+
+    .steps-list li {
+      counter-increment: step-counter;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin: 12px 0;
+      padding: 12px 16px;
+      background: var(--gc-surface);
+      border-radius: 8px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .steps-list li::before {
+      content: counter(step-counter);
+      background: var(--gc-blue-600);
+      color: #FFFFFF;
+      font-weight: 700;
+      font-size: 14px;
+      min-width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .merit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .pricing-table td:first-child {
+      font-weight: 600;
+      color: var(--gc-on-surface);
+    }
+
+    .links-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .links-list li {
+      margin: 8px 0;
+      padding: 8px 12px;
+      background: var(--gc-surface);
+      border-radius: 8px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .links-list li a {
+      word-break: break-all;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    footer li {
+      margin: 4px 0;
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .header { flex-direction: column; }
+      .subtitle { text-align: left; margin-top: 8px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stat-cards { grid-template-columns: 1fr 1fr; }
+      .merit-grid { grid-template-columns: 1fr; }
+      .section { padding: 16px; }
+    }
+
+    @media (max-width: 480px) {
+      .stat-cards { grid-template-columns: 1fr; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>&#x1F6E1;&#xFE0F; Google SecOps: YARA-L 2.0 マルチステージクエリにおけるクロスジョイン</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge badge-security">Security</span>
+          <span class="badge badge-service">Google SecOps / SIEM</span>
+          <span class="badge badge-preview">Pre-GA</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-02-24</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>&#x1F4CB; 概要</h2>
+      <p>Google SecOps (旧 Chronicle) の <span class="highlight">YARA-L 2.0</span> において、マルチステージクエリで<span class="highlight">クロスジョイン (cross join)</span> が新たにサポートされました。これにより、個別の UDM イベントデータと、他の YARA-L ステージで算出された集約統計データを直接比較できるようになります。</p>
+      <p>クロスジョインは、<code>limit: 1</code> が設定されたステージ (1 行のみを出力するステージ) と、別のデータセット (UDM イベントなど) を組み合わせる仕組みです。<code>limit: 1</code> のステージから出力された 1 行が、もう一方のデータセットの各行に付加されるため、イベントデータ全体に対して全体統計 (平均値、標準偏差など) をエンリッチメントとして付与できます。この機能は Search および Dashboards の両方でサポートされます。</p>
+      <p>主な対象ユーザーは、Google SecOps を利用する<strong>セキュリティアナリスト</strong>、<strong>SOC チーム</strong>、<strong>Detection Engineer</strong> です。特に、ベースラインからの逸脱検知や異常行動分析など、個別イベントと全体傾向を比較する高度なセキュリティ分析ワークフローにおいて大きな価値を提供します。</p>
+    </div>
+
+    <!-- Before / After -->
+    <div class="section">
+      <h2>&#x1F504; Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h3>&#x274C; アップデート前</h3>
+          <ul>
+            <li>ステージ間の結合には共通の match 変数による等価結合 (equi-join) が必要で、1 対多のブロードキャスト結合ができなかった</li>
+            <li>全体の集約統計 (全ユーザーの平均ログイン回数など) を個別イベントと比較するには、複数のクエリを個別に実行して手動で突き合わせる必要があった</li>
+            <li>個別イベントに全体統計を付与するエンリッチメントパターンをクエリ単体で実現する手段がなかった</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>&#x2705; アップデート後</h3>
+          <ul>
+            <li><code>cross join</code> キーワードを使用して、<code>limit: 1</code> のステージ出力を他のデータセットの全行にブロードキャスト結合できる</li>
+            <li>個別のユーザーアクティビティと全体の集約統計 (平均値、件数など) を単一のクエリ内で比較できる</li>
+            <li>ベースラインとの乖離による異常検知 (通常より多いログイン回数の検出など) を、マルチステージクエリだけで完結できる</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>&#x1F3D7;&#xFE0F; アーキテクチャ図</h2>
+      <p>クロスジョインを使用して個別ユーザーのログインカウントと全体ユーザー数を結合し、異常なログイン頻度を検出するクエリの処理フローを示しています。Stage 2 の <code>limit: 1</code> により 1 行のみが出力され、それが Stage 1 の全行にブロードキャストされます。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Stage1["Stage 1: user_login_counts"]
+        UDM[("UDM Events\nUSER_LOGIN")]
+        Agg1["match: $user\noutcome: $login_count = count()"]
+        UDM --> Agg1
+    end
+
+    subgraph Stage2["Stage 2: total_users"]
+        Agg2["outcome: $count = count($user)\nlimit: 1"]
+        Agg1 -->|"$user_login_counts"| Agg2
+    end
+
+    subgraph CrossJoin["Cross Join"]
+        CJ{"cross join\n$total_users,\n$user_login_counts"}
+        Agg2 -->|"1 row: total count"| CJ
+        Agg1 -->|"N rows: per-user counts"| CJ
+    end
+
+    subgraph Root["Root Stage"]
+        Compare["match: $login_count\noutcome:\n$num_users = count($user)\n$frequency_percent"]
+        CJ -->|"N rows enriched\nwith total stats"| Compare
+    end
+
+    Compare --> Result([Search / Dashboard Results])
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Stats -->
+    <div class="section">
+      <h2>&#x1F4CA; 数字で見る技術仕様</h2>
+      <div class="stat-cards">
+        <div class="stat-card">
+          <div class="stat-value">4</div>
+          <div class="stat-label">最大名前付きステージ数</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-value">4</div>
+          <div class="stat-label">最大 non-data-table Join 数</div>
+        </div>
+        <div class="stat-card orange">
+          <div class="stat-value">10,000</div>
+          <div class="stat-label">最大結果セットサイズ</div>
+        </div>
+        <div class="stat-card purple">
+          <div class="stat-value">120 QPH</div>
+          <div class="stat-label">統計クエリレート制限</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>&#x2699;&#xFE0F; 主要機能</h2>
+
+      <div class="card">
+        <h3>&#x1F517; クロスジョインキーワード</h3>
+        <p><code>cross join</code> キーワードにより、<code>limit: 1</code> のステージ出力を他のデータセットの全行に結合します。</p>
+        <p><strong>構文:</strong> <code>cross join $stage_with_limit_1, $other_stage</code></p>
+        <p><code>limit: 1</code> のステージは 1 行のみを出力し、その 1 行がもう一方のデータセットの各行に付加されます。</p>
+      </div>
+
+      <div class="card card-green">
+        <h3>&#x1F4E1; 集約統計のブロードキャスト</h3>
+        <p>全体統計 (平均値、件数、標準偏差など) を集約したステージの出力を、個別イベントデータにエンリッチメントとして付与できます。これにより、各イベントに対して「全体と比較してどうか」という文脈情報が自動的に追加されます。</p>
+      </div>
+
+      <div class="card card-purple">
+        <h3>&#x1F4BB; Search および Dashboards でのサポート</h3>
+        <p>クロスジョインは Google SecOps の <strong>Search</strong> 機能と <strong>Dashboards</strong> 機能の両方で使用可能です。リアルタイムの検索結果や、ダッシュボードでの可視化に対応します。</p>
+      </div>
+    </div>
+
+    <!-- Technical Spec Table -->
+    <div class="section">
+      <h2>&#x1F4D0; 技術仕様</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>キーワード</td>
+            <td><code>cross join</code></td>
+          </tr>
+          <tr>
+            <td>必須条件</td>
+            <td>一方のステージに <code>limit: 1</code> が設定されていること</td>
+          </tr>
+          <tr>
+            <td>サポート対象</td>
+            <td>Search、Dashboards</td>
+          </tr>
+          <tr>
+            <td>非サポート対象</td>
+            <td>Rules (検出ルール)</td>
+          </tr>
+          <tr>
+            <td>最大ステージ数</td>
+            <td>ルートステージに加えて最大 4 つの名前付きステージ</td>
+          </tr>
+          <tr>
+            <td>最大 Join 数</td>
+            <td>全ステージ合計で最大 4 つの non-data-table Join</td>
+          </tr>
+          <tr>
+            <td>最大結果セットサイズ</td>
+            <td>10,000 件</td>
+          </tr>
+          <tr>
+            <td>最大クエリ時間範囲</td>
+            <td>30 日間</td>
+          </tr>
+          <tr>
+            <td>最大 UDM イベント数</td>
+            <td>クエリあたり 2 つ</td>
+          </tr>
+          <tr>
+            <td>最大 ECG イベント数</td>
+            <td>クエリあたり 1 つ</td>
+          </tr>
+          <tr>
+            <td>統計クエリレート制限</td>
+            <td>120 QPH (API および UI)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Code Sample -->
+    <div class="section">
+      <h2>&#x1F4DD; クロスジョインのクエリ例</h2>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">YARA-L 2.0</span>
+          <span class="code-title">ログイン頻度分析クエリ</span>
+        </div>
+        <pre><code class="language-sql">stage user_login_counts {
+    $user = principal.user.userid
+    metadata.event_type = "USER_LOGIN"
+    security_result.action = "ALLOW"
+
+    match:
+        $user
+
+    outcome:
+        $login_count = count(metadata.id)
+}
+
+stage total_users {
+    outcome:
+        $count = count($user_login_counts.user)
+    limit:
+        1
+}
+
+cross join $total_users, $user_login_counts
+
+$login_count = $user_login_counts.login_count
+$user = $user_login_counts.user
+$tot_users = $total_users.count
+
+// all users who logged in the same number of times are grouped together.
+match:
+    $login_count
+outcome:
+    $num_users = count($user)
+    $frequency_percent = (count($user) / max($tot_users) ) * 100</code></pre>
+      </div>
+    </div>
+
+    <!-- Setup Steps -->
+    <div class="section">
+      <h2>&#x1F527; 設定方法</h2>
+
+      <div class="note-box">
+        <strong>&#x1F4CB; 前提条件:</strong>
+        <ul style="margin: 8px 0; padding-left: 20px;">
+          <li>Google SecOps のアクティブなサブスクリプション (Enterprise パッケージ推奨)</li>
+          <li>Search または Dashboards へのアクセス権限</li>
+          <li>YARA-L 2.0 のマルチステージクエリに関する基本的な知識</li>
+        </ul>
+      </div>
+
+      <ol class="steps-list">
+        <li>
+          <div>
+            <strong>Search 画面へのアクセス</strong><br>
+            Google SecOps コンソールで <strong>Investigation &gt; Search</strong> に移動する。
+          </div>
+        </li>
+        <li>
+          <div>
+            <strong>マルチステージクエリの作成</strong><br>
+            名前付きステージを定義し、集約したいステージに <code>limit: 1</code> を設定する。
+          </div>
+        </li>
+        <li>
+          <div>
+            <strong>クロスジョインの適用</strong><br>
+            ルートステージの前に <code>cross join</code> キーワードで 2 つのステージを結合する。
+          </div>
+        </li>
+        <li>
+          <div>
+            <strong>結果の確認</strong><br>
+            クエリを実行し、Search 結果または Dashboard で個別イベントにエンリッチされた全体統計を確認する。
+          </div>
+        </li>
+      </ol>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">YARA-L 2.0</span>
+          <span class="code-title">集約ステージの定義例</span>
+        </div>
+        <pre><code class="language-sql">stage aggregated_stats {
+    // 全体の統計を計算
+    outcome:
+        $total_count = count($previous_stage.variable)
+    limit:
+        1
+}
+
+cross join $aggregated_stats, $detail_stage
+
+$detail_var = $detail_stage.variable
+$total = $aggregated_stats.total_count
+
+match:
+    $detail_var
+outcome:
+    $ratio = $detail_var / max($total)</code></pre>
+      </div>
+    </div>
+
+    <!-- Merits -->
+    <div class="section">
+      <h2>&#x1F4C8; メリット</h2>
+      <div class="merit-grid">
+        <div class="card card-green">
+          <h3>&#x1F4BC; ビジネス面</h3>
+          <div class="icon-text">
+            <span>&#x2192;</span>
+            <span><strong>脅威検出の精度向上:</strong> 個別のアクティビティを全体のベースラインと比較することで、統計的に異常な行動パターンを単一のクエリで特定でき、脅威の早期発見につながる</span>
+          </div>
+          <div class="icon-text">
+            <span>&#x2192;</span>
+            <span><strong>調査効率の改善:</strong> 従来は複数クエリの実行と手動突き合わせが必要だった分析が、単一のマルチステージクエリで完結するため、インシデント対応時間 (MTTR) の短縮に貢献する</span>
+          </div>
+        </div>
+        <div class="card">
+          <h3>&#x1F4BB; 技術面</h3>
+          <div class="icon-text">
+            <span>&#x2192;</span>
+            <span><strong>クエリのシンプル化:</strong> 全体統計と個別イベントの比較ロジックを 1 つのクエリに集約できるため、クエリの管理・保守が容易になる</span>
+          </div>
+          <div class="icon-text">
+            <span>&#x2192;</span>
+            <span><strong>リアルタイム分析:</strong> Search 機能でリアルタイムに結果を取得できるため、Composite Detection Rules と異なり即座にインタラクティブな分析が可能</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>&#x26A0;&#xFE0F; デメリット・制約事項</h2>
+
+      <div class="error-box">
+        <strong>&#x1F6AB; 制限事項</strong>
+        <ul style="margin: 8px 0; padding-left: 20px; font-size: 14px;">
+          <li>クロスジョインを含むマルチステージクエリは <strong>Rules (検出ルール) ではサポートされておらず</strong>、Search と Dashboards のみで使用可能</li>
+          <li>クロスジョインの一方のステージには必ず <code>limit: 1</code> を設定する必要がある</li>
+          <li>マルチステージクエリ全体として、最大 4 つの名前付きステージ、最大 4 つの non-data-table Join、最大 10,000 件の結果という制約がある</li>
+          <li>本機能は <strong>Pre-GA Offerings Terms</strong> の対象であり、制限付きサポートおよび互換性のない変更が行われる可能性がある</li>
+        </ul>
+      </div>
+
+      <div class="warning-box">
+        <strong>&#x1F4A1; 考慮すべき点</strong>
+        <ul style="margin: 8px 0; padding-left: 20px; font-size: 14px;">
+          <li>UDM イベントやエンティティイベントを含む Join は、データセットのサイズによりパフォーマンスが低下する可能性がある。UDM 側のフィルタリング (例: イベントタイプでの絞り込み) を可能な限り行うことを推奨</li>
+          <li>マルチステージクエリはすべて統計クエリとして動作するため、出力は集約された統計情報となり、未集約の個別イベントやデータテーブル行は返されない</li>
+          <li>統計クエリのレート制限 (120 QPH) が適用されるため、大量のクエリを短時間に実行する場合は注意が必要</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>&#x1F3AF; ユースケース</h2>
+
+      <div class="usecase-card">
+        <h3>&#x1F512; ユースケース 1: 異常なログイン頻度の検出</h3>
+        <p><strong>シナリオ:</strong> 組織内の全ユーザーの平均ログイン回数と比較して、突出してログイン回数の多いユーザーを特定する。アカウント侵害やクレデンシャルスタッフィング攻撃の兆候を示す可能性がある。</p>
+        <p><strong>効果:</strong> 全ユーザーのログイン頻度分布を一目で把握でき、外れ値となるユーザーを即座に特定可能。手動で複数クエリを実行する手間が不要になる。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>&#x1F310; ユースケース 2: ネットワークトラフィックの異常検知</h3>
+        <p><strong>シナリオ:</strong> 日次のネットワーク通信量の全体平均・標準偏差と個別の通信ペアのデータ量を比較し、統計的に異常なトラフィックパターンを検出する。データ流出や C2 通信の兆候を発見するための分析に活用できる。</p>
+        <p><strong>効果:</strong> Z スコアやパーセンタイルベースの異常検知を単一のマルチステージクエリで実現でき、Dashboard で継続的にモニタリングすることで、ベースラインからの逸脱をリアルタイムに把握可能。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>&#x1F6E1;&#xFE0F; ユースケース 3: 権限昇格の検知</h3>
+        <p><strong>シナリオ:</strong> 全ユーザーの平均的な権限変更回数と比較して、短期間に多数の権限変更を実行しているユーザーを特定する。ラテラルムーブメントや権限昇格攻撃の早期検知に有効。</p>
+        <p><strong>効果:</strong> 組織全体のベースラインに対する個別ユーザーの振る舞いを定量的に評価し、リスクスコアリングに活用できる。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>&#x1F4B0; 料金情報</h2>
+      <p>Google SecOps の料金はサブスクリプションベースで、データ取り込み量に基づいて課金されます。クロスジョイン機能自体に追加料金は発生しませんが、マルチステージクエリの実行は統計クエリのレート制限 (120 QPH) の対象となります。</p>
+      <table class="pricing-table">
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>サブスクリプション (コミットメント)</td>
+            <td>契約内容に基づく定額課金</td>
+          </tr>
+          <tr>
+            <td>使用量 (データ取り込み)</td>
+            <td>取り込みバイト数に基づく従量課金</td>
+          </tr>
+          <tr>
+            <td>超過料金</td>
+            <td>コミットメントを超過した場合、交渉済みレートで追加課金</td>
+          </tr>
+          <tr>
+            <td>データ保持延長</td>
+            <td>12 か月超のデータ保持は追加課金</td>
+          </tr>
+        </tbody>
+      </table>
+      <p style="font-size: 14px; color: var(--gc-outline);">詳細な料金については、Google Cloud の営業担当者またはパートナーに問い合わせてください。</p>
+    </div>
+
+    <!-- Region -->
+    <div class="section">
+      <h2>&#x1F30D; 利用可能リージョン</h2>
+      <p>Google SecOps はグローバルに提供されるサービスであり、リージョナルエンドポイントとして <strong>US</strong>、<strong>Europe</strong>、<strong>Asia</strong> などが利用可能です。具体的なリージョン情報は公式ドキュメントを参照してください。</p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#x1F517; 関連サービス・機能</h2>
+      <div class="card">
+        <h3>マルチステージクエリ</h3>
+        <p>クロスジョインはマルチステージクエリの拡張機能であり、ステージ間でデータを受け渡す基盤機能と密接に関連します。</p>
+      </div>
+      <div class="card">
+        <h3>Search Joins</h3>
+        <p>Inner Join、Outer Join、Data Join など、Search での結合操作全般。クロスジョインはこれらの Join タイプを補完します。</p>
+      </div>
+      <div class="card">
+        <h3>Composite Detection Rules</h3>
+        <p>マルチステージクエリが Search でリアルタイムに結果を返すのに対し、Composite Detection Rules はルールベースの検知を提供します。</p>
+      </div>
+      <div class="card">
+        <h3>YARA-L 2.0 ベストプラクティス</h3>
+        <p>Join クエリのパフォーマンス最適化に関するガイダンス。</p>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section" style="background: var(--gc-blue-tint); border: 2px solid var(--gc-blue-300);">
+      <h2>&#x1F4CC; まとめ</h2>
+      <p>Google SecOps の YARA-L 2.0 マルチステージクエリにクロスジョインが追加されたことで、個別イベントデータと全体の集約統計を<span class="highlight">単一のクエリ内で直接比較</span>できるようになりました。これにより、異常なログイン活動やネットワークトラフィックの逸脱検知など、ベースライン比較型のセキュリティ分析が大幅に効率化されます。</p>
+      <p>Google SecOps を利用しているセキュリティチームは、Search および Dashboards でクロスジョインを活用した<strong>脅威ハンティングクエリの構築</strong>を検討することを推奨します。</p>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>&#x1F4CE; 出典・参考リンク:</strong></p>
+      <ul>
+        <li><a href="https://cloud.google.com/release-notes#February_24_2026" target="_blank" rel="noopener noreferrer">Google Cloud 公式リリースノート (2026-02-24)</a></li>
+        <li><a href="https://docs.cloud.google.com/chronicle/docs/secops/release-notes" target="_blank" rel="noopener noreferrer">Google SecOps リリースノート</a></li>
+        <li><a href="https://docs.cloud.google.com/chronicle/docs/investigation/multi-stage-yaral#cross-joins" target="_blank" rel="noopener noreferrer">Cross joins in multi-stage queries ドキュメント</a></li>
+        <li><a href="https://docs.cloud.google.com/chronicle/docs/investigation/search-joins" target="_blank" rel="noopener noreferrer">Use joins in Search</a></li>
+        <li><a href="https://docs.cloud.google.com/chronicle/docs/detection/yara-l-best-practices" target="_blank" rel="noopener noreferrer">YARA-L best practices</a></li>
+      </ul>
+      <p style="margin-top: 12px; font-size: 11px; color: var(--gc-outline);">
+        #GoogleSecOps #YARAL #CrossJoin #MultiStageQuery #SIEM #ThreatDetection #SecurityAnalytics #UDM
+      </p>
+    </footer>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

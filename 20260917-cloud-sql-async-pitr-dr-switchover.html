@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud SQL: DR スイッチオーバー・レプリカフェイルオーバー後の PITR 非同期有効化</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated,
+    .badge-change {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); }
+    .badge-preview { background: var(--gc-orange); }
+    .badge-deprecated { background: var(--gc-red); }
+    .badge-change { background: var(--gc-yellow); color: #202124; }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-box h3 { color: #C5221F; }
+    .after-box h3 { color: #188038; }
+
+    .before-after ul {
+      margin: 8px 0 0 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-after li {
+      margin: 6px 0;
+    }
+
+    @media (max-width: 700px) {
+      .before-after { grid-template-columns: 1fr; }
+      .stat-grid { grid-template-columns: 1fr !important; }
+      h1 { font-size: 26px; }
+    }
+
+    /* 統計カード */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px 16px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 30px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* チェックリスト */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon { color: var(--gc-green); font-size: 18px; }
+    .cross-icon { color: var(--gc-red); font-size: 18px; }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* コードブロック */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-title { color: #AAAAAA; }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 0;
+      padding: 0;
+    }
+
+    .code-block pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+      color: inherit;
+      display: block;
+      padding: 16px !important;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* テーブル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-100);
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer ul {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    footer li { margin: 4px 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <h1>🗄️ Cloud SQL: DR スイッチオーバー後の PITR 非同期有効化</h1>
+        <div class="subtitle">スイッチオーバー / レプリカフェイルオーバーの完了が速くなり RTO を短縮</div>
+        <div style="margin-top: 8px;">
+          <span class="badge">Cloud SQL for MySQL</span>
+          <span class="badge">Cloud SQL for PostgreSQL</span>
+          <span class="badge badge-change">Change (仕様変更)</span>
+        </div>
+      </div>
+      <div class="subtitle" style="text-align: right;">
+        📅 リリース日: 2026-09-17
+      </div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📌 概要</h2>
+      <p>
+        Cloud SQL for MySQL / PostgreSQL において、災害復旧 (DR) の<span class="highlight">スイッチオーバー</span>と<span class="highlight">レプリカフェイルオーバー</span>の完了後に、<span class="highlight">ポイントインタイムリカバリ (PITR) が別の非同期オペレーションとして自動有効化</span>されるようになりました。PITR の有効化がオペレーションをブロックしなくなったため、処理がより速く完了し、<span class="highlight">復旧時間 (RTO) の短縮</span>に貢献します。
+      </p>
+      <p>
+        高度な災害復旧 (Advanced DR) は <strong>Cloud SQL Enterprise Plus エディション</strong>の機能で、クロスリージョンの DR レプリカを指定し、計画的なロール切り替え (スイッチオーバー) やリージョン障害時の昇格 (レプリカフェイルオーバー) を実行できます。従来はこれらのオペレーション内で、新プライマリ昇格後のバックアップ (ディスクサイズにより 5〜15 分) と PITR 有効化まで行われていました。
+      </p>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before: アップデート前の課題</h3>
+          <ul>
+            <li>スイッチオーバー / レプリカフェイルオーバーのオペレーションに PITR 有効化処理が含まれ、完了までの時間が長かった</li>
+            <li>昇格後バックアップ (ディスクサイズにより 5〜15 分) の分だけ、災害時の復旧時間 (RTO) が延びる要因になっていた</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After: アップデート後の改善</h3>
+          <ul>
+            <li>PITR の構成・有効化がオペレーション完了後の独立した非同期処理として自動実行される</li>
+            <li>PITR 有効化がオペレーションをブロックせず、スイッチオーバー / フェイルオーバーがより速く完了</li>
+            <li>DR 発動時の復旧時間 (RTO) を短縮できる</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">5〜15 分</div>
+          <div class="stat-label">オペレーションから分離された昇格後バックアップの所要時間</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">RTO 短縮</div>
+          <div class="stat-label">書き込み再開までの時間を短縮</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">設定不要</div>
+          <div class="stat-label">既存の Advanced DR 構成に自動適用</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図: Before / After</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Before["Before: PITR 有効化がオペレーションに含まれる"]
+        B1["🔄 スイッチオーバー / レプリカフェイルオーバー開始"] --> B2["⬆️ DR レプリカを新プライマリに昇格"]
+        B2 --> B3["💾 新プライマリのバックアップ取得<br/>(5〜15 分)"]
+        B3 --> B4["🕐 PITR 有効化"]
+        B4 --> B5["✅ オペレーション完了<br/>(所要時間: 長い)"]
+    end
+
+    subgraph After["After: PITR 有効化を非同期化"]
+        A1["🔄 スイッチオーバー / レプリカフェイルオーバー開始"] --> A2["⬆️ DR レプリカを新プライマリに昇格"]
+        A2 --> A3["✅ オペレーション完了<br/>(所要時間: 短縮)"]
+        A3 -.非同期.-> A4["💾 バックアップ取得 + 🕐 PITR 有効化<br/>(バックグラウンドで自動実行)"]
+    end
+        </pre>
+      </div>
+      <p>
+        従来はスイッチオーバー / レプリカフェイルオーバーのオペレーション内で PITR 有効化まで行われていましたが、今回の変更で PITR の構成・有効化がオペレーション完了後の<span class="highlight">非同期処理に分離</span>され、オペレーション自体の完了が速くなりました。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="card">
+        <h3>1️⃣ PITR 有効化の非同期化</h3>
+        <p>スイッチオーバー / レプリカフェイルオーバーの完了後、Cloud SQL が PITR を<strong>別の非同期オペレーション</strong>として自動的に構成・有効化。PITR 有効化がオペレーションの所要時間に加算されなくなりました。</p>
+      </div>
+      <div class="card">
+        <h3>2️⃣ 復旧時間 (RTO) の短縮</h3>
+        <p>スイッチオーバーとレプリカフェイルオーバーがより速く完了するため、DR 発動時の復旧時間を短縮。リージョン障害時に、新プライマリへの<strong>書き込み切り替えまでの時間短縮</strong>に寄与します。</p>
+      </div>
+      <div class="card">
+        <h3>3️⃣ 昇格後の自動バックアップと PITR カバレッジ</h3>
+        <p>新プライマリインスタンスの昇格直後に、Cloud SQL がベストエフォートでバックアップを開始。PITR はこのバックアップ完了後に有効化されます (バックアップはディスクサイズにより 5〜15 分)。<strong>PITR のカバレッジ (復元可能期間) はバックアップ完了後から開始</strong>されます。</p>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+      <h3>高度な災害復旧 (Advanced DR) の前提条件</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>エディション</td><td>プライマリ・DR レプリカともに Cloud SQL Enterprise Plus</td></tr>
+          <tr><td>PITR</td><td>プライマリインスタンスで PITR を有効化しておく必要がある</td></tr>
+          <tr><td>DR レプリカの配置</td><td>プライマリと別リージョンの直接接続リードレプリカ (カスケードレプリカ不可)</td></tr>
+          <tr><td>トランザクションログ</td><td>DR レプリカは PITR 用トランザクションログを Cloud Storage に保存する必要がある</td></tr>
+          <tr><td>gcloud CLI</td><td>バージョン 502.0.0 以降が必要</td></tr>
+        </tbody>
+      </table>
+
+      <h3>PITR と Advanced DR の関係</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>スイッチオーバー / レプリカフェイルオーバーに関与したインスタンスは、リードレプリカ期間中もプライマリ期間中も PITR とバックアップからの復元をサポート</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>スイッチオーバー前 (プライマリだった時点) の時刻への PITR も実行可能</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>昇格後のバックアップ完了までの期間は、新プライマリで PITR は利用できない</span></div>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>💻 設定方法</h2>
+      <div class="note-box">
+        <strong>💡 ポイント:</strong> 今回の変更はユーザー側の設定変更は不要で、スイッチオーバー / レプリカフェイルオーバー実行時に自動的に適用されます。以下は Advanced DR の主なオペレーションのコマンドです。
+      </div>
+
+      <h3>DR レプリカの指定</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">DR レプリカを指定</span>
+        </div>
+        <pre><code class="language-bash">gcloud sql instances patch PRIMARY_INSTANCE_NAME \
+    --failover-dr-replica-name=REPLICA_NAME</code></pre>
+      </div>
+
+      <h3>スイッチオーバーの実行 (計画的なロール切り替え)</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">計画的なロール切り替え</span>
+        </div>
+        <pre><code class="language-bash">gcloud sql instances switchover REPLICA_NAME [--db-timeout=TIMEOUT_DURATION]</code></pre>
+      </div>
+
+      <h3>レプリカフェイルオーバーの実行 (リージョン障害時)</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">リージョン障害時の昇格</span>
+        </div>
+        <pre><code class="language-bash">gcloud sql instances promote-replica REPLICA_NAME --failover</code></pre>
+      </div>
+
+      <p>いずれのオペレーションも、完了後に PITR が非同期で自動的に有効化されます。</p>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>🎯 メリット</h2>
+      <h3>💼 ビジネス面</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>復旧時間 (RTO) の短縮</strong>: DR 発動時にアプリケーションの書き込み再開までの時間が短縮され、ダウンタイムによるビジネス影響を低減</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>追加コスト・設定不要</strong>: 既存の Advanced DR 構成のまま自動的に適用され、ユーザー側の作業は不要</span></div>
+
+      <h3>⚙️ 技術面</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>オペレーションの高速化</strong>: PITR 有効化 (昇格後バックアップを含む) がスイッチオーバー / レプリカフェイルオーバーをブロックしなくなった</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>自動化された PITR 再有効化</strong>: 新プライマリでの PITR 構成を Cloud SQL が非同期で自動実行するため、手動での再構成が不要</span></div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <h3>制限事項</h3>
+      <div class="check-item"><span class="cross-icon">✗</span><span>プライマリインスタンスが PITR 用トランザクションログをディスクに保存している場合、Enterprise Plus エディションのリードレプリカを DR レプリカに指定できない</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>外部レプリカは DR レプリカに指定できない</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>レプリカフェイルオーバーのオペレーションは Terraform でサポートされていない</span></div>
+
+      <h3>考慮すべき点</h3>
+      <div class="warning-box">
+        <strong>⏳ PITR カバレッジの空白期間:</strong> 昇格後のバックアップ (5〜15 分程度) が完了するまで、新プライマリで PITR は利用できません。PITR のカバレッジはバックアップ完了後から開始されます。
+      </div>
+      <div class="warning-box">
+        <strong>🔒 VPC Service Controls / CMEK:</strong> VPC Service Controls を使用している場合、特に別プロジェクトの鍵で CMEK を使用しているときは、PITR の有効化・再構成がサービス境界にブロックされないよう境界の設定を確認してください (KMS 鍵のプロジェクトをインスタンスと同じ境界に含めることが推奨)。
+      </div>
+      <div class="warning-box">
+        <strong>🧩 スプリットブレインの可能性:</strong> レプリカフェイルオーバーでは、レプリケーションラグによりデータ損失 (スプリットブレイン) が発生する可能性があります。旧プライマリ復旧時に取得される最終バックアップから未反映データを回復できます。
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+      <div class="usecase">
+        <h3>🚨 ユースケース 1: リージョン障害時の迅速な復旧</h3>
+        <p><strong>シナリオ</strong>: プライマリリージョンで障害が発生し、クロスリージョンの DR レプリカへのフェイルオーバーが必要になった。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">実装例</span>
+          </div>
+          <pre><code class="language-bash">gcloud sql instances promote-replica dr-replica-tokyo --failover</code></pre>
+        </div>
+        <p><strong>効果</strong>: PITR 有効化がフェイルオーバーをブロックしないため、新プライマリへの書き込み切り替えがより速く完了し、RTO を短縮できる。PITR はフェイルオーバー完了後にバックグラウンドで自動的に有効化される。</p>
+      </div>
+      <div class="usecase">
+        <h3>🔄 ユースケース 2: DR 訓練 (計画的スイッチオーバー) の所要時間短縮</h3>
+        <p><strong>シナリオ</strong>: 定期的な DR 訓練として、プライマリと DR レプリカのロールを計画的に入れ替える。</p>
+        <p><strong>効果</strong>: スイッチオーバーの所要時間が短縮され、訓練時のメンテナンスウィンドウを短くできる。訓練後の切り戻し (逆方向のスイッチオーバー) でも同様に時間を短縮できる。</p>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>
+        今回の変更自体に伴う追加料金の情報はリリースノートに記載されていません。なお、高度な災害復旧 (Advanced DR) は <strong>Cloud SQL Enterprise Plus エディション</strong>で利用可能な機能であり、DR レプリカのインスタンス料金やバックアップ・ログのストレージ料金が発生します。
+      </p>
+      <div class="icon-text">
+        <span class="arrow">→</span>
+        <a href="https://cloud.google.com/sql/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud SQL の料金</a>
+      </div>
+    </div>
+
+    <!-- 関連サービス・機能 -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <h3>🕐 ポイントインタイムリカバリ (PITR)</h3>
+        <p>トランザクションログを使用して任意の時点にインスタンスを復元する機能。今回のアップデートで DR オペレーション後の有効化が非同期化された。</p>
+      </div>
+      <div class="card">
+        <h3>🛡️ 高可用性 (HA) 構成</h3>
+        <p>同一リージョン内のゾーン障害に対応する機能。Advanced DR (クロスリージョン) と組み合わせて使用し、プライマリで HA を有効にしている場合は DR レプリカでも HA を有効にすることが推奨される。</p>
+      </div>
+      <div class="card">
+        <h3>🌐 DNS 書き込みエンドポイント</h3>
+        <p>スイッチオーバー / フェイルオーバー後に新プライマリへ自動的に解決されるエンドポイント。アプリケーションの接続先変更を不要にする。</p>
+      </div>
+      <div class="card">
+        <h3>🔒 VPC Service Controls / Cloud KMS (CMEK)</h3>
+        <p>DR オペレーションによる PITR の有効化・再構成がサービス境界にブロックされないよう、境界設定の確認が必要。</p>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="success-box">
+        <strong>✅ 要点:</strong> Cloud SQL for MySQL / PostgreSQL の DR スイッチオーバーとレプリカフェイルオーバーにおいて、PITR の有効化が非同期化され、オペレーションの完了が速くなり RTO を短縮できるようになりました。ユーザー側の設定変更は不要です。
+      </div>
+      <div class="icon-text"><span class="arrow">→</span><span>昇格後バックアップが完了するまで新プライマリで PITR が利用できない点に留意</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>VPC Service Controls / CMEK 環境では境界設定の確認が必要</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>Advanced DR を利用中のチームは、DR 訓練 (スイッチオーバー) で所要時間の短縮効果を確認しておくことを推奨</span></div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p><strong>📎 出典・参考リンク</strong></p>
+      <ul>
+        <li><a href="https://docs.cloud.google.com/release-notes#September_17_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026 年 9 月 17 日)</a></li>
+        <li><a href="https://cloud.google.com/sql/docs/mysql/use-advanced-disaster-recovery" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud SQL for MySQL: 高度な災害復旧 (DR) の使用</a></li>
+        <li><a href="https://cloud.google.com/sql/docs/postgres/use-advanced-disaster-recovery" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud SQL for PostgreSQL: 高度な災害復旧 (DR) の使用</a></li>
+        <li><a href="https://cloud.google.com/sql/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud SQL の料金</a></li>
+      </ul>
+      <p>タグ: Cloud SQL, MySQL, PostgreSQL, 災害復旧, DR, PITR, スイッチオーバー, フェイルオーバー, Enterprise Plus</p>
+      <p>本インフォグラフィックは Google Cloud News レポート (2026-09-17) を基に生成されています。</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

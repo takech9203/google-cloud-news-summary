@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Managed Service for Apache Kafka: ブローカーごとのディスク容量設定</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+:root {
+  --gc-blue: #4285F4;
+  --gc-red: #EA4335;
+  --gc-yellow: #FBBC04;
+  --gc-green: #34A853;
+  --gc-blue-900: #174EA6;
+  --gc-blue-800: #185ABC;
+  --gc-blue-700: #1967D2;
+  --gc-blue-600: #1A73E8;
+  --gc-blue-500: #4285F4;
+  --gc-blue-300: #669DF6;
+  --gc-blue-200: #8AB4F8;
+  --gc-blue-100: #AECBFA;
+  --gc-blue-50: #E8F0FE;
+  --gc-on-surface: #202124;
+  --gc-on-surface-variant: #5F6368;
+  --gc-outline: #80868B;
+  --gc-surface: #FFFFFF;
+  --gc-surface-container-lowest: #F8F9FA;
+  --gc-surface-container-low: #F1F3F4;
+  --gc-surface-container: #E8EAED;
+  --gc-outline-variant: #DADCE0;
+  --gc-blue-tint: #E8F0FE;
+  --gc-green-tint: #E6F4EA;
+  --gc-red-tint: #FCE8E6;
+  --gc-yellow-tint: #FEF7E0;
+  --gc-purple-tint: #F3E8FD;
+  --gc-teal-tint: #E0F7FA;
+  --gc-purple: #A142F4;
+  --gc-teal: #00BCD4;
+  --gc-orange: #FF6D00;
+}
+
+body {
+  background-color: var(--gc-surface);
+  font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+  color: var(--gc-on-surface-variant);
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 20px;
+  margin: 0;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 16px;
+  border-bottom: 3px solid var(--gc-blue-600);
+}
+
+h1, .title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--gc-on-surface);
+  margin: 0;
+  line-height: 1.4;
+}
+
+h2, .section-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 20px 0 8px 0;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: var(--gc-outline);
+}
+
+.section {
+  background: var(--gc-surface-container-low);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid var(--gc-outline-variant);
+}
+
+.highlight {
+  background-color: var(--gc-blue-50);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--gc-blue-800);
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+.card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin: 12px 0;
+  border-left: 4px solid var(--gc-blue-600);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+}
+
+.card h4 {
+  margin: 0 0 8px 0;
+  color: var(--gc-on-surface);
+  font-size: 16px;
+}
+
+.card p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.gc-link {
+  color: var(--gc-blue-600);
+  text-decoration: none;
+}
+
+.gc-link:hover {
+  color: var(--gc-blue-800);
+  text-decoration: underline;
+}
+
+.badge,
+.badge-ga,
+.badge-feature {
+  display: inline-block;
+  color: #FFFFFF;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+  margin: 4px 8px 4px 0;
+}
+
+.badge { background: var(--gc-blue-600); }
+.badge-feature { background: var(--gc-green); }
+
+/* Before/After 比較 */
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.before-box, .after-box {
+  border-radius: 12px;
+  padding: 16px 20px;
+}
+
+.before-box {
+  background: var(--gc-red-tint);
+  border: 1px solid rgba(234, 67, 53, 0.3);
+}
+
+.after-box {
+  background: var(--gc-green-tint);
+  border: 1px solid rgba(52, 168, 83, 0.3);
+}
+
+.before-box h3, .after-box h3 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+}
+
+.before-box h3 { color: #C5221F; }
+.after-box h3 { color: #188038; }
+
+.before-box ul, .after-box ul {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.before-box li, .after-box li {
+  margin: 8px 0;
+  font-size: 14px;
+  padding-left: 24px;
+  position: relative;
+}
+
+.before-box li::before {
+  content: "✕";
+  position: absolute;
+  left: 0;
+  color: var(--gc-red);
+  font-weight: bold;
+}
+
+.after-box li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: var(--gc-green);
+  font-weight: bold;
+}
+
+@media (max-width: 700px) {
+  .before-after { grid-template-columns: 1fr; }
+}
+
+/* 統計カード */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.stat-card {
+  background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+  color: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 30px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+/* ユースケース */
+.usecase {
+  background: var(--gc-blue-tint);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 16px 0;
+  border: 1px solid var(--gc-blue-100);
+}
+
+.usecase h3 {
+  margin: 0 0 8px 0;
+  color: var(--gc-blue-900);
+  font-size: 17px;
+}
+
+.usecase p {
+  font-size: 14px;
+  margin: 8px 0;
+}
+
+/* Mermaid */
+.mermaid-container {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 20px 0;
+  border: 2px solid rgba(66, 133, 244, 0.3);
+  overflow-x: auto;
+}
+
+.mermaid {
+  display: flex;
+  justify-content: center;
+  background: #FFFFFF !important;
+  padding: 0 !important;
+  color: inherit !important;
+}
+
+/* コードブロック */
+.code-block {
+  background: #1E1E1E;
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 16px 0;
+}
+
+.code-header {
+  background: #2D2D2D;
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.code-lang {
+  color: #9CDCFE;
+  font-weight: bold;
+}
+
+.code-title {
+  color: #AAAAAA;
+}
+
+.code-block pre {
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+}
+
+.code-block code {
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 16px !important;
+  display: block;
+}
+
+pre:not(.mermaid) {
+  background: #1E1E1E;
+  border-radius: 8px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: #E8E8E8;
+  margin: 16px 0;
+}
+
+pre:not(.mermaid) code {
+  background: none;
+  border: none;
+  font-size: inherit;
+}
+
+code:not(pre code) {
+  background: var(--gc-surface-container-low);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 0.9em;
+  color: var(--gc-blue-900);
+}
+
+.section code:not(pre code) {
+  background: var(--gc-surface);
+}
+
+/* テーブル */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--gc-outline-variant);
+  background: var(--gc-surface);
+}
+
+th {
+  background: var(--gc-blue-50);
+  color: var(--gc-blue-900);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 2px solid var(--gc-blue-200);
+}
+
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--gc-outline-variant);
+  font-size: 14px;
+}
+
+tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+tr:hover { background: var(--gc-blue-50); }
+
+/* ボックス */
+.note-box {
+  background: var(--gc-blue-tint);
+  border-left: 4px solid var(--gc-blue-600);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+  font-size: 14px;
+}
+
+.warning-box {
+  background: var(--gc-yellow-tint);
+  border-left: 4px solid var(--gc-yellow);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+  font-size: 14px;
+}
+
+.error-box {
+  background: var(--gc-red-tint);
+  border-left: 4px solid var(--gc-red);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+  font-size: 14px;
+}
+
+.success-box {
+  background: var(--gc-green-tint);
+  border-left: 4px solid var(--gc-green);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+  font-size: 14px;
+}
+
+/* チェックリスト */
+.check-item, .cross-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+  font-size: 14px;
+}
+
+.check-icon { color: var(--gc-green); font-size: 16px; flex-shrink: 0; }
+.cross-icon { color: var(--gc-red); font-size: 16px; flex-shrink: 0; }
+
+/* 見積もり式 */
+.formula-box {
+  background: var(--gc-surface);
+  border: 2px dashed var(--gc-blue-300);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin: 16px 0;
+  text-align: center;
+  font-family: 'Roboto Mono', 'Source Code Pro', monospace;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--gc-blue-900);
+}
+
+/* リンクリスト */
+.link-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.link-list li {
+  margin: 8px 0;
+  padding-left: 24px;
+  position: relative;
+  font-size: 14px;
+  word-break: break-all;
+}
+
+.link-list li::before {
+  content: "🔗";
+  position: absolute;
+  left: 0;
+}
+
+footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gc-outline-variant);
+  font-size: 12px;
+  color: var(--gc-outline);
+}
+
+footer a { word-break: break-all; }
+
+ul.plain {
+  padding-left: 20px;
+  margin: 8px 0;
+}
+
+ul.plain li {
+  margin: 6px 0;
+  font-size: 14px;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ヘッダー -->
+  <div class="header">
+    <div>
+      <div style="margin-bottom: 8px;">
+        <span class="badge">Managed Service for Apache Kafka</span>
+        <span class="badge badge-feature">Feature</span>
+      </div>
+      <h1>💾 ブローカーごとのディスク容量設定が可能に</h1>
+      <div class="subtitle">Kafka クラスタのローカルストレージサイズをカスタム指定・後から拡張</div>
+    </div>
+    <div class="subtitle">📅 リリース日: 2026-08-27</div>
+  </div>
+
+  <!-- 概要 -->
+  <div class="section">
+    <h2>📌 概要</h2>
+    <p>
+      Google Cloud Managed Service for Apache Kafka で、クラスタ作成時に<span class="highlight">ブローカーごとのディスク容量 (ローカルストレージサイズ)</span> を指定できるようになりました。作成後のクラスタでも<span class="highlight">後からディスク容量を増やす</span>ことが可能です。設定は Google Cloud コンソール、または gcloud CLI の <code>--broker-disk-size-gib</code> フラグから行えます。
+    </p>
+    <p>
+      本サービスは、ブローカーに接続されたローカル SSD Persistent Disk と Cloud Storage ベースの実質無制限のリモートストレージを組み合わせた<span class="highlight">階層型ストレージ (Tiered Storage、KIP-405)</span> を採用しています。従来はディスク容量が完全自動管理でしたが、ログコンパクションを有効にした大きなキースペースのトピックや、パーティション数が非常に多いワークロードではデフォルト容量が不足するケースがあり、今回のアップデートでワークロード特性に応じた明示的な容量制御が可能になりました。
+    </p>
+
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-value">100 GiB</div>
+        <div class="stat-label">デフォルト最小容量 (vCPU あたり)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">32 TiB</div>
+        <div class="stat-label">ブローカーあたりの最大ディスクサイズ</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">増加のみ</div>
+        <div class="stat-label">既存クラスタは拡張可能 (縮小は不可)</div>
+      </div>
+    </div>
+
+    <div class="before-after">
+      <div class="before-box">
+        <h3>😣 Before: アップデート前の課題</h3>
+        <ul>
+          <li>ディスク容量は vCPU あたり最低 100 GiB の自動プロビジョニングのみで、ユーザー指定は不可</li>
+          <li>vCPU あたりの Persistent Disk 容量は「変更されうる実装詳細」で、調整手段が提供されていなかった</li>
+          <li>ログコンパクション有効時はローカルストレージのみ使用されるため、容量を増やすには vCPU 数を増やすしかなかった</li>
+        </ul>
+      </div>
+      <div class="after-box">
+        <h3>😊 After: アップデート後の改善</h3>
+        <ul>
+          <li>クラスタ作成時にブローカーごとのディスク容量をカスタム指定可能 (コンソールのトグル / <code>--broker-disk-size-gib</code>)</li>
+          <li>既存クラスタもクラスタ更新でディスク容量を後から拡張可能 (ディスク不足エラーの復旧手段にも)</li>
+          <li><code>describe --full</code> で実際にプロビジョニングされた容量 (effective disk capacity) を確認可能</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- アーキテクチャ図 -->
+  <div class="section">
+    <h2>🏗️ アーキテクチャ図</h2>
+    <div class="mermaid-container">
+      <pre class="mermaid">
+flowchart TD
+    Admin([👤 管理者]) -->|"gcloud managed-kafka clusters create/update<br>--broker-disk-size-gib=DISK_SIZE"| API[⚙️ Managed Kafka API]
+    API --> Cluster
+
+    subgraph Cluster["☁️ Managed Service for Apache Kafka クラスタ (3 ゾーン分散)"]
+        B1[🖥️ ブローカー 1]
+        B2[🖥️ ブローカー 2]
+        B3[🖥️ ブローカー 3]
+        B1 --> D1[(💾 SSD PD<br>カスタムサイズ)]
+        B2 --> D2[(💾 SSD PD<br>カスタムサイズ)]
+        B3 --> D3[(💾 SSD PD<br>カスタムサイズ)]
+    end
+
+    D1 & D2 & D3 -->|"セグメントロール後に移動<br>(Tiered Storage / KIP-405)"| GCS[(🗄️ リモートストレージ<br>Cloud Storage ベース)]
+      </pre>
+    </div>
+    <p style="font-size: 14px;">
+      管理者が <code>--broker-disk-size-gib</code> でブローカーごとのローカルディスク容量を指定し、<span class="highlight">全ブローカーに同一のカスタムサイズ</span>が適用されます。ロールされたセグメントファイルは階層型ストレージによりリモートストレージへ移動されます。
+    </p>
+  </div>
+
+  <!-- 主要機能 -->
+  <div class="section">
+    <h2>⚙️ 主要機能</h2>
+
+    <div class="card">
+      <h4>🆕 1. クラスタ作成時のカスタムディスク構成</h4>
+      <p><code>gcloud managed-kafka clusters create</code> の <code>--broker-disk-size-gib</code> フラグ、またはコンソールの「Capacity configuration」セクションでブローカーごとのディスクサイズ (GiB) を指定。設定はクラスタ内の<strong>すべてのブローカーに適用</strong>されます。</p>
+    </div>
+
+    <div class="card">
+      <h4>📈 2. 既存クラスタのディスク容量拡張</h4>
+      <p><code>gcloud managed-kafka clusters update</code> で後からディスク容量を増加可能。ブローカーがディスク不足 (out-of-disk) になった場合の<strong>復旧手段</strong>としても利用できます。縮小は不可 (更新時は現在の effective disk capacity 以上の値が必要)。</p>
+    </div>
+
+    <div class="card">
+      <h4>🔍 3. 有効ディスク容量 (effective disk capacity) の確認</h4>
+      <p><code>gcloud managed-kafka clusters describe --full</code> の <code>effectiveCapacityConfig</code> フィールドで、ブローカー数と実際のディスクサイズを確認可能。カスタム構成の有無は <code>brokerCapacityConfig</code> フィールドで確認できます (未設定の場合は空)。</p>
+    </div>
+
+    <h3>💡 カスタムディスク構成が推奨されるケース (公式ドキュメントより)</h3>
+    <div class="card" style="border-left-color: var(--gc-yellow);">
+      <h4>🗜️ 大きなキースペースでのログコンパクション</h4>
+      <p>ログコンパクション有効時は各キーの最新メッセージがディスクに保持され続けるため、キースペースが大きいとディスク使用量が増大します。</p>
+    </div>
+    <div class="card" style="border-left-color: var(--gc-yellow);">
+      <h4>🧩 パーティション数が多いクラスタ</h4>
+      <p>vCPU あたり <strong>200 パーティション</strong>を超える場合はカスタムストレージ構成の検討が推奨されます。</p>
+    </div>
+    <div class="card" style="border-left-color: var(--gc-yellow);">
+      <h4>🔥 高負荷</h4>
+      <p>過負荷のブローカーはロール済みセグメントをリモートストレージへ十分な速度で移動できず、より多くのローカルストレージを必要とする場合があります。</p>
+    </div>
+    <div class="card" style="border-left-color: var(--gc-yellow);">
+      <h4>🚑 ディスク不足エラーの解消</h4>
+      <p>ブローカーのディスクが枯渇した場合、容量を増やしてクラスタを復旧できます。</p>
+    </div>
+  </div>
+
+  <!-- 技術仕様 -->
+  <div class="section">
+    <h2>🔬 技術仕様</h2>
+
+    <h3>📐 ディスク構成の要件</h3>
+    <table>
+      <thead>
+        <tr><th style="width: 30%;">項目</th><th>詳細</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>最小ディスクサイズ</td><td>ブローカーあたり vCPU 数 × 100 GiB 以上 (例: 6 vCPU / 3 ブローカーのクラスタでは、ブローカーあたり 200 GiB 以上)</td></tr>
+        <tr><td>最大ディスクサイズ</td><td>ブローカーあたり 32,768 GiB (32 TiB)</td></tr>
+        <tr><td>縮小</td><td>不可。更新時は現在の effective disk capacity 以上の値を指定する必要がある</td></tr>
+        <tr><td>スケールアップ時</td><td>更新後の vCPU 数とディスクサイズが上記要件を満たす必要がある。ブローカーが追加される場合は同一リクエスト内でディスクサイズも併せて更新</td></tr>
+        <tr><td>デフォルト構成への復帰</td><td>カスタムディスク構成を一度設定すると、そのクラスタでデフォルト構成に戻すことはできない</td></tr>
+        <tr><td>デフォルト構成</td><td>vCPU あたり最低 100 GiB を自動プロビジョニング。スケールダウンしてもディスク容量は縮小されない</td></tr>
+      </tbody>
+    </table>
+
+    <h3>🧮 必要ディスクサイズの見積もり</h3>
+    <p style="font-size: 14px;">
+      セグメントファイルの最大サイズはデフォルトで <strong>230 MiB</strong>。中程度の利用率のクラスタでは、ロール済みセグメントの移動中のバッファを含めて<span class="highlight">パーティションあたり 250 MiB</span> を想定し、以下の式でブローカーあたりの最小ディスクサイズを見積もれます。
+    </p>
+    <div class="formula-box">
+      250 MiB × パーティション数 × レプリケーションファクター ÷ ブローカー数
+    </div>
+    <div class="note-box">
+      <strong>💡 ヒント:</strong> 実際の必要量はセグメントファイルの最大サイズ、クラスタ負荷、書き込みレート、リモートストレージへの書き込みレイテンシに依存します。Cloud Monitoring の <code>managedkafka/byte_size</code> メトリクスでパーティションのディスクサイズを監視することが推奨されます。
+    </div>
+  </div>
+
+  <!-- 設定方法 -->
+  <div class="section">
+    <h2>🛠️ 設定方法</h2>
+
+    <h3>✅ 前提条件</h3>
+    <div class="check-item"><span class="check-icon">✓</span><span>Managed Service for Apache Kafka クラスタの作成・更新権限があること</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span>指定するディスクサイズが「ディスク構成の要件」を満たすこと</span></div>
+
+    <div class="flow-diagram" style="display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; margin: 24px 0;">
+      <div style="background: var(--gc-surface); border: 2px solid var(--gc-blue-600); border-radius: 12px; padding: 12px 20px; text-align: center; color: var(--gc-on-surface); box-shadow: 0 1px 3px rgba(60,64,67,0.12);">1️⃣ 作成時に<br>サイズ指定</div>
+      <span style="color: var(--gc-blue-600); font-size: 24px; font-weight: bold;">→</span>
+      <div style="background: var(--gc-surface); border: 2px solid var(--gc-blue-600); border-radius: 12px; padding: 12px 20px; text-align: center; color: var(--gc-on-surface); box-shadow: 0 1px 3px rgba(60,64,67,0.12);">2️⃣ 必要に応じて<br>更新 (増加のみ)</div>
+      <span style="color: var(--gc-blue-600); font-size: 24px; font-weight: bold;">→</span>
+      <div style="background: var(--gc-surface); border: 2px solid var(--gc-blue-600); border-radius: 12px; padding: 12px 20px; text-align: center; color: var(--gc-on-surface); box-shadow: 0 1px 3px rgba(60,64,67,0.12);">3️⃣ 有効容量を<br>確認</div>
+    </div>
+
+    <h3>ステップ 1: クラスタ作成時にディスクサイズを指定</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Bash</span>
+        <span class="code-title">クラスタ作成</span>
+      </div>
+      <pre><code class="language-bash">gcloud managed-kafka clusters create CLUSTER_ID \
+  --location=LOCATION \
+  --broker-disk-size-gib=DISK_SIZE
+  # その他の構成フラグ ...</code></pre>
+    </div>
+    <p style="font-size: 14px;">コンソールの場合は、「Create Kafka cluster」ページの「Capacity configuration」で<span class="highlight">「Enable custom local storage size」トグル</span>を有効にし、ブローカーごとのディスクサイズ (GiB) を入力します。</p>
+
+    <h3>ステップ 2: 既存クラスタのディスクサイズを更新 (増加のみ)</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Bash</span>
+        <span class="code-title">クラスタ更新</span>
+      </div>
+      <pre><code class="language-bash">gcloud managed-kafka clusters update CLUSTER_ID \
+  --location=LOCATION \
+  --broker-disk-size-gib=DISK_SIZE</code></pre>
+    </div>
+
+    <h3>ステップ 3: 構成と有効ディスク容量を確認</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Bash</span>
+        <span class="code-title">構成確認</span>
+      </div>
+      <pre><code class="language-bash"># カスタムディスク構成の確認
+gcloud managed-kafka clusters describe CLUSTER_ID \
+  --location=LOCATION
+# 出力例:
+# brokerCapacityConfig:
+#   diskSizeGib: '3000'
+
+# 有効ディスク容量の確認
+gcloud managed-kafka clusters describe CLUSTER_ID --full \
+  --location=LOCATION
+# 出力例:
+# effectiveCapacityConfig:
+#   brokerCount: '3'
+#   brokerDiskSizeGib: '1024'</code></pre>
+    </div>
+    <div class="note-box">
+      <strong>💡 ポイント:</strong> クラスタの総ディスク容量は <code>brokerCount × brokerDiskSizeGib</code> で計算できます。
+    </div>
+  </div>
+
+  <!-- メリット -->
+  <div class="section">
+    <h2>🎯 メリット</h2>
+    <h3>💼 ビジネス面</h3>
+    <div class="success-box">
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>ディスク不足による障害リスクの低減</strong>: ディスク枯渇時に vCPU の増強を伴わずに容量だけを拡張でき、復旧手段が明確になる</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>コスト効率の向上</strong>: コンピュートリソース (vCPU/RAM) とストレージ容量を独立して調整できるため、ストレージ集約型ワークロードで vCPU を過剰にプロビジョニングする必要がない</span></div>
+    </div>
+    <h3>🔧 技術面</h3>
+    <div class="success-box">
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>ログコンパクションワークロードへの対応</strong>: キースペースが大きいコンパクショントピックに必要なローカルストレージを明示的に確保できる</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>多パーティション構成のサポート</strong>: vCPU あたり 200 パーティションを超える構成でも、ディスク容量を適切に確保できる</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>可観測性</strong>: <code>effectiveCapacityConfig</code> によりプロビジョニング済み容量を API/CLI/コンソールから確認できる</span></div>
+    </div>
+  </div>
+
+  <!-- デメリット・制約事項 -->
+  <div class="section">
+    <h2>⚠️ デメリット・制約事項</h2>
+    <h3>🚫 制限事項</h3>
+    <div class="error-box">
+      <div class="cross-item"><span class="cross-icon">✕</span><span>カスタムディスク構成を一度有効にすると、そのクラスタでデフォルト構成 (自動管理) に戻すことはできない</span></div>
+      <div class="cross-item"><span class="cross-icon">✕</span><span>ディスクサイズの縮小はできない (デフォルト構成でも同様)</span></div>
+      <div class="cross-item"><span class="cross-icon">✕</span><span>ブローカーあたりの上限は 32 TiB</span></div>
+      <div class="cross-item"><span class="cross-icon">✕</span><span>ディスクサイズは vCPU 数 × 100 GiB 以上である必要がある</span></div>
+    </div>
+    <h3>🤔 考慮すべき点</h3>
+    <div class="warning-box">
+      <ul class="plain">
+        <li>スケールアップでブローカーが追加される場合、追加後のブローカー構成で最小要件を満たすよう、<strong>vCPU 数とディスクサイズを同一の更新リクエストで指定</strong>する必要がある (例: 3 vCPU / ブローカーあたり 200 GiB のクラスタを 9 vCPU にスケールする場合、最小ディスクサイズは 300 GiB)</li>
+        <li>ローカルストレージは GiB 時間単位で課金されるため、容量を増やすとその分コストが増加し、縮小による削減はできない</li>
+        <li>設定はクラスタ内の全ブローカーに一律に適用される (ブローカー個別の指定は不可)</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ユースケース -->
+  <div class="section">
+    <h2>💡 ユースケース</h2>
+
+    <div class="usecase">
+      <h3>📚 ユースケース 1: ログコンパクショントピックのディスク容量確保</h3>
+      <p><strong>シナリオ:</strong> ユーザープロファイルの最新状態を保持するコンパクショントピックを運用しており、キースペースが数億件規模。ログコンパクション有効時はローカルストレージのみが使用されるため、デフォルトの vCPU あたり 100 GiB では不足する。</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">実装例</span>
+        </div>
+        <pre><code class="language-bash">gcloud managed-kafka clusters create profile-cluster \
+  --location=asia-northeast1 \
+  --cpu=6 \
+  --memory=24GiB \
+  --broker-disk-size-gib=1000</code></pre>
+      </div>
+      <p><strong>✨ 効果:</strong> vCPU を増やさずに必要なローカルストレージを確保でき、コンパクショントピックのデータ増加に耐えられる構成になる。</p>
+    </div>
+
+    <div class="usecase">
+      <h3>🚑 ユースケース 2: ディスク不足エラーからの復旧</h3>
+      <p><strong>シナリオ:</strong> 高負荷によりロール済みセグメントのリモートストレージへの移動が追いつかず、ブローカーがディスク不足に陥りクラスタが正常に動作しなくなった。</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">実装例</span>
+        </div>
+        <pre><code class="language-bash">gcloud managed-kafka clusters update production-cluster \
+  --location=us-central1 \
+  --broker-disk-size-gib=2048</code></pre>
+      </div>
+      <p><strong>✨ 効果:</strong> クラスタの再作成やデータ移行を行わずに、ディスク容量の拡張のみでクラスタを復旧できる。</p>
+    </div>
+  </div>
+
+  <!-- 料金 -->
+  <div class="section">
+    <h2>💰 料金</h2>
+    <p style="font-size: 14px;">
+      Managed Service for Apache Kafka の料金は、<span class="highlight">コンピュート (vCPU / RAM を DCU 換算で課金)</span>、<span class="highlight">ストレージ (ローカルストレージ + 長期ストレージ)</span>、ネットワーキングで構成されます。ローカル Persistent Disk ストレージはブローカーごとにプロビジョニングされた容量に対して課金されます (デフォルト構成では vCPU あたり 100 GiB 分)。
+    </p>
+    <h3>💵 料金例 (us-central1、料金ページより)</h3>
+    <table>
+      <thead>
+        <tr><th>項目</th><th>単価</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>コンピュート (DCU)</td><td>$0.09 / DCU 時間 (1 vCPU = 0.6 DCU、1 GiB RAM = 0.1 DCU)</td></tr>
+        <tr><td>ローカルストレージ</td><td>$0.000232877 / GiB 時間</td></tr>
+        <tr><td>長期ストレージ (Tiered Storage のリモート層)</td><td>$0.000136986 / GiB 時間</td></tr>
+      </tbody>
+    </table>
+    <div class="note-box">
+      <strong>💡 補足:</strong> 長期ストレージは単一レプリカ分のみ課金されます。リージョンにより単価は異なります。最新の料金は<a href="https://cloud.google.com/managed-service-for-apache-kafka/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">料金ページ</a>を参照してください。
+    </div>
+  </div>
+
+  <!-- 関連サービス -->
+  <div class="section">
+    <h2>🔗 関連サービス・機能</h2>
+    <div class="card" style="border-left-color: var(--gc-blue-300);">
+      <h4>🪣 Cloud Storage</h4>
+      <p>階層型ストレージのリモート層 (長期ストレージ) の基盤。ロールされたセグメントファイルの移動先 (ユーザーが直接アクセスすることはできない)。</p>
+    </div>
+    <div class="card" style="border-left-color: var(--gc-green);">
+      <h4>📊 Cloud Monitoring</h4>
+      <p><code>managedkafka/byte_size</code> メトリクスでパーティションごとのディスクサイズを監視し、容量計画やアラート設定に活用。</p>
+    </div>
+    <div class="card" style="border-left-color: var(--gc-blue-300);">
+      <h4>💾 Compute Engine Persistent Disk (SSD)</h4>
+      <p>ブローカーのローカルストレージとして使用される。</p>
+    </div>
+    <div class="card" style="border-left-color: var(--gc-teal);">
+      <h4>🔌 Private Service Connect</h4>
+      <p>クラスタへの VPC からのプライベートアクセスを提供 (ストレージ構成とは独立したクラスタ構成要素)。</p>
+    </div>
+  </div>
+
+  <!-- まとめ -->
+  <div class="section">
+    <h2>📝 まとめ</h2>
+    <div class="success-box">
+      <div class="check-item"><span class="check-icon">✓</span><span>従来完全自動だったストレージ管理が、<strong>ブローカーごとのディスク容量をユーザーが制御可能</strong>に</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>ログコンパクションや多パーティション構成など<strong>ストレージ集約型ワークロードへの適合性が大きく向上</strong></span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>既存クラスタの容量拡張により、<strong>ディスク不足エラーからの復旧</strong>が容易に</span></div>
+    </div>
+    <div class="warning-box">
+      <strong>⚠️ 計画的な設定を:</strong> カスタム構成は一度有効にすると解除できず、容量の縮小もできないため、<code>managedkafka/byte_size</code> メトリクスによる監視と見積もり式に基づいて計画的に設定することを推奨します。
+    </div>
+  </div>
+
+  <!-- 参考リンク -->
+  <div class="section">
+    <h2>📚 参考リンク</h2>
+    <ul class="link-list">
+      <li><a href="https://docs.cloud.google.com/release-notes#August_27_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (August 27, 2026)</a></li>
+      <li><a href="https://docs.cloud.google.com/managed-service-for-apache-kafka/docs/brokers/configure-disk-size" target="_blank" rel="noopener noreferrer" class="gc-link">Configure broker disk size (公式ドキュメント)</a></li>
+      <li><a href="https://docs.cloud.google.com/managed-service-for-apache-kafka/docs/plan-cluster-size" target="_blank" rel="noopener noreferrer" class="gc-link">Plan cluster size - Estimate the required disk size</a></li>
+      <li><a href="https://docs.cloud.google.com/managed-service-for-apache-kafka/docs/overview" target="_blank" rel="noopener noreferrer" class="gc-link">Managed Service for Apache Kafka 概要</a></li>
+      <li><a href="https://cloud.google.com/managed-service-for-apache-kafka/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">料金ページ</a></li>
+    </ul>
+  </div>
+
+  <!-- フッター -->
+  <footer>
+    <p>📎 出典:</p>
+    <ul style="list-style: none; padding-left: 0; margin: 4px 0;">
+      <li>・<a href="https://docs.cloud.google.com/release-notes#August_27_2026" target="_blank" rel="noopener noreferrer" class="gc-link" style="word-break: break-all;">https://docs.cloud.google.com/release-notes#August_27_2026</a></li>
+      <li>・<a href="https://docs.cloud.google.com/managed-service-for-apache-kafka/docs/brokers/configure-disk-size" target="_blank" rel="noopener noreferrer" class="gc-link" style="word-break: break-all;">https://docs.cloud.google.com/managed-service-for-apache-kafka/docs/brokers/configure-disk-size</a></li>
+    </ul>
+    <p>🗓️ リリース日: 2026-08-27 | 生成日: 2026-08-29 | Google Cloud News Summary</p>
+    <p>🏷️ タグ: Managed Service for Apache Kafka / Kafka / ストレージ / Tiered Storage / Persistent Disk / キャパシティプランニング / Feature</p>
+  </footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#4285F4',
+      primaryTextColor: '#202124',
+      primaryBorderColor: '#4285F4',
+      lineColor: '#4285F4',
+      secondaryColor: '#F1F3F4',
+      tertiaryColor: '#FAFAFA',
+      background: '#FFFFFF',
+      mainBkg: '#E8F0FE',
+      nodeBorder: '#4285F4',
+      clusterBkg: '#E8F0FE',
+      clusterBorder: '#4285F4',
+      edgeLabelBackground: '#FFFFFF',
+      textColor: '#202124'
+    }
+  });
+</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

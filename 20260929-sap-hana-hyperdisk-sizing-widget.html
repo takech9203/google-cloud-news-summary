@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SAP on Google Cloud: SAP HANA 向け Hyperdisk サイジングウィジェット</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-title {
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin-bottom: 8px;
+      font-size: 16px;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .badge-deprecated {
+      background: var(--gc-red);
+      color: #FFFFFF;
+    }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 768px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid rgba(234, 67, 53, 0.3);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid rgba(52, 168, 83, 0.3);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-box h3 {
+      color: var(--gc-red);
+      margin-top: 0;
+    }
+
+    .after-box h3 {
+      color: var(--gc-green);
+      margin-top: 0;
+    }
+
+    .before-box ul, .after-box ul {
+      margin: 8px 0 0 0;
+      padding-left: 20px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 8px 0;
+      font-size: 14px;
+    }
+
+    /* フロー図スタイル */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+      font-size: 14px;
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* チェックリストスタイル */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+    }
+
+    /* コードブロック */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブルスタイル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* 3 構成比較カード */
+    .config-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 768px) {
+      .config-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .config-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .config-card.simple {
+      border-top: 4px solid var(--gc-green);
+    }
+
+    .config-card.advanced {
+      border-top: 4px solid var(--gc-yellow);
+    }
+
+    .config-card.performance {
+      border-top: 4px solid var(--gc-blue-600);
+    }
+
+    .config-card h3 {
+      margin-top: 0;
+      font-size: 18px;
+    }
+
+    .config-card p {
+      font-size: 14px;
+      margin: 8px 0;
+    }
+
+    .config-meta {
+      margin-top: auto;
+      padding-top: 12px;
+      border-top: 1px dashed var(--gc-outline-variant);
+      font-size: 13px;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+    }
+
+    .usecase-title {
+      font-weight: 700;
+      color: var(--gc-blue-900);
+      margin-bottom: 8px;
+      font-size: 16px;
+    }
+
+    .usecase p {
+      font-size: 14px;
+      margin: 8px 0;
+    }
+
+    /* ステップ */
+    .step-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .step-number {
+      background: var(--gc-blue-600);
+      color: #FFFFFF;
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      min-width: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 16px;
+    }
+
+    .step-content {
+      flex: 1;
+    }
+
+    .step-title {
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 4px;
+    }
+
+    .step-content p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    /* 2 カラムグリッド (メリット) */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 768px) {
+      .two-col {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* リンクリスト */
+    .link-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .link-list li {
+      margin: 10px 0;
+      padding-left: 24px;
+      position: relative;
+      font-size: 14px;
+      word-break: break-all;
+    }
+
+    .link-list li::before {
+      content: "🔗";
+      position: absolute;
+      left: 0;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      word-break: break-all;
+    }
+
+    ul.compact {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    ul.compact li {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <h1>💾 SAP HANA 向け Hyperdisk サイジングウィジェット</h1>
+        <div style="margin-top: 12px;">
+          <span class="badge">SAP on Google Cloud</span>
+          <span class="badge badge-ga">発表 (Announcement)</span>
+        </div>
+      </div>
+      <div class="subtitle">📅 リリース日: 2026-09-29</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📌 概要</h2>
+      <p>
+        SAP HANA プランニングガイドの「Minimum sizes for SSD-based Persistent Disk or Hyperdisk volumes」セクションに、
+        <span class="highlight">Hyperdisk ベースのディスク構成を確認できるサイジングウィジェット</span>が追加されました。
+        Hyperdisk Balanced をサポートする SAP 認定マシンタイプを選択すると、Google Cloud が推奨する最大 3 つのディスク構成
+        (<strong>Simple / Advanced / Performance</strong>) が表示されます。
+      </p>
+      <p>
+        SAP HANA のディスクサイジングでは、<code>/hana/data</code>、<code>/hana/log</code>、<code>/hana/shared</code>、<code>/usr/sap</code> の各ボリュームについて、
+        容量だけでなくパフォーマンス要件 (IOPS、スループット) も考慮が必要です。Hyperdisk はディスクサイズとパフォーマンスが独立しているため選択肢が多く、
+        設計が複雑になりがちでしたが、このウィジェットにより<span class="highlight">マシンタイプを選ぶだけで要件を満たす具体的な構成を確認</span>できます。
+      </p>
+      <div class="note-box">
+        <strong>🎯 対象ユーザー:</strong> Google Cloud 上で SAP HANA の新規導入やディスク構成の見直し (Persistent Disk から Hyperdisk への移行を含む) を計画している Solutions Architect やインフラ担当者
+      </div>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before: アップデート前の課題</h3>
+          <ul>
+            <li>各ボリュームのサイズをメモリベースの計算式 (<code>/hana/data</code> = 1 x メモリ、<code>/hana/log</code> = 0.5 x メモリまたは 512 GB の小さい方など) で手動計算する必要があった</li>
+            <li>Hyperdisk はサイズと独立して IOPS・スループットをプロビジョニングするため、SAP HANA の最小要件 (Hyperdisk Balanced では集約 IOPS 3,000、スループット 400 MiB/s 以上) を満たす構成をマシンタイプごとに個別検討する必要があった</li>
+            <li>パフォーマンス・デプロイの複雑さ・コストのトレードオフを比較するための体系的な構成例がドキュメント上になかった</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After: アップデート後の改善</h3>
+          <ul>
+            <li>SAP 認定マシンタイプを選択するだけで、Google Cloud 推奨の最大 3 つの Hyperdisk ベース構成をウィジェット上で確認できる</li>
+            <li>Simple / Advanced / Performance の 3 構成が提示され、パフォーマンス・複雑さ・コストの観点から自ワークロードに合う構成を選びやすくなった</li>
+            <li>最小ストレージ要件とパフォーマンス要件を満たすことを前提とした構成が提示され、サイジングミスのリスクを低減できる</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🗺️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    A([👤 SAP 管理者 / アーキテクト]) --> B[📖 SAP HANA プランニングガイド<br>サイジングウィジェット]
+    B --> C{🖥️ SAP 認定マシンタイプを選択<br>Hyperdisk Balanced 対応}
+    C --> D[🟢 Simple<br>シンプルな構成<br>低コスト・低複雑性]
+    C --> E[🟡 Advanced<br>ストライプディスクで<br>/hana/data をホスト<br>同等コストで高性能]
+    C --> F[🔵 Performance<br>高 IOPS / スループットを<br>プロビジョニング<br>最高性能・最高コスト]
+    D --> G[💾 Hyperdisk ボリューム構成<br>/hana/data, /hana/log,<br>/hana/shared, /usr/sap]
+    E --> G
+    F --> G
+        </pre>
+      </div>
+      <p>
+        ウィジェットで SAP 認定マシンタイプを選択すると、Simple / Advanced / Performance の 3 つの推奨ディスク構成が提示され、
+        要件に合った Hyperdisk ボリューム構成を選択できます。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚙️ 主要機能</h2>
+
+      <div class="card">
+        <div class="card-title">1️⃣ マシンタイプベースの構成提示</div>
+        <div class="icon-text"><span class="arrow">→</span><span>Hyperdisk Balanced をサポートする SAP 認定マシンタイプを選択すると、そのマシンタイプに合わせた最大 3 つのディスク構成が表示される</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>提示される構成はいずれも SAP HANA の最小ストレージ要件とパフォーマンス要件を満たすように設計されている</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">2️⃣ Simple / Advanced / Performance の 3 構成</div>
+        <div class="config-grid">
+          <div class="config-card simple">
+            <h3>🟢 Simple</h3>
+            <p>シンプルな構成。デプロイ・運用が容易。</p>
+            <div class="config-meta">💰 コスト: Advanced とほぼ同等<br>⚡ 性能: Advanced が上回る<br>🔧 複雑さ: 低</div>
+          </div>
+          <div class="config-card advanced">
+            <h3>🟡 Advanced</h3>
+            <p>ストライプディスクで <code>/hana/data</code> をホストし、Simple とほぼ同等のコストでより高い性能を実現。</p>
+            <div class="config-meta">💰 コスト: Simple とほぼ同等<br>⚡ 性能: Simple より高い<br>🔧 複雑さ: デプロイ・保守運用の複雑さが増す</div>
+          </div>
+          <div class="config-card performance">
+            <h3>🔵 Performance</h3>
+            <p>高い IOPS とスループットをプロビジョニングし、ストライプディスク保守の複雑さなしに最大性能を実現。</p>
+            <div class="config-meta">💰 コスト: 多くの場合 3 構成で最も高い<br>⚡ 性能: 最大<br>🔧 複雑さ: 低</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">3️⃣ スケールアップ / スケールアウト両対応の考え方</div>
+        <div class="icon-text"><span class="arrow">→</span><span>ウィジェットが提示するディスク構成はスケールアップシステム向け</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>スケールアウトシステムでも <code>/hana/shared</code> 以外の計算は同じ。<code>/hana/shared</code> はワーカーノード 4 台ごとに「1 x メモリまたは 1 TB の小さい方」を加算する</span></div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔬 技術仕様</h2>
+
+      <h3>📐 SAP HANA ボリュームのサイズ計算式 (スケールアップ)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>ボリューム</th>
+            <th>最小サイズの目安</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>/hana/data</code></td><td>1 x メモリ</td></tr>
+          <tr><td><code>/hana/log</code></td><td>0.5 x メモリ または 512 GB の小さい方</td></tr>
+          <tr><td><code>/hana/shared</code></td><td>1 x メモリ または 1,024 GB の小さい方</td></tr>
+          <tr><td><code>/usr/sap</code></td><td>32 GB</td></tr>
+          <tr><td><code>/hanabackup</code></td><td>2 x メモリ (オプション)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>⚡ Hyperdisk のパフォーマンス特性</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>パフォーマンスの決定要因</td><td>ディスクサイズではなく、プロビジョニングした IOPS / スループット</td></tr>
+          <tr><td>Hyperdisk Balanced の SAP HANA 最小要件</td><td>集約プロビジョニング IOPS 3,000、スループット 400 MiB/s</td></tr>
+          <tr><td>Hyperdisk Extreme の IOPS 目安 (データ / ログ個別ディスク時)</td><td>max(10,000, ディスクサイズ GB x 2)</td></tr>
+          <tr><td>推奨 SAP HANA 設定 (global.ini)</td><td><code>fileio</code> セクションで <code>num_completion_queues = 12</code>、<code>num_submit_queues = 12</code></td></tr>
+          <tr><td>推奨 SAP HANA 設定 (indexserver.ini)</td><td><code>parallel</code> セクションで <code>tables_preloaded_in_parallel = 32</code>、<code>global</code> セクションで <code>load_table_numa_aware = true</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>✅ 前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>Hyperdisk Balanced の利用をサポートする SAP 認定マシンタイプを利用対象としていること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>Persistent Disk のみをサポートするレガシーマシンタイプの場合は、従来どおり「Disk sizes for legacy machine and disk types」の表を参照すること</span></div>
+
+      <h3>📋 手順</h3>
+      <div class="step-item">
+        <div class="step-number">1</div>
+        <div class="step-content">
+          <div class="step-title">プランニングガイドのウィジェットにアクセス</div>
+          <p><a href="https://docs.cloud.google.com/sap/docs/sap-hana-planning-guide#hana-minimum-pd-sizes-ssd-balanced" target="_blank" rel="noopener noreferrer" class="gc-link">SAP HANA プランニングガイド</a>の「Minimum sizes for SSD-based Persistent Disk or Hyperdisk volumes」セクションを開きます。</p>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-number">2</div>
+        <div class="step-content">
+          <div class="step-title">マシンタイプを選択して構成を比較</div>
+          <p>ウィジェットで SAP 認定マシンタイプを選択し、表示される Simple / Advanced / Performance の各構成を、パフォーマンス・デプロイの複雑さ・コストの観点で比較して、要件に合う構成を選択します。</p>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-number">3</div>
+        <div class="step-content">
+          <div class="step-title">ワークロードのサイジングと検証</div>
+          <p>提示される構成はあくまで初期推奨値のため、実際のワークロードでサイジングと検証を行い、最適なパフォーマンスが得られることを確認します。</p>
+        </div>
+      </div>
+
+      <div class="flow-diagram">
+        <div class="flow-step">📖 ウィジェットに<br>アクセス</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🖥️ マシンタイプを<br>選択・構成比較</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🧪 サイジングと<br>検証</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🚀 構成を確定・<br>デプロイ</div>
+      </div>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>💡 メリット</h2>
+      <div class="two-col">
+        <div>
+          <h3>💼 ビジネス面</h3>
+          <div class="success-box">
+            <strong>⏱️ 設計工数の削減</strong>
+            <p style="margin: 4px 0 0 0; font-size: 14px;">マシンタイプを選択するだけで推奨ディスク構成を確認でき、SAP HANA 導入時のストレージ設計にかかる時間を短縮できる</p>
+          </div>
+          <div class="success-box">
+            <strong>💰 コスト最適化の判断材料</strong>
+            <p style="margin: 4px 0 0 0; font-size: 14px;">コスト・性能・運用複雑性のトレードオフが 3 構成として明示されるため、要件に応じた過不足のない投資判断がしやすくなる</p>
+          </div>
+        </div>
+        <div>
+          <h3>🔧 技術面</h3>
+          <div class="success-box">
+            <strong>🛡️ サイジングミスの防止</strong>
+            <p style="margin: 4px 0 0 0; font-size: 14px;">提示される構成はいずれも SAP HANA の最小ストレージ要件・パフォーマンス要件を満たすよう設計されており、性能不足の構成を選ぶリスクを低減できる</p>
+          </div>
+          <div class="success-box">
+            <strong>🔄 Hyperdisk 移行の後押し</strong>
+            <p style="margin: 4px 0 0 0; font-size: 14px;">Persistent Disk から Hyperdisk への移行を検討する際に、移行先の具体的な構成の目安を簡単に得られる</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>🚧 制限事項</h3>
+      <div class="error-box">
+        <ul class="compact" style="margin: 0;">
+          <li>ウィジェットが対象とするのは、<strong>Hyperdisk Balanced の利用をサポートする SAP 認定マシンタイプのみ</strong>。Persistent Disk のみ対応のレガシーマシンタイプは従来の表を参照する必要がある</li>
+          <li>提示されるディスク構成は<strong>スケールアップシステム向け</strong>。スケールアウトシステムでは <code>/hana/shared</code> のサイズをワーカーノード数に応じて調整する必要がある</li>
+        </ul>
+      </div>
+
+      <h3>🤔 考慮すべき点</h3>
+      <div class="warning-box">
+        <ul class="compact" style="margin: 0;">
+          <li>提示される構成はあくまで<strong>初期推奨値</strong>であり、Google Cloud はワークロードのサイジングと検証を実施して最適なパフォーマンスを確認することを強く推奨している</li>
+          <li>Advanced 構成はストライプディスクを使用するため、デプロイと保守運用の複雑さが増す。Advanced 構成で示されるディスク数は必要最小限であり、ディスクを追加すればコストも増加する</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <div class="usecase-title">📦 ユースケース 1: SAP HANA の新規導入時のストレージ設計</div>
+        <p><strong>シナリオ:</strong> Google Cloud 上に SAP HANA スケールアップシステムを新規導入するにあたり、選定したマシンタイプに対する適切な Hyperdisk 構成を短時間で決定したい。</p>
+        <p><strong>効果:</strong> ウィジェットでマシンタイプを選択するだけで、要件を満たす 3 つの構成が提示されるため、手計算による設計とレビューの工数を削減し、要件超過や性能不足を避けた構成を選択できる。</p>
+      </div>
+
+      <div class="usecase">
+        <div class="usecase-title">🔄 ユースケース 2: Persistent Disk から Hyperdisk への移行計画</div>
+        <p><strong>シナリオ:</strong> SSD Persistent Disk (<code>pd-ssd</code>) で稼働中の SAP HANA を、より高い IOPS・スループットを提供する Hyperdisk へ移行する計画を立てたい。</p>
+        <p><strong>効果:</strong> 移行先の Hyperdisk 構成 (ディスクサイズ、IOPS、スループット) の目安をウィジェットから取得でき、<a href="https://docs.cloud.google.com/sap/docs/migrate-hana-pd-to-hyperdisk" target="_blank" rel="noopener noreferrer" class="gc-link">Persistent Disk から Hyperdisk への移行ガイド</a>と組み合わせて移行計画を具体化できる。</p>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <div class="note-box">
+        <p style="margin: 0;">
+          サイジングウィジェット自体はドキュメント上のツールであり、<strong>利用に料金は発生しません</strong>。
+          提示される構成の Hyperdisk 費用は、プロビジョニングする容量・IOPS・スループットに応じて課金されます。
+          詳細は <a href="https://cloud.google.com/compute/disks-image-pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Compute Engine ディスクの料金ページ</a>を参照してください。
+        </p>
+      </div>
+    </div>
+
+    <!-- 関連サービス・機能 -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <div class="card-title">💾 Compute Engine Hyperdisk (Balanced / Extreme)</div>
+        <p style="font-size: 14px; margin: 4px 0;">SAP HANA の <code>/hana/data</code>、<code>/hana/log</code> などのボリュームをホストするブロックストレージ。ディスクサイズとは独立して IOPS・スループットをプロビジョニングできる。</p>
+      </div>
+      <div class="card">
+        <div class="card-title">🖥️ Compute Engine SAP 認定マシンタイプ</div>
+        <p style="font-size: 14px; margin: 4px 0;">ウィジェットの選択対象。マシンタイプごとにメモリ容量が異なり、それに応じて必要なディスクサイズが変わる。</p>
+      </div>
+      <div class="card">
+        <div class="card-title">🏗️ SAP HANA 用 Terraform デプロイ自動化</div>
+        <p style="font-size: 14px; margin: 4px 0;">Google Cloud が提供する Terraform 構成を使用すると、<code>/hana/data</code>、<code>/hana/log</code>、<code>/hana/shared</code>、<code>/usr/sap</code> の各ディスクが自動的にプロビジョニングされる。</p>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="success-box">
+        <p style="margin: 0;">
+          SAP HANA プランニングガイドに追加されたサイジングウィジェットにより、SAP 認定マシンタイプを選ぶだけで、
+          SAP HANA のサイズ・パフォーマンス要件を満たす Hyperdisk 構成 (<strong>Simple / Advanced / Performance</strong>) を簡単に比較検討できるようになりました。
+          Google Cloud で SAP HANA の新規導入や Hyperdisk への移行を計画している場合は、まずこのウィジェットで初期構成の目安を確認し、
+          その上で<strong>実ワークロードでのサイジング検証</strong>を行うことを推奨します。
+        </p>
+      </div>
+    </div>
+
+    <!-- 参考リンク -->
+    <div class="section">
+      <h2>📚 参考リンク</h2>
+      <ul class="link-list">
+        <li><a href="https://docs.cloud.google.com/release-notes#September_29_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026-09-29)</a></li>
+        <li><a href="https://docs.cloud.google.com/sap/docs/sap-hana-planning-guide#hana-minimum-pd-sizes-ssd-balanced" target="_blank" rel="noopener noreferrer" class="gc-link">SAP HANA プランニングガイド (サイジングウィジェット)</a></li>
+        <li><a href="https://docs.cloud.google.com/compute/docs/disks/hyperdisks" target="_blank" rel="noopener noreferrer" class="gc-link">About Hyperdisk</a></li>
+        <li><a href="https://docs.cloud.google.com/compute/docs/disks/hyperdisk-performance" target="_blank" rel="noopener noreferrer" class="gc-link">Hyperdisk のプロビジョニングパフォーマンス</a></li>
+        <li><a href="https://docs.cloud.google.com/sap/docs/migrate-hana-pd-to-hyperdisk" target="_blank" rel="noopener noreferrer" class="gc-link">SAP HANA Persistent Disk ボリュームの Hyperdisk への移行</a></li>
+        <li><a href="https://cloud.google.com/compute/disks-image-pricing" target="_blank" rel="noopener noreferrer" class="gc-link">料金ページ (Compute Engine ディスク)</a></li>
+      </ul>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="margin: 4px 0; padding-left: 20px;">
+        <li><a href="https://docs.cloud.google.com/release-notes#September_29_2026" target="_blank" rel="noopener noreferrer">https://docs.cloud.google.com/release-notes#September_29_2026</a></li>
+        <li><a href="https://docs.cloud.google.com/sap/docs/sap-hana-planning-guide#hana-minimum-pd-sizes-ssd-balanced" target="_blank" rel="noopener noreferrer">https://docs.cloud.google.com/sap/docs/sap-hana-planning-guide#hana-minimum-pd-sizes-ssd-balanced</a></li>
+      </ul>
+      <p>🏷️ タグ: SAP on Google Cloud, SAP HANA, Hyperdisk, Compute Engine, ストレージ, サイジング</p>
+      <p>本インフォグラフィックは Google Cloud News レポート (2026-09-29) を基に生成されました。</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GKE: Filestore API / 予約アフィニティ / N4D / VPA CPU ブースト</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--gc-outline);
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card.green { border-left-color: var(--gc-green); }
+    .card.orange { border-left-color: var(--gc-orange); }
+    .card.purple { border-left-color: var(--gc-purple); }
+    .card.teal { border-left-color: var(--gc-teal); }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge-ga { background: var(--gc-green); }
+    .badge-preview { background: var(--gc-orange); }
+    .badge-service { background: var(--gc-blue-600); }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h4, .after-box h4 {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .before-box h4 { color: var(--gc-red); }
+    .after-box h4 { color: var(--gc-green); }
+
+    .before-box ul, .after-box ul {
+      margin: 0;
+      padding-left: 16px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li { margin: 4px 0; }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .stat-card.green { background: linear-gradient(135deg, var(--gc-green), #1B7340); }
+    .stat-card.orange { background: linear-gradient(135deg, var(--gc-orange), #E65100); }
+    .stat-card.purple { background: linear-gradient(135deg, var(--gc-purple), #7B1FA2); }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      background: #1E1E1E;
+      border-radius: 0;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-900);
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .usecase-card p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon { color: var(--gc-green); font-size: 18px; flex-shrink: 0; }
+    .cross-icon { color: var(--gc-red); font-size: 18px; flex-shrink: 0; }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(440px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .related-services {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    .service-tag {
+      background: var(--gc-blue-50);
+      border: 1px solid var(--gc-blue-200);
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: 13px;
+      color: var(--gc-blue-900);
+      font-weight: 500;
+    }
+
+    footer {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; }
+      .subtitle { text-align: left; margin-top: 8px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stat-grid { grid-template-columns: 1fr; }
+      .feature-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>GKE: Filestore API / 予約アフィニティ / N4D / VPA CPU ブースト</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge badge-service">Google Kubernetes Engine</span>
+          <span class="badge badge-ga">GA</span>
+          <span class="badge badge-preview">Preview</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-07-16</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>Google Kubernetes Engine (GKE) に <strong>4 つの機能強化</strong>が同時にリリースされた。ストレージ設定の簡素化、予約キャパシティ管理の厳格化、コンピュート選択肢の拡大、起動パフォーマンスの最適化を実現する。</p>
+
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">4</div>
+          <div class="stat-label">同時リリース機能</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-value">96 vCPU</div>
+          <div class="stat-label">N4D 最大スペック</div>
+        </div>
+        <div class="stat-card orange">
+          <div class="stat-value">x3</div>
+          <div class="stat-label">CPU ブースト倍率例</div>
+        </div>
+        <div class="stat-card purple">
+          <div class="stat-value">768 GB</div>
+          <div class="stat-label">N4D 最大 DDR5 メモリ</div>
+        </div>
+      </div>
+
+      <h3>Before / After</h3>
+      <div class="before-after">
+        <div class="before-box">
+          <h4>Before</h4>
+          <ul>
+            <li>Filestore API を手動で有効化が必要</li>
+            <li>予約不足時にオンデマンドへ自動フォールバック (予期しないコスト増)</li>
+            <li>N4D は GKE 1.34 以降のみ対応</li>
+            <li>起動時の CPU 不足は過剰プロビジョニングで対応</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h4>After</h4>
+          <ul>
+            <li>Kubernetes Engine API 有効化で Filestore API も自動有効化</li>
+            <li><code>any-reservation-then-fail</code> でフォールバック防止</li>
+            <li>GKE 1.33 系でも N4D が利用可能に</li>
+            <li>VPA CPU ブーストで起動時のみ自動増加、起動後に自動復帰</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>GKE クラスタにおける予約キャパシティ消費フローと VPA CPU スタートアップブーストのライフサイクルを示す。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph "GKE クラスタ"
+        direction TB
+        A["ノードプール作成リクエスト"] --> B{"予約アフィニティ"}
+        B -->|any| C["予約消費 then オンデマンドフォールバック"]
+        B -->|any-reservation-then-fail| D{"予約キャパシティ確認"}
+        D -->|利用可能| E["予約キャパシティ消費"]
+        D -->|不足| F["プロビジョニング失敗 / 次の優先ルールへ"]
+
+        G["Pod 起動"] --> H["VPA CPU スタートアップブースト"]
+        H --> I["一時的に CPU 増加"]
+        I --> J["Ready 状態到達"]
+        J --> K["ベースラインに In-Place リサイズ"]
+    end
+
+    subgraph "コンピュートリソース"
+        L["N4D マシンシリーズ - AMD EPYC Turin"]
+        M["Filestore - ReadWriteMany PV"]
+    end
+
+    E --> L
+    K --> M
+        </pre>
+      </div>
+    </div>
+
+    <!-- Feature 1: Filestore API -->
+    <div class="section">
+      <h2>🗄️ 機能 1: Filestore API デフォルト有効化</h2>
+      <div class="card green">
+        <h3>自動有効化の仕組み</h3>
+        <div class="check-item">
+          <span class="check-icon">&#10003;</span>
+          <span>2026年6月30日以降、Kubernetes Engine API (<code>container.googleapis.com</code>) を有効にすると Filestore API (<code>file.googleapis.com</code>) が自動的に有効化</span>
+        </div>
+        <div class="check-item">
+          <span class="check-icon">&#10003;</span>
+          <span>ReadWriteMany (RWX) アクセスモードの PersistentVolume に Filestore API が必要</span>
+        </div>
+        <div class="check-item">
+          <span class="check-icon">&#10003;</span>
+          <span>Autopilot クラスタでは Filestore CSI ドライバーがデフォルトで有効</span>
+        </div>
+        <div class="check-item">
+          <span class="cross-icon">&#10007;</span>
+          <span>Standard クラスタでは別途 CSI ドライバーの有効化が必要</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Feature 2: Reservation Affinity -->
+    <div class="section">
+      <h2>🎯 機能 2: 予約アフィニティ any-reservation-then-fail</h2>
+      <p>予約キャパシティが利用できない場合、オンデマンドキャパシティへのフォールバックを防止する新しいアフィニティオプション。</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>アフィニティタイプ</th>
+            <th>動作</th>
+            <th>フォールバック</th>
+            <th>対応バージョン</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>any</code> (デフォルト)</td>
+            <td>一致する予約を消費</td>
+            <td>オンデマンドにフォールバック</td>
+            <td>全バージョン</td>
+          </tr>
+          <tr>
+            <td><code>any-reservation-then-fail</code></td>
+            <td>一致する予約を消費</td>
+            <td>フォールバックなし (失敗)</td>
+            <td>1.36.0-gke.3204000+</td>
+          </tr>
+          <tr>
+            <td><code>specific</code></td>
+            <td>特定の予約を消費</td>
+            <td>フォールバックなし (失敗)</td>
+            <td>全バージョン</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="note-box">
+        <strong>💡 ポイント:</strong> ComputeClass では、予約不足時に次の優先ルールに移行 (オンデマンドリソースを作成しない)。予約を超えるノード数をリクエストした場合、超過分はキャパシティが確保されるまでプロビジョニングを再試行する。
+      </div>
+
+      <h3>設定例</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">予約の作成</span>
+        </div>
+        <pre><code class="language-bash">gcloud compute reservations create my-reservation \
+    --machine-type=n4d-standard-8 --vm-count=3</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">フォールバックなしのノードプール作成</span>
+        </div>
+        <pre><code class="language-bash">gcloud container node-pools create my-node-pool \
+    --cluster my-cluster --num-nodes=3 \
+    --machine-type=n4d-standard-8 \
+    --reservation-affinity=any-reservation-then-fail</code></pre>
+      </div>
+    </div>
+
+    <!-- Feature 3: N4D Machine Series -->
+    <div class="section">
+      <h2>⚡ 機能 3: N4D マシンシリーズのサポート拡大</h2>
+      <p>AMD EPYC Turin (第5世代) プロセッサ搭載の N4D マシンシリーズが GKE 1.33 系でも利用可能に。</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>プロセッサ</td><td>AMD EPYC Turin (第5世代)</td></tr>
+          <tr><td>最大 vCPU</td><td>96</td></tr>
+          <tr><td>最大メモリ</td><td>768 GB DDR5</td></tr>
+          <tr><td>ネットワーク帯域</td><td>最大 50 Gbps</td></tr>
+          <tr><td>ストレージ</td><td>Hyperdisk のみ対応</td></tr>
+          <tr><td>Local SSD</td><td>非対応</td></tr>
+          <tr><td>構成タイプ</td><td>standard (4GB/vCPU), highcpu (2GB/vCPU), highmem (8GB/vCPU)</td></tr>
+          <tr><td>カスタムマシンタイプ</td><td>対応 (2-96 vCPU, 0.5-8 GB/vCPU)</td></tr>
+        </tbody>
+      </table>
+
+      <div class="note-box">
+        <strong>📌 GKE バージョン要件:</strong><br>
+        ノードプール自動作成: <code>1.33.12-gke.1208000</code> 以降<br>
+        Autopilot: <code>1.33.13-gke.1079000</code> 以降<br>
+        Titanium による高速ネットワーキング対応。
+      </div>
+    </div>
+
+    <!-- Feature 4: VPA CPU Startup Boost -->
+    <div class="section">
+      <h2>🚀 機能 4: VPA CPU スタートアップブースト (Preview)</h2>
+      <p>アプリケーション起動時に一時的に CPU リクエストを増加し、起動完了後に Kubernetes In-Place Pod Resize (IPPR) を使用してコンテナ再起動なしにベースラインに戻す。</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>パラメータ</th>
+            <th>説明</th>
+            <th>値の例</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>type</code></td>
+            <td>ブースト計算方式</td>
+            <td><code>Factor</code> または <code>Quantity</code></td>
+          </tr>
+          <tr>
+            <td><code>factor</code></td>
+            <td>CPU 乗数 (Factor タイプ)</td>
+            <td><code>2</code> (ベースの2倍)</td>
+          </tr>
+          <tr>
+            <td><code>quantity</code></td>
+            <td>CPU 追加量 (Quantity タイプ)</td>
+            <td><code>"2"</code> (2 vCPU 追加)</td>
+          </tr>
+          <tr>
+            <td><code>durationSeconds</code></td>
+            <td>ブースト持続時間</td>
+            <td><code>10</code> (Ready 後10秒)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>VPA マニフェスト例 (ブーストのみ使用)</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">YAML</span>
+          <span class="code-title">VPA CPU スタートアップブースト設定</span>
+        </div>
+        <pre><code class="language-yaml">apiVersion: "autoscaling.k8s.io/v1"
+kind: VerticalPodAutoscaler
+metadata:
+  name: example-vpa
+spec:
+  targetRef:
+    apiVersion: "apps/v1"
+    kind: Deployment
+    name: example
+  updatePolicy:
+    updateMode: "Off"
+  startupBoost:
+    cpu:
+      type: "Factor"
+      factor: 2
+      durationSeconds: 10</code></pre>
+      </div>
+
+      <h3>VPA + ブースト両方有効化</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">YAML</span>
+          <span class="code-title">VPA とブーストの併用設定</span>
+        </div>
+        <pre><code class="language-yaml">apiVersion: "autoscaling.k8s.io/v1"
+kind: VerticalPodAutoscaler
+metadata:
+  name: example-vpa
+spec:
+  targetRef:
+    apiVersion: "apps/v1"
+    kind: Deployment
+    name: example
+  updatePolicy:
+    updateMode: "InPlaceOrRecreate"
+  startupBoost:
+    cpu:
+      type: "Factor"
+      factor: 2
+      durationSeconds: 10</code></pre>
+      </div>
+
+      <div class="note-box">
+        <strong>💡 動作:</strong> 起動時に CPU リクエストが2倍に増加され、Pod が Ready 状態になってから10秒後にベースラインに戻る。GKE バージョン <code>1.36.0-gke.4447000</code> 以降で利用可能。
+      </div>
+    </div>
+
+    <!-- Merits -->
+    <div class="section">
+      <h2>&#10003; メリット</h2>
+      <div class="feature-grid">
+        <div class="card green">
+          <h3>ビジネス面</h3>
+          <div class="check-item">
+            <span class="check-icon">&#10003;</span>
+            <span><strong>コスト管理の厳格化</strong>: 予約キャパシティの範囲内でのみリソースを消費、予期しないオンデマンドコストを防止</span>
+          </div>
+          <div class="check-item">
+            <span class="check-icon">&#10003;</span>
+            <span><strong>運用効率の向上</strong>: Filestore API の自動有効化により初期セットアップの手順削減</span>
+          </div>
+          <div class="check-item">
+            <span class="check-icon">&#10003;</span>
+            <span><strong>コスト最適化</strong>: N4D の動的リソース管理で効率的な利用が可能</span>
+          </div>
+        </div>
+        <div class="card">
+          <h3>技術面</h3>
+          <div class="check-item">
+            <span class="check-icon">&#10003;</span>
+            <span><strong>起動パフォーマンス改善</strong>: Java/Node.js/Python などの起動が高速化</span>
+          </div>
+          <div class="check-item">
+            <span class="check-icon">&#10003;</span>
+            <span><strong>リソース効率</strong>: ブースト後に In-Place リサイズで定常運用時の過剰プロビジョニングが不要</span>
+          </div>
+          <div class="check-item">
+            <span class="check-icon">&#10003;</span>
+            <span><strong>柔軟なキャパシティプランニング</strong>: ComputeClass と予約アフィニティで優先度ベースのリソース割り当て</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <div class="warning-box">
+        <strong>制限事項:</strong>
+        <ul style="margin: 8px 0; padding-left: 20px;">
+          <li>VPA CPU スタートアップブーストは Preview 段階であり、SLA の対象外</li>
+          <li>CPU スタートアップブーストは Pod 作成時のみ適用 (コンテナ再起動時には非適用)</li>
+          <li>N4D マシンシリーズは Local SSD に非対応</li>
+          <li>N4D は per VM Tier_1 ネットワーキングパフォーマンスに非対応</li>
+          <li><code>any-reservation-then-fail</code> は GKE 1.36.0-gke.3204000 以降が必要</li>
+        </ul>
+      </div>
+      <div class="warning-box">
+        <strong>考慮すべき点:</strong>
+        <ul style="margin: 8px 0; padding-left: 20px;">
+          <li>CPU ブーストと HPA 併用時は <code>readinessProbe</code> の定義と <code>durationSeconds: 0</code> の設定が必要</li>
+          <li>Standard クラスタでの CPU ブースト使用時はスケールアップ後のノード削除による Pod エビクションループに注意 (Autopilot 推奨)</li>
+          <li><code>any-reservation-then-fail</code> 使用時は予約不足でノードがプロビジョニングされないため可用性に影響する可能性</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>🎮 ユースケース 1: 予約ベースの GPU ワークロード管理</h4>
+        <p><strong>シナリオ:</strong> GPU 予約を確保している環境で、予約を超えるオンデマンド GPU コストを防止したい場合</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">GPU ノードプール作成例</span>
+          </div>
+          <pre><code class="language-bash">gcloud container node-pools create gpu-pool \
+    --cluster my-cluster \
+    --accelerator type=nvidia-tesla-t4,count=1 \
+    --machine-type=n1-standard-8 \
+    --num-nodes=4 \
+    --reservation-affinity=any-reservation-then-fail \
+    --node-locations=us-central1-a</code></pre>
+        </div>
+        <p><strong>効果:</strong> 予約キャパシティの範囲内でのみ GPU ノードが作成され、予期しないオンデマンド GPU 課金を防止。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>☕ ユースケース 2: Java アプリケーションの起動高速化</h4>
+        <p><strong>シナリオ:</strong> Spring Boot アプリケーションの起動に 30 秒以上かかり、ReadinessProbe のタイムアウトが発生しやすい環境</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">YAML</span>
+            <span class="code-title">Spring Boot 向け VPA ブースト設定</span>
+          </div>
+          <pre><code class="language-yaml">apiVersion: "autoscaling.k8s.io/v1"
+kind: VerticalPodAutoscaler
+metadata:
+  name: spring-boot-vpa
+spec:
+  targetRef:
+    apiVersion: "apps/v1"
+    kind: Deployment
+    name: spring-boot-app
+  updatePolicy:
+    updateMode: "Off"
+  startupBoost:
+    cpu:
+      type: "Factor"
+      factor: 3
+      durationSeconds: 0</code></pre>
+        </div>
+        <p><strong>効果:</strong> 起動時に CPU リクエストが3倍に増加し、JVM ウォームアップが高速化。<code>durationSeconds: 0</code> により Ready 後即座にベースラインに復帰。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>💰 ユースケース 3: コスト効率の高い汎用ワークロード</h4>
+        <p><strong>シナリオ:</strong> N4D マシンシリーズを使用してコスト効率の高い汎用ワークロードを Autopilot で実行</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">YAML</span>
+            <span class="code-title">ComputeClass 設定例</span>
+          </div>
+          <pre><code class="language-yaml">apiVersion: cloud.google.com/v1
+kind: ComputeClass
+metadata:
+  name: cost-optimized
+spec:
+  priorities:
+    - machineFamily: n4d
+    - machineFamily: n4
+  whenUnsatisfiable: ScaleUpAnyway
+  nodePoolAutoCreation:
+    enabled: true</code></pre>
+        </div>
+        <p><strong>効果:</strong> AMD EPYC Turin プロセッサの高い価格性能比と動的リソース管理により汎用ワークロードのコストを最適化。</p>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="related-services">
+        <span class="service-tag">Compute Engine 予約</span>
+        <span class="service-tag">Filestore</span>
+        <span class="service-tag">Vertical Pod Autoscaler (VPA)</span>
+        <span class="service-tag">ComputeClass</span>
+        <span class="service-tag">Cluster Autoscaler</span>
+        <span class="service-tag">In-Place Pod Resize</span>
+        <span class="service-tag">Autopilot</span>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <p>今回の GKE アップデートは、<span class="highlight">ストレージ設定の簡素化</span>、<span class="highlight">コスト管理の厳格化</span>、<span class="highlight">コンピュート選択肢の拡大</span>、<span class="highlight">起動パフォーマンスの最適化</span>という 4 つの側面で GKE の運用体験を向上させる。</p>
+      <p>特に <code>any-reservation-then-fail</code> 予約アフィニティと VPA CPU スタートアップブーストは、コスト最適化とパフォーマンス改善を両立させたい環境で即座に検討すべき機能である。N4D マシンシリーズの 1.33 系へのバックポートにより、最新バージョンにアップグレードできない環境でも AMD EPYC Turin の恩恵を受けられるようになった。</p>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>📎 出典:</strong></p>
+      <ul style="list-style: none; padding: 0; margin: 8px 0;">
+        <li style="margin: 4px 0;">- <a href="https://cloud.google.com/kubernetes-engine/docs/release-notes-new-features#July_16_2026" target="_blank" rel="noopener noreferrer">GKE 新機能リリースノート</a></li>
+        <li style="margin: 4px 0;">- <a href="https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/filestore-csi-driver" target="_blank" rel="noopener noreferrer">Filestore CSI ドライバー</a></li>
+        <li style="margin: 4px 0;">- <a href="https://cloud.google.com/kubernetes-engine/docs/how-to/consuming-reservations" target="_blank" rel="noopener noreferrer">予約済みゾーンリソースの消費</a></li>
+        <li style="margin: 4px 0;">- <a href="https://cloud.google.com/compute/docs/general-purpose-machines#n4d_series" target="_blank" rel="noopener noreferrer">N4D マシンシリーズ</a></li>
+        <li style="margin: 4px 0;">- <a href="https://cloud.google.com/kubernetes-engine/docs/how-to/boost-application-startup" target="_blank" rel="noopener noreferrer">CPU スタートアップブースト</a></li>
+        <li style="margin: 4px 0;">- <a href="https://cloud.google.com/kubernetes-engine/docs/concepts/node-auto-provisioning" target="_blank" rel="noopener noreferrer">ノードプール自動作成</a></li>
+      </ul>
+      <p style="margin-top: 12px; font-size: 11px; color: #9AA0A6;">Generated on 2026-07-17 | Google Cloud News Summary</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

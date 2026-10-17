@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BigQuery: AI.AGG 関数によるセマンティック集約 (Preview)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1 {
+      font-size: 34px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 12px;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--gc-outline);
+      text-align: right;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge-service { background: var(--gc-blue-600); }
+    .badge-preview { background: var(--gc-orange); }
+    .badge-ai { background: var(--gc-purple); }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green { border-left-color: var(--gc-green); }
+    .card-purple { border-left-color: var(--gc-purple); }
+    .card-orange { border-left-color: var(--gc-orange); }
+    .card-red { border-left-color: var(--gc-red); }
+
+    .card h4 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 8px;
+    }
+
+    .card p, .card li {
+      font-size: 14px;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .card ul {
+      padding-left: 20px;
+      margin-top: 8px;
+    }
+
+    .card li {
+      margin-bottom: 4px;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .before-box h4, .after-box h4 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .before-box h4 { color: var(--gc-red); }
+    .after-box h4 { color: var(--gc-green); }
+
+    .before-box ul, .after-box ul {
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin-bottom: 4px;
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .ai-box {
+      background: var(--gc-purple-tint);
+      border-left: 4px solid var(--gc-purple);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Stats grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.green { background: linear-gradient(135deg, var(--gc-green), #1E8E3E); }
+    .stat-card.purple { background: linear-gradient(135deg, var(--gc-purple), #7B1FA2); }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    /* Feature cards grid */
+    .features-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    /* Use case cards */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--gc-blue-900);
+      margin-bottom: 8px;
+    }
+
+    .usecase-card p {
+      font-size: 14px;
+      color: var(--gc-on-surface-variant);
+      margin-bottom: 8px;
+    }
+
+    /* Comparison table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* Code blocks */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      background: #1E1E1E;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Mermaid container */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Pricing */
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .pricing-card {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-outline-variant);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .pricing-card h4 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 8px;
+    }
+
+    .pricing-card p {
+      font-size: 14px;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; }
+      .before-after { grid-template-columns: 1fr; }
+      .features-grid { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .pricing-grid { grid-template-columns: 1fr; }
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    footer ul {
+      list-style: none;
+      padding: 0;
+      margin: 8px 0;
+    }
+
+    footer li {
+      margin-bottom: 4px;
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>BigQuery: AI.AGG 関数によるセマンティック集約</h1>
+        <div style="margin-top: 12px;">
+          <span class="badge badge-service">BigQuery</span>
+          <span class="badge badge-ai">AI Functions</span>
+          <span class="badge badge-preview">Preview</span>
+        </div>
+      </div>
+      <div class="subtitle">
+        2026-04-06<br>
+        Google Cloud Release Notes
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>BigQuery に新しいマネージド AI 関数 <span class="highlight">AI.AGG</span> が Preview として追加されました。Vertex AI の Gemini モデルを活用し、<strong>自然言語の指示に基づいて非構造化データをセマンティックに集約</strong>する機能を提供します。</p>
+      <p style="margin-top: 12px;">従来の SQL 集約関数 (SUM, COUNT, AVG など) では対応できなかった、自然言語による意味的な集約を SQL クエリ内で直接実行できます。テキストデータだけでなく画像データも処理でき、集約結果を単一の文字列として返します。</p>
+
+      <div class="ai-box" style="margin-top: 16px;">
+        <strong>🎯 対象ユーザー:</strong> BigQuery を利用するデータアナリスト、データサイエンティスト、および非構造化データの大規模な集約・要約を必要とするビジネスユーザー
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value">SQL 1行</div>
+        <div class="stat-label">自然言語でセマンティック集約</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-value">自動</div>
+        <div class="stat-label">マルチレベル集約で大規模データ対応</div>
+      </div>
+      <div class="stat-card purple">
+        <div class="stat-value">マルチモーダル</div>
+        <div class="stat-label">テキスト + 画像データに対応</div>
+      </div>
+    </div>
+
+    <!-- Before / After -->
+    <div class="section">
+      <h2>🔄 Before / After</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h4>❌ Before (これまで)</h4>
+          <ul>
+            <li>非構造化データの意味的集約には AI.GENERATE を使用し、手動でマルチレベルのバッチング処理ロジックを記述する必要があった</li>
+            <li>Gemini のコンテキストウィンドウを超えるデータ量の場合、データの分割・中間結果の統合を手動で実装する必要があった</li>
+            <li>AI.GENERATE は入力行ごとに 1 つの結果を返すため、グループ単位の集約には追加処理が必要だった</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h4>✅ After (これから)</h4>
+          <ul>
+            <li>AI.AGG 関数により、自然言語の指示だけで非構造化データのセマンティック集約が可能に</li>
+            <li>自動マルチレベル集約により、Gemini のコンテキストウィンドウを超える大規模データも自動処理</li>
+            <li>GROUP BY と組み合わせることで、入力グループごとに 1 つの文字列結果を簡潔に取得</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>AI.AGG 関数は入力データを自動的にバッチに分割し、各バッチを Vertex AI Gemini モデルで処理した後、中間結果をマルチレベルで集約して最終的な単一の文字列結果を返します。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    A[BigQuery テーブル\nテキスト / 画像データ] --> B[AI.AGG 関数]
+    B --> C{自動バッチ分割}
+    C --> D1[バッチ 1\nGemini 処理]
+    C --> D2[バッチ 2\nGemini 処理]
+    C --> D3[バッチ N\nGemini 処理]
+    D1 --> E[中間結果の\nマルチレベル集約]
+    D2 --> E
+    D3 --> E
+    E --> F[最終集約結果\nSTRING]
+
+    style A fill:#4285F4,color:#fff
+    style B fill:#34A853,color:#fff
+    style E fill:#FBBC04,color:#000
+    style F fill:#EA4335,color:#fff
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="card">
+        <h4>💬 自然言語ベースのセマンティック集約</h4>
+        <ul>
+          <li>SQL クエリ内で自然言語の指示を使って、非構造化データの集約方法を指定可能</li>
+          <li>テキストデータおよび画像データの両方に対応</li>
+          <li>GROUP BY 句と組み合わせてグループ単位の集約が可能</li>
+        </ul>
+      </div>
+      <div class="card card-green">
+        <h4>🔄 自動マルチレベル集約</h4>
+        <ul>
+          <li>データを自動的にバッチに分割し、各バッチの結果をさらに集約する多段階処理を実行</li>
+          <li>Gemini のコンテキストウィンドウを超える大規模データセットも処理可能</li>
+          <li>手動でのバッチングロジック実装が不要</li>
+        </ul>
+      </div>
+      <div class="card card-purple">
+        <h4>🖼️ マルチモーダルデータ対応</h4>
+        <ul>
+          <li>テキストデータの集約 (レビュー分析、ログ分析など)</li>
+          <li>画像データの集約 (オブジェクトテーブル経由)</li>
+          <li>STRUCT を使用した画像データの入力サポート</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Technical Specs -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+      <h3 style="margin-top: 8px;">AI.AGG 関数の基本情報</h3>
+      <table>
+        <tr><th>項目</th><th>詳細</th></tr>
+        <tr><td>関数名</td><td><code>AI.AGG</code></td></tr>
+        <tr><td>カテゴリ</td><td>マネージド AI 関数</td></tr>
+        <tr><td>入力データ型</td><td>テキスト (STRING)、画像 (ObjectRefRuntime / オブジェクトテーブル)</td></tr>
+        <tr><td>出力データ型</td><td>STRING</td></tr>
+        <tr><td>使用モデル</td><td>Vertex AI Gemini モデル</td></tr>
+        <tr><td>ステータス</td><td><span class="badge badge-preview" style="font-size: 12px;">Preview</span></td></tr>
+        <tr><td>サポート連絡先</td><td>bqml-feedback@google.com</td></tr>
+      </table>
+
+      <h3 style="margin-top: 24px;">関連する AI 関数との比較</h3>
+      <table>
+        <tr>
+          <th>関数</th><th>用途</th><th>入力/出力</th><th>大規模データ対応</th>
+        </tr>
+        <tr>
+          <td><strong>AI.AGG</strong></td><td>セマンティック集約</td><td>複数行 → 1 文字列</td><td>自動マルチレベル集約</td>
+        </tr>
+        <tr>
+          <td>AI.GENERATE</td><td>汎用生成 AI</td><td>1 行 → 1 結果</td><td>手動バッチング必要</td>
+        </tr>
+        <tr>
+          <td>AI.GENERATE_TEXT</td><td>テーブル値生成 AI</td><td>1 行 → テーブル行</td><td>手動バッチング必要</td>
+        </tr>
+        <tr>
+          <td>AI.IF</td><td>フィルタリング</td><td>1 行 → BOOL</td><td>-</td>
+        </tr>
+        <tr>
+          <td>AI.SCORE</td><td>スコアリング</td><td>1 行 → FLOAT64</td><td>-</td>
+        </tr>
+        <tr>
+          <td>AI.CLASSIFY</td><td>分類</td><td>1 行 → STRING</td><td>-</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Setup & Code Samples -->
+    <div class="section">
+      <h2>💻 設定方法・コードサンプル</h2>
+
+      <div class="note-box">
+        <strong>📌 前提条件:</strong>
+        <ul style="margin-top: 8px; padding-left: 20px; font-size: 14px;">
+          <li>BigQuery API が有効化されたプロジェクト</li>
+          <li>Cloud リソース接続の作成 (接続のサービスアカウントに <strong>Vertex AI User</strong> ロールが必要)</li>
+          <li>適切な IAM ロール: BigQuery Data Editor, BigQuery Connection Admin, BigQuery Job User</li>
+        </ul>
+      </div>
+
+      <h3 style="margin-top: 20px;">ステップ 1: テキストデータに対するセマンティック集約</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">ユーザーレビューの感情分析の例</span>
+        </div>
+        <pre><code class="language-sql">-- ユーザーレビューの感情分析の例
+SELECT
+  title,
+  AI.AGG(
+    review,
+    'ユーザーのレビューに基づいて、この映画に対する全体的な感情をまとめてください。'
+  ) AS sentiment
+FROM `my_project.my_dataset.reviews`
+GROUP BY title;</code></pre>
+      </div>
+      <p style="font-size: 14px; color: var(--gc-on-surface-variant);">AI.AGG 関数の第 1 引数に集約対象のカラム、第 2 引数に自然言語の集約指示を指定します。GROUP BY と組み合わせることで、グループ単位の集約結果を取得できます。</p>
+
+      <h3 style="margin-top: 20px;">ステップ 2: 画像データに対するセマンティック集約</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">オブジェクトテーブルの画像を集約する例</span>
+        </div>
+        <pre><code class="language-sql">-- オブジェクトテーブルの画像を集約する例
+SELECT
+  AI.AGG(
+    STRUCT(OBJ.GET_ACCESS_URL(ref, 'r')),
+    'これらの画像の主要なカテゴリは何ですか？'
+  ) AS category_description
+FROM `my_project.my_dataset.product_images`;</code></pre>
+      </div>
+      <p style="font-size: 14px; color: var(--gc-on-surface-variant);">画像データを集約する場合は、STRUCT と OBJ.GET_ACCESS_URL を使用してオブジェクトテーブルから画像にアクセスします。</p>
+
+      <h3 style="margin-top: 20px;">ステップ 3: 大規模データセットでの使用</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">大規模ニュース記事から頻出企業を抽出する例</span>
+        </div>
+        <pre><code class="language-sql">-- 大規模なニュース記事データセットから頻出企業を抽出する例
+SELECT
+  AI.AGG(
+    TO_JSON_STRING(t),
+    'これらのテクノロジーニュース記事で最も多く言及されている
+     企業トップ 3 と、その企業が有名な理由を教えてください。'
+  ) AS tech_news_companies
+FROM (
+  SELECT * FROM `bigquery-public-data.bbc_news.fulltext`
+  LIMIT 30000
+) AS t
+WHERE t.category = 'tech';</code></pre>
+      </div>
+      <p style="font-size: 14px; color: var(--gc-on-surface-variant);">TO_JSON_STRING を使用して行全体を JSON 文字列に変換し、AI.AGG に渡すことで、複数カラムの情報を含む集約が可能です。</p>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>📝 ユースケース 1: ユーザーレビューの感情分析</h4>
+        <p><strong>シナリオ:</strong> EC サイトの運営チームが、数万件の商品レビューから商品ごとの全体的な感情傾向を把握したい。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">実装例</span>
+          </div>
+          <pre><code class="language-sql">SELECT
+  product_name,
+  AI.AGG(
+    review_text,
+    'レビュー全体の感情を分析し、ポジティブ・ネガティブな点をまとめてください。'
+  ) AS sentiment_summary
+FROM `ecommerce.product_reviews`
+GROUP BY product_name;</code></pre>
+        </div>
+        <p>→ 商品ごとのユーザー感情を即座に把握し、改善すべき商品や好評な商品を迅速に特定できる。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>📊 ユースケース 2: アプリケーションログの傾向分析</h4>
+        <p><strong>シナリオ:</strong> SRE チームが大量のアプリケーションログから、エラーパターンやユーザー行動の傾向を自然言語で要約したい。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">実装例</span>
+          </div>
+          <pre><code class="language-sql">SELECT
+  AI.AGG(
+    log_message,
+    'これらのログメッセージから、最も頻繁に発生している
+     エラーパターンとその原因を分析してください。'
+  ) AS error_analysis
+FROM `monitoring.application_logs`
+WHERE severity = 'ERROR'
+  AND timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR);</code></pre>
+        </div>
+        <p>→ 手動でのログ解析作業を大幅に削減し、障害対応の初動を迅速化できる。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>🖼️ ユースケース 3: 画像コンテンツの自動分類</h4>
+        <p><strong>シナリオ:</strong> マーケティングチームが、ユーザーがアップロードした大量の商品画像を自動的にカテゴリ分けしたい。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">実装例</span>
+          </div>
+          <pre><code class="language-sql">SELECT
+  AI.AGG(
+    STRUCT(OBJ.GET_ACCESS_URL(ref, 'r')),
+    'これらの画像に含まれる商品の主要カテゴリと、
+     各カテゴリの割合を分析してください。'
+  ) AS image_categories
+FROM `marketing.user_uploaded_images`;</code></pre>
+        </div>
+        <p>→ 画像の手動分類作業を自動化し、コンテンツ管理の効率を大幅に向上させる。</p>
+      </div>
+    </div>
+
+    <!-- Merits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div class="features-grid">
+        <div class="card card-green">
+          <h4>📈 ビジネス面</h4>
+          <ul>
+            <li><strong>分析の民主化:</strong> SQL の知識だけで大規模な非構造化データの意味的分析が可能に</li>
+            <li><strong>迅速なインサイト獲得:</strong> 数万件のレビューやログの傾向分析を 1 つの SQL クエリで即座に実行</li>
+            <li><strong>マルチモーダル分析:</strong> テキストと画像を組み合わせた分析で業務効率化</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>🔧 技術面</h4>
+          <ul>
+            <li><strong>自動スケーリング:</strong> マルチレベル集約でコンテキストウィンドウの制約を超えた大規模データ処理を自動化</li>
+            <li><strong>シンプルな構文:</strong> 複雑なバッチング処理なしで直感的な SQL 関数として利用可能</li>
+            <li><strong>既存ワークフロー統合:</strong> BigQuery 標準 SQL 内でそのまま使用、既存パイプラインに容易に組込み</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <div class="features-grid">
+        <div class="card card-orange">
+          <h4>🚧 制限事項</h4>
+          <ul>
+            <li>Preview 段階のため、本番環境での使用には注意が必要 (Pre-GA Offerings Terms が適用)</li>
+            <li>サポートは限定的 (bqml-feedback@google.com 経由)</li>
+            <li>特定の BigQuery エディションで作成されたリザベーションでは利用できない場合がある</li>
+          </ul>
+        </div>
+        <div class="card card-red">
+          <h4>💡 考慮すべき点</h4>
+          <ul>
+            <li>BigQuery の計算コストに加え、Vertex AI の利用料金が発生する</li>
+            <li>大規模データのマルチレベル集約では、バッチ数に応じて Vertex AI への API 呼び出し回数が増加しコストに影響する可能性</li>
+            <li>生成 AI の出力は確率的であるため、同じ入力に対して異なる結果が返される可能性がある</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>AI.AGG 関数の利用料金は、以下の 2 つの要素で構成されます。</p>
+      <div class="pricing-grid">
+        <div class="pricing-card">
+          <h4>☁️ BigQuery 計算コスト</h4>
+          <p>クエリ処理に使用されるコンピューティングリソース (オンデマンドまたはキャパシティベース)</p>
+        </div>
+        <div class="pricing-card">
+          <h4>🤖 Vertex AI 利用料金</h4>
+          <p>Gemini モデルへのリクエストに対する Vertex AI の課金 (モデルやトークン数に依存)</p>
+        </div>
+      </div>
+      <div class="note-box" style="margin-top: 16px;">
+        <strong>📌 料金の詳細:</strong>
+        <ul style="margin-top: 8px; padding-left: 20px; font-size: 14px;">
+          <li><a href="https://cloud.google.com/bigquery/pricing" target="_blank" class="gc-link">BigQuery 料金</a></li>
+          <li><a href="https://cloud.google.com/bigquery/pricing#bigquery-ml-pricing" target="_blank" class="gc-link">BigQuery ML 料金</a></li>
+          <li><a href="https://cloud.google.com/vertex-ai/generative-ai/pricing" target="_blank" class="gc-link">Vertex AI 生成 AI 料金</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="features-grid">
+        <div class="card">
+          <h4>AI.GENERATE</h4>
+          <p>汎用的な生成 AI 関数。行単位の推論に使用</p>
+        </div>
+        <div class="card">
+          <h4>AI.IF / AI.SCORE / AI.CLASSIFY</h4>
+          <p>他のマネージド AI 関数。フィルタリング、スコアリング、分類に使用</p>
+        </div>
+        <div class="card card-purple">
+          <h4>Vertex AI Gemini モデル</h4>
+          <p>AI.AGG が内部で使用する基盤モデル</p>
+        </div>
+        <div class="card">
+          <h4>BigQuery オブジェクトテーブル</h4>
+          <p>画像データの集約時に使用する外部テーブル</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section" style="background: var(--gc-blue-tint); border-color: var(--gc-blue-200);">
+      <h2>📝 まとめ</h2>
+      <p>BigQuery の <span class="highlight">AI.AGG</span> 関数は、自然言語の指示だけで非構造化データのセマンティック集約を実現する新しいマネージド AI 関数です。自動マルチレベル集約により大規模データも処理可能であり、従来の AI.GENERATE を使用した手動実装と比較して、コードの簡素化と開発効率の大幅な向上が期待できます。</p>
+      <div class="warning-box" style="margin-top: 16px;">
+        <strong>💡 推奨:</strong> 現在 Preview 段階のため、まずは開発・検証環境で機能を試し、本番導入に向けた評価を開始することを推奨します。
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>📎 出典・参考リンク:</strong></p>
+      <ul>
+        <li>📄 <a href="https://docs.cloud.google.com/release-notes#April_06_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li>📘 <a href="https://cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-ai-agg" target="_blank" rel="noopener noreferrer">AI.AGG 関数リファレンス</a></li>
+        <li>📗 <a href="https://cloud.google.com/bigquery/docs/generative-ai-overview" target="_blank" rel="noopener noreferrer">BigQuery 生成 AI 概要</a></li>
+        <li>📕 <a href="https://cloud.google.com/bigquery/docs/ai-introduction" target="_blank" rel="noopener noreferrer">BigQuery AI 入門</a></li>
+        <li>💰 <a href="https://cloud.google.com/bigquery/pricing#bigquery-ml-pricing" target="_blank" rel="noopener noreferrer">BigQuery ML 料金</a></li>
+      </ul>
+      <p style="margin-top: 12px; font-size: 11px; color: var(--gc-outline);">Generated on 2026-04-06 | Google Cloud News Infographic</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

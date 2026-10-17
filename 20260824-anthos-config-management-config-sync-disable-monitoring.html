@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anthos Config Management (Config Sync): RootSync/RepoSync 単位でのモニタリング無効化と CVE 対応</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+:root {
+  --gc-blue: #4285F4;
+  --gc-red: #EA4335;
+  --gc-yellow: #FBBC04;
+  --gc-green: #34A853;
+  --gc-blue-900: #174EA6;
+  --gc-blue-800: #185ABC;
+  --gc-blue-700: #1967D2;
+  --gc-blue-600: #1A73E8;
+  --gc-blue-500: #4285F4;
+  --gc-blue-300: #669DF6;
+  --gc-blue-200: #8AB4F8;
+  --gc-blue-100: #AECBFA;
+  --gc-blue-50: #E8F0FE;
+  --gc-on-surface: #202124;
+  --gc-on-surface-variant: #5F6368;
+  --gc-outline: #80868B;
+  --gc-surface: #FFFFFF;
+  --gc-surface-container-lowest: #F8F9FA;
+  --gc-surface-container-low: #F1F3F4;
+  --gc-surface-container: #E8EAED;
+  --gc-outline-variant: #DADCE0;
+  --gc-blue-tint: #E8F0FE;
+  --gc-green-tint: #E6F4EA;
+  --gc-red-tint: #FCE8E6;
+  --gc-yellow-tint: #FEF7E0;
+  --gc-purple-tint: #F3E8FD;
+  --gc-teal-tint: #E0F7FA;
+  --gc-purple: #A142F4;
+  --gc-teal: #00BCD4;
+  --gc-orange: #FF6D00;
+}
+
+body {
+  background-color: var(--gc-surface);
+  font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+  color: var(--gc-on-surface-variant);
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 20px;
+  margin: 0;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.header {
+  margin-bottom: 32px;
+  padding-bottom: 16px;
+  border-bottom: 3px solid var(--gc-blue-600);
+}
+
+h1, .title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--gc-on-surface);
+  margin: 0 0 12px 0;
+  line-height: 1.4;
+}
+
+h2, .section-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 20px 0 8px 0;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: var(--gc-outline);
+}
+
+.section {
+  background: var(--gc-surface-container-low);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid var(--gc-outline-variant);
+}
+
+.highlight {
+  background-color: var(--gc-blue-50);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--gc-blue-800);
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+.card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border-left: 4px solid var(--gc-blue-600);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+}
+
+.card h3 {
+  margin-top: 0;
+}
+
+.icon-text {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+  color: var(--gc-on-surface-variant);
+}
+
+.arrow {
+  color: var(--gc-blue-600);
+  font-size: 20px;
+}
+
+.gc-link {
+  color: var(--gc-blue-600);
+  text-decoration: none;
+}
+
+.gc-link:hover {
+  color: var(--gc-blue-800);
+  text-decoration: underline;
+}
+
+.badge,
+.badge-ga,
+.badge-preview,
+.badge-deprecated {
+  display: inline-block;
+  color: #FFFFFF;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+  margin: 4px 8px 4px 0;
+}
+
+.badge {
+  background: var(--gc-blue-600);
+}
+
+.badge-ga {
+  background: var(--gc-green);
+  color: #FFFFFF;
+}
+
+/* Before/After 比較 */
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+@media (max-width: 768px) {
+  .before-after {
+    grid-template-columns: 1fr;
+  }
+}
+
+.before-box {
+  background: var(--gc-red-tint);
+  border: 2px solid var(--gc-red);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.after-box {
+  background: var(--gc-green-tint);
+  border: 2px solid var(--gc-green);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.before-box h3, .after-box h3 {
+  margin-top: 0;
+  font-size: 16px;
+}
+
+.before-box h3 {
+  color: #C5221F;
+}
+
+.after-box h3 {
+  color: #188038;
+}
+
+.before-box ul, .after-box ul {
+  margin: 8px 0 0 0;
+  padding-left: 20px;
+  font-size: 14px;
+}
+
+.before-box li, .after-box li {
+  margin: 8px 0;
+}
+
+/* チェックリスト */
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.check-icon {
+  color: var(--gc-green);
+  font-size: 18px;
+}
+
+.cross-icon {
+  color: var(--gc-red);
+  font-size: 18px;
+}
+
+/* コードブロック */
+.code-block,
+pre:not(.mermaid) {
+  background: #1E1E1E;
+  border-radius: 8px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: #E8E8E8;
+  margin: 16px 0;
+}
+
+.code-block {
+  overflow: hidden;
+}
+
+.code-header {
+  background: #2D2D2D;
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.code-lang {
+  color: #9CDCFE;
+  font-weight: bold;
+}
+
+.code-title {
+  color: #AAAAAA;
+}
+
+.code-block pre {
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+}
+
+.code-block code {
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 16px !important;
+  display: block;
+}
+
+pre:not(.mermaid) code {
+  background: none;
+  border: none;
+  font-size: inherit;
+}
+
+/* インラインコード */
+code:not(pre code) {
+  background: var(--gc-surface-container-low);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 0.9em;
+  color: var(--gc-blue-900);
+}
+
+.section code:not(pre code) {
+  background: var(--gc-surface);
+}
+
+/* テーブル */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--gc-outline-variant);
+  background: var(--gc-surface);
+}
+
+th {
+  background: var(--gc-blue-50);
+  color: var(--gc-blue-900);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 2px solid var(--gc-blue-200);
+}
+
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--gc-outline-variant);
+  font-size: 14px;
+}
+
+tr:nth-child(even) {
+  background: var(--gc-surface-container-lowest);
+}
+
+tr:hover {
+  background: var(--gc-blue-50);
+}
+
+/* ボックス */
+.note-box {
+  background: var(--gc-blue-tint);
+  border-left: 4px solid var(--gc-blue-600);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.warning-box {
+  background: var(--gc-yellow-tint);
+  border-left: 4px solid var(--gc-yellow);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.error-box {
+  background: var(--gc-red-tint);
+  border-left: 4px solid var(--gc-red);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.success-box {
+  background: var(--gc-green-tint);
+  border-left: 4px solid var(--gc-green);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+/* Mermaid コンテナ */
+.mermaid-container {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 20px 0;
+  border: 2px solid rgba(66, 133, 244, 0.3);
+  overflow-x: auto;
+}
+
+.mermaid {
+  display: flex;
+  justify-content: center;
+}
+
+/* ユースケース */
+.usecase {
+  background: var(--gc-blue-tint);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 16px 0;
+  border: 1px solid var(--gc-blue-100);
+}
+
+.usecase h3 {
+  margin-top: 0;
+  color: var(--gc-blue-900);
+}
+
+/* 関連サービスグリッド */
+.related-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.related-item {
+  background: var(--gc-surface);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 8px;
+  padding: 14px 16px;
+  font-size: 14px;
+}
+
+.related-item strong {
+  color: var(--gc-on-surface);
+  display: block;
+  margin-bottom: 4px;
+}
+
+ul {
+  padding-left: 22px;
+}
+
+li {
+  margin: 6px 0;
+}
+
+footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gc-outline-variant);
+  font-size: 13px;
+  color: var(--gc-outline);
+}
+
+footer a {
+  word-break: break-all;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <h1>⚙️ Config Sync: RootSync/RepoSync 単位でモニタリングを無効化</h1>
+    <div>
+      <span class="badge">Anthos Config Management (Config Sync)</span>
+      <span class="badge badge-ga">GA (一般提供)</span>
+      <span class="subtitle">リリース日: 2026-08-24</span>
+    </div>
+  </div>
+
+  <!-- 概要 -->
+  <div class="section">
+    <h2>📌 概要</h2>
+    <p>
+      Config Sync で、カスタムの RootSync / RepoSync オブジェクトごとに
+      <span class="highlight">spec.monitoring.enabled</span> フィールドを <code>false</code> に設定することで、
+      メトリクステレメトリーの収集・エクスポートを<span class="highlight">オブジェクト単位で無効化</span>できるようになりました。
+      無効化した Reconciler Pod からは <code>otel-agent</code> サイドカーコンテナが省略され、クラスタのリソース消費を削減できます。
+    </p>
+    <p>
+      多数の RootSync/RepoSync を運用する大規模 GitOps 環境や、エッジ環境などリソース制約のあるクラスタで特に有用です。
+      あわせて<span class="highlight">依存関係の更新による複数の CVE 対応</span>も行われており、最新バージョンへの更新が推奨されます。
+    </p>
+
+    <div class="before-after">
+      <div class="before-box">
+        <h3>❌ アップデート前の課題</h3>
+        <ul>
+          <li>デフォルトで全 RootSync/RepoSync のメトリクスを収集し、オブジェクト単位で無効化する手段がなかった</li>
+          <li>Reconciler Pod ごとに <code>otel-agent</code> サイドカーが常時起動し、同期対象が多い環境では CPU/メモリを消費</li>
+          <li>メトリクス不要な同期対象でも Cloud Monitoring へのサンプル取り込みが発生し得た</li>
+        </ul>
+      </div>
+      <div class="after-box">
+        <h3>✅ アップデート後の改善</h3>
+        <ul>
+          <li><code>spec.monitoring.enabled: false</code> で特定のカスタム RootSync/RepoSync のテレメトリーを無効化可能に</li>
+          <li>無効化した Reconciler Pod では <code>otel-agent</code> サイドカーが省略され、リソース消費を削減</li>
+          <li>依存関係の更新で複数の CVE が解消され、セキュリティ体制を強化</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- アーキテクチャ図 -->
+  <div class="section">
+    <h2>🏗️ アーキテクチャ図</h2>
+    <div class="mermaid-container">
+      <pre class="mermaid">
+flowchart TD
+    subgraph Before["従来 (モニタリング常時有効)"]
+        RS1["📄 RootSync / RepoSync"] --> POD1["🤖 Reconciler Pod<br/>reconciler + git-sync<br/>+ otel-agent サイドカー"]
+        POD1 -->|メトリクス| OTEL["📡 otel-collector<br/>(config-management-monitoring)"]
+        OTEL --> CM["📊 Cloud Monitoring /<br/>Prometheus"]
+    end
+
+    subgraph After["今回 (spec.monitoring.enabled: false)"]
+        RS2["📄 RootSync / RepoSync<br/>monitoring.enabled: false"] --> POD2["🤖 Reconciler Pod<br/>reconciler + git-sync<br/>(otel-agent なし)"]
+        POD2 -.->|メトリクス送信なし| X["🚫 テレメトリー無効"]
+    end
+
+    Before ~~~ After
+      </pre>
+    </div>
+    <p>
+      従来はすべての Reconciler Pod に <code>otel-agent</code> サイドカーが付与されメトリクスが収集されていましたが、
+      今回のアップデートによりオブジェクト単位でサイドカーを省略し、テレメトリー収集を無効化できるようになりました。
+    </p>
+  </div>
+
+  <!-- 主要機能 -->
+  <div class="section">
+    <h2>🔧 主要機能</h2>
+
+    <div class="card">
+      <h3>1️⃣ RootSync/RepoSync 単位のモニタリング無効化 (<code>spec.monitoring.enabled</code>)</h3>
+      <div class="icon-text"><span class="arrow">→</span><span><code>spec.monitoring.enabled</code> を <code>false</code> に設定すると、そのオブジェクトのメトリクステレメトリー収集・エクスポートが無効化される</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>デフォルト値は <code>true</code> (モニタリング有効) で、このフィールドはオプション</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>無効化すると Reconciler Pod から <code>otel-agent</code> サイドカーが省略され、リソース消費の削減に寄与</span></div>
+    </div>
+
+    <div class="card">
+      <h3>2️⃣ カスタムオブジェクトのみサポート</h3>
+      <div class="icon-text"><span class="arrow">→</span><span>カスタムの RootSync オブジェクト、および任意の RepoSync オブジェクトに設定可能</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>コンソール / gcloud CLI / Terraform で自動作成されるデフォルトの <code>root-sync</code> オブジェクトでは非サポートで、変更は自動的に元に戻される (revert)</span></div>
+    </div>
+
+    <div class="card">
+      <h3>3️⃣ 依存関係更新による CVE 対応</h3>
+      <div class="icon-text"><span class="arrow">→</span><span>依存関係 (dependencies) の更新により、複数の CVE に対応</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>コンテナイメージや内部ライブラリの脆弱性が解消されるため、最新バージョンへのアップグレードを推奨</span></div>
+    </div>
+  </div>
+
+  <!-- 技術仕様 -->
+  <div class="section">
+    <h2>📐 技術仕様</h2>
+
+    <h3>🧾 <code>spec.monitoring.enabled</code> フィールド</h3>
+    <table>
+      <tr><th>項目</th><th>詳細</th></tr>
+      <tr><td>フィールド</td><td><code>spec.monitoring.enabled</code></td></tr>
+      <tr><td>型 / デフォルト</td><td>boolean / <code>true</code> (オプション)</td></tr>
+      <tr><td>対象リソース</td><td>カスタム RootSync オブジェクト、任意の RepoSync オブジェクト</td></tr>
+      <tr><td>非対応</td><td>デフォルトの <code>root-sync</code> オブジェクト (コンソール / gcloud CLI / Terraform で作成されたもの) では変更が自動的に元に戻される</td></tr>
+      <tr><td><code>false</code> 設定時の動作</td><td>対象 Reconciler のメトリクステレメトリー収集・エクスポートが無効化され、Reconciler Pod から <code>otel-agent</code> サイドカーが省略される</td></tr>
+    </table>
+
+    <h3>📡 Config Sync のメトリクス収集の仕組み</h3>
+    <p>
+      Config Sync は OpenCensus でメトリクスを作成・記録し、OpenTelemetry を使用して Prometheus および Cloud Monitoring にエクスポートします。
+      <code>otel-collector</code> Deployment は <code>config-management-monitoring</code> Namespace で実行され、
+      GKE 上では <code>otel-collector-google-cloud</code> ConfigMap により Cloud Monitoring へのエクスポートが構成されます。
+      今回のフィールドは、この収集パイプラインへの Reconciler 単位でのテレメトリー送信を制御します。
+    </p>
+
+    <h3>📝 設定例</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">YAML</span>
+        <span class="code-title">モニタリング無効化の設定例</span>
+      </div>
+      <pre><code class="language-yaml">apiVersion: configsync.gke.io/v1beta1
+kind: RootSync # または RepoSync
+metadata:
+  name: SYNC_NAME
+  namespace: SYNC_NAMESPACE
+spec:
+  monitoring:
+    enabled: false</code></pre>
+    </div>
+  </div>
+
+  <!-- 設定方法 -->
+  <div class="section">
+    <h2>🛠️ 設定方法</h2>
+
+    <h3>✅ 前提条件</h3>
+    <div class="check-item"><span class="check-icon">✓</span><span>Config Sync がインストールされたクラスタ (GKE または登録済みクラスタ)</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span>対象がカスタム RootSync オブジェクトまたは RepoSync オブジェクトであること (デフォルトの <code>root-sync</code> は対象外)</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span>RootSync/RepoSync リソースを編集できる Kubernetes RBAC 権限</span></div>
+
+    <h3>ステップ 1: マニフェストに <code>spec.monitoring.enabled: false</code> を追加</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">YAML</span>
+        <span class="code-title">repo-sync-app.yaml</span>
+      </div>
+      <pre><code class="language-yaml">apiVersion: configsync.gke.io/v1beta1
+kind: RepoSync
+metadata:
+  name: repo-sync-app
+  namespace: my-app
+spec:
+  monitoring:
+    enabled: false
+  sourceFormat: unstructured
+  git:
+    repo: https://github.com/example/app-configs
+    branch: main
+    auth: none</code></pre>
+    </div>
+
+    <h3>ステップ 2: マニフェストを適用し、Reconciler Pod を確認</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Bash</span>
+        <span class="code-title">適用と otel-agent サイドカーの確認</span>
+      </div>
+      <pre><code class="language-bash">kubectl apply -f repo-sync-app.yaml
+
+# Reconciler Pod に otel-agent サイドカーがないことを確認
+kubectl get pods -n config-management-system \
+  -o jsonpath='{range .items[*]}{.metadata.name}{": "}{range .spec.containers[*]}{.name}{" "}{end}{"\n"}{end}'</code></pre>
+    </div>
+    <p>適用後、対象の Reconciler Pod のコンテナ一覧に <code>otel-agent</code> が含まれていないことを確認します。</p>
+  </div>
+
+  <!-- メリット -->
+  <div class="section">
+    <h2>💡 メリット</h2>
+
+    <h3>💼 ビジネス面</h3>
+    <div class="success-box">
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>クラスタコストの最適化</strong>: 同期対象ごとに不要なサイドカーコンテナを省略し、CPU/メモリ消費を削減してノードリソースを有効活用</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>モニタリングコストの抑制</strong>: Cloud Monitoring のサンプル取り込み量に応じた課金を、不要なメトリクス収集の停止により削減</span></div>
+    </div>
+
+    <h3>⚙️ 技術面</h3>
+    <div class="success-box">
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>きめ細かいテレメトリー制御</strong>: クラスタ全体ではなくオブジェクト単位で有効/無効を選択でき、重要な同期のみ観測する運用が可能</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>宣言的な設定</strong>: フィールド 1 つで制御でき、GitOps ワークフローの中でモニタリング設定自体もコード管理できる</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>セキュリティ強化</strong>: 依存関係の更新により複数の CVE が解消され、脆弱性リスクが低減</span></div>
+    </div>
+  </div>
+
+  <!-- デメリット・制約事項 -->
+  <div class="section">
+    <h2>⚠️ デメリット・制約事項</h2>
+
+    <h3>🚧 制限事項</h3>
+    <div class="error-box">
+      <div class="check-item"><span class="cross-icon">✗</span><span>デフォルトの <code>root-sync</code> オブジェクト (コンソール、gcloud CLI、Terraform で作成) では <code>spec.monitoring.enabled</code> は非サポートで、変更しても自動的に元に戻される</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>モニタリングを無効化した Reconciler は、同期の状態やパフォーマンスに関するメトリクスを Cloud Monitoring / Prometheus で確認できなくなる</span></div>
+    </div>
+
+    <h3>🤔 考慮すべき点</h3>
+    <div class="warning-box">
+      <div class="check-item"><span>⚠️</span><span>無効化した同期対象のトラブルシューティングは、RootSync/RepoSync のステータスや Reconciler のログ (<code>kubectl logs</code>) に依存することになる</span></div>
+      <div class="check-item"><span>⚠️</span><span>本番環境で重要な構成を同期している RootSync/RepoSync では、可観測性とリソース削減のトレードオフを慎重に判断する必要がある</span></div>
+    </div>
+  </div>
+
+  <!-- ユースケース -->
+  <div class="section">
+    <h2>🎯 ユースケース</h2>
+
+    <div class="usecase">
+      <h3>1. 多数の RepoSync を運用するマルチテナントクラスタのリソース削減</h3>
+      <p>
+        <strong>シナリオ</strong>: 数十の Namespace それぞれに RepoSync を構成しているマルチテナント GKE クラスタで、
+        Reconciler Pod ごとの <code>otel-agent</code> サイドカーの積み上げによる CPU/メモリ消費が無視できなくなっている。
+      </p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">YAML</span>
+          <span class="code-title">テナント Namespace の RepoSync 実装例</span>
+        </div>
+        <pre><code class="language-yaml">apiVersion: configsync.gke.io/v1beta1
+kind: RepoSync
+metadata:
+  name: repo-sync
+  namespace: tenant-a
+spec:
+  monitoring:
+    enabled: false
+  git:
+    repo: https://github.com/example/tenant-a-configs
+    branch: main</code></pre>
+      </div>
+      <p>
+        <strong>効果</strong>: 重要度の低いテナントの RepoSync でテレメトリーを無効化することで、
+        クラスタ全体のリソース消費と Cloud Monitoring のサンプル取り込みコストを削減できる。
+      </p>
+    </div>
+
+    <div class="usecase">
+      <h3>2. リソース制約の厳しいエッジ/小規模クラスタでの Config Sync 運用</h3>
+      <p>
+        <strong>シナリオ</strong>: エッジ拠点の小規模クラスタで Config Sync による構成同期を行っているが、
+        ノードのリソースが限られており、監視コンポーネントのオーバーヘッドを最小化したい。
+      </p>
+      <p>
+        <strong>効果</strong>: カスタム RootSync でモニタリングを無効化し、同期状態の確認は RootSync のステータスとログで代替することで、
+        限られたリソースを本来のワークロードに割り当てられる。
+      </p>
+    </div>
+  </div>
+
+  <!-- 料金 -->
+  <div class="section">
+    <h2>💰 料金</h2>
+    <p>
+      Anthos Config Management (Config Sync) 自体の料金体系に変更はありません。
+      Config Sync のメトリクスは Google Cloud Managed Service for Prometheus を通じて Cloud Monitoring に取り込まれ、
+      <span class="highlight">取り込まれたサンプル数に基づいて課金</span>されます。
+      モニタリングを無効化することで、この取り込みコストを削減できる場合があります。
+    </p>
+    <div class="note-box">
+      <strong>💡 参考:</strong>
+      <a href="https://cloud.google.com/kubernetes-engine/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Google Kubernetes Engine の料金</a> /
+      <a href="https://cloud.google.com/stackdriver/pricing#monitoring-pricing-summary" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud Monitoring の料金</a>
+    </div>
+  </div>
+
+  <!-- 関連サービス -->
+  <div class="section">
+    <h2>🔗 関連サービス・機能</h2>
+    <div class="related-grid">
+      <div class="related-item">
+        <strong>📊 Cloud Monitoring</strong>
+        Config Sync のメトリクスのエクスポート先。本機能で Reconciler 単位のメトリクス送信を制御できる
+      </div>
+      <div class="related-item">
+        <strong>📈 Managed Service for Prometheus</strong>
+        Config Sync メトリクスの Cloud Monitoring への取り込みに使用される
+      </div>
+      <div class="related-item">
+        <strong>☁️ GKE (Google Kubernetes Engine)</strong>
+        Config Sync の主要な実行環境。GKE Enterprise の構成管理機能として提供される
+      </div>
+      <div class="related-item">
+        <strong>📡 OpenTelemetry</strong>
+        Config Sync がメトリクスのエクスポートに使用する仕組み。無効化時は <code>otel-agent</code> サイドカーが省略される
+      </div>
+    </div>
+  </div>
+
+  <!-- まとめ -->
+  <div class="section">
+    <h2>📝 まとめ</h2>
+    <div class="note-box">
+      <div class="check-item"><span class="check-icon">✓</span><span><code>spec.monitoring.enabled</code> により、RootSync/RepoSync オブジェクト単位でメトリクステレメトリーを無効化可能に</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><code>otel-agent</code> サイドカーの省略により、クラスタリソースと Cloud Monitoring の取り込みコストを削減</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>多数の同期オブジェクトを運用する環境やリソース制約のあるクラスタでは、可観測性とのトレードオフを踏まえて適用を検討する価値がある</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>複数の CVE に対応した依存関係の更新が行われているため、最新バージョンへのアップグレードを推奨</span></div>
+    </div>
+  </div>
+
+  <footer>
+    <p>📎 出典:</p>
+    <ul>
+      <li><a href="https://docs.cloud.google.com/release-notes#August_24_2026" target="_blank" rel="noopener noreferrer" class="gc-link">Google Cloud 公式リリースノート (2026-08-24)</a></li>
+      <li><a href="https://docs.cloud.google.com/kubernetes-engine/config-sync/docs/how-to/monitoring-config-sync#disable-monitoring" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: Config Sync のモニタリングを無効化する</a></li>
+      <li><a href="https://docs.cloud.google.com/kubernetes-engine/config-sync/docs/reference/rootsync-reposync-fields" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: RootSync / RepoSync フィールドリファレンス</a></li>
+      <li><a href="https://cloud.google.com/stackdriver/pricing#monitoring-pricing-summary" target="_blank" rel="noopener noreferrer" class="gc-link">料金ページ (Cloud Monitoring)</a></li>
+    </ul>
+    <p>タグ: #AnthosConfigManagement #ConfigSync #GitOps #GKE #Monitoring #OpenTelemetry #Security #CVE</p>
+  </footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#4285F4',
+      primaryTextColor: '#202124',
+      primaryBorderColor: '#4285F4',
+      lineColor: '#4285F4',
+      secondaryColor: '#F1F3F4',
+      tertiaryColor: '#FAFAFA',
+      background: '#FFFFFF',
+      mainBkg: '#E8F0FE',
+      nodeBorder: '#4285F4',
+      clusterBkg: '#E8F0FE',
+      clusterBorder: '#4285F4',
+      edgeLabelBackground: '#FFFFFF',
+      textColor: '#202124'
+    }
+  });
+  hljs.highlightAll();
+</script>
+</body>
+</html>
