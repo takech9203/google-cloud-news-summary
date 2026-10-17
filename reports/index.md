@@ -5,7 +5,10 @@
 
 ## 2026 年
 
+- [2026-10-16 - Google Kubernetes Engine (GKE): Standard CPU ノードプールのインプレースノードアップグレード](2026/2026-10-16-gke-standard-in-place-node-upgrade.md)
+- [2026-10-16 - BigQuery: Conversational analytics (会話型分析) がモントリオール・トロントリージョンで利用可能に](2026/2026-10-16-bigquery-conversational-analytics-locations.md)
 - [2026-10-16 - Vertex AI Search: Agent Search の回答生成 stable モデルが gemini-3.5-flash に更新](2026/2026-10-16-vertex-ai-search-agent-search-stable-model-update.md)
+- [2026-10-16 - Gemini Enterprise: カスタム MCP データストア向け引用 (Citation) 設定が GA](2026/2026-10-16-gemini-enterprise-mcp-citation-mappings.md)
 - [2026-10-16 - Dialogflow: gemini-3.5-flash-lite が一般提供 (GA) 開始](2026/2026-10-16-dialogflow-gemini-3-5-flash-lite-ga.md)
 - [2026-10-16 - Gemini Enterprise: Workflow Builder のワークフローが Confluence Data Center / Jira Data Center に接続可能に](2026/2026-10-16-gemini-enterprise-workflow-builder-confluence-jira.md)
 - [2026-10-15 - BigQuery: クロスリージョンテーブルコピー / GoogleSQL 列エイリアス / 会話型分析エクスポートが GA](2026/2026-10-15-bigquery-cross-region-copy-column-aliases.md)
@@ -16,6 +19,7 @@
 - [2026-10-15 - Compute Engine: ゾーンブートディスクのクローンによるリージョナルディスク作成 (Preview) / 予約キャパシティ上限エラーの追加](2026/2026-10-15-compute-engine-regional-disk-clone-reservation-limit.md)
 - [2026-10-15 - Apigee X: MIG スタートアップスクリプトの IP フォワーディング設定永続化の修正](2026/2026-10-15-apigee-x-mig-ip-forward-fix.md)
 - [2026-10-15 - Gemini Enterprise: Anthropic Claude モデル (Claude Opus 5.5 / Claude Sonnet 5.5) が利用可能に](2026/2026-10-15-gemini-enterprise-anthropic-claude-models.md)
+- [2026-10-15 - Compute Engine: ストレージ最適化 Z4M マシンシリーズが一般提供 (GA)](2026/2026-10-15-compute-engine-z4m-ga.md)
 - [2026-10-15 - Google Cloud NetApp Volumes: Flex Unified サービスレベルが europe-west8 (ミラノ) で利用可能に](2026/2026-10-15-netapp-volumes-flex-unified-europe-west8.md)
 - [2026-10-15 - Cloud Vision API / Video Intelligence API: 感情ラベルレスポンスの非推奨化](2026/2026-10-15-cloud-vision-video-intelligence-emotion-label-deprecation.md)
 - [2026-10-15 - Looker (Google Cloud core): Looker 26.18 機能の有効化開始](2026/2026-10-15-looker-26-18-rollout.md)
