@@ -9,6 +9,7 @@
 - [2026-10-16 - BigQuery: Conversational analytics (会話型分析) がモントリオール・トロントリージョンで利用可能に](2026/2026-10-16-bigquery-conversational-analytics-locations.md)
 - [2026-10-16 - Vertex AI Search: Agent Search の回答生成 stable モデルが gemini-3.5-flash に更新](2026/2026-10-16-vertex-ai-search-agent-search-stable-model-update.md)
 - [2026-10-16 - Gemini Enterprise: カスタム MCP データストア向け引用 (Citation) 設定が GA](2026/2026-10-16-gemini-enterprise-mcp-citation-mappings.md)
+- [2026-10-16 - Google Cloud Contact Center as a Service: Advanced Reporting ダッシュボード 6.16 プレリリースノート](2026/2026-10-16-ccaas-6-16-advanced-reporting-prerelease.md)
 - [2026-10-16 - Dialogflow: gemini-3.5-flash-lite が一般提供 (GA) 開始](2026/2026-10-16-dialogflow-gemini-3-5-flash-lite-ga.md)
 - [2026-10-16 - Gemini Enterprise: Workflow Builder のワークフローが Confluence Data Center / Jira Data Center に接続可能に](2026/2026-10-16-gemini-enterprise-workflow-builder-confluence-jira.md)
 - [2026-10-15 - BigQuery: クロスリージョンテーブルコピー / GoogleSQL 列エイリアス / 会話型分析エクスポートが GA](2026/2026-10-15-bigquery-cross-region-copy-column-aliases.md)
