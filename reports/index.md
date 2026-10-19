@@ -5,6 +5,13 @@
 
 ## 2026 年
 
+- [2026-10-19 - Google Cloud Armor: 事前構成 WAF ルールセット (CRS 3.3 / 3.0 stable) のセキュリティ修正と機能強化](2026/2026-10-19-cloud-armor-waf-ruleset-updates.md)
+- [2026-10-19 - Dialogflow CX: telephony_disable_voice_processing セッションパラメータによる音声認識の無効化](2026/2026-10-19-dialogflow-cx-telephony-disable-voice-processing.md)
+- [2026-10-19 - Cloud Tasks: デリー・トロントリージョンで利用可能に](2026/2026-10-19-cloud-tasks-new-regions.md)
+- [2026-10-19 - Compute Engine: グレースフルシャットダウンが GA (一般提供開始)](2026/2026-10-19-compute-engine-graceful-shutdown-ga.md)
+- [2026-10-19 - Agent Platform Workbench: 20261018.00_p0 リリース (パッケージ更新と Jupyter Server 設定競合の修正)](2026/2026-10-19-agent-platform-workbench-20261018-release.md)
+- [2026-10-19 - Security Command Center: フォルダ・プロジェクトレベルでのイシュー表示 (Preview)](2026/2026-10-19-security-command-center-issues-folder-project-level.md)
+- [2026-10-18 - Google SecOps / Google SecOps SOAR: クローズ済みケースの再オープン設定・SOAR Release 6.3.103・ListCaseEvents API 非推奨化](2026/2026-10-18-google-secops-soar-updates.md)
 - [2026-10-16 - Google Kubernetes Engine (GKE): Standard CPU ノードプールのインプレースノードアップグレード](2026/2026-10-16-gke-standard-in-place-node-upgrade.md)
 - [2026-10-16 - BigQuery: Conversational analytics (会話型分析) がモントリオール・トロントリージョンで利用可能に](2026/2026-10-16-bigquery-conversational-analytics-locations.md)
 - [2026-10-16 - Vertex AI Search: Agent Search の回答生成 stable モデルが gemini-3.5-flash に更新](2026/2026-10-16-vertex-ai-search-agent-search-stable-model-update.md)
