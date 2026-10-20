@@ -5,12 +5,22 @@
 
 ## 2026 年
 
+- [2026-10-20 - Cloud SDK: gcloud CLI 590.0.0 リリース (破壊的変更と多数の GA 昇格)](2026/2026-10-20-cloud-sdk-590-0-0.md)
+- [2026-10-20 - Apigee: メンテナンスウィンドウ構成インスタンスの 1-18-0-apigee-6 への更新開始](2026/2026-10-20-apigee-maintenance-1-18-0-apigee-6.md)
+- [2026-10-20 - Google Kubernetes Engine: Cloud Storage FUSE CSI driver の Pod 起動失敗問題が解決 (コントロールプレーンのアップグレードで修正可能に)](2026/2026-10-20-gke-cloud-storage-fuse-csi-driver-fix.md)
 - [2026-10-19 - Google Cloud Armor: 事前構成 WAF ルールセット (CRS 3.3 / 3.0 stable) のセキュリティ修正と機能強化](2026/2026-10-19-cloud-armor-waf-ruleset-updates.md)
 - [2026-10-19 - Dialogflow CX: telephony_disable_voice_processing セッションパラメータによる音声認識の無効化](2026/2026-10-19-dialogflow-cx-telephony-disable-voice-processing.md)
+- [2026-10-19 - AlloyDB for PostgreSQL: Lakehouse Federation (BigQuery リアルタイムアクセス) が GA](2026/2026-10-19-alloydb-lakehouse-federation-ga.md)
+- [2026-10-19 - Confidential Space: 新イメージ 261000 リリース](2026/2026-10-19-confidential-space-image-261000.md)
+- [2026-10-19 - Cloud Asset Inventory: 新規リソースタイプのサポート追加 (Fault Injection Testing / Firebase Storage / Privileged Access Manager)](2026/2026-10-19-cloud-asset-inventory-new-resource-types.md)
 - [2026-10-19 - Cloud Tasks: デリー・トロントリージョンで利用可能に](2026/2026-10-19-cloud-tasks-new-regions.md)
 - [2026-10-19 - Compute Engine: グレースフルシャットダウンが GA (一般提供開始)](2026/2026-10-19-compute-engine-graceful-shutdown-ga.md)
 - [2026-10-19 - Agent Platform Workbench: 20261018.00_p0 リリース (パッケージ更新と Jupyter Server 設定競合の修正)](2026/2026-10-19-agent-platform-workbench-20261018-release.md)
 - [2026-10-19 - Security Command Center: フォルダ・プロジェクトレベルでのイシュー表示 (Preview)](2026/2026-10-19-security-command-center-issues-folder-project-level.md)
+- [2026-10-19 - Cloud Service Mesh: セキュリティ速報 GCP-2026-069 に対応するパッチリリース](2026/2026-10-19-cloud-service-mesh-security-patches-gcp-2026-069.md)
+- [2026-10-19 - Firestore: テキスト検索と地理空間検索が一般提供 (GA) に](2026/2026-10-19-firestore-text-geospatial-search-ga.md)
+- [2026-10-19 - Container-Optimized OS: 新規 LTS イメージリリース (cos-129 / cos-125 / cos-121)](2026/2026-10-19-container-optimized-os-image-updates.md)
+- [2026-10-19 - Google Cloud Contact Center as a Service: バージョン 6.22 正式リリース](2026/2026-10-19-ccaas-6-22-release.md)
 - [2026-10-18 - Google SecOps / Google SecOps SOAR: クローズ済みケースの再オープン設定・SOAR Release 6.3.103・ListCaseEvents API 非推奨化](2026/2026-10-18-google-secops-soar-updates.md)
 - [2026-10-16 - Google Kubernetes Engine (GKE): Standard CPU ノードプールのインプレースノードアップグレード](2026/2026-10-16-gke-standard-in-place-node-upgrade.md)
 - [2026-10-16 - BigQuery: Conversational analytics (会話型分析) がモントリオール・トロントリージョンで利用可能に](2026/2026-10-16-bigquery-conversational-analytics-locations.md)
