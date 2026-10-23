@@ -1,5 +1,7 @@
 # App Engine / Cloud Run / Buildpacks: PHP ランタイムセキュリティパッチ (CVE-2026-109618 / CVE-2026-109619)
 
+> **⚠️ 訂正 (2026-10-22)**: 本レポートの元となった 2026 年 10 月 21 日の Release Notes 注記 (App Engine スタンダード / フレキシブル環境、Cloud Run、Cloud Run functions) は、公式に「This note is incorrect; follow guidance in the entry for October 22, 2026.」とマークされました。訂正版ガイダンスでは、サポート対象の PHP 8.2 以降はすべてパッチ済みであり、**4 サービスすべてのユーザーが更新された依存関係で直ちに再デプロイする** よう一律に指示されています (「自動適用済みのためアクション不要」の区分はなくなりました)。最新のガイダンスは訂正版レポート [2026-10-22-php-runtime-security-patches-update.md](./2026-10-22-php-runtime-security-patches-update.md) を参照してください。
+
 **リリース日**: 2026-10-21
 
 **サービス**: App Engine (スタンダード環境 / フレキシブル環境), Cloud Run, Cloud Run functions, Buildpacks

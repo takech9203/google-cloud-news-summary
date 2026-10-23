@@ -5,10 +5,20 @@
 
 ## 2026 年
 
+- [2026-10-23 - Cloud Monitoring (Ops Agent): Ops Agent 2.73.0 セキュリティ修正 (CVE-2026-111943)](2026/2026-10-23-cloud-monitoring-ops-agent-2-73-0-security-fix.md)
 - [2026-10-22 - Data Studio (Looker Studio): BigQuery コネクタが BigQuery Graph への接続に対応](2026/2026-10-22-data-studio-bigquery-graph-connector.md)
+- [2026-10-22 - Container-Optimized OS: cos-133 新リリースと LTS Refresh (cos-121/125/129) によるセキュリティ強化](2026/2026-10-22-container-optimized-os-cos-133-lts-refresh.md)
+- [2026-10-22 - BigQuery: AI.TRANSLATE 関数が一般提供 (GA) に](2026/2026-10-22-bigquery-ai-translate-ga.md)
 - [2026-10-22 - Compute Engine: MIG インスタンス分散状況のモニタリング (Monitoring タブ)](2026/2026-10-22-compute-engine-mig-instance-distribution-monitoring.md)
+- [2026-10-22 - Apigee: セキュリティ修正と不具合修正を含む 1-18-0-apigee-7 のリリース](2026/2026-10-22-apigee-maintenance-1-18-0-apigee-7.md)
+- [2026-10-22 - Compute Engine: ブロックストレージ向けリソースベース確約利用割引 (CUD) が GA](2026/2026-10-22-compute-engine-hyperdisk-block-storage-cud-ga.md)
 - [2026-10-22 - Looker: Looker 26.22 リリース (Looker (original) 向けロールアウト)](2026/2026-10-22-looker-26-22-release.md)
+- [2026-10-22 - App Engine / Cloud Run: PHP ランタイムセキュリティパッチ続報 — 10/21 の注記を訂正、全ワークロードで再デプロイを指示](2026/2026-10-22-php-runtime-security-patches-update.md)
+- [2026-10-22 - Gemini Enterprise: AlphaEvolve のデフォルトモデルが 2026 年 10 月 26 日に Gemini 4 Argon へ変更](2026/2026-10-22-gemini-enterprise-alphaevolve-gemini-4-argon-default.md)
 - [2026-10-22 - Gemini Enterprise: 単一ユーザークォータ上限 (Single-user quota limits)](2026/2026-10-22-gemini-enterprise-single-user-quota-limits.md)
+- [2026-10-22 - Firestore: Pipeline DML オペレーションが GA、insert / upsert ステージを追加](2026/2026-10-22-firestore-pipeline-dml-ga.md)
+- [2026-10-22 - Cloud Run: Direct VPC ingress (インスタンス向け)](2026/2026-10-22-cloud-run-direct-vpc-ingress.md)
+- [2026-10-22 - Google Cloud Contact Center as a Service (CCAI Platform): 高度なレポートダッシュボード プレリリースノート 6.24](2026/2026-10-22-ccaas-advanced-reporting-dashboards-6-24.md)
 - [2026-10-21 - Model Armor: Template リソースに対するカスタム組織ポリシーが GA](2026/2026-10-21-model-armor-custom-org-policies.md)
 - [2026-10-21 - Cloud Billing: 料金データの BigQuery エクスポートに SKU 属性と詳細使用量単位を追加 (Preview)](2026/2026-10-21-cloud-billing-pricing-export-sku-attributes.md)
 - [2026-10-21 - Google Distributed Cloud (software only): 1.36.200-gke.118 リリース (VMware 版 / ベアメタル版)](2026/2026-10-21-google-distributed-cloud-1-36-200.md)
