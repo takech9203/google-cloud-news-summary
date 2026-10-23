@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Trace DAG 可視化 - トレースコール階層のグラフ表示</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card.green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card.purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .card.teal {
+      border-left-color: var(--gc-teal);
+    }
+
+    .card.orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-green);
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 20px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.green {
+      background: linear-gradient(135deg, var(--gc-green), #2E7D32);
+    }
+
+    .stat-card.teal {
+      background: linear-gradient(135deg, var(--gc-teal), #00838F);
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-card h4 {
+      color: var(--gc-red);
+      margin: 0 0 12px 0;
+      font-size: 16px;
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-card h4 {
+      color: var(--gc-green);
+      margin: 0 0 12px 0;
+      font-size: 16px;
+    }
+
+    .before-card ul, .after-card ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .before-card li, .after-card li {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-900);
+      margin: 0 0 8px 0;
+    }
+
+    .usecase-card p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .pricing-table {
+      margin: 16px 0;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stat-cards { grid-template-columns: 1fr; }
+      .feature-grid { grid-template-columns: 1fr; }
+      .flow-diagram { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>📊 Cloud Trace: DAG 可視化</h1>
+        <p style="margin: 8px 0 0 0; color: var(--gc-on-surface-variant);">トレースコール階層の有向非巡回グラフ表示</p>
+      </div>
+      <div style="text-align: right;">
+        <div class="subtitle">2026-06-01</div>
+        <span class="badge">Cloud Monitoring</span>
+        <span class="badge">Cloud Trace</span>
+        <span class="badge-ga">GA</span>
+      </div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>🎯 概要</h2>
+      <p>Cloud Monitoring / Cloud Trace に、トレースのコール階層を<span class="highlight">有向非巡回グラフ (DAG)</span> として表示する新機能がリリースされました。従来のタイムライン形式に加えて、スパンの呼び出し関係をグラフ形式で視覚的に把握できます。</p>
+
+      <div class="flow-diagram">
+        <div class="flow-step">📋 Trace Explorer<br/>スパン選択</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🔄 Graph ボタン<br/>クリック</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🌐 DAG ビュー<br/>表示</div>
+      </div>
+
+      <div class="note-box">
+        <strong>💡 ポイント:</strong> ツールバーの「Graph」ボタンを選択するだけで、タイムラインビューから DAG ビューにワンクリックで切り替え可能。Trace Explorer と Application Monitoring ダッシュボードの両方で利用できます。
+      </div>
+    </div>
+
+    <!-- Before/After Section -->
+    <div class="section">
+      <h2>🔄 Before / After</h2>
+      <div class="before-after">
+        <div class="before-card">
+          <h4>❌ Before (従来)</h4>
+          <ul>
+            <li>タイムライン形式のみで表示</li>
+            <li>サービス間の依存関係を視覚的に把握困難</li>
+            <li>多数のスパンの親子関係の全体像が不明瞭</li>
+            <li>ボトルネック特定に時間がかかる</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>✅ After (新機能)</h4>
+          <ul>
+            <li>DAG 形式でコール階層をグラフ表示</li>
+            <li>サービス間の依存関係を直感的に理解</li>
+            <li>色でスパンステータスを即座に識別</li>
+            <li>ズーム操作で大規模トレースも閲覧可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>DAG ビューで表示されるトレースのコール階層の概念図です。各ノードがスパンを表し、矢印が呼び出し関係を示します。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph TraceExplorer["Trace Explorer / Application Monitoring"]
+        direction TB
+        TL["タイムラインビュー (デフォルト)"]
+        DAG["DAG ビュー (新機能)"]
+        TL -->|"Graph ボタン選択"| DAG
+        DAG -->|"Timeline ボタン選択"| TL
+    end
+
+    subgraph DAGView["DAG 可視化の構造"]
+        direction TB
+        Root["ルートスパン HTTP GET /api/orders 350ms"]
+        Root --> AuthSvc["認証サービス auth.validate 20ms"]
+        Root --> OrderSvc["注文サービス orders.process 280ms"]
+        OrderSvc --> DBQuery["データベース db.query 150ms"]
+        OrderSvc --> CacheLookup["キャッシュ cache.get 5ms"]
+        OrderSvc --> NotifySvc["通知サービス notify.send 45ms"]
+    end
+
+    subgraph Legend["凡例"]
+        Blue["青色 = 正常完了"]
+        Red["赤色 = エラー"]
+    end
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features Section -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h3>🌐 DAG ビュー</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span>スパン詳細ページでコール階層をグラフ形式で表示</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>各ノードにスパン名とレイテンシーを表示</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>ステータスを色で表現 (青: 正常、赤: エラー)</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>マウスホイールでズームイン/アウト</span></div>
+        </div>
+        <div class="card green">
+          <h3>🔍 Trace Explorer 連携</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span>スパン選択で詳細フライアウトを表示</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>ツールバーの Graph ボタンで切替</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>タイムラインビューとの自由な切替</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>Find in Trace 検索機能と併用可能</span></div>
+        </div>
+        <div class="card purple">
+          <h3>📈 Application Monitoring 連携</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span>ダッシュボードの Traces セクションから利用</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>インタラクティブフライアウト内で DAG 選択</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>App Hub 登録サービスのアイコン表示</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>View in Trace Explorer で遷移可能</span></div>
+        </div>
+        <div class="card teal">
+          <h3>🤖 GenAI スパン統合</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span>GenAI アイコン付きスパンを DAG 内で識別</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>AI エージェントアプリのトレース解析に有効</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>生成 AI イベント/属性を含むスパンを可視化</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+      <h3>表示要素</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>ビュー切替</td><td>ツールバーの「Graph」/「Timeline」ボタン</td></tr>
+          <tr><td>ノード表示情報</td><td>スパン名、レイテンシー</td></tr>
+          <tr><td>ステータス表現</td><td>色による表示 (青: 正常、赤: エラー)</td></tr>
+          <tr><td>ズーム操作</td><td>マウスのスクロールホイール</td></tr>
+          <tr><td>対応ページ</td><td>Trace Explorer、Application Monitoring ダッシュボード</td></tr>
+        </tbody>
+      </table>
+
+      <h3>コール階層で表示される情報</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Name カラム</td><td>スパン名およびスパン/トレース ID</td></tr>
+          <tr><td>Service/workload カラム</td><td>サービスまたはワークロード名 (OpenTelemetry の <code>service.name</code> 属性)</td></tr>
+          <tr><td>レイテンシーバー</td><td>ステータスと所要時間を色と長さで表現</td></tr>
+          <tr><td>ログ/イベント表示</td><td>レイテンシーバー上の丸印でログエントリやイベントの存在を示す</td></tr>
+          <tr><td>GenAI アイコン</td><td>生成 AI イベントまたは属性を含むスパンを識別</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup Steps -->
+    <div class="section">
+      <h2>📋 設定方法</h2>
+      <h3>前提条件</h3>
+      <div class="card">
+        <div class="check-item"><span class="check-icon">✓</span><span>Google Cloud プロジェクトで Cloud Trace API が有効であること</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>適切な IAM ロール (Cloud Trace の閲覧権限) が付与されていること</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>アプリケーションが OpenTelemetry などでインストルメンテーション済みであること</span></div>
+      </div>
+
+      <h3>Trace Explorer からの利用手順</h3>
+      <div class="flow-diagram">
+        <div class="flow-step">1. Trace Explorer<br/>ページを開く</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">2. スパンを選択<br/>or トレース ID 入力</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">3. 詳細フライアウト<br/>が表示される</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">4. Graph ボタン<br/>をクリック</div>
+      </div>
+
+      <h3>Application Monitoring からの利用手順</h3>
+      <div class="flow-diagram">
+        <div class="flow-step">1. Application<br/>Monitoring を開く</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">2. Traces セクション<br/>でスパン選択</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">3. フライアウト表示<br/>コール階層確認</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">4. Graph ボタン<br/>をクリック</div>
+      </div>
+    </div>
+
+    <!-- Benefits Section -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div class="feature-grid">
+        <div>
+          <h3>ビジネス面</h3>
+          <div class="card green">
+            <div class="icon-text"><span>🚀</span><span><strong>トラブルシューティング時間の短縮</strong> - サービス間の依存関係をグラフで即座に把握でき、障害の根本原因特定が迅速化</span></div>
+          </div>
+          <div class="card green">
+            <div class="icon-text"><span>📈</span><span><strong>運用効率の向上</strong> - 複雑なマイクロサービスアーキテクチャの全体像を直感的に理解可能</span></div>
+          </div>
+          <div class="card green">
+            <div class="icon-text"><span>🤖</span><span><strong>AI/ML ワークロードの可視性向上</strong> - GenAI スパンを含むエージェントアプリケーションの動作フローを把握</span></div>
+          </div>
+        </div>
+        <div>
+          <h3>技術面</h3>
+          <div class="card">
+            <div class="icon-text"><span>🔗</span><span><strong>依存関係の構造的理解</strong> - サービス間の親子関係・兄弟関係をグラフで明確に表現</span></div>
+          </div>
+          <div class="card">
+            <div class="icon-text"><span>🎯</span><span><strong>ボトルネックの視覚的特定</strong> - レイテンシー情報とステータスの色表現で問題箇所を即座に特定</span></div>
+          </div>
+          <div class="card">
+            <div class="icon-text"><span>🔍</span><span><strong>スケーラブルな表示</strong> - ズーム機能により大規模トレースでも効率的に閲覧可能</span></div>
+          </div>
+          <div class="card">
+            <div class="icon-text"><span>🔄</span><span><strong>既存ワークフロー統合</strong> - Application Monitoring と Trace Explorer の両方で利用可能</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations Section -->
+    <div class="section">
+      <h2>⚠️ 制約事項・注意点</h2>
+      <div class="warning-box">
+        <div class="check-item"><span class="cross-icon">!</span><span>DAG ビューは構造を表示するが、時間軸のタイミング確認にはタイムラインビューとの併用が必要</span></div>
+      </div>
+      <div class="warning-box">
+        <div class="check-item"><span class="cross-icon">!</span><span>非常に深いネストや多数の並列呼び出しを持つトレースでは、グラフが複雑になる可能性がある</span></div>
+      </div>
+      <div class="warning-box">
+        <div class="check-item"><span class="cross-icon">!</span><span>Application Monitoring での利用には App Hub にサービス/ワークロードが登録されている必要がある (Discovered サービスでは非対応)</span></div>
+      </div>
+    </div>
+
+    <!-- Use Cases Section -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+      <div class="usecase-card">
+        <h4>🛒 ユースケース 1: マイクロサービスの障害分析</h4>
+        <p><strong>シナリオ:</strong> e コマースアプリケーションで注文処理のレスポンスタイムが増加。複数のマイクロサービスが連携する中で、ボトルネックを特定したい。</p>
+        <p><strong>効果:</strong> DAG ビューで注文サービスから在庫・決済・通知サービスへの呼び出し構造を一目で把握。赤色ノードでエラー発生箇所を即座に特定し、レイテンシー表示でボトルネックを発見。</p>
+      </div>
+      <div class="usecase-card">
+        <h4>🤖 ユースケース 2: AI エージェントアプリケーションのデバッグ</h4>
+        <p><strong>シナリオ:</strong> LangChain / LangGraph で構築した AI エージェントが予期しない動作。ツール呼び出しの順序と分岐を確認したい。</p>
+        <p><strong>効果:</strong> GenAI アイコン付きスパンを含むトレースを DAG で表示し、エージェントのツール呼び出しパターンや MCP サーバーへのリクエストフローを視覚的に理解。</p>
+      </div>
+      <div class="usecase-card">
+        <h4>⚡ ユースケース 3: パフォーマンスチューニング</h4>
+        <p><strong>シナリオ:</strong> アプリケーションの P95 レイテンシーを改善するため、クリティカルパス上のサービス呼び出しを最適化したい。</p>
+        <p><strong>効果:</strong> DAG ビューでクリティカルパスを視覚的に追跡し、直列化されている呼び出しの中で並列化可能なものを特定。キャッシュ導入やバッチ処理の適用箇所を効率的に判断。</p>
+      </div>
+    </div>
+
+    <!-- Pricing Section -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <div class="success-box">
+        <strong>✅ DAG 可視化機能自体に追加料金は発生しません。</strong> Cloud Trace の利用料金は従来通り、取り込まれたトレーススパン数に基づいて課金されます。
+      </div>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>料金</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>最初の 250 万スパン/月</td><td><strong>無料</strong></td></tr>
+          <tr><td>250 万スパンを超える分</td><td>$0.20 / 100 万スパン</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <div class="icon-text"><span>📊</span><span><strong>Cloud Trace</strong> - トレースデータの収集・保存・分析。DAG ビューは Trace Explorer 内の機能</span></div>
+        </div>
+        <div class="card">
+          <div class="icon-text"><span>📈</span><span><strong>Cloud Monitoring (App Monitoring)</strong> - アプリケーションレベルのダッシュボード。フライアウト内で DAG 利用可能</span></div>
+        </div>
+        <div class="card">
+          <div class="icon-text"><span>🔎</span><span><strong>Observability Analytics</strong> - SQL でトレースデータを分析可能 (2026年5月 GA)。DAG ビューと併用してデータドリブンな分析</span></div>
+        </div>
+        <div class="card">
+          <div class="icon-text"><span>📡</span><span><strong>OpenTelemetry</strong> - トレースデータ収集の標準。service.name 属性が DAG のノード表示に使用される</span></div>
+        </div>
+        <div class="card">
+          <div class="icon-text"><span>🏢</span><span><strong>App Hub</strong> - サービスとワークロードの登録管理。Application Monitoring でトレースデータ表示に必要</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="margin: 4px 0; padding-left: 20px;">
+        <li><a href="https://docs.cloud.google.com/release-notes#June_01_2026" target="_blank" rel="noopener noreferrer">Google Cloud Release Notes (June 01, 2026)</a></li>
+        <li><a href="https://docs.cloud.google.com/trace/docs/finding-traces#explore" target="_blank" rel="noopener noreferrer">Trace Explorer: Explore a trace</a></li>
+        <li><a href="https://docs.cloud.google.com/monitoring/docs/application-monitoring#explore-trace" target="_blank" rel="noopener noreferrer">Application Monitoring: Explore a trace</a></li>
+        <li><a href="https://cloud.google.com/trace/pricing" target="_blank" rel="noopener noreferrer">Cloud Trace 料金</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline);">Generated: 2026-06-01 | Cloud Monitoring / Cloud Trace DAG Visualization</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+</body>
+</html>

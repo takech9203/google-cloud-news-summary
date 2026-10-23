@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GKE Dataplane V2: NetworkPolicy 有効時のノード上限が 15,000 に倍増</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+      white-space: nowrap;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+    }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 720px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .before-box, .after-box {
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid rgba(234, 67, 53, 0.35);
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid rgba(52, 168, 83, 0.35);
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .before-box h3 { color: #C5221F; }
+    .after-box h3 { color: #188038; }
+
+    .before-box ul, .after-box ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 8px 0;
+      font-size: 14.5px;
+    }
+
+    /* 統計カード */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px 16px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 34px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      line-height: 1.2;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.92;
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* コードブロック */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブル */
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* チェックリスト */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    /* ステップ */
+    .step {
+      display: flex;
+      gap: 16px;
+      margin: 16px 0;
+      align-items: flex-start;
+    }
+
+    .step-number {
+      background: var(--gc-blue-600);
+      color: #FFFFFF;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .step-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .step-content h3 {
+      margin-top: 2px;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-100);
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+    }
+
+    ul {
+      padding-left: 24px;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+      word-break: break-all;
+    }
+
+    footer ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <div style="margin-bottom: 8px;">
+          <span class="badge">Google Kubernetes Engine</span>
+          <span class="badge badge-ga">Feature (GKE 1.36+)</span>
+        </div>
+        <h1>☁️ GKE Dataplane V2 + NetworkPolicy<br>ノード上限が <span style="color: var(--gc-blue-600);">15,000</span> に倍増</h1>
+      </div>
+      <div class="subtitle">📅 リリース日: 2026-07-27</div>
+    </div>
+
+    <!-- 統計情報 -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value">15,000</div>
+        <div class="stat-label">最大ノード数/クラスタ<br>(NetworkPolicy 有効)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">2 倍</div>
+        <div class="stat-label">従来上限 7,500 ノード<br>からの拡大率</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">400,000</div>
+        <div class="stat-label">最大 Pod 数/クラスタ<br>(Dataplane V2)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">1.36+</div>
+        <div class="stat-label">必要な GKE バージョン</div>
+      </div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📌 概要</h2>
+      <p>
+        GKE バージョン 1.36 以降で、<span class="highlight">NetworkPolicy を使用する GKE Dataplane V2 クラスタ</span>が
+        1 クラスタあたり<span class="highlight">最大 15,000 ノード</span>をサポートするようになりました。
+        従来の上限 7,500 ノードから <strong>2 倍</strong>への引き上げです。
+        5,000 ノードを超える構成では、Cloud カスタマーケアへのクォータ引き上げ申請が必要です。
+      </p>
+      <p>
+        これまで、ネットワークポリシーによる Pod 間通信制御を維持したまま運用できるのは 7,500 ノードが上限で、
+        それを超えるスケール (最大 65,000 ノード) にはネットワークポリシー適用を無効化する
+        <strong>scale-optimized モード</strong>が必要でした。今回のアップデートで、
+        <span class="highlight">セキュリティ制御を犠牲にせず到達できるクラスタ規模</span>が大幅に拡大します。
+      </p>
+      <p>
+        HPC、大規模データ処理、大規模 AI/ML トレーニングなど、単一クラスタで数千〜1 万ノード超を必要とするワークロードを、
+        マルチテナント分離やゼロトラストのネットワーク制御と両立して運用したいユーザーにとって重要なアップデートです。
+      </p>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before (GKE 1.36 未満)</h3>
+          <ul>
+            <li>NetworkPolicy 有効の Dataplane V2 クラスタは<strong>最大 7,500 ノード</strong>まで</li>
+            <li>7,500 ノード超には <strong>scale-optimized モード</strong> (NetworkPolicy 無効化) か<strong>複数クラスタへの分割</strong>が必要</li>
+            <li>クラスタ分割はフリート管理などの追加運用負荷を伴い、管理効率・リソース利用効率が低下</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After (GKE 1.36 以降)</h3>
+          <ul>
+            <li>NetworkPolicy を有効にしたまま<strong>最大 15,000 ノード</strong>までスケール (従来比 2 倍)</li>
+            <li>Pod レベルの<strong>セキュリティ制御と超大規模スケールを両立</strong></li>
+            <li>7,500 ノード超でもクラスタ分割が必須でなくなり、<strong>単一クラスタの管理・コスト効率</strong>を維持しやすい</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph before["Before: GKE 1.36 未満"]
+        NP1["🔒 NetworkPolicy 有効<br/>GKE Dataplane V2"] --> L1["🖥️ 最大 7,500 ノード/クラスタ"]
+        L1 -.->|"7,500 超が必要"| ALT["⚠️ scale-optimized モード<br/>(NetworkPolicy 無効化)<br/>または複数クラスタへ分割"]
+    end
+
+    subgraph after["After: GKE 1.36 以降"]
+        NP2["🔒 NetworkPolicy 有効<br/>GKE Dataplane V2"] --> L2["🖥️ 最大 15,000 ノード/クラスタ<br/>(2 倍に拡大)"]
+        L2 --> REQ["📋 5,000 ノード超の要件:<br/>リージョナル Standard クラスタ<br/>Private Service Connect<br/>Cloud カスタマーケアへ<br/>クォータ引き上げ申請"]
+    end
+
+    before ~~~ after
+        </pre>
+      </div>
+      <p>
+        従来はネットワークポリシーを維持したままでは 7,500 ノードが上限でしたが、
+        GKE 1.36 以降では<strong>セキュリティ制御を保ったまま 15,000 ノードまで単一クラスタでスケール</strong>できます。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+
+      <div class="card">
+        <h3>🖥️ 1. NetworkPolicy 有効クラスタのノード上限が 15,000 に拡大</h3>
+        <p>
+          GKE 1.36 以降の GKE Dataplane V2 クラスタで、NetworkPolicy を使用したまま
+          1 クラスタあたり<strong>最大 15,000 ノード</strong>をサポート。従来の上限 7,500 ノードから 2 倍への引き上げです。
+        </p>
+      </div>
+
+      <div class="card">
+        <h3>📋 2. 5,000 ノード超はクォータ引き上げ申請で対応</h3>
+        <p>
+          5,000 ノードまでのスケールは、要件 (Dataplane V2、Private Service Connect) を満たしていれば自動。
+          5,000 ノードを超える場合は、<strong>Cloud カスタマーケア</strong>に連絡してクラスタサイズとクォータの引き上げをリクエストします。
+        </p>
+      </div>
+
+      <div class="card">
+        <h3>🔒 3. セキュリティとスケールの両立</h3>
+        <p>
+          15,000 ノードを超えて最大 65,000 ノードまでスケールする場合は、引き続きネットワークポリシー適用を無効化する
+          scale-optimized モードが必要です。今回の拡大により、<strong>Pod 間通信制御を保ったまま到達可能な規模</strong>が大幅に広がりました。
+        </p>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3>📊 クラスタサイズ別の要件 (公式ドキュメントより)</h3>
+      <div class="table-wrap">
+        <table>
+          <tr>
+            <th>ノード数</th>
+            <th>インフラ要件</th>
+            <th>ネットワーク要件</th>
+            <th>申請</th>
+            <th>ユースケース例</th>
+          </tr>
+          <tr>
+            <td>〜1,000</td>
+            <td>すべてのクラスタで利用可能</td>
+            <td>追加要件なし</td>
+            <td>不要 (自動)</td>
+            <td>一般ワークロード、開発、テスト</td>
+          </tr>
+          <tr>
+            <td>1,000〜5,000</td>
+            <td>リージョナル Standard / Autopilot クラスタ</td>
+            <td>GKE Dataplane V2、Private Service Connect</td>
+            <td>不要 (要件を満たせば自動)</td>
+            <td>大量の短命ジョブ、エンタープライズサービス</td>
+          </tr>
+          <tr style="background: var(--gc-green-tint);">
+            <td><strong>5,000〜15,000</strong></td>
+            <td>リージョナル Standard クラスタのみ。GKE 1.36 以降を推奨 (大規模スケーリングの性能改善)</td>
+            <td>GKE Dataplane V2、Private Service Connect</td>
+            <td>Cloud カスタマーケアへクォータ引き上げを申請</td>
+            <td>HPC、データ処理ワークロード</td>
+          </tr>
+          <tr>
+            <td>15,000〜65,000</td>
+            <td>GKE 1.31 以降 (1.36 以降推奨)。リージョナル Standard のみ。クラスタオートスケーラー非対応</td>
+            <td>Dataplane V2 scale-optimized モード (ネットワークポリシー適用が無効化される)、Private Service Connect</td>
+            <td>Cloud カスタマーケアへ申請</td>
+            <td>大規模モデルトレーニング</td>
+          </tr>
+        </table>
+      </div>
+
+      <h3>📈 GKE Dataplane V2 の主なスケール仕様</h3>
+      <div class="table-wrap">
+        <table>
+          <tr>
+            <th>項目</th>
+            <th>上限 (GKE)</th>
+          </tr>
+          <tr><td>ノード数/クラスタ</td><td><strong>15,000</strong></td></tr>
+          <tr><td>Pod 数/クラスタ</td><td>400,000</td></tr>
+          <tr><td>1 Service あたりのバックエンド Pod 数</td><td>10,000</td></tr>
+          <tr><td>ClusterIP Service 数</td><td>10,000</td></tr>
+          <tr><td>LoadBalancer Service 数/クラスタ</td><td>750</td></tr>
+          <tr><td>Service マップのエントリ数 (全 Service のエンドポイント合計)</td><td>260,000</td></tr>
+        </table>
+      </div>
+
+      <div class="warning-box">
+        <strong>⚠️ NetworkPolicy CRD に関する注意:</strong>
+        <ul style="margin: 8px 0 0;">
+          <li><code>CiliumNetworkPolicy</code> CRD (namespace スコープ) を使用するクラスタは、ゾーンクラスタ相当の上限 (最大 1,000 ノード) に制限される</li>
+          <li>5,000 ノード以上へのスケーリングをサポートするには、<code>CiliumClusterwideNetworkPolicy</code> CRD を使用する</li>
+          <li>ゾーンクラスタの上限は最大 1,000 ノード (大規模スケールはリージョナルクラスタのみ)</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>✅ 前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>GKE バージョン 1.36 以降のリージョナル Standard クラスタ</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>GKE Dataplane V2 が有効であること (クラスタ作成時にのみ有効化可能)</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>Private Service Connect が有効なクラスタであること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>5,000 ノード超のスケールには Cloud カスタマーケアへのクォータ引き上げ申請</span></div>
+
+      <div class="step">
+        <div class="step-number">1</div>
+        <div class="step-content">
+          <h3>Dataplane V2 有効のリージョナルクラスタを作成</h3>
+          <div class="code-block">
+            <span class="code-label" style="border-radius: 0;">Bash</span>
+            <pre style="margin: 0; border-radius: 0;"><code class="language-bash">gcloud container clusters create CLUSTER_NAME \
+    --region COMPUTE_REGION \
+    --enable-dataplane-v2 \
+    --cluster-version 1.36</code></pre>
+          </div>
+          <p style="font-size: 14px;">
+            GKE Dataplane V2 は<strong>新規クラスタ作成時にのみ有効化</strong>できます。
+            既存クラスタを Dataplane V2 にアップグレードすることはできません。
+          </p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-number">2</div>
+        <div class="step-content">
+          <h3>Private Service Connect の利用を確認</h3>
+          <div class="code-block">
+            <span class="code-label" style="border-radius: 0;">Bash</span>
+            <pre style="margin: 0; border-radius: 0;"><code class="language-bash">gcloud container clusters describe CLUSTER_NAME \
+    --region COMPUTE_REGION</code></pre>
+          </div>
+          <p style="font-size: 14px;">
+            クラスタが Private Service Connect を使用しているかどうかは、
+            公式ドキュメントの「Clusters with Private Service Connect」の手順で確認します。
+          </p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-number">3</div>
+        <div class="step-content">
+          <h3>5,000 ノード超のクォータ引き上げを申請</h3>
+          <p style="font-size: 14px;">
+            5,000 ノードを超えるスケールが必要な場合は、
+            <a href="https://cloud.google.com/support-hub" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud カスタマーケア</a>
+            に連絡し、クラスタサイズとクォータの引き上げをリクエストします。
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- メリット / デメリット -->
+    <div class="section">
+      <h2>💡 メリット</h2>
+
+      <h3>💼 ビジネス面</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>インフラ集約によるコスト効率</strong>: クラスタ分割が必須だった規模のワークロードを単一クラスタに集約でき、管理コストの削減とリソース利用率の向上が見込める</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>セキュリティ要件との両立</strong>: マルチテナント分離やコンプライアンス上ネットワークポリシーが必須の環境でも、超大規模ワークロードを GKE で実行可能になる</span></div>
+
+      <h3>⚙️ 技術面</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>上限 2 倍への拡大</strong>: NetworkPolicy 有効時のノード上限が 7,500 から 15,000 に倍増</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>セキュリティ制御の維持</strong>: scale-optimized モード (ネットワークポリシー無効) に切り替えることなく 15,000 ノードまで到達可能</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>大規模スケーリングの性能改善</strong>: GKE 1.36 以降では大規模クラスタのスケーリングに関する性能改善が含まれる</span></div>
+    </div>
+
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>🚫 制限事項</h3>
+      <div class="check-item"><span class="cross-icon">✗</span><span>5,000 ノードを超えるスケールは<strong>リージョナル Standard クラスタのみ</strong>対応 (Autopilot は 5,000 ノードまで、ゾーンクラスタは 1,000 ノードまで)</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>5,000 ノード超には <strong>Private Service Connect が必須</strong></span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>5,000 ノード超は自動では拡張されず、<strong>Cloud カスタマーケアへのクォータ引き上げ申請</strong>が必要</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span><code>CiliumNetworkPolicy</code> CRD を使用するクラスタは最大 1,000 ノードに制限される (<code>CiliumClusterwideNetworkPolicy</code> CRD を使用すること)</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>15,000 ノードを超えるスケール (最大 65,000 ノード) には scale-optimized モードが必要で、<strong>ネットワークポリシー適用が無効化</strong>される</span></div>
+
+      <h3>🤔 考慮すべき点</h3>
+      <div class="note-box">
+        <ul style="margin: 0;">
+          <li>ノード数以外の Dataplane V2 の上限 (Pod 400,000/クラスタ、Service マップ 260,000 エントリなど) は引き続き適用されるため、大規模化の際は<strong>ノード数以外の軸でも上限を確認</strong>する必要がある</li>
+          <li>GKE Dataplane V2 は新規クラスタ作成時にのみ有効化できるため、既存の非 Dataplane V2 クラスタでは<strong>クラスタの再作成</strong>が必要</li>
+          <li>クラスタが GKE の各種上限に近づく場合は、<strong>フリート管理を用いた複数クラスタへの分割</strong>も引き続き有効な選択肢</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>🧬 ユースケース 1: HPC / 大規模データ処理基盤のセキュアな単一クラスタ運用</h3>
+        <p>
+          <strong>シナリオ</strong>: 金融リスク計算やゲノム解析などの HPC ワークロードで 1 万ノード規模のクラスタが必要だが、
+          部門間のマルチテナント分離のためネットワークポリシーが必須。従来は 7,500 ノード上限のため 2 クラスタに分割していた。
+        </p>
+        <p style="margin-bottom: 0;">
+          <strong>効果</strong>: GKE 1.36 以降では NetworkPolicy を維持したまま単一クラスタで 15,000 ノードまでスケールでき、
+          <span class="highlight">クラスタ分割に伴う運用負荷とリソースの分断を解消</span>できる。
+        </p>
+      </div>
+
+      <div class="usecase">
+        <h3>📦 ユースケース 2: コンプライアンス要件のある大規模バッチ処理</h3>
+        <p>
+          <strong>シナリオ</strong>: Pod 間通信の制御 (ネットワークポリシー) がセキュリティ標準で義務付けられている環境で、
+          ピーク時に 7,500 ノードを超える大量の短命ジョブを実行する。
+        </p>
+        <p style="margin-bottom: 0;">
+          <strong>効果</strong>: scale-optimized モードによるネットワークポリシー無効化という妥協をせずに、
+          ピーク時のスケール需要 (最大 15,000 ノード) に対応できる。<code>CiliumClusterwideNetworkPolicy</code> を用いれば
+          <span class="highlight">クラスタ全体の一元的な通信制御</span>も維持できる。
+        </p>
+      </div>
+    </div>
+
+    <!-- 料金・リージョン -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <div class="success-box">
+        <strong>✅ ノード上限の拡大自体に追加料金はありません。</strong>
+        <p style="margin: 8px 0 0;">
+          通常の GKE の料金 (クラスタ管理料金およびノードとして稼働する Compute Engine リソースの料金) が適用されます。
+          大規模クラスタではノード数に比例してコンピュートコストが増加するため、コスト管理の仕組みと合わせて計画してください。
+          詳細は <a href="https://cloud.google.com/kubernetes-engine/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">GKE の料金ページ</a> を参照してください。
+        </p>
+      </div>
+
+      <h2 style="margin-top: 24px;">🌏 利用可能リージョン</h2>
+      <p style="margin-bottom: 0;">
+        GKE 1.36 以降が利用可能なリージョンの<strong>リージョナル Standard クラスタ</strong>で利用できます。
+        5,000 ノード超のスケールにはクォータ引き上げ申請が必要です。
+      </p>
+    </div>
+
+    <!-- 関連サービス -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <strong>🌐 GKE Dataplane V2</strong>: 本アップデートの対象。eBPF (Cilium) ベースのデータプレーンで、NetworkPolicy の適用・ロギング・可観測性を提供
+      </div>
+      <div class="card">
+        <strong>🔒 Kubernetes NetworkPolicy / CiliumClusterwideNetworkPolicy / ClusterNetworkPolicy</strong>: Pod 間通信を制御するポリシー。大規模スケールには CiliumClusterwideNetworkPolicy (または Kubernetes ネイティブの ClusterNetworkPolicy) を使用
+      </div>
+      <div class="card">
+        <strong>🔌 Private Service Connect</strong>: 5,000 ノード超のスケールに必須のネットワーク要件
+      </div>
+      <div class="card">
+        <strong>🚢 フリート管理 (Fleet Management)</strong>: 上限を超える規模や要件でクラスタを分割する場合のマルチクラスタ管理を簡素化
+      </div>
+      <div class="card">
+        <strong>🙋 Cloud カスタマーケア</strong>: 5,000 ノード超のクォータ引き上げ申請窓口
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <p>
+        GKE 1.36 以降で、NetworkPolicy を有効にした GKE Dataplane V2 クラスタのノード上限が
+        <span class="highlight">7,500 から 15,000 へと倍増</span>しました。
+        ネットワークポリシーによるセキュリティ制御を維持したまま超大規模ワークロードを単一クラスタで運用できるようになり、
+        HPC や大規模データ処理での構成の選択肢が広がります。
+      </p>
+      <div class="note-box">
+        <strong>💡 次のアクション:</strong>
+        7,500 ノード上限を理由にクラスタを分割している、または scale-optimized モードを検討していた場合は、
+        <strong>GKE 1.36 へのアップグレード</strong>と <strong>Cloud カスタマーケアへのクォータ引き上げ申請</strong>を検討してください。
+      </div>
+      <p style="margin-bottom: 0;">
+        <strong>タグ</strong>: #GKE #Kubernetes #DataplaneV2 #NetworkPolicy #Cilium #eBPF #大規模クラスタ #スケーラビリティ #HPC
+      </p>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p><strong>📎 出典・参考リンク</strong></p>
+      <ul>
+        <li>公式リリースノート (2026-07-27): <a href="https://docs.cloud.google.com/release-notes#July_27_2026" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/release-notes#July_27_2026</a></li>
+        <li>大規模クラスタの計画 (5,000 ノード超の要件): <a href="https://docs.cloud.google.com/kubernetes-engine/docs/concepts/planning-large-clusters#clusters-5k-nodes" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/kubernetes-engine/docs/concepts/planning-large-clusters#clusters-5k-nodes</a></li>
+        <li>GKE Dataplane V2 の概要 (ノード上限): <a href="https://docs.cloud.google.com/kubernetes-engine/docs/concepts/dataplane-v2#node-limits" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/kubernetes-engine/docs/concepts/dataplane-v2#node-limits</a></li>
+        <li>Cilium クラスタ全体ネットワークポリシーの構成: <a href="https://docs.cloud.google.com/kubernetes-engine/docs/how-to/configure-cilium-network-policy" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/kubernetes-engine/docs/how-to/configure-cilium-network-policy</a></li>
+        <li>GKE 料金ページ: <a href="https://cloud.google.com/kubernetes-engine/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">https://cloud.google.com/kubernetes-engine/pricing</a></li>
+      </ul>
+      <p style="margin-top: 12px;">レポート: reports/2026/2026-07-27-gke-dataplane-v2-15000-nodes.md | 生成日: 2026-07-28</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

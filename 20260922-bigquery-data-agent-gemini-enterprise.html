@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BigQuery: Agent Registry と Google 管理認証情報による Gemini Enterprise へのデータエージェント公開</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Google Brand Colors */
+  --gc-blue: #4285F4;
+  --gc-red: #EA4335;
+  --gc-yellow: #FBBC04;
+  --gc-green: #34A853;
+
+  /* Google Cloud UI Blue Scale */
+  --gc-blue-900: #174EA6;
+  --gc-blue-800: #185ABC;
+  --gc-blue-700: #1967D2;
+  --gc-blue-600: #1A73E8;
+  --gc-blue-500: #4285F4;
+  --gc-blue-300: #669DF6;
+  --gc-blue-200: #8AB4F8;
+  --gc-blue-100: #AECBFA;
+  --gc-blue-50: #E8F0FE;
+
+  /* Text Colors */
+  --gc-on-surface: #202124;
+  --gc-on-surface-variant: #5F6368;
+  --gc-outline: #80868B;
+
+  /* Surface Colors */
+  --gc-surface: #FFFFFF;
+  --gc-surface-container-lowest: #F8F9FA;
+  --gc-surface-container-low: #F1F3F4;
+  --gc-surface-container: #E8EAED;
+  --gc-outline-variant: #DADCE0;
+
+  /* Semantic Tints */
+  --gc-blue-tint: #E8F0FE;
+  --gc-green-tint: #E6F4EA;
+  --gc-red-tint: #FCE8E6;
+  --gc-yellow-tint: #FEF7E0;
+  --gc-purple-tint: #F3E8FD;
+  --gc-teal-tint: #E0F7FA;
+
+  /* Extended Colors */
+  --gc-purple: #A142F4;
+  --gc-teal: #00BCD4;
+  --gc-orange: #FF6D00;
+}
+
+body {
+  background-color: var(--gc-surface);
+  font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+  color: var(--gc-on-surface-variant);
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 20px;
+  margin: 0;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 16px;
+  border-bottom: 3px solid var(--gc-blue-600);
+}
+
+h1, .title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--gc-on-surface);
+  margin: 0;
+  line-height: 1.4;
+}
+
+h2, .section-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin-top: 0;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 20px 0 8px;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: var(--gc-outline);
+}
+
+.section {
+  background: var(--gc-surface-container-low);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid var(--gc-outline-variant);
+}
+
+.highlight {
+  background-color: var(--gc-blue-50);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--gc-blue-800);
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+.card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border-left: 4px solid var(--gc-blue-600);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+}
+
+.card h3 {
+  margin-top: 0;
+}
+
+.icon-text {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+  color: var(--gc-on-surface-variant);
+}
+
+.arrow {
+  color: var(--gc-blue-600);
+  font-size: 20px;
+}
+
+.gc-link {
+  color: var(--gc-blue-600);
+  text-decoration: none;
+}
+
+.gc-link:hover {
+  color: var(--gc-blue-800);
+  text-decoration: underline;
+}
+
+/* サービスバッジ */
+.badge,
+.badge-ga,
+.badge-preview,
+.badge-deprecated {
+  display: inline-block;
+  color: #FFFFFF;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+  margin: 4px 8px 4px 0;
+}
+
+.badge {
+  background: var(--gc-blue-600);
+}
+
+.badge-ga {
+  background: var(--gc-green);
+  color: #FFFFFF;
+}
+
+.badge-preview {
+  background: var(--gc-orange);
+  color: #FFFFFF;
+}
+
+.badge-deprecated {
+  background: var(--gc-red);
+  color: #FFFFFF;
+}
+
+/* フロー図スタイル */
+.flow-diagram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 24px 0;
+}
+
+.flow-step {
+  background: var(--gc-surface);
+  border: 2px solid var(--gc-blue-600);
+  border-radius: 12px;
+  padding: 12px 20px;
+  text-align: center;
+  min-width: 100px;
+  color: var(--gc-on-surface);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+}
+
+.flow-arrow {
+  color: var(--gc-blue-600);
+  font-size: 24px;
+  font-weight: bold;
+}
+
+/* チェックリストスタイル */
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.check-icon {
+  color: var(--gc-green);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.cross-icon {
+  color: var(--gc-red);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+/* Before/After 比較 */
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.before-box {
+  background: var(--gc-red-tint);
+  border: 1px solid rgba(234, 67, 53, 0.35);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.after-box {
+  background: var(--gc-green-tint);
+  border: 1px solid rgba(52, 168, 83, 0.35);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.before-box h3, .after-box h3 {
+  margin-top: 0;
+  font-size: 16px;
+}
+
+.before-box h3 { color: #C5221F; }
+.after-box h3 { color: #188038; }
+
+@media (max-width: 720px) {
+  .before-after { grid-template-columns: 1fr; }
+  h1 { font-size: 26px; }
+}
+
+/* コードブロック */
+.code-block,
+pre:not(.mermaid) {
+  background: #1E1E1E;
+  border-radius: 8px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 15px;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: #E8E8E8;
+  margin: 16px 0;
+}
+
+.code-block {
+  overflow: hidden;
+}
+
+.code-block pre {
+  margin: 0;
+  padding: 0;
+}
+
+.code-block code {
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 16px !important;
+  display: block;
+  overflow-x: auto;
+}
+
+.code-header {
+  background: #2D2D2D;
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.code-lang {
+  color: #9CDCFE;
+  font-weight: bold;
+}
+
+.code-title {
+  color: #AAAAAA;
+}
+
+pre code {
+  background: none;
+  border: none;
+  font-size: inherit;
+}
+
+/* インラインコード */
+code:not(pre code) {
+  background: var(--gc-surface-container-low);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 0.9em;
+  color: var(--gc-blue-900);
+}
+
+.section code:not(pre code) {
+  background: var(--gc-surface);
+}
+
+/* テーブルスタイル */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--gc-outline-variant);
+  background: var(--gc-surface);
+}
+
+th {
+  background: var(--gc-blue-50);
+  color: var(--gc-blue-900);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 2px solid var(--gc-blue-200);
+}
+
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--gc-outline-variant);
+  font-size: 14px;
+}
+
+tr:nth-child(even) {
+  background: var(--gc-surface-container-lowest);
+}
+
+tr:hover {
+  background: var(--gc-blue-50);
+}
+
+/* 注意・警告ボックス */
+.note-box {
+  background: var(--gc-blue-tint);
+  border-left: 4px solid var(--gc-blue-600);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.warning-box {
+  background: var(--gc-yellow-tint);
+  border-left: 4px solid var(--gc-yellow);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.error-box {
+  background: var(--gc-red-tint);
+  border-left: 4px solid var(--gc-red);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.ai-box {
+  background: var(--gc-purple-tint);
+  border-left: 4px solid var(--gc-purple);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.success-box {
+  background: var(--gc-green-tint);
+  border-left: 4px solid var(--gc-green);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+/* 統計カード */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.stat-card {
+  background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+  color: var(--gc-surface);
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+/* Mermaid コンテナ */
+.mermaid-container {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 20px 0;
+  border: 2px solid rgba(66, 133, 244, 0.3);
+  overflow-x: auto;
+}
+
+.mermaid {
+  display: flex;
+  justify-content: center;
+}
+
+/* ユースケース */
+.usecase {
+  background: var(--gc-blue-tint);
+  border: 1px solid var(--gc-blue-100);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 16px 0;
+}
+
+.usecase h3 {
+  margin-top: 0;
+  color: var(--gc-blue-900);
+}
+
+/* ステップリスト */
+.step-card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border-left: 4px solid var(--gc-blue-600);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+}
+
+.step-card .step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--gc-blue-600);
+  color: #FFFFFF;
+  font-weight: 700;
+  font-size: 14px;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.step-card h3 {
+  display: flex;
+  align-items: center;
+  margin-top: 0;
+}
+
+.step-card ol {
+  margin: 8px 0 0;
+  padding-left: 24px;
+}
+
+.step-card li {
+  margin: 6px 0;
+}
+
+ul.plain {
+  list-style: none;
+  padding-left: 0;
+  margin: 8px 0;
+}
+
+ul.plain li {
+  margin: 6px 0;
+}
+
+footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gc-outline-variant);
+  font-size: 12px;
+  color: var(--gc-outline);
+}
+
+footer a {
+  word-break: break-all;
+}
+
+footer ul {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ヘッダー -->
+  <div class="header">
+    <div>
+      <div style="margin-bottom: 8px;">
+        <span class="badge">📊 BigQuery</span>
+        <span class="badge" style="background: var(--gc-purple);">✨ Gemini Enterprise</span>
+        <span class="badge badge-preview">🚧 Preview</span>
+      </div>
+      <h1>🤖 BigQuery データエージェントを<br>Agent Registry 経由で Gemini Enterprise に公開</h1>
+      <div class="subtitle">Google 管理認証情報で OAuth 設定が不要に — JSON カードのコピペからの解放</div>
+    </div>
+    <div class="subtitle">📅 リリース日: 2026-09-22</div>
+  </div>
+
+  <!-- 概要 -->
+  <div class="section">
+    <h2>📌 概要</h2>
+    <p>
+      BigQuery で作成した<span class="highlight">データエージェント</span>を、<span class="highlight">Agent Registry</span> に登録して
+      <strong>Gemini Enterprise</strong> に公開できるようになりました。BigQuery と Gemini Enterprise が
+      <strong>同一の Google Cloud プロジェクト</strong>にあり、<strong>Agent Gateway のリージョンが一致</strong>している場合、
+      Agent-to-Agent (A2A) JSON カードの手動コピーや OAuth クライアント認証情報の設定が不要になります。
+      インポート時にはデフォルトの <span class="highlight">Google 管理認証情報</span> (Google-managed credentials) を利用でき、
+      OAuth クライアント ID / シークレットの作成・管理が不要です。
+    </p>
+    <p>
+      データアナリストが BigQuery Studio で作成・公開したエージェントを、Gemini Enterprise 管理者が Agent Registry から検索して
+      <strong>ワンクリックで追加</strong>でき、ビジネスユーザーは Gemini Enterprise 内から<strong>自然言語で BigQuery のデータを直接クエリ・分析</strong>できます。
+      3 者 (データアナリスト / 管理者 / ビジネスユーザー) にまたがる公開ワークフローが大幅に簡素化されます。
+    </p>
+
+    <div class="before-after">
+      <div class="before-box">
+        <h3>❌ Before: アップデート前の課題</h3>
+        <div class="check-item"><span class="cross-icon">✗</span><span>A2A JSON カードを BigQuery 側でコピーし、Gemini Enterprise 側に手動で貼り付ける必要があった</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>OAuth クライアント ID とクライアントシークレットを手動で作成・設定・管理する必要があった</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>データアナリストと Gemini Enterprise 管理者の間で JSON カードを受け渡す運用上の手間が発生していた</span></div>
+      </div>
+      <div class="after-box">
+        <h3>✅ After: アップデート後の改善</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span>同一プロジェクトなら「Register this agent」を選択するだけで Agent Registry に登録され、Registry から検索してインポート可能に</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>Google 管理認証情報により OAuth 認証情報が自動管理され、クライアント ID / シークレットの手動設定が不要に</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>別プロジェクト (A2A JSON カード方式) でも Google 管理認証情報を選択でき、OAuth クライアント作成が不要に</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- アーキテクチャ図 -->
+  <div class="section">
+    <h2>🏗️ アーキテクチャ図</h2>
+    <div class="mermaid-container">
+      <pre class="mermaid">
+flowchart LR
+    subgraph Project["☁️ 同一 Google Cloud プロジェクト"]
+        subgraph BQ["BigQuery"]
+            Analyst(["🧑‍💻 データアナリスト"])
+            Agent["🤖 データエージェント"]
+            Data[("📊 BigQuery データ")]
+        end
+        Registry["📇 Agent Registry<br>(登録)"]
+        Gateway["🚪 Agent Gateway<br>(リージョン一致: US / EU / Global)"]
+        subgraph GE["Gemini Enterprise"]
+            Admin(["🛠️ 管理者"])
+            App["💬 Gemini Enterprise アプリ"]
+        end
+    end
+    User(["👤 ビジネスユーザー"])
+
+    Analyst -->|作成・公開<br>Register this agent| Agent
+    Agent -->|自動登録| Registry
+    Admin -->|Registry から検索して<br>インポート| Registry
+    Registry --> Gateway
+    Gateway -->|"🔑 Google 管理認証情報<br>(OAuth 設定不要)"| App
+    User -->|自然言語で質問| App
+    Agent --> Data
+      </pre>
+    </div>
+    <p>
+      同一プロジェクト内で BigQuery データエージェントを Agent Registry に登録すると、Gemini Enterprise 管理者は
+      Agent Gateway 経由でエージェントを検索・インポートでき、認証は Google 管理認証情報で自動処理されます。
+    </p>
+  </div>
+
+  <!-- 主要機能 -->
+  <div class="section">
+    <h2>⚡ 主要機能</h2>
+
+    <div class="card">
+      <h3>📇 1. Agent Registry 経由のエージェント公開 (同一プロジェクト)</h3>
+      <div class="icon-text"><span class="arrow">→</span><span>Publishing channels ペインの Agent Registry セクションで<strong>「Register this agent」チェックボックスを選択するだけ</strong>で登録完了</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>A2A JSON カードのコピー &amp; ペーストが不要に</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>登録解除も「Unregister」をクリックするだけ</span></div>
+    </div>
+
+    <div class="card">
+      <h3>🔑 2. デフォルト Google 管理認証情報によるインポート</h3>
+      <div class="icon-text"><span class="arrow">→</span><span>エージェント追加時に「<strong>Default Google-managed credentials</strong>」を選択すると、OAuth 認証情報を Google が自動管理</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>クライアント ID、クライアントシークレット、認可 URL、トークン URL の手動入力が不要</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>独自の OAuth クライアント認証情報が必要な組織は、従来どおり Custom OAuth も選択可能</span></div>
+    </div>
+
+    <div class="card">
+      <h3>🔗 3. クロスプロジェクト構成での認証簡素化</h3>
+      <div class="icon-text"><span class="arrow">→</span><span>BigQuery と Gemini Enterprise が異なるプロジェクトの場合は、従来どおり A2A JSON カードのコピーが必要</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>ただしこの場合でも <strong>Google 管理認証情報を選択でき</strong>、OAuth クライアント ID / シークレットの作成・入力は不要に</span></div>
+    </div>
+
+    <div class="card">
+      <h3>🌐 4. Agent Gateway によるリージョン整合</h3>
+      <div class="icon-text"><span class="arrow">→</span><span>BigQuery データエージェントのストレージリージョンと、Agent Gateway のレジストリバインディングの<strong>リージョンが一致</strong>している必要がある</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>リージョンの選択肢は <strong>US、EU、Global</strong></span></div>
+    </div>
+  </div>
+
+  <!-- 技術仕様 -->
+  <div class="section">
+    <h2>🔧 技術仕様</h2>
+
+    <h3>📋 公開ワークフローの比較</h3>
+    <table>
+      <thead>
+        <tr><th>構成</th><th>公開方法</th><th>認証設定</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>同一プロジェクト</strong></td>
+          <td>Agent Registry に登録 → Registry からインポート (JSON コピー不要)</td>
+          <td>Google 管理認証情報 (OAuth 設定不要)</td>
+        </tr>
+        <tr>
+          <td><strong>別プロジェクト</strong></td>
+          <td>A2A JSON カードをコピーして貼り付け</td>
+          <td>Google 管理認証情報を選択可能 (OAuth クライアント作成は不要)</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>🌍 リージョンに関する制約</h3>
+    <table>
+      <thead>
+        <tr><th>項目</th><th>詳細</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>選択可能なリージョン</td><td>US、EU、Global</td></tr>
+        <tr><td>エージェントのストレージリージョン</td><td>BigQuery Web UI のエージェントエディタの Region セクションで設定。<strong>保存後は変更不可</strong></td></tr>
+        <tr><td>Agent Gateway</td><td>エージェントのリージョンと一致するレジストリバインディングを持つ Agent Gateway の構成が必要</td></tr>
+        <tr><td>Agent Gateway の制限</td><td>1 つの Agent Gateway インスタンスで管理できる Agent Registry 登録リソースは<strong>最大 5,000 件</strong></td></tr>
+      </tbody>
+    </table>
+
+    <h3>🔐 必要な IAM ロール</h3>
+    <table>
+      <thead>
+        <tr><th>操作</th><th>必要なロール</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>データエージェントの作成</td><td>Gemini Data Analytics Data Agent Creator (<code>roles/geminidataanalytics.dataAgentCreator</code>)</td></tr>
+        <tr><td>エージェントの編集・共有・削除</td><td>Gemini Data Analytics Data Agent Owner (<code>roles/geminidataanalytics.dataAgentOwner</code>)</td></tr>
+        <tr><td>エージェントとのチャット</td><td>Gemini Data Analytics Data Agent User (<code>roles/geminidataanalytics.dataAgentUser</code>)</td></tr>
+        <tr><td>Gemini Enterprise でのプロビジョニング</td><td>カスタムエージェントの登録・管理権限と Agent Gateway の構成権限</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 設定方法 -->
+  <div class="section">
+    <h2>🛠️ 設定方法</h2>
+
+    <h3>✅ 前提条件</h3>
+    <div class="check-item"><span class="check-icon">✓</span><span>課金が有効な Google Cloud プロジェクト</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span>BigQuery、Gemini Data Analytics、Gemini for Google Cloud、Knowledge Catalog の各 API の有効化</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span>Agent Registry を使用する場合、BigQuery データエージェントのストレージリージョンと一致するレジストリバインディングを持つ Agent Gateway</span></div>
+
+    <div class="flow-diagram">
+      <div class="flow-step">🧑‍💻 ①エージェント<br>作成・公開<br><small>(データアナリスト)</small></div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">🚪 ②Agent Gateway<br>構成<br><small>(管理者)</small></div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">📥 ③エージェント<br>インポート<br><small>(管理者)</small></div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">💬 自然言語で<br>データ分析<br><small>(ビジネスユーザー)</small></div>
+    </div>
+
+    <div class="step-card">
+      <h3><span class="step-num">1</span>BigQuery でデータエージェントを作成・公開する (データアナリスト)</h3>
+      <ol>
+        <li>BigQuery でデータエージェントを作成または編集する</li>
+        <li>Region セクションで、ストレージリージョン (US / EU / Global) がデータソースおよび Agent Gateway の構成と一致していることを確認する</li>
+        <li><strong>Publish</strong> をクリックし、Publishing channels ペインの <strong>Agent Registry</strong> セクションで <strong>Register this agent</strong> チェックボックスを選択する</li>
+        <li><strong>Publish</strong> をクリックし、利用ユーザー・グループに <code>roles/geminidataanalytics.dataAgentUser</code> を付与してエージェントを共有する</li>
+      </ol>
+    </div>
+
+    <div class="step-card">
+      <h3><span class="step-num">2</span>Agent Gateway を構成する (Gemini Enterprise 管理者)</h3>
+      <ol>
+        <li>データエージェントのリージョンと一致する Agent Registry バインディングを含む Agent Gateway をセットアップする</li>
+        <li>Gemini Enterprise でアプリケーションを開き、<strong>Security &gt; Configuration</strong> の Agent Gateway configuration セクションにゲートウェイのリソース名を入力する</li>
+      </ol>
+    </div>
+
+    <div class="step-card">
+      <h3><span class="step-num">3</span>Gemini Enterprise でエージェントをインポートする (Gemini Enterprise 管理者)</h3>
+      <ol>
+        <li>Gemini Enterprise でアプリを開き、<strong>Agents &gt; Add agent</strong> をクリックする</li>
+        <li><strong>Agents from Agent Registry</strong> を選択し、エージェントを名前・Registry ID・タイプなどで検索する</li>
+        <li>エージェントカードで <strong>Add agent</strong> をクリックし、A2A カードから取得されたメタデータ (名前、説明、URL、機能、スキル) を確認する</li>
+        <li>認証ステップで <strong>Default Google-managed credentials</strong> を選択し、<strong>Finish</strong> をクリックする</li>
+        <li>エージェントが <strong>Enabled</strong> 状態・タイプ <strong>A2A (Custom)</strong> として Agents テーブルに表示されたら、必要なユーザー・グループに共有する</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- メリット -->
+  <div class="section">
+    <h2>💡 メリット</h2>
+
+    <h3>💼 ビジネス面</h3>
+    <div class="success-box">
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>データ民主化の加速</strong>: ビジネスユーザーが Gemini Enterprise 内から自然言語で BigQuery のデータを直接分析でき、データチームへの依頼を待たずに意思決定できる</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>導入リードタイムの短縮</strong>: JSON カードの受け渡しや OAuth クライアントの発行といった部門間調整が不要になり、エージェント公開までの時間が短縮される</span></div>
+    </div>
+
+    <h3>⚙️ 技術面</h3>
+    <div class="success-box">
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>認証情報管理の負荷軽減</strong>: OAuth クライアント ID / シークレットの作成・保管・ローテーションが不要になり、認証情報漏えいのリスクが低減する</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>ガバナンスの一元化</strong>: Agent Registry が組織内の承認済みエージェントの中央ディレクトリとして機能し、Agent Gateway が IAM ポリシーや Model Armor などのポリシー適用ポイントとなる</span></div>
+    </div>
+  </div>
+
+  <!-- デメリット・制約事項 -->
+  <div class="section">
+    <h2>⚠️ デメリット・制約事項</h2>
+
+    <h3>🚧 制限事項</h3>
+    <div class="warning-box">
+      <div class="check-item"><span class="cross-icon">•</span><span><strong>Preview 段階</strong>の機能であり、Pre-GA Offerings Terms が適用される (サポートが限定される可能性がある)</span></div>
+      <div class="check-item"><span class="cross-icon">•</span><span>Agent Registry 使用時は、エージェントのストレージリージョンと Agent Gateway のレジストリバインディングの<strong>リージョン一致が必須</strong></span></div>
+      <div class="check-item"><span class="cross-icon">•</span><span>エージェントのストレージリージョンは<strong>保存後に変更できない</strong></span></div>
+      <div class="check-item"><span class="cross-icon">•</span><span>JSON コピー不要のワークフローは<strong>同一プロジェクトの場合のみ</strong>。別プロジェクトでは引き続き A2A JSON カードのコピーが必要</span></div>
+      <div class="check-item"><span class="cross-icon">•</span><span>Gemini Enterprise では Agent Gateway の Client-to-Agent (ingress) モードは非サポート (<strong>Agent-to-Anywhere モードのみ</strong>)</span></div>
+    </div>
+
+    <h3>🤔 考慮すべき点</h3>
+    <div class="note-box">
+      <div class="icon-text"><span class="arrow">→</span><span>エージェントは<strong>ユーザーの権限で動作</strong>するため、ユーザーがアクセス権を持つデータ・リソースにのみアクセスできる。IAM 設計を事前に整理する必要がある</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>組織のセキュリティ要件によっては <strong>Custom OAuth</strong> の選択が必要になる場合がある</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>クエリコスト管理のため、<code>big_query_max_billed_bytes</code> によるクエリ単位のコスト上限設定やプロジェクト / ユーザー単位のクォータ設定を検討するとよい</span></div>
+    </div>
+  </div>
+
+  <!-- ユースケース -->
+  <div class="section">
+    <h2>🎯 ユースケース</h2>
+
+    <div class="usecase">
+      <h3>📈 ユースケース 1: 営業部門向けセルフサービス分析</h3>
+      <p>
+        <strong>シナリオ</strong>: データアナリストが売上データを対象とした BigQuery データエージェントを作成し、
+        営業部門が日常的に使用する Gemini Enterprise から自然言語で売上分析を行えるようにする。
+      </p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Text</span>
+          <span class="code-title">実装例</span>
+        </div>
+        <pre><code class="language-plaintext">1. データアナリスト: BigQuery で売上データセットを参照するデータエージェントを作成
+   - Region: US (データソースと Agent Gateway に合わせる)
+   - Publish 時に「Register this agent」を選択
+2. Gemini Enterprise 管理者: Agent Registry からエージェントを検索し、
+   Default Google-managed credentials でインポート
+3. 営業チームに roles/geminidataanalytics.dataAgentUser を付与して共有
+4. 営業担当者: Gemini Enterprise で「今四半期の地域別売上トップ 5 は?」と質問</code></pre>
+      </div>
+      <p>
+        <strong>効果</strong>: OAuth 設定や JSON カードの受け渡しなしで数ステップで公開が完了し、
+        営業担当者は使い慣れた Gemini Enterprise の画面からデータ分析を実行できる。
+      </p>
+    </div>
+
+    <div class="usecase">
+      <h3>🛡️ ユースケース 2: 全社共通データエージェントのガバナンス統制</h3>
+      <p>
+        <strong>シナリオ</strong>: 企業のプラットフォームチームが、複数のデータエージェントを Agent Registry で一元管理し、
+        Agent Gateway 経由で Model Armor や IAM Unified Access Policies を適用して安全にビジネスユーザーへ提供する。
+      </p>
+      <p>
+        <strong>効果</strong>: 承認済みエージェントのみが Registry 経由で公開され、プロンプトインジェクション対策や
+        機密データ漏えい防止などのポリシーをゲートウェイで一元的に適用できる。
+      </p>
+    </div>
+  </div>
+
+  <!-- 料金 -->
+  <div class="section">
+    <h2>💰 料金</h2>
+    <p>
+      BigQuery データエージェントとの会話 (Conversational Analytics) では、エージェントが実行するクエリに対して
+      BigQuery のコンピューティング料金が適用されるほか、エージェントの<strong>トークン使用量に応じた料金</strong>が発生します。
+    </p>
+
+    <h3>💵 料金例 (Conversational Analytics Agent)</h3>
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-value">$3</div>
+        <div class="stat-label">入力データ / 100 万トークン</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">$20</div>
+        <div class="stat-label">出力データ / 100 万トークン</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">$6.25〜</div>
+        <div class="stat-label">クエリ実行 (オンデマンド) / TiB<br>毎月最初の 1 TiB は無料</div>
+      </div>
+    </div>
+
+    <div class="note-box">
+      <strong>💡 コスト管理のヒント:</strong> エージェント設定の <code>big_query_max_billed_bytes</code> によるクエリ単位の上限設定
+      (オンデマンド課金のみ対象) や、プロジェクト / ユーザー単位のクォータ設定が利用できます。詳細は
+      <a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">BigQuery 料金ページ</a> および
+      <a href="https://cloud.google.com/products/data-agents/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">データエージェント料金</a> を参照してください。
+    </div>
+  </div>
+
+  <!-- 利用可能リージョン -->
+  <div class="section">
+    <h2>🌍 利用可能リージョン</h2>
+    <p>
+      データエージェントのストレージリージョンおよび Agent Gateway のレジストリバインディングとして以下を選択できます。
+      Agent Registry を使用する場合は<strong>両者のリージョンを一致させる</strong>必要があります。
+    </p>
+    <div class="flow-diagram">
+      <div class="flow-step">🇺🇸 US</div>
+      <div class="flow-step">🇪🇺 EU</div>
+      <div class="flow-step">🌐 Global</div>
+    </div>
+  </div>
+
+  <!-- 関連サービス・機能 -->
+  <div class="section">
+    <h2>🔗 関連サービス・機能</h2>
+    <div class="card">
+      <h3>✨ Gemini Enterprise</h3>
+      <p>ビジネスユーザー向けの AI アシスタントプラットフォーム。本アップデートによりデータエージェントの公開先としての連携が簡素化された。</p>
+    </div>
+    <div class="card">
+      <h3>📇 Agent Registry</h3>
+      <p>組織内の承認済みエージェント・ツール・MCP サーバー・エンドポイントの中央ディレクトリ。Agent Gateway が接続許可の判断に使用する。</p>
+    </div>
+    <div class="card">
+      <h3>🚪 Agent Gateway</h3>
+      <p>エージェント間トラフィックのエントリ / イグジットポイント。IAM ポリシー、Model Armor、Semantic Governance ポリシーなどの適用ポイントとなる。</p>
+    </div>
+    <div class="card">
+      <h3>💬 Conversational Analytics API</h3>
+      <p>データエージェントとの会話をプログラムから利用するための API。独自のチャットインターフェース構築にも利用できる。</p>
+    </div>
+    <div class="card">
+      <h3>🛡️ Model Armor</h3>
+      <p>Agent Gateway に接続し、プロンプトインジェクションや機密データ漏えいをリアルタイムで検査するコンテンツセキュリティフィルタ。</p>
+    </div>
+  </div>
+
+  <!-- まとめ -->
+  <div class="section">
+    <h2>📝 まとめ</h2>
+    <div class="success-box">
+      <p style="margin-top: 0;">
+        BigQuery データエージェントの Gemini Enterprise への公開が、<span class="highlight">Agent Registry への登録</span>と
+        <span class="highlight">Google 管理認証情報</span>によって大幅に簡素化されました。
+        A2A JSON カードのコピーや OAuth クライアント認証情報の手動管理が不要になり、
+        ビジネスユーザーへのデータエージェント展開のハードルが下がります。
+      </p>
+      <p style="margin-bottom: 0;">
+        Preview 段階ですが、Gemini Enterprise を導入済みで BigQuery のセルフサービス分析を推進したい組織は、
+        <strong>同一プロジェクト構成</strong>と <strong>Agent Gateway のリージョン設計</strong>を確認したうえで検証を始めることをおすすめします。
+      </p>
+    </div>
+    <div>
+      <span class="badge">BigQuery</span>
+      <span class="badge">Gemini Enterprise</span>
+      <span class="badge">Agent Registry</span>
+      <span class="badge">Agent Gateway</span>
+      <span class="badge">データエージェント</span>
+      <span class="badge">Conversational Analytics</span>
+      <span class="badge">A2A</span>
+      <span class="badge badge-preview">Preview</span>
+    </div>
+  </div>
+
+  <!-- フッター -->
+  <footer>
+    <p><strong>📎 出典・参考リンク</strong></p>
+    <ul>
+      <li>公式リリースノート: <a href="https://docs.cloud.google.com/release-notes#September_22_2026" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/release-notes#September_22_2026</a></li>
+      <li>ドキュメント: Gemini Enterprise でのデータエージェント公開: <a href="https://docs.cloud.google.com/bigquery/docs/create-data-agents#publish-agent-gemini-enterprise" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/bigquery/docs/create-data-agents#publish-agent-gemini-enterprise</a></li>
+      <li>ドキュメント: Agent Gateway の概要: <a href="https://docs.cloud.google.com/gemini-enterprise-agent-platform/govern/gateways/agent-gateway-overview" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/gemini-enterprise-agent-platform/govern/gateways/agent-gateway-overview</a></li>
+      <li>料金ページ (BigQuery): <a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">https://cloud.google.com/bigquery/pricing</a></li>
+      <li>プロダクトのローンチステージ: <a href="https://cloud.google.com/products#product-launch-stages" target="_blank" rel="noopener noreferrer" class="gc-link">https://cloud.google.com/products#product-launch-stages</a></li>
+    </ul>
+    <p>本インフォグラフィックは Google Cloud News レポート (2026-09-22) を基に作成されています。</p>
+  </footer>
+
+</div>
+
+<!-- Mermaid.js -->
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+    mermaid.initialize({
+        startOnLoad: true,
+        theme: 'base',
+        themeVariables: {
+            primaryColor: '#4285F4',
+            primaryTextColor: '#202124',
+            primaryBorderColor: '#4285F4',
+            lineColor: '#4285F4',
+            secondaryColor: '#F1F3F4',
+            tertiaryColor: '#FAFAFA',
+            background: '#FFFFFF',
+            mainBkg: '#E8F0FE',
+            nodeBorder: '#4285F4',
+            clusterBkg: '#E8F0FE',
+            clusterBorder: '#4285F4',
+            edgeLabelBackground: '#FFFFFF',
+            textColor: '#202124'
+        }
+    });
+</script>
+
+<!-- highlight.js -->
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

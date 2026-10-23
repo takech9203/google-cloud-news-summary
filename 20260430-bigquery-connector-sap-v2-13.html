@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BigQuery Connector for SAP v2.13 - パーティションテーブル スキーマキャッシュ修正</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+        :root {
+            --gc-blue: #4285F4;
+            --gc-red: #EA4335;
+            --gc-yellow: #FBBC04;
+            --gc-green: #34A853;
+            --gc-blue-900: #174EA6;
+            --gc-blue-800: #185ABC;
+            --gc-blue-700: #1967D2;
+            --gc-blue-600: #1A73E8;
+            --gc-blue-500: #4285F4;
+            --gc-blue-300: #669DF6;
+            --gc-blue-200: #8AB4F8;
+            --gc-blue-100: #AECBFA;
+            --gc-blue-50: #E8F0FE;
+            --gc-on-surface: #202124;
+            --gc-on-surface-variant: #5F6368;
+            --gc-outline: #80868B;
+            --gc-surface: #FFFFFF;
+            --gc-surface-container-lowest: #F8F9FA;
+            --gc-surface-container-low: #F1F3F4;
+            --gc-surface-container: #E8EAED;
+            --gc-outline-variant: #DADCE0;
+            --gc-blue-tint: #E8F0FE;
+            --gc-green-tint: #E6F4EA;
+            --gc-red-tint: #FCE8E6;
+            --gc-yellow-tint: #FEF7E0;
+            --gc-purple-tint: #F3E8FD;
+            --gc-teal-tint: #E0F7FA;
+            --gc-purple: #A142F4;
+            --gc-teal: #00BCD4;
+            --gc-orange: #FF6D00;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            background-color: var(--gc-surface);
+            font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+            color: var(--gc-on-surface-variant);
+            font-size: 16px;
+            line-height: 1.7;
+            padding: 20px;
+            margin: 0;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 32px;
+            flex-wrap: wrap;
+            padding-bottom: 16px;
+            border-bottom: 3px solid var(--gc-blue-600);
+        }
+
+        .header-left { flex: 1; }
+
+        h1 {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--gc-on-surface);
+            margin: 0 0 8px 0;
+            line-height: 1.3;
+        }
+
+        h2 {
+            font-size: 22px;
+            font-weight: 600;
+            color: var(--gc-on-surface);
+            margin: 0 0 16px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--gc-blue-600);
+        }
+
+        .subtitle {
+            font-size: 16px;
+            color: var(--gc-outline);
+        }
+
+        .badge {
+            display: inline-block;
+            color: #FFFFFF;
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 13px;
+            font-weight: 500;
+            letter-spacing: 0.25px;
+            margin: 4px 8px 4px 0;
+        }
+
+        .badge-service { background: var(--gc-blue-600); }
+        .badge-ga { background: var(--gc-green); }
+        .badge-fix { background: var(--gc-orange); }
+
+        .section {
+            background: var(--gc-surface-container-low);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            border: 1px solid var(--gc-outline-variant);
+        }
+
+        .card {
+            background: var(--gc-surface);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 12px 0;
+            border-left: 4px solid var(--gc-blue-600);
+            box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+        }
+
+        .card-green { border-left-color: var(--gc-green); }
+        .card-orange { border-left-color: var(--gc-orange); }
+        .card-red { border-left-color: var(--gc-red); }
+
+        .card h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--gc-on-surface);
+            margin: 0 0 8px 0;
+        }
+
+        .card p {
+            margin: 4px 0;
+            font-size: 14px;
+        }
+
+        .highlight {
+            background-color: var(--gc-blue-50);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            color: var(--gc-blue-800);
+            border-bottom: 2px solid var(--gc-blue-600);
+        }
+
+        /* Before/After comparison */
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin: 16px 0;
+        }
+
+        @media (max-width: 600px) {
+            .comparison { grid-template-columns: 1fr; }
+        }
+
+        .comparison-before {
+            background: var(--gc-red-tint);
+            border: 1px solid var(--gc-red);
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .comparison-after {
+            background: var(--gc-green-tint);
+            border: 1px solid var(--gc-green);
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .comparison-before h4 {
+            color: var(--gc-red);
+            margin: 0 0 8px 0;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .comparison-after h4 {
+            color: var(--gc-green);
+            margin: 0 0 8px 0;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .comparison-before ul,
+        .comparison-after ul {
+            margin: 0;
+            padding-left: 18px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        /* Stats */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin: 16px 0;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+            color: var(--gc-surface);
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            opacity: 0.9;
+        }
+
+        /* Flow diagram */
+        .flow-diagram {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin: 24px 0;
+        }
+
+        .flow-step {
+            background: var(--gc-surface);
+            border: 2px solid var(--gc-blue-600);
+            border-radius: 12px;
+            padding: 12px 20px;
+            text-align: center;
+            min-width: 100px;
+            color: var(--gc-on-surface);
+            box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+            font-size: 14px;
+        }
+
+        .flow-arrow {
+            color: var(--gc-blue-600);
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--gc-outline-variant);
+        }
+
+        th {
+            background: var(--gc-blue-50);
+            color: var(--gc-blue-900);
+            padding: 12px 16px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 14px;
+            border-bottom: 2px solid var(--gc-blue-200);
+        }
+
+        td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--gc-outline-variant);
+            font-size: 14px;
+        }
+
+        tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+        tr:hover { background: var(--gc-blue-50); }
+
+        /* Mermaid */
+        .mermaid-container {
+            background: #FFFFFF;
+            border-radius: 12px;
+            padding: 24px;
+            margin: 20px 0;
+            border: 2px solid rgba(66, 133, 244, 0.3);
+            overflow-x: auto;
+        }
+
+        .mermaid {
+            display: flex;
+            justify-content: center;
+        }
+
+        /* Code blocks */
+        .code-block,
+        pre:not(.mermaid) {
+            background: #1E1E1E;
+            border-radius: 8px;
+            padding: 16px;
+            font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            overflow-x: auto;
+            color: #E8E8E8;
+            margin: 16px 0;
+        }
+
+        pre code {
+            background: none;
+            border: none;
+            padding: 0;
+            font-size: inherit;
+            color: inherit;
+        }
+
+        .code-label {
+            display: inline-block;
+            background: #2D2D2D;
+            color: #9CDCFE;
+            padding: 4px 12px;
+            border-radius: 8px 8px 0 0;
+            font-size: 12px;
+            font-weight: 600;
+            font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .code-label + pre:not(.mermaid) {
+            border-top-left-radius: 0;
+            margin-top: 0;
+        }
+
+        code:not(pre code) {
+            background: var(--gc-surface-container-low);
+            border: 1px solid var(--gc-outline-variant);
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+            font-size: 0.9em;
+            color: var(--gc-blue-900);
+        }
+
+        /* Usecase */
+        .usecase {
+            background: var(--gc-blue-tint);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 12px 0;
+            border: 1px solid var(--gc-blue-200);
+        }
+
+        .usecase h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--gc-blue-900);
+            margin: 0 0 8px 0;
+        }
+
+        .usecase p {
+            margin: 4px 0;
+            font-size: 14px;
+            color: var(--gc-on-surface-variant);
+        }
+
+        .usecase .effect {
+            background: var(--gc-green-tint);
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 12px;
+            font-size: 14px;
+        }
+
+        /* Warning / Note boxes */
+        .note-box {
+            background: var(--gc-blue-tint);
+            border-left: 4px solid var(--gc-blue-600);
+            padding: 16px 20px;
+            border-radius: 0 12px 12px 0;
+            margin: 16px 0;
+        }
+
+        .warning-box {
+            background: var(--gc-yellow-tint);
+            border-left: 4px solid var(--gc-yellow);
+            padding: 16px 20px;
+            border-radius: 0 12px 12px 0;
+            margin: 16px 0;
+        }
+
+        /* Pricing */
+        .pricing-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin: 8px 0;
+            font-size: 14px;
+        }
+
+        .pricing-icon {
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        /* Links */
+        .gc-link {
+            color: var(--gc-blue-600);
+            text-decoration: none;
+        }
+
+        .gc-link:hover {
+            color: var(--gc-blue-800);
+            text-decoration: underline;
+        }
+
+        /* Footer */
+        footer {
+            margin-top: 24px;
+            padding-top: 16px;
+            border-top: 1px solid var(--gc-outline-variant);
+            font-size: 12px;
+            color: var(--gc-outline);
+        }
+
+        footer a {
+            color: var(--gc-blue-600);
+            text-decoration: underline;
+            word-break: break-all;
+        }
+
+        .related-services {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin: 16px 0;
+        }
+
+        .service-chip {
+            background: var(--gc-surface);
+            border: 1px solid var(--gc-outline-variant);
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 13px;
+            text-align: center;
+            font-weight: 500;
+            color: var(--gc-on-surface);
+        }
+
+        .steps-list {
+            counter-reset: step;
+            list-style: none;
+            padding: 0;
+        }
+
+        .steps-list li {
+            counter-increment: step;
+            position: relative;
+            padding-left: 36px;
+            margin: 12px 0;
+            font-size: 14px;
+        }
+
+        .steps-list li::before {
+            content: counter(step);
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 24px;
+            height: 24px;
+            background: var(--gc-blue-600);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .icon-text {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            margin: 8px 0;
+            color: var(--gc-on-surface-variant);
+            font-size: 14px;
+        }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 24px; }
+            h2 { font-size: 18px; }
+            .stats-grid { grid-template-columns: 1fr; }
+            .related-services { grid-template-columns: 1fr 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-left">
+                <h1>🔌 BigQuery Connector for SAP v2.13</h1>
+                <p style="margin: 8px 0 12px 0; font-size: 18px; color: var(--gc-on-surface-variant);">パーティションテーブル + スキーマキャッシュの不具合修正</p>
+                <div>
+                    <span class="badge badge-service">SAP on Google Cloud</span>
+                    <span class="badge badge-ga">GA</span>
+                    <span class="badge badge-fix">Bug Fix</span>
+                </div>
+            </div>
+            <div class="subtitle">2026-04-30</div>
+        </div>
+
+        <!-- Overview -->
+        <div class="section">
+            <h2>📋 概要</h2>
+            <p>BigQuery Connector for SAP バージョン 2.13 がリリースされました。<span class="highlight">テーブルスキーマキャッシュ機能有効時にパーティションテーブルのデータレプリケーションが失敗する問題</span>が修正されています。</p>
+            <p style="margin-top: 12px;">BigQuery Connector for SAP は、SAP LT Replication Server にインストールされ、SAP アプリケーションデータを BigQuery にほぼリアルタイムでレプリケーションするコネクタです。</p>
+
+            <div class="comparison">
+                <div class="comparison-before">
+                    <h4>&#x274C; Before (v2.12 以前の問題)</h4>
+                    <ul>
+                        <li>スキーマキャッシュ有効時にパーティションテーブルへのレプリケーションが失敗</li>
+                        <li>キャッシュ無効化が必要で API クォータ制限に抵触するリスク</li>
+                        <li>高頻度レプリケーション環境で tables.get 呼び出しが過剰化</li>
+                    </ul>
+                </div>
+                <div class="comparison-after">
+                    <h4>&#x2705; After (v2.13)</h4>
+                    <ul>
+                        <li>パーティションテーブルでもスキーマキャッシュが正常動作</li>
+                        <li>全環境でスキーマキャッシュ活用可能、API クォータ消費削減</li>
+                        <li>パーティション/非パーティション混在環境でも一貫設定で最適化可能</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value">3</div>
+                <div class="stat-label">レプリケーションパス</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" style="font-size: 24px;">tables.get</div>
+                <div class="stat-label">API 呼び出し削減対象</div>
+            </div>
+            <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-green), #2E8B57);">
+                <div class="stat-value" style="font-size: 24px;">v2.13</div>
+                <div class="stat-label">最新バージョン (GA)</div>
+            </div>
+        </div>
+
+        <!-- Architecture Diagram -->
+        <div class="section">
+            <h2>🏗️ アーキテクチャ図</h2>
+            <p>SAP データソースから BigQuery パーティションテーブルへのストリーミングデータレプリケーションフロー。v2.13 では ABAP Shared Objects メモリに格納されたスキーマキャッシュがパーティションテーブルでも正しく機能します。</p>
+            <div class="mermaid-container">
+                <pre class="mermaid">
+flowchart LR
+    subgraph SAP環境
+        A[("🗄️ SAP データソース")]
+        B["⚙️ SAP LT\nReplication Server"]
+        C["🔌 BigQuery Connector\nfor SAP v2.13"]
+    end
+
+    subgraph キャッシュ層
+        D["💾 ABAP Shared Objects\n(スキーマキャッシュ)"]
+    end
+
+    subgraph Google Cloud
+        E["📡 BigQuery\nStreaming API"]
+        F[("📊 BigQuery\nパーティションテーブル")]
+    end
+
+    A -->|RFC| B
+    B -->|CDC データ| C
+    C <-->|スキーマ参照\n API呼び出し削減| D
+    C -->|チャンク送信| E
+    E -->|INSERT| F
+                </pre>
+            </div>
+        </div>
+
+        <!-- Key Features -->
+        <div class="section">
+            <h2>🔧 主要機能</h2>
+
+            <div class="card card-green">
+                <h3>1. パーティションテーブル向けスキーマキャッシュの不具合修正</h3>
+                <p><code>SCH_CACHE_ENABLE</code> 有効時にパーティションテーブルへのレプリケーションが失敗する問題を解消。パーティション情報を含むスキーマ定義がキャッシュから正しく取得されるように修正されました。</p>
+            </div>
+
+            <div class="card">
+                <h3>2. テーブルスキーマキャッシュ機能 (v2.12 導入)</h3>
+                <p>SAP ABAP Shared Objects メモリにテーブルスキーマ情報を格納し、スキーマに変更がない場合は BigQuery API の <code>tables.get</code> 呼び出しをバイパス。BigQuery API クォータ制限 (<code>TableService.getTable</code>) の超過を防止します。</p>
+            </div>
+
+            <div class="card">
+                <h3>3. 3 つのレプリケーションパスのサポート</h3>
+                <div class="icon-text"><span>&#x27A1;</span><span><strong>CDC レプリケーション (Pub/Sub 経由)</strong>: BigQuery テーブルを SAP ソースと同期</span></div>
+                <div class="icon-text"><span>&#x27A1;</span><span><strong>ストリーミングデータレプリケーション</strong>: 全変更をアペンドオンリーで記録</span></div>
+                <div class="icon-text"><span>&#x27A1;</span><span><strong>ファイルベースレプリケーション (Cloud Storage)</strong>: JSON ファイルとして配信</span></div>
+            </div>
+        </div>
+
+        <!-- Technical Specs -->
+        <div class="section">
+            <h2>&#x2699;&#xFE0F; 技術仕様</h2>
+
+            <h3 style="font-size: 16px; margin: 16px 0 8px 0;">スキーマキャッシュの設定パラメータ</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>パラメータ名</th>
+                        <th>説明</th>
+                        <th>デフォルト値</th>
+                        <th>有効な値</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>SCH_CACHE_ENABLE</code></td>
+                        <td>スキーマキャッシュを有効にし、BigQuery API の tables.get 呼び出しを削減</td>
+                        <td>False</td>
+                        <td>True / False</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3 style="font-size: 16px; margin: 24px 0 8px 0;">影響を受けるレプリケーションパス</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>レプリケーションパス</th>
+                        <th>スキーマキャッシュ対応</th>
+                        <th>パーティションテーブル対応 (v2.13)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>ストリーミングデータレプリケーション</td>
+                        <td>&#x2705; 対応</td>
+                        <td>&#x2705; 修正済み</td>
+                    </tr>
+                    <tr>
+                        <td>CDC レプリケーション (Pub/Sub 経由)</td>
+                        <td>&#x2705; Cache Validations で対応</td>
+                        <td>--</td>
+                    </tr>
+                    <tr>
+                        <td>ファイルベースレプリケーション (Cloud Storage)</td>
+                        <td>--</td>
+                        <td>--</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Setup -->
+        <div class="section">
+            <h2>&#x1F6E0;&#xFE0F; 設定方法</h2>
+
+            <h3 style="font-size: 16px; margin: 0 0 12px 0;">前提条件</h3>
+            <div class="icon-text"><span>&#x2705;</span><span>BigQuery Connector for SAP バージョン 2.13 がインストールされていること</span></div>
+            <div class="icon-text"><span>&#x2705;</span><span>SAP LT Replication Server が稼働していること</span></div>
+            <div class="icon-text"><span>&#x2705;</span><span>BigQuery データセットが作成済みであること</span></div>
+            <div class="icon-text"><span>&#x2705;</span><span>IAM サービスアカウントに BigQuery Data Editor / Job User ロールが付与されていること</span></div>
+
+            <h3 style="font-size: 16px; margin: 24px 0 12px 0;">設定手順</h3>
+            <ol class="steps-list">
+                <li>BigQuery Connector for SAP をバージョン 2.13 に更新</li>
+                <li>SAP GUI で <code>/n/GOOG/SLT_SETTINGS</code> トランザクションを実行</li>
+                <li>Settings Table ドロップダウンメニューから「Parameters」を選択</li>
+                <li>行挿入アイコンをクリック</li>
+                <li>Parameter Name に「<code>SCH_CACHE_ENABLE</code>」、Value に「<code>X</code>」を入力</li>
+                <li>保存をクリック</li>
+                <li>パーティションテーブルへのレプリケーション動作を確認</li>
+            </ol>
+
+            <span class="code-label">SAP Transaction</span>
+            <pre><code>/n/GOOG/SLT_SETTINGS
+  → Settings Table: Parameters
+  → Parameter Name: SCH_CACHE_ENABLE
+  → Parameter Value: X</code></pre>
+        </div>
+
+        <!-- Benefits -->
+        <div class="section">
+            <h2>&#x1F4C8; メリット</h2>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div>
+                    <h3 style="font-size: 15px; color: var(--gc-blue-800); margin: 0 0 12px 0;">&#x1F4BC; ビジネス面</h3>
+                    <div class="card card-green" style="margin: 0 0 8px 0;">
+                        <p><strong>運用の安定性向上</strong>: パーティションテーブル環境でスキーマキャッシュによるパフォーマンス最適化を安心して利用可能</p>
+                    </div>
+                    <div class="card card-green" style="margin: 0;">
+                        <p><strong>API コスト最適化</strong>: BigQuery API 呼び出し回数の削減により、大規模レプリケーション環境でのクォータ消費を抑制</p>
+                    </div>
+                </div>
+                <div>
+                    <h3 style="font-size: 15px; color: var(--gc-blue-800); margin: 0 0 12px 0;">&#x2699;&#xFE0F; 技術面</h3>
+                    <div class="card" style="margin: 0 0 8px 0;">
+                        <p><strong>パフォーマンス改善</strong>: tables.get 呼び出し削減でスループット向上</p>
+                    </div>
+                    <div class="card" style="margin: 0 0 8px 0;">
+                        <p><strong>クォータ制限回避</strong>: 高頻度シナリオで TableService.getTable の超過防止</p>
+                    </div>
+                    <div class="card" style="margin: 0;">
+                        <p><strong>一貫した設定管理</strong>: 全テーブルで同一のキャッシュ設定を使用可能</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Limitations -->
+        <div class="section">
+            <h2>&#x26A0;&#xFE0F; 制約事項・注意点</h2>
+
+            <div class="warning-box">
+                <strong>&#x26A0;&#xFE0F; 制限事項:</strong>
+                <ul style="margin: 8px 0 0 0; padding-left: 18px; font-size: 14px;">
+                    <li>スキーマキャッシュはストリーミングデータレプリケーション (insert-only) パスでのみ利用可能</li>
+                    <li>テーブルスキーマを変更した場合、キャッシュの手動クリアが必要になる場合がある</li>
+                    <li>CDC レプリケーション (Pub/Sub 経由) では別途 Cache Validations 機能を使用する必要あり</li>
+                </ul>
+            </div>
+
+            <div class="note-box">
+                <strong>&#x1F4A1; 考慮すべき点:</strong>
+                <ul style="margin: 8px 0 0 0; padding-left: 18px; font-size: 14px;">
+                    <li>スキーマ変更を頻繁に行う環境では、キャッシュの無効化タイミングに注意</li>
+                    <li>v2.13 へのアップデート後、既存のレプリケーション設定の動作確認を推奨</li>
+                    <li>SAP LT Replication Server の ABAP Shared Objects メモリの利用量が増加する可能性</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Use Cases -->
+        <div class="section">
+            <h2>&#x1F3AF; ユースケース</h2>
+
+            <div class="usecase">
+                <h3>&#x1F3ED; 大規模 SAP データウェアハウスのリアルタイム分析</h3>
+                <p><strong>シナリオ:</strong> 製造業の企業が、SAP ERP の販売データ・在庫データをパーティションテーブル (日付パーティション) で BigQuery に格納。高頻度レプリケーションにより BigQuery API クォータ制限に達しており、スキーマキャッシュを有効にしたいがパーティションテーブルの問題により有効化できなかった。</p>
+                <div class="effect">
+                    <strong>&#x2728; 効果:</strong> v2.13 に更新することで、パーティションテーブル環境でもスキーマキャッシュを安全に有効化でき、API クォータ問題を解消しつつ安定したリアルタイムデータ連携を実現。
+                </div>
+            </div>
+
+            <div class="usecase">
+                <h3>&#x1F6D2; マルチテーブルレプリケーション環境での統一設定</h3>
+                <p><strong>シナリオ:</strong> 小売業の企業が、数百の SAP テーブルを BigQuery にレプリケーション中。一部テーブルのパーティション化により、テーブルごとに個別のキャッシュ設定を管理する必要があった。</p>
+                <div class="effect">
+                    <strong>&#x2728; 効果:</strong> v2.13 により、すべてのテーブルに対して統一的にスキーマキャッシュを有効化でき、設定管理の複雑さが解消。
+                </div>
+            </div>
+        </div>
+
+        <!-- Pricing -->
+        <div class="section">
+            <h2>&#x1F4B0; 料金</h2>
+            <p>BigQuery Connector for SAP 自体は<span class="highlight">無料</span>で提供されています。以下の関連サービスの利用料金が発生します:</p>
+
+            <div style="margin-top: 16px;">
+                <div class="pricing-item"><span class="pricing-icon">&#x1F4CA;</span><span><strong>BigQuery</strong>: ストレージ料金 + クエリ料金 (ストリーミング API 利用料含む)</span></div>
+                <div class="pricing-item"><span class="pricing-icon">&#x1F4E8;</span><span><strong>Pub/Sub</strong> (CDC レプリケーション使用時): メッセージ配信料金</span></div>
+                <div class="pricing-item"><span class="pricing-icon">&#x1F4C1;</span><span><strong>Cloud Storage</strong> (ファイルベースレプリケーション使用時): ストレージ + API 操作料金</span></div>
+                <div class="pricing-item"><span class="pricing-icon">&#x1F5A5;&#xFE0F;</span><span><strong>Compute Engine</strong>: SAP LT Replication Server のホスティング料金</span></div>
+            </div>
+        </div>
+
+        <!-- Related Services -->
+        <div class="section">
+            <h2>&#x1F517; 関連サービス</h2>
+            <div class="related-services">
+                <div class="service-chip">&#x1F4CA; BigQuery</div>
+                <div class="service-chip">&#x1F4E8; Pub/Sub</div>
+                <div class="service-chip">&#x1F4C1; Cloud Storage</div>
+                <div class="service-chip">&#x2699;&#xFE0F; SAP LT Replication Server</div>
+                <div class="service-chip">&#x1F512; Cloud IAM</div>
+                <div class="service-chip">&#x1F5A5;&#xFE0F; Compute Engine</div>
+            </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="section">
+            <h2>&#x1F4DD; まとめ</h2>
+            <p>BigQuery Connector for SAP v2.13 は、テーブルスキーマキャッシュとパーティションテーブルの組み合わせで発生していた不具合を修正する重要なバグフィックスリリースです。</p>
+            <div class="note-box" style="margin-top: 16px;">
+                <strong>&#x1F4CC; アクション推奨:</strong> パーティションテーブルを使用して SAP データを BigQuery にレプリケーションしている環境では、本バージョンへの早期アップデートを推奨します。更新後にスキーマキャッシュを有効化することで、API クォータ消費の削減とレプリケーションパフォーマンスの向上が期待できます。
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <p><strong>&#x1F4CE; 出典:</strong></p>
+            <ul style="list-style: none; padding: 0; margin: 8px 0;">
+                <li style="margin: 4px 0;"><a href="https://cloud.google.com/release-notes#April_30_2026" target="_blank" rel="noopener noreferrer">Google Cloud Release Notes (April 30, 2026)</a></li>
+                <li style="margin: 4px 0;"><a href="https://docs.cloud.google.com/sap/docs/bq-connector/whats-new" target="_blank" rel="noopener noreferrer">BigQuery Connector for SAP - What's New</a></li>
+                <li style="margin: 4px 0;"><a href="https://docs.cloud.google.com/sap/docs/bq-connector/latest/overview" target="_blank" rel="noopener noreferrer">BigQuery Connector for SAP - Overview</a></li>
+                <li style="margin: 4px 0;"><a href="https://docs.cloud.google.com/sap/docs/bq-connector/latest/operations#table-schema-caching" target="_blank" rel="noopener noreferrer">Table Schema Caching Configuration</a></li>
+            </ul>
+            <p style="margin-top: 12px; color: var(--gc-outline); font-size: 11px;">Generated on 2026-04-30 | Google Cloud News Infographic</p>
+        </footer>
+    </div>
+
+    <!-- Mermaid.js -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',
+            themeVariables: {
+                primaryColor: '#4285F4',
+                primaryTextColor: '#202124',
+                primaryBorderColor: '#4285F4',
+                lineColor: '#4285F4',
+                secondaryColor: '#F1F3F4',
+                tertiaryColor: '#FAFAFA',
+                background: '#FFFFFF',
+                mainBkg: '#E8F0FE',
+                nodeBorder: '#4285F4',
+                clusterBkg: '#E8F0FE',
+                clusterBorder: '#4285F4',
+                edgeLabelBackground: '#FFFFFF',
+                textColor: '#202124'
+            }
+        });
+    </script>
+</body>
+</html>

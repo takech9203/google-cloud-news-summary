@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spanner: 全文検索でカスタム辞書によるシノニムマッピングをサポート</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; min-width: 280px; }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .badge, .badge-ga, .badge-preview, .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); color: #FFFFFF; }
+    .badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green { border-left-color: var(--gc-green); }
+    .card-red { border-left-color: var(--gc-red); }
+    .card-yellow { border-left-color: var(--gc-yellow); }
+    .card-purple { border-left-color: var(--gc-purple); }
+    .card-teal { border-left-color: var(--gc-teal); }
+    .card-orange { border-left-color: var(--gc-orange); }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow { color: var(--gc-blue-600); font-size: 20px; }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon { color: var(--gc-green); font-size: 18px; }
+    .cross-icon { color: var(--gc-red); font-size: 18px; }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-card h3 { color: var(--gc-red); margin-top: 0; }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-card h3 { color: var(--gc-green); margin-top: 0; }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h3 {
+      color: var(--gc-blue-800);
+      margin-top: 0;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .link-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .link-list li {
+      padding: 8px 0;
+      border-bottom: 1px solid var(--gc-outline-variant);
+    }
+
+    .link-list li:last-child { border-bottom: none; }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    .synonym-demo {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin: 20px 0;
+      padding: 20px;
+      background: var(--gc-surface);
+      border-radius: 12px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .synonym-key {
+      background: var(--gc-blue-50);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-weight: 700;
+      color: var(--gc-blue-800);
+      font-size: 18px;
+    }
+
+    .synonym-expand {
+      color: var(--gc-blue-600);
+      font-size: 28px;
+      font-weight: bold;
+    }
+
+    .synonym-values {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .synonym-value {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-weight: 600;
+      color: #1B5E20;
+      font-size: 15px;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stat-cards { grid-template-columns: 1fr; }
+      .feature-grid { grid-template-columns: 1fr; }
+      .header { flex-direction: column; }
+      .synonym-demo { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>🔍 Spanner: 全文検索でカスタム辞書によるシノニムマッピングをサポート</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge badge-ga">GA</span>
+          <span class="badge" style="background: #F4B400; color: #FFFFFF;">Cloud Spanner</span>
+          <span class="badge">Full-Text Search</span>
+          <span class="badge">Custom Dictionary</span>
+        </div>
+      </div>
+      <div class="subtitle" style="text-align: right; white-space: nowrap; margin-top: 8px;">
+        <div>📅 2026-04-21</div>
+        <div>Enterprise / Enterprise Plus</div>
+      </div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        Cloud Spanner の全文検索機能において、<span class="highlight">カスタム辞書 (Custom Dictionaries)</span> を使用したシノニム (同義語) マッピングの作成が GA としてサポートされました。SEARCH、SCORE、SNIPPET の各関数で <code>dictionary</code> パラメータを指定するだけで、ドメイン固有の用語やビジネス特有の略語に対する検索精度を大幅に向上させることが可能になります。
+      </p>
+      <p>
+        カスタム辞書はキーと値のペアで構成されるテーブルとして実装されます。検索語がキーに一致した場合、検索は自動的に対応するシノニムに展開されます。既存の <code>enhance_query</code> による自動クエリ拡張と組み合わせることも可能であり、両方の拡張を同時に活用できます。
+      </p>
+
+      <!-- Synonym Demo -->
+      <div class="synonym-demo">
+        <div class="synonym-key">edm</div>
+        <div class="synonym-expand">→</div>
+        <div class="synonym-values">
+          <div class="synonym-value">edm</div>
+          <div class="synonym-value">electronic dance music</div>
+        </div>
+      </div>
+
+      <div class="note-box">
+        <strong>💡 ポイント:</strong> アプリケーション側でのクエリ書き換えロジックが不要になり、検索ロジックの管理をデータベースレベルに集約できます。GoogleSQL と PostgreSQL の両方のインターフェースに対応しています。
+      </div>
+    </div>
+
+    <!-- Stats Section -->
+    <div class="stat-cards">
+      <div class="stat-card">
+        <div class="stat-value">3</div>
+        <div class="stat-label">対応関数<br>(SEARCH / SCORE / SNIPPET)</div>
+      </div>
+      <div class="stat-card" style="background: linear-gradient(135deg, #F4B400, #E6A000);">
+        <div class="stat-value">2</div>
+        <div class="stat-label">対応 SQL 方言<br>(GoogleSQL / PostgreSQL)</div>
+      </div>
+      <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-green), #2E7D32);">
+        <div class="stat-value">GA</div>
+        <div class="stat-label">一般提供<br>本番ワークロード対応</div>
+      </div>
+      <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-purple), #7B1FA2);">
+        <div class="stat-value">15s</div>
+        <div class="stat-label">デフォルト staleness<br>(カスタマイズ可能)</div>
+      </div>
+    </div>
+
+    <!-- Before/After Section -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-card">
+          <h3>❌ Before (アップデート前)</h3>
+          <div class="check-item">
+            <span class="cross-icon">✗</span>
+            <span>ドメイン固有の用語や業界特有の略語に対するカスタムマッピングを定義する手段がなかった</span>
+          </div>
+          <div class="check-item">
+            <span class="cross-icon">✗</span>
+            <span>業界用語・社内用語・製品名のバリエーションをカバーするにはアプリケーション側でクエリ書き換えロジックの実装が必要だった</span>
+          </div>
+          <div class="check-item">
+            <span class="cross-icon">✗</span>
+            <span>自動的なクエリ拡張 (enhance_query) だけでは専門ドメインにおける検索の再現率 (recall) が不十分なケースがあった</span>
+          </div>
+        </div>
+        <div class="after-card">
+          <h3>✅ After (アップデート後)</h3>
+          <div class="check-item">
+            <span class="check-icon">✓</span>
+            <span>データベースレベルでカスタムシノニムマッピングを定義でき、アプリケーション側のロジックが不要に</span>
+          </div>
+          <div class="check-item">
+            <span class="check-icon">✓</span>
+            <span>SEARCH、SCORE、SNIPPET の各関数で <code>dictionary</code> パラメータを指定するだけでカスタム辞書によるクエリ拡張が適用</span>
+          </div>
+          <div class="check-item">
+            <span class="check-icon">✓</span>
+            <span>enhance_query と組み合わせて自動シノニム拡張とカスタム辞書の両方を同時に活用し、再現率を最大化</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>カスタム辞書を使用した全文検索のクエリ処理フローです。<code>dictionary</code> パラメータが指定されている場合、検索語がカスタム辞書テーブルのキーと照合され、一致するシノニムに展開されます。<code>enhance_query</code> と組み合わせた場合、両方の拡張が独立して動作し、最終的に統合されたクエリが検索インデックスに対して実行されます。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    A[ユーザークエリ\n例: album] --> B{SEARCH / SCORE / SNIPPET 関数}
+    B --> C{dictionary パラメータ\n指定あり?}
+    C -->|あり| D[カスタム辞書テーブル参照]
+    C -->|なし| E{enhance_query\n指定あり?}
+    D --> F[キー一致確認\nalbum → vinyl, cassette]
+    F --> E
+    E -->|あり| G[自動クエリ拡張\nalbum → record]
+    E -->|なし| H[元のクエリのみ]
+    G --> I[拡張済みクエリ生成\nalbum OR record OR vinyl OR cassette]
+    H --> J[検索インデックス参照]
+    F -->|キー不一致| E
+    I --> J
+    J --> K[検索結果返却]
+
+    subgraph カスタム辞書テーブル
+        D
+        F
+    end
+
+    subgraph クエリ拡張エンジン
+        G
+    end
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features Section -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h3>📖 カスタム辞書テーブルの作成</h3>
+          <div class="icon-text"><span class="arrow">→</span><span><code>fulltext_dictionary_table = true</code> オプションを指定した専用テーブルとして作成</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>Key (STRING) と Value (ARRAY&lt;STRING&gt;) の 2 列で構成</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>GoogleSQL と PostgreSQL の両方で対応</span></div>
+        </div>
+        <div class="card card-green">
+          <h3>🔍 SEARCH 関数でのカスタム辞書利用</h3>
+          <div class="icon-text"><span class="arrow">→</span><span><code>dictionary</code> パラメータに辞書テーブル名を指定して使用</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>検索語がキーに一致した場合、値に含まれる全シノニムに自動展開</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>複数語の値はフレーズ検索として処理</span></div>
+        </div>
+        <div class="card card-purple">
+          <h3>📊 SCORE / SNIPPET 関数との統合</h3>
+          <div class="icon-text"><span class="arrow">→</span><span>SCORE 関数でカスタム辞書を使用したランキングスコア計算が可能</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>SNIPPET 関数でカスタム辞書によるマッチ箇所のハイライト表示が可能</span></div>
+        </div>
+        <div class="card card-teal">
+          <h3>⏱️ 辞書ルックアップの鮮度制御</h3>
+          <div class="icon-text"><span class="arrow">→</span><span>デフォルトでは最大 15 秒の staleness でルックアップ (パフォーマンス最適化)</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>テーブルオプション <code>fulltext_dictionary_staleness</code> でテーブルレベル設定可能</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>クエリヒントで個別クエリレベルのオーバーライドが可能</span></div>
+        </div>
+        <div class="card card-orange">
+          <h3>🔗 enhance_query との併用</h3>
+          <div class="icon-text"><span class="arrow">→</span><span><code>dictionary</code> と <code>enhance_query=&gt;true</code> を同時に指定可能</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>両方の拡張は独立して動作し、一方の拡張結果が他方の入力にはならない</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3>カスタム辞書テーブルの制約</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>テーブル構造</td><td>Key (STRING, NOT NULL) + Value (ARRAY&lt;STRING&gt;, NOT NULL) の 2 列のみ</td></tr>
+          <tr><td>キーの制約</td><td>単一語のみ (複数語のキーは不可)</td></tr>
+          <tr><td>値の制約</td><td>単一語またはフレーズ (複数語はフレーズ検索として扱われる)</td></tr>
+          <tr><td>大文字小文字</td><td>すべて小文字で格納することを推奨</td></tr>
+          <tr><td>マッピング方向</td><td>単方向 (双方向が必要な場合は逆方向も明示的に登録)</td></tr>
+          <tr><td>スキーマ</td><td>デフォルトスキーマにのみ作成可能 (named schema は不可)</td></tr>
+          <tr><td>クエリ方言</td><td>デフォルトの SEARCH クエリ方言のみサポート</td></tr>
+          <tr><td>デフォルト staleness</td><td>15 秒</td></tr>
+          <tr><td>エディション</td><td>Enterprise / Enterprise Plus のみ</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup Steps -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>Spanner Enterprise エディションまたは Enterprise Plus エディションのインスタンス</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>全文検索インデックスが作成済みのテーブル</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>カスタム辞書テーブルの作成権限</span></div>
+
+      <h3>ステップ 1: カスタム辞書テーブルの作成</h3>
+      <span class="code-label">GoogleSQL</span>
+      <pre><code class="language-sql">CREATE TABLE ProductDictionary (
+  Key STRING(MAX) NOT NULL,
+  Value ARRAY&lt;STRING(MAX)&gt; NOT NULL,
+) PRIMARY KEY(Key),
+OPTIONS (fulltext_dictionary_table = true);</code></pre>
+
+      <span class="code-label">PostgreSQL</span>
+      <pre><code class="language-sql">CREATE TABLE mycustomdictionary (
+  key character varying NOT NULL,
+  value character varying [] NOT NULL,
+  PRIMARY KEY(key)
+) WITH (
+  type = 'fulltext_dictionary'
+);</code></pre>
+
+      <h3>ステップ 2: シノニムデータの投入</h3>
+      <span class="code-label">GoogleSQL</span>
+      <pre><code class="language-sql">INSERT INTO ProductDictionary (Key, Value)
+VALUES
+  ('k8s', ['kubernetes']),
+  ('gke', ['google kubernetes engine']),
+  ('vm', ['virtual machine']),
+  ('lb', ['load balancer']);</code></pre>
+
+      <h3>ステップ 3: SEARCH 関数でカスタム辞書を使用</h3>
+      <span class="code-label">GoogleSQL</span>
+      <pre><code class="language-sql">-- 'k8s' が 'kubernetes' にも展開されて検索される
+SELECT DocumentId, Title
+FROM Documents
+WHERE SEARCH(Content_Tokens, 'k8s deployment',
+             dictionary=>'ProductDictionary');</code></pre>
+
+      <h3>ステップ 4: SCORE 関数でランキングに辞書を適用</h3>
+      <span class="code-label">GoogleSQL</span>
+      <pre><code class="language-sql">SELECT DocumentId, Title,
+       SCORE(Content_Tokens, 'k8s deployment',
+             dictionary=>'ProductDictionary') AS relevance
+FROM Documents
+WHERE SEARCH(Content_Tokens, 'k8s deployment',
+             dictionary=>'ProductDictionary')
+ORDER BY relevance DESC;</code></pre>
+
+      <h3>ステップ 5 (オプション): staleness の調整</h3>
+      <span class="code-label">GoogleSQL</span>
+      <pre><code class="language-sql">-- テーブルレベルの設定
+ALTER TABLE ProductDictionary SET OPTIONS (
+  fulltext_dictionary_staleness = '5s'
+);
+
+-- クエリレベルのヒント (0 秒 = 最新データを常に参照)
+@{fulltext_dictionary_staleness="0s"}
+SELECT DocumentId, Title
+FROM Documents
+WHERE SEARCH(Content_Tokens, 'k8s',
+             dictionary=>'ProductDictionary');</code></pre>
+      <div class="warning-box">
+        <strong>⚠️ 注意:</strong> staleness を 0 秒に設定するとクエリレイテンシーが増加する可能性があります。辞書の更新頻度に応じて適切な値を設定してください。
+      </div>
+
+      <h3>双方向マッピングの登録</h3>
+      <span class="code-label">GoogleSQL</span>
+      <pre><code class="language-sql">INSERT INTO MyCustomDictionary (Key, Value)
+  -- 1. album -> vinyl, cassette
+  SELECT 'album', ['vinyl', 'cassette']
+  UNION ALL
+  -- 2. vinyl -> album, cassette -> album
+  SELECT syn, ['album']
+  FROM UNNEST(['vinyl', 'cassette']) AS syn;</code></pre>
+      <div class="note-box">
+        <strong>💡 ポイント:</strong> カスタム辞書のマッピングは単方向です。双方向のシノニムマッピングが必要な場合は、逆方向のマッピングも明示的に登録する必要があります。
+      </div>
+    </div>
+
+    <!-- Benefits Section -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+
+      <h3>ビジネス面</h3>
+      <div class="card card-green">
+        <div class="icon-text"><span>🎯</span><span><strong>検索品質の向上</strong>: ドメイン固有の略語、業界用語、製品名のバリエーションをカスタム辞書で定義することにより、エンドユーザーの検索体験が大幅に改善される</span></div>
+      </div>
+      <div class="card card-green">
+        <div class="icon-text"><span>⚙️</span><span><strong>運用コストの削減</strong>: アプリケーション側でのクエリ書き換えロジックが不要になり、検索ロジックの管理をデータベースレベルに集約できる</span></div>
+      </div>
+      <div class="card card-green">
+        <div class="icon-text"><span>📈</span><span><strong>検索の再現率 (Recall) 向上</strong>: 自動クエリ拡張とカスタム辞書の組み合わせにより、ユーザーがどのような表現で検索しても関連する結果が返される可能性が高まる</span></div>
+      </div>
+
+      <h3>技術面</h3>
+      <div class="card">
+        <div class="icon-text"><span>🗄️</span><span><strong>SQL ネイティブ統合</strong>: 標準的な DDL/DML でカスタム辞書を管理でき、既存の Spanner ワークフローにシームレスに組み込める</span></div>
+      </div>
+      <div class="card">
+        <div class="icon-text"><span>🔒</span><span><strong>トランザクション整合性</strong>: Spanner の全文検索はトランザクション整合性を保証しており、カスタム辞書もこの特性を継承する</span></div>
+      </div>
+      <div class="card">
+        <div class="icon-text"><span>⏱️</span><span><strong>柔軟な鮮度制御</strong>: テーブルレベルおよびクエリレベルで staleness を制御でき、パフォーマンスとデータ鮮度のトレードオフを最適化できる</span></div>
+      </div>
+      <div class="card">
+        <div class="icon-text"><span>🌐</span><span><strong>GoogleSQL / PostgreSQL 両対応</strong>: 使用しているインターフェースに関わらず同等の機能を利用できる</span></div>
+      </div>
+    </div>
+
+    <!-- Limitations Section -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>制限事項</h3>
+      <div class="card card-red">
+        <div class="icon-text"><span class="cross-icon">✗</span><span>カスタム辞書テーブルはデフォルトスキーマにのみ作成可能であり、named schema には作成できない</span></div>
+      </div>
+      <div class="card card-red">
+        <div class="icon-text"><span class="cross-icon">✗</span><span>Spanner のインポート/エクスポート機能によるカスタム辞書テーブルのサポートは限定的</span></div>
+      </div>
+      <div class="card card-red">
+        <div class="icon-text"><span class="cross-icon">✗</span><span>デフォルトの SEARCH クエリ方言のみサポートされる</span></div>
+      </div>
+      <div class="card card-red">
+        <div class="icon-text"><span class="cross-icon">✗</span><span>キーは単一語に限定され、複数語のキーは定義できない</span></div>
+      </div>
+
+      <h3>考慮すべき点</h3>
+      <div class="warning-box">
+        <strong>⚠️ 双方向マッピング:</strong> 双方向のシノニムマッピングが必要な場合、逆方向のマッピングも明示的に登録する必要がある (自動的には双方向にならない)
+      </div>
+      <div class="warning-box">
+        <strong>⚠️ staleness:</strong> デフォルトの staleness は 15 秒であり、辞書の更新が即座に反映されない場合がある (必要に応じて staleness を調整)。0 秒に設定するとクエリレイテンシーが増加する可能性がある
+      </div>
+      <div class="warning-box">
+        <strong>⚠️ 小文字推奨:</strong> すべてのキーと値は小文字で格納することが推奨される (デフォルトのトークナイザーがトークンを小文字に変換するため)
+      </div>
+    </div>
+
+    <!-- Use Cases Section -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h3>💡 ユースケース 1: EC サイトの商品検索</h3>
+        <p><strong>シナリオ:</strong> EC サイトで、ユーザーが「スニーカー」「運動靴」「ランニングシューズ」など様々な表現で商品を検索するケース。</p>
+        <span class="code-label">GoogleSQL</span>
+        <pre><code class="language-sql">-- カスタム辞書テーブル作成
+CREATE TABLE ProductSynonyms (
+  Key STRING(MAX) NOT NULL,
+  Value ARRAY&lt;STRING(MAX)&gt; NOT NULL,
+) PRIMARY KEY(Key),
+OPTIONS (fulltext_dictionary_table = true);
+
+-- 双方向のシノニムを登録
+INSERT INTO ProductSynonyms (Key, Value)
+VALUES
+  ('sneakers', ['running shoes', 'athletic shoes']),
+  ('laptop', ['notebook', 'portable computer']);
+
+-- 辞書を使用した商品検索
+SELECT ProductId, ProductName,
+       SCORE(Description_Tokens, @query,
+             dictionary=>'ProductSynonyms') AS relevance
+FROM Products
+WHERE SEARCH(Description_Tokens, @query,
+             dictionary=>'ProductSynonyms')
+ORDER BY relevance DESC
+LIMIT 20;</code></pre>
+        <div class="success-box">
+          <strong>✅ 効果:</strong> ユーザーがどのような表現で検索しても、関連する商品が網羅的にヒットし、商品発見率と購入率の向上が期待できる。
+        </div>
+      </div>
+
+      <div class="usecase-card">
+        <h3>💡 ユースケース 2: 社内ナレッジベースの技術用語検索</h3>
+        <p><strong>シナリオ:</strong> IT 企業の社内ナレッジベースで、技術略語やプロジェクトコードネームを検索可能にするケース。</p>
+        <span class="code-label">GoogleSQL</span>
+        <pre><code class="language-sql">INSERT INTO TechDictionary (Key, Value)
+VALUES
+  ('k8s', ['kubernetes']),
+  ('tf', ['terraform']),
+  ('ci', ['continuous integration']),
+  ('cd', ['continuous deployment']);
+
+-- enhance_query との併用で最大限の検索精度を実現
+SELECT DocId, Title,
+       SNIPPET(Content, @query) AS preview
+FROM KnowledgeBase
+WHERE SEARCH(Content_Tokens, @query,
+             enhance_query=>true,
+             dictionary=>'TechDictionary')
+ORDER BY SCORE(Content_Tokens, @query,
+               enhance_query=>true,
+               dictionary=>'TechDictionary') DESC;</code></pre>
+        <div class="success-box">
+          <strong>✅ 効果:</strong> 略語でもフルネームでも同じ検索結果が得られ、社内ナレッジの発見性が向上する。enhance_query との併用により、スペルミスも自動修正される。
+        </div>
+      </div>
+
+      <div class="usecase-card">
+        <h3>💡 ユースケース 3: 多言語対応の医療用語検索</h3>
+        <p><strong>シナリオ:</strong> 医療データベースで、一般的な病名と専門的な医学用語の両方で検索できるようにするケース。</p>
+        <div class="success-box">
+          <strong>✅ 効果:</strong> 専門家は医学用語で、一般ユーザーは日常的な表現で検索しても、同一の検索結果にたどり着けるようになる。
+        </div>
+      </div>
+    </div>
+
+    <!-- Pricing Section -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>Spanner の全文検索機能自体には追加料金は発生しません。ただし、全文検索の実装に伴う追加のコンピュートリソースおよびストレージリソースによりコストが増加します。</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>料金</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>全文検索機能</td><td><strong style="color: var(--gc-green);">追加料金なし</strong> (Spanner インスタンス料金に含む)</td></tr>
+          <tr><td>カスタム辞書テーブル</td><td>通常の Spanner テーブルとして課金 (ストレージ + 読み取り/書き込み)</td></tr>
+          <tr><td>対応エディション</td><td>Enterprise / Enterprise Plus のみ</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Region Section -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <p>Spanner の全文検索機能は、Spanner Enterprise エディションおよび Enterprise Plus エディションが利用可能な<span class="highlight">すべてのリージョン、デュアルリージョン、マルチリージョン構成</span>で使用できます。カスタム辞書機能にリージョンの制限はありません。</p>
+    </div>
+
+    <!-- Related Services Section -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <div class="icon-text"><span>🔍</span><span><strong>Spanner Full-Text Search</strong>: カスタム辞書はこの全文検索フレームワークの拡張機能として位置付けられる</span></div>
+      </div>
+      <div class="card card-green">
+        <div class="icon-text"><span>⚡</span><span><strong>Spanner Enhanced Query</strong>: <code>enhance_query</code> オプションによる自動クエリ拡張機能。カスタム辞書と併用可能</span></div>
+      </div>
+      <div class="card card-purple">
+        <div class="icon-text"><span>🔗</span><span><strong>Spanner Graph Full-Text Search</strong>: Spanner Graph でもカスタム辞書を含む全文検索機能を利用可能</span></div>
+      </div>
+      <div class="card card-teal">
+        <div class="icon-text"><span>🔤</span><span><strong>Spanner Fuzzy Search (n-gram)</strong>: スペルバリエーションに対応するファジー検索。カスタム辞書とは異なるアプローチで検索精度を向上</span></div>
+      </div>
+      <div class="card card-yellow">
+        <div class="icon-text"><span>📊</span><span><strong>BigQuery Full-Text Search</strong>: BigQuery の全文検索機能。Spanner とは独立した実装</span></div>
+      </div>
+    </div>
+
+    <!-- Reference Links Section -->
+    <div class="section">
+      <h2>📚 参考リンク</h2>
+      <ul class="link-list">
+        <li>📄 <a href="https://docs.cloud.google.com/release-notes#April_21_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート</a></li>
+        <li>📘 <a href="https://docs.cloud.google.com/spanner/docs/full-text-search/search-query-enhancement" target="_blank" rel="noopener noreferrer" class="gc-link">カスタム辞書ドキュメント</a></li>
+        <li>📗 <a href="https://docs.cloud.google.com/spanner/docs/full-text-search" target="_blank" rel="noopener noreferrer" class="gc-link">Spanner 全文検索概要</a></li>
+        <li>📙 <a href="https://docs.cloud.google.com/spanner/docs/reference/standard-sql/search_functions" target="_blank" rel="noopener noreferrer" class="gc-link">検索関数リファレンス</a></li>
+        <li>📕 <a href="https://docs.cloud.google.com/spanner/docs/editions-overview" target="_blank" rel="noopener noreferrer" class="gc-link">Spanner エディション概要</a></li>
+        <li>💰 <a href="https://cloud.google.com/spanner/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Spanner 料金ページ</a></li>
+      </ul>
+    </div>
+
+    <!-- Summary Section -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <p>
+        Spanner のカスタム辞書機能は、全文検索のクエリ拡張をユーザーが自由にカスタマイズできる重要なアップデートです。ドメイン固有の用語、業界略語、製品名のバリエーションなどをデータベースレベルで定義することで、アプリケーション側のロジックを簡素化しつつ検索品質を大幅に向上させることができます。
+      </p>
+      <div class="note-box">
+        <strong>💡 推奨アクション:</strong> Spanner で全文検索を活用している組織は、まずドメイン固有の用語リストを整理し、カスタム辞書テーブルとして登録することから始めることを推奨します。<code>enhance_query</code> との併用により、検索の再現率を最大化できます。
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="list-style: none; padding: 0; margin: 4px 0;">
+        <li><a href="https://docs.cloud.google.com/release-notes#April_21_2026" target="_blank" rel="noopener noreferrer">https://docs.cloud.google.com/release-notes#April_21_2026</a></li>
+        <li><a href="https://docs.cloud.google.com/spanner/docs/full-text-search/search-query-enhancement" target="_blank" rel="noopener noreferrer">https://docs.cloud.google.com/spanner/docs/full-text-search/search-query-enhancement</a></li>
+        <li><a href="https://docs.cloud.google.com/spanner/docs/full-text-search" target="_blank" rel="noopener noreferrer">https://docs.cloud.google.com/spanner/docs/full-text-search</a></li>
+      </ul>
+      <p style="margin-top: 12px;">🏷️ #CloudSpanner #FullTextSearch #CustomDictionary #Synonym #SEARCH #SCORE #SNIPPET #EnterpriseEdition</p>
+    </footer>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>
