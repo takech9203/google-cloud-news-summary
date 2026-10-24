@@ -5,7 +5,10 @@
 
 ## 2026 年
 
+- [2026-10-23 - Cloud SQL (MySQL / PostgreSQL / SQL Server): セキュリティ情報 GCP-2026-071 への対応 (eMudhra CA 証明書の侵害)](2026/2026-10-23-cloud-sql-security-gcp-2026-071.md)
 - [2026-10-23 - Cloud Monitoring (Ops Agent): Ops Agent 2.73.0 セキュリティ修正 (CVE-2026-111943)](2026/2026-10-23-cloud-monitoring-ops-agent-2-73-0-security-fix.md)
+- [2026-10-23 - Google Cloud CCaaS: プレリリースノート 6.26 (IVR オーバーキャパシティ向けスケジュールコールバック、Salesforce PKCE 対応)](2026/2026-10-23-ccaas-prerelease-6-26.md)
+- [2026-10-22 - Google SecOps: 強化された Investigation Management エクスペリエンスでのケース一括選択](2026/2026-10-22-google-secops-bulk-case-selection.md)
 - [2026-10-22 - Data Studio (Looker Studio): BigQuery コネクタが BigQuery Graph への接続に対応](2026/2026-10-22-data-studio-bigquery-graph-connector.md)
 - [2026-10-22 - Container-Optimized OS: cos-133 新リリースと LTS Refresh (cos-121/125/129) によるセキュリティ強化](2026/2026-10-22-container-optimized-os-cos-133-lts-refresh.md)
 - [2026-10-22 - BigQuery: AI.TRANSLATE 関数が一般提供 (GA) に](2026/2026-10-22-bigquery-ai-translate-ga.md)
@@ -15,7 +18,9 @@
 - [2026-10-22 - Looker: Looker 26.22 リリース (Looker (original) 向けロールアウト)](2026/2026-10-22-looker-26-22-release.md)
 - [2026-10-22 - App Engine / Cloud Run: PHP ランタイムセキュリティパッチ続報 — 10/21 の注記を訂正、全ワークロードで再デプロイを指示](2026/2026-10-22-php-runtime-security-patches-update.md)
 - [2026-10-22 - Gemini Enterprise: AlphaEvolve のデフォルトモデルが 2026 年 10 月 26 日に Gemini 4 Argon へ変更](2026/2026-10-22-gemini-enterprise-alphaevolve-gemini-4-argon-default.md)
+- [2026-10-22 - Google Distributed Cloud (software only) for bare metal: バージョン 1.34.1000-gke.111 リリース](2026/2026-10-22-gdc-bare-metal-1-34-1000-gke-111.md)
 - [2026-10-22 - Gemini Enterprise: 単一ユーザークォータ上限 (Single-user quota limits)](2026/2026-10-22-gemini-enterprise-single-user-quota-limits.md)
+- [2026-10-22 - Google Distributed Cloud (software only) for VMware: バージョン 1.34.1000-gke.111 リリース](2026/2026-10-22-gdc-vmware-1-34-1000-gke-111.md)
 - [2026-10-22 - Firestore: Pipeline DML オペレーションが GA、insert / upsert ステージを追加](2026/2026-10-22-firestore-pipeline-dml-ga.md)
 - [2026-10-22 - Cloud Run: Direct VPC ingress (インスタンス向け)](2026/2026-10-22-cloud-run-direct-vpc-ingress.md)
 - [2026-10-22 - Google Cloud Contact Center as a Service (CCAI Platform): 高度なレポートダッシュボード プレリリースノート 6.24](2026/2026-10-22-ccaas-advanced-reporting-dashboards-6-24.md)
