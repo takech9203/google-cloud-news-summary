@@ -5,6 +5,9 @@
 
 ## 2026 年
 
+- [2026-10-25 - Google SecOps SOAR: Release 6.3.104 第 1 フェーズリージョンへのロールアウト開始](2026/2026-10-25-google-secops-soar-6-3-104-rollout.md)
+- [2026-10-24 - Google SecOps SOAR: Release 6.3.103 が全リージョンで利用可能に](2026/2026-10-24-google-secops-soar-6-3-103-all-regions.md)
+- [2026-10-24 - サーバーレスコンピューティング全サービス: 全言語ランタイム・スタックの一斉セキュリティアップデート](2026/2026-10-24-serverless-runtimes-security-updates.md)
 - [2026-10-23 - Cloud SQL (MySQL / PostgreSQL / SQL Server): セキュリティ情報 GCP-2026-071 への対応 (eMudhra CA 証明書の侵害)](2026/2026-10-23-cloud-sql-security-gcp-2026-071.md)
 - [2026-10-23 - Cloud Monitoring (Ops Agent): Ops Agent 2.73.0 セキュリティ修正 (CVE-2026-111943)](2026/2026-10-23-cloud-monitoring-ops-agent-2-73-0-security-fix.md)
 - [2026-10-23 - Google Cloud CCaaS: プレリリースノート 6.26 (IVR オーバーキャパシティ向けスケジュールコールバック、Salesforce PKCE 対応)](2026/2026-10-23-ccaas-prerelease-6-26.md)
