@@ -5,6 +5,14 @@
 
 ## 2026 年
 
+- [2026-10-26 - Model Armor: テンプレートのデータレジデンシー遵守を必須化する管理対象組織ポリシー制約がデフォルトで適用 (GA)](2026/2026-10-26-model-armor-data-residency-constraint-ga.md)
+- [2026-10-26 - Gemini Enterprise Agent Platform: Semantic Governance Policy のユーザー意図マッチング制御](2026/2026-10-26-gemini-enterprise-agent-platform-sgp-user-intent-matching.md)
+- [2026-10-26 - Apigee X: セキュリティ速報 GCP-2026-072 (PHP2Shell: CVE-2026-109618 / CVE-2026-109619)](2026/2026-10-26-apigee-x-security-bulletin-gcp-2026-072.md)
+- [2026-10-26 - Compute Engine: セキュリティ速報 GCP-2026-073 (CVE-2026-85299)](2026/2026-10-26-compute-engine-security-gcp-2026-073.md)
+- [2026-10-26 - BigQuery: Python UDF のボリュームマウント対応 (Preview)](2026/2026-10-26-bigquery-python-udf-volume-mounts.md)
+- [2026-10-26 - Database Migration Service: Cloud Storage からのスキーマインポートによる異種間変換ワークスペース作成](2026/2026-10-26-database-migration-service-conversion-workspace-cloud-storage.md)
+- [2026-10-26 - Apigee X: MCP ツール引数の OpenAPI 宣言ロケーションへのルーティング](2026/2026-10-26-apigee-x-mcp-tool-argument-placement.md)
+- [2026-10-26 - Oracle Database@Google Cloud: リモート MCP サーバーが GA、Database Connection 管理と SQL 実行ツールを追加](2026/2026-10-26-oracle-database-google-cloud-mcp-server-ga.md)
 - [2026-10-25 - Google SecOps SOAR: Release 6.3.104 第 1 フェーズリージョンへのロールアウト開始](2026/2026-10-25-google-secops-soar-6-3-104-rollout.md)
 - [2026-10-24 - Google SecOps SOAR: Release 6.3.103 が全リージョンで利用可能に](2026/2026-10-24-google-secops-soar-6-3-103-all-regions.md)
 - [2026-10-24 - サーバーレスコンピューティング全サービス: 全言語ランタイム・スタックの一斉セキュリティアップデート](2026/2026-10-24-serverless-runtimes-security-updates.md)
