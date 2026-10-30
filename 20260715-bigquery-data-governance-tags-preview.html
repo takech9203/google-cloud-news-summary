@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BigQuery: データガバナンスタグによるカラムレベルセキュリティ (Preview)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .card-teal {
+      border-left-color: var(--gc-teal);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 20px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.green {
+      background: linear-gradient(135deg, var(--gc-green), #2E7D32);
+    }
+
+    .stat-card.orange {
+      background: linear-gradient(135deg, var(--gc-orange), #E65100);
+    }
+
+    .stat-card.purple {
+      background: linear-gradient(135deg, var(--gc-purple), #6A1B9A);
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before {
+      background: var(--gc-red-tint);
+      border: 1px solid #FADBD8;
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before h4 {
+      color: var(--gc-red);
+      margin: 0 0 12px 0;
+      font-size: 16px;
+    }
+
+    .after {
+      background: var(--gc-green-tint);
+      border: 1px solid #D5F5E3;
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after h4 {
+      color: var(--gc-green);
+      margin: 0 0 12px 0;
+      font-size: 16px;
+    }
+
+    .before ul, .after ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before li, .after li {
+      margin: 6px 0;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-800);
+      margin: 0 0 8px 0;
+    }
+
+    .usecase-card p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .masking-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .masking-item {
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 8px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .masking-item .icon {
+      font-size: 28px;
+      margin-bottom: 8px;
+    }
+
+    .masking-item .name {
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      font-size: 14px;
+    }
+
+    .masking-item .desc {
+      font-size: 12px;
+      color: var(--gc-outline);
+      margin-top: 4px;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    footer ul {
+      list-style: none;
+      padding: 0;
+      margin: 8px 0;
+    }
+
+    footer li {
+      margin: 4px 0;
+    }
+
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 24px;
+      }
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+      .stat-cards {
+        grid-template-columns: 1fr;
+      }
+      .feature-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>🔒 BigQuery: データガバナンスタグによるカラムレベルセキュリティ</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">BigQuery</span>
+          <span class="badge-preview">Preview</span>
+          <span class="badge" style="background: var(--gc-blue-300);">Data Governance</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-07-15</div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>BigQuery において、<span class="highlight">データガバナンスタグ</span>によるカラムレベルセキュリティおよびデータマスキング機能が Preview として利用可能になりました。Resource Manager タグの一種として、機密性の高いカラムにタグを付与し、BigQuery データポリシーと連携させることで、ユーザーへの条件付きアクセス制御を実現します。</p>
+
+      <div class="note-box">
+        <strong>💡 ポイント:</strong> 従来の Data Catalog ポリシータグに代わり、Resource Manager タグのエコシステムを活用した統一的なカラムレベルアクセス制御が可能に。BigQuery Enterprise エディションが前提条件です。
+      </div>
+
+      <!-- Before/After -->
+      <h3>Before / After 比較</h3>
+      <div class="before-after">
+        <div class="before">
+          <h4>❌ Before (従来)</h4>
+          <ul>
+            <li>Data Catalog のポリシータグを個別管理</li>
+            <li>Resource Manager と別ワークフロー</li>
+            <li>タクソノミー設計・作成・適用の煩雑さ</li>
+            <li>組織全体でのポリシー一貫性の維持が困難</li>
+          </ul>
+        </div>
+        <div class="after">
+          <h4>✅ After (新機能)</h4>
+          <ul>
+            <li>Resource Manager タグで一元管理</li>
+            <li><code>purpose=DATA_GOVERNANCE</code> で簡単定義</li>
+            <li>SQL DDL から直接タグを付与</li>
+            <li>階層型タグ値 (最大 5 階層) をサポート</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stat-cards">
+      <div class="stat-card">
+        <div class="stat-value">5</div>
+        <div class="stat-label">最大タグ階層深度</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-value">$0</div>
+        <div class="stat-label">追加料金なし</div>
+      </div>
+      <div class="stat-card orange">
+        <div class="stat-value">4</div>
+        <div class="stat-label">マスキングオプション</div>
+      </div>
+      <div class="stat-card purple">
+        <div class="stat-value">SQL</div>
+        <div class="stat-label">ネイティブ対応</div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>Resource Manager でデータガバナンスタグを作成し、BigQuery カラムに付与する。データポリシーがタグを参照してクエリ実行時にアクセスチェックを行い、ユーザーの権限に応じてフルアクセス、マスクされたデータ、またはアクセス拒否を返す。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph RM["Resource Manager"]
+        TagKey["タグキー\npurpose=DATA_GOVERNANCE"]
+        TagValue["タグ値\n(階層型: 最大5階層)"]
+        TagKey --> TagValue
+    end
+
+    subgraph BQ["BigQuery"]
+        Table["テーブル"]
+        Column["機密カラム\ndata_governance_tags オプション"]
+        Table --> Column
+    end
+
+    subgraph DP["BigQuery Data Policy"]
+        DataPolicy["データポリシー"]
+        MaskingRule["マスキングルール\n(SHA256, NULL, DEFAULT等)"]
+        AccessGrant["アクセス許可\n(プリンシパル指定)"]
+        DataPolicy --> MaskingRule
+        DataPolicy --> AccessGrant
+    end
+
+    subgraph IAM["IAM / アクセス制御"]
+        Admin["Tag Administrator\nroles/resourcemanager.tagAdmin"]
+        Owner["BigQuery Data Owner\nroles/bigquery.dataOwner"]
+        PolicyAdmin["BigQuery Data Policy Admin\nroles/bigquerydatapolicy.admin"]
+    end
+
+    subgraph User["クエリ実行時"]
+        Query["SELECT クエリ"]
+        Check["アクセスチェック"]
+        Result["結果返却\n(フルアクセス/マスク/拒否)"]
+        Query --> Check
+        Check --> Result
+    end
+
+    TagValue -->|"タグをカラムに付与"| Column
+    Column -->|"タグを参照"| DataPolicy
+    DataPolicy -->|"ポリシー適用"| Check
+    Admin -->|"タグ作成"| TagKey
+    Owner -->|"タグ付与"| Column
+    PolicyAdmin -->|"ポリシー管理"| DataPolicy
+
+    classDef rm fill:#E8F5E9,stroke:#388E3C,stroke-width:2px,color:#333333
+    classDef bq fill:#E3F2FD,stroke:#1565C0,stroke-width:2px,color:#333333
+    classDef dp fill:#FFF3E0,stroke:#F57C00,stroke-width:2px,color:#333333
+    classDef iam fill:#F3E5F5,stroke:#7B1FA2,stroke-width:2px,color:#333333
+    classDef user fill:#FAFAFA,stroke:#616161,stroke-width:2px,color:#333333
+
+    class TagKey,TagValue rm
+    class Table,Column bq
+    class DataPolicy,MaskingRule,AccessGrant dp
+    class Admin,Owner,PolicyAdmin iam
+    class Query,Check,Result user
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h3>🏷️ データガバナンスタグの作成</h3>
+          <div class="icon-text"><span class="arrow">→</span><span>Resource Manager タグキーを <code>purpose=DATA_GOVERNANCE</code> で作成</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>階層構造 (最大 5 階層) サポート</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>プロジェクト/組織レベルで作成可能</span></div>
+        </div>
+        <div class="card card-green">
+          <h3>📊 BigQuery カラムへのタグ付与</h3>
+          <div class="icon-text"><span class="arrow">→</span><span>SQL DDL (<code>CREATE TABLE</code>, <code>ALTER TABLE</code>) で直接付与</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>bq CLI / REST API からも管理可能</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>既存テーブルへの後付けも対応</span></div>
+        </div>
+        <div class="card card-orange">
+          <h3>🔐 データポリシーとの連携</h3>
+          <div class="icon-text"><span class="arrow">→</span><span>タグ付きカラムにマスキングルールを定義</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>指定プリンシパルのみアクセス可能</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>動的データマスキングとの統合</span></div>
+        </div>
+        <div class="card card-purple">
+          <h3>🌐 クロスプロジェクトポリシー適用</h3>
+          <div class="icon-text"><span class="arrow">→</span><span>デフォルトはテーブル所在プロジェクトのポリシー評価</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>組織レベルでデフォルトデータポリシープロジェクトを設定可能</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>クロスプロジェクトでのポリシー適用が可能</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Masking Options -->
+    <div class="section">
+      <h2>🎭 マスキングオプション</h2>
+      <div class="masking-grid">
+        <div class="masking-item">
+          <div class="icon">🔑</div>
+          <div class="name">SHA-256</div>
+          <div class="desc">カラム値をハッシュに置換</div>
+        </div>
+        <div class="masking-item">
+          <div class="icon">🚫</div>
+          <div class="name">NULL</div>
+          <div class="desc">カラム値を NULL に置換</div>
+        </div>
+        <div class="masking-item">
+          <div class="icon">📝</div>
+          <div class="name">デフォルト値</div>
+          <div class="desc">データ型のデフォルト値に置換</div>
+        </div>
+        <div class="masking-item">
+          <div class="icon">⚙️</div>
+          <div class="name">カスタムルーチン</div>
+          <div class="desc">UDF によるカスタムマスキング</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>📐 技術仕様</h2>
+
+      <h3>必要な IAM ロール</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>操作</th>
+            <th>必要なロール</th>
+            <th>スコープ</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>タグキー/値の作成</td>
+            <td><code>roles/resourcemanager.tagAdmin</code></td>
+            <td>プロジェクトまたは組織</td>
+          </tr>
+          <tr>
+            <td>組織のタグ表示</td>
+            <td><code>roles/resourcemanager.organizationViewer</code></td>
+            <td>組織</td>
+          </tr>
+          <tr>
+            <td>カラムへのタグ付与/削除</td>
+            <td><code>roles/bigquery.dataOwner</code></td>
+            <td>テーブル</td>
+          </tr>
+          <tr>
+            <td>カラムへのタグ付与/削除</td>
+            <td><code>roles/resourcemanager.tagUser</code></td>
+            <td>組織、プロジェクト、またはタグ値</td>
+          </tr>
+          <tr>
+            <td>データポリシーの作成/管理</td>
+            <td><code>roles/bigquerydatapolicy.admin</code></td>
+            <td>プロジェクト</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>タグキーの仕様</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>タグ目的 (purpose)</td>
+            <td><code>DATA_GOVERNANCE</code></td>
+          </tr>
+          <tr>
+            <td>階層深度</td>
+            <td>最大 5 階層</td>
+          </tr>
+          <tr>
+            <td>タグキー形式</td>
+            <td><code>PROJECT_ID/TAG_KEY</code> または <code>ORGANIZATION_ID/TAG_KEY</code></td>
+          </tr>
+          <tr>
+            <td>カラムあたりのタグ数</td>
+            <td>複数のタグを付与可能</td>
+          </tr>
+          <tr>
+            <td>必要なエディション</td>
+            <td>BigQuery Enterprise</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup Steps -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <div class="note-box">
+        <strong>前提条件:</strong> BigQuery Enterprise エディション / Google Cloud CLI 最新版 / 適切な IAM ロール (Tag Administrator, BigQuery Data Owner, BigQuery Data Policy Admin)
+      </div>
+
+      <h3>ステップ 1: データガバナンスタグキーの作成</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># タグキーを DATA_GOVERNANCE 目的で作成
+gcloud resource-manager tags keys create sensitivity_level \
+  --parent=projects/my-project-id \
+  --purpose=DATA_GOVERNANCE</code></pre>
+
+      <h3>ステップ 2: タグ値の作成</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># タグ値を作成
+gcloud resource-manager tags values create high_sensitivity \
+  --parent=my-project-id/sensitivity_level
+
+gcloud resource-manager tags values create medium_sensitivity \
+  --parent=my-project-id/sensitivity_level</code></pre>
+
+      <h3>ステップ 3: BigQuery カラムへのタグ付与</h3>
+      <span class="code-label">SQL</span>
+      <pre><code class="language-sql">-- 新規テーブル作成時にタグを付与
+CREATE TABLE my_project.my_dataset.customers (
+  customer_id INT64,
+  name STRING,
+  email STRING OPTIONS (
+    data_governance_tags=[("my-project-id/sensitivity_level", "high_sensitivity")]
+  ),
+  ssn STRING OPTIONS (
+    data_governance_tags=[("my-project-id/sensitivity_level", "high_sensitivity")]
+  ),
+  city STRING
+);
+
+-- 既存テーブルのカラムにタグを追加
+ALTER TABLE my_project.my_dataset.customers
+ALTER COLUMN email
+SET OPTIONS (
+  data_governance_tags=[("my-project-id/sensitivity_level", "high_sensitivity")]
+);</code></pre>
+
+      <h3>ステップ 4: データポリシーの作成</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># データポリシーを作成してマスキングルールを適用
+curl --request POST \
+  "https://bigquerydatapolicy.googleapis.com/v1/projects/my-project-id/locations/us/dataPolicies" \
+  --header "Authorization: Bearer $(gcloud auth print-access-token)" \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "dataPolicyType": "DATA_MASKING_POLICY",
+    "dataMaskingPolicy": {
+      "predefinedExpression": "SHA256"
+    },
+    "dataGovernanceTag": "my-project-id/sensitivity_level/high_sensitivity"
+  }'</code></pre>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+
+      <h3>ビジネス面</h3>
+      <div class="card card-green">
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>コンプライアンス対応の効率化</strong> - GDPR、HIPAA、PCI DSS などの規制要件に対し、タグベースの一元的なポリシー管理により準拠コストを削減</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>データ共有の促進</strong> - マスキングにより機密カラムを保護しつつテーブル全体を共有でき、部門間のデータ活用が促進</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>監査対応の強化</strong> - 誰がどのカテゴリのデータにアクセスできるかが明確に文書化される</span></div>
+      </div>
+
+      <h3>技術面</h3>
+      <div class="card">
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>管理の一元化</strong> - Resource Manager タグのエコシステムで組織全体のタグ管理と BigQuery カラムセキュリティを統一運用</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>スケーラビリティ</strong> - 1 つのタグ値に 1 つのデータポリシーを定義すれば、全カラムに自動適用</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>SQL ネイティブ</strong> - DDL 文で直接管理でき、既存の IaC やスキーマ管理ワークフローに容易に統合</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>既存クエリへの影響なし</strong> - データマスキングは透過的に適用され、既存クエリの変更不要</span></div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ 制限事項・注意点</h2>
+
+      <div class="warning-box">
+        <strong>制限事項:</strong>
+        <div class="check-item"><span class="cross-icon">✗</span><span>Preview 段階 - 本番環境での利用には制限付きサポート (Pre-GA Offerings Terms 適用)</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>BigQuery Enterprise エディション必須 (Standard / On-demand では利用不可)</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>デフォルトではテーブル所在プロジェクトのポリシーのみ評価 (クロスプロジェクトは追加設定要)</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span><code>tabledata.list</code> API との互換性なし (全カラムへのフルアクセスが必要)</span></div>
+      </div>
+
+      <div class="warning-box">
+        <strong>考慮すべき点:</strong>
+        <div class="check-item"><span class="cross-icon">!</span><span>タグキー名前空間形式 (<code>PROJECT_ID/TAG_KEY</code>) と短縮名の使い分けに注意 (形式誤りは <code>Invalid tagKey</code> エラーの原因)</span></div>
+        <div class="check-item"><span class="cross-icon">!</span><span>行レベルセキュリティとの組み合わせでは Fine-Grained Reader アクセスが必要な場合あり</span></div>
+        <div class="check-item"><span class="cross-icon">!</span><span>コピージョブではソーステーブル全カラムへの Fine-Grained Reader が必要</span></div>
+        <div class="check-item"><span class="cross-icon">!</span><span>コレーションカラムへのマスキング適用で予期しない結果の可能性</span></div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>🔐 ユースケース 1: PII (個人識別情報) の保護</h4>
+        <p><strong>シナリオ:</strong> 顧客データベースにおいて、SSN、メールアドレス、電話番号などの PII カラムに対して、チームごとに異なるアクセスレベルを設定。経理チームはフルアクセス、分析チームはマスクデータ、営業チームはアクセス不可。</p>
+        <span class="code-label">SQL</span>
+        <pre><code class="language-sql">ALTER TABLE project.dataset.customers
+ALTER COLUMN ssn
+SET OPTIONS (data_governance_tags=[("my-project/pii_level", "highly_restricted")]);
+
+ALTER TABLE project.dataset.customers
+ALTER COLUMN email
+SET OPTIONS (data_governance_tags=[("my-project/pii_level", "restricted")]);</code></pre>
+        <p><strong>効果:</strong> 経理チームはフルアクセスで業務継続、分析チームは SHA-256 ハッシュ化データで統計分析可能、営業チームにはアクセス拒否で情報漏洩リスクを大幅低減。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>🇪🇺 ユースケース 2: GDPR コンプライアンスの実装</h4>
+        <p><strong>シナリオ:</strong> EU 在住ユーザーのデータを扱うテーブルにおいて、GDPR の「データ最小化」原則に基づき、必要なチーム以外には個人データを公開しない仕組みを構築。</p>
+        <span class="code-label">SQL</span>
+        <pre><code class="language-sql">CREATE TABLE project.dataset.eu_users (
+  user_id INT64,
+  full_name STRING OPTIONS (
+    data_governance_tags=[("my-project/gdpr_category", "personal_data")]
+  ),
+  ip_address STRING OPTIONS (
+    data_governance_tags=[("my-project/gdpr_category", "personal_data")]
+  ),
+  purchase_amount NUMERIC
+);</code></pre>
+        <p><strong>効果:</strong> GDPR 対象データへのアクセスがポリシーで一元管理され、監査時に明確なアクセス制御の証跡を提示可能。新テーブル/カラム追加時も同タグ付与で自動ポリシー適用。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>🏢 ユースケース 3: マルチテナント環境でのデータ分離</h4>
+        <p><strong>シナリオ:</strong> SaaS プラットフォームにおいて、テナント固有のデータカラムに対してテナントごとのアクセス制御を実現。各テナントの管理者は自社データのみ閲覧可能。</p>
+        <p><strong>効果:</strong> テナント間のデータ漏洩を防止しつつ、共有テーブルでの効率的なデータ管理を維持。タグの階層構造を活用して「テナント > データカテゴリ」の分類体系でポリシーを構成。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金情報</h2>
+      <p>データガバナンスタグ機能自体に追加料金は発生しません。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>BigQuery Enterprise エディション</td>
+            <td>必須 (スロットベースの料金)</td>
+          </tr>
+          <tr>
+            <td>Resource Manager タグ</td>
+            <td>追加料金なし</td>
+          </tr>
+          <tr>
+            <td>BigQuery Data Policy</td>
+            <td>追加料金なし</td>
+          </tr>
+          <tr>
+            <td>カラムレベルアクセス制御</td>
+            <td>BigQuery 使用料に含まれる</td>
+          </tr>
+          <tr>
+            <td>データマスキング</td>
+            <td>BigQuery 使用料に含まれる</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="note-box">
+        <strong>📝 参考:</strong> BigQuery Enterprise エディションは autoscaling スロットで $0.04/スロット時間 (US リージョン) から利用可能。
+      </div>
+    </div>
+
+    <!-- Region -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <p>BigQuery Enterprise エディションが利用可能な<strong>すべてのリージョンおよびマルチリージョン (US, EU)</strong> で利用可能。データポリシーはリージョン単位で作成する必要があります。</p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <strong>Resource Manager タグ</strong>
+          <p style="font-size:14px; margin:4px 0 0 0;">データガバナンスタグの基盤となるタグ管理サービス</p>
+        </div>
+        <div class="card card-green">
+          <strong>BigQuery Data Policy API</strong>
+          <p style="font-size:14px; margin:4px 0 0 0;">カラムに対するデータマスキングポリシーを管理する API</p>
+        </div>
+        <div class="card card-orange">
+          <strong>Data Catalog ポリシータグ</strong>
+          <p style="font-size:14px; margin:4px 0 0 0;">従来のカラムレベルアクセス制御 (代替手段)</p>
+        </div>
+        <div class="card card-purple">
+          <strong>Sensitive Data Protection</strong>
+          <p style="font-size:14px; margin:4px 0 0 0;">テーブル内の機密データを自動検出</p>
+        </div>
+        <div class="card card-teal">
+          <strong>BigQuery 行レベルセキュリティ</strong>
+          <p style="font-size:14px; margin:4px 0 0 0;">行単位のアクセス制御と組み合わせ可能</p>
+        </div>
+        <div class="card">
+          <strong>IAM Conditions</strong>
+          <p style="font-size:14px; margin:4px 0 0 0;">タグに基づく条件付きアクセス制御</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>📌 まとめ</h2>
+      <div class="success-box">
+        <p>BigQuery のデータガバナンスタグ機能は、Resource Manager タグのエコシステムを活用してカラムレベルのセキュリティとデータマスキングを統一的に管理できる重要な機能強化です。PII 保護やコンプライアンス対応が求められる環境において、BigQuery Enterprise エディションを利用中の組織は早期に検証を開始し、GA に向けた準備を進めることが推奨されます。</p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>📎 出典:</strong></p>
+      <ul>
+        <li><a href="https://cloud.google.com/bigquery/docs/tags#data-governance-tags" target="_blank" rel="noopener noreferrer">BigQuery タグ (データガバナンスタグ)</a></li>
+        <li><a href="https://cloud.google.com/bigquery/docs/column-level-security-intro" target="_blank" rel="noopener noreferrer">カラムレベルアクセス制御の概要</a></li>
+        <li><a href="https://cloud.google.com/bigquery/docs/column-data-masking-intro" target="_blank" rel="noopener noreferrer">データマスキングの概要</a></li>
+        <li><a href="https://cloud.google.com/resource-manager/docs/tags/tags-overview" target="_blank" rel="noopener noreferrer">Resource Manager タグの概要</a></li>
+        <li><a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer">BigQuery 料金</a></li>
+      </ul>
+      <p style="margin-top: 12px; font-size: 11px; color: #9AA0A6;">Generated on 2026-07-16 | Google Cloud News Summary</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

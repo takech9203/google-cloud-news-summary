@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spanner: GoogleSQL / PostgreSQL 両ダイアレクトで近似集計関数をサポート</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+      --gc-database: #F4B400;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-title {
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      font-size: 16px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .badge-db {
+      background: var(--gc-database);
+      color: #FFFFFF;
+    }
+
+    /* Before / After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid rgba(234, 67, 53, 0.35);
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid rgba(52, 168, 83, 0.35);
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-box h3 { color: #C5221F; }
+    .after-box h3 { color: #188038; }
+
+    .before-box ul, .after-box ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 6px 0;
+    }
+
+    @media (max-width: 720px) {
+      .before-after { grid-template-columns: 1fr; }
+      h1 { font-size: 26px; }
+    }
+
+    /* フロー図スタイル */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+      font-size: 14px;
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* チェックリストスタイル */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+    }
+
+    /* コードブロック (Mermaid の pre を除外) */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block {
+      overflow: hidden;
+      padding: 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブルスタイル */
+    .table-wrapper {
+      overflow-x: auto;
+      margin: 16px 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    .table-wrapper table {
+      margin: 0;
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* 統計カード */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+      border: 1px solid var(--gc-blue-100);
+    }
+
+    .usecase-title {
+      font-weight: 600;
+      color: var(--gc-blue-900);
+      font-size: 16px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    ul.plain-list {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    ul.plain-list li {
+      margin: 6px 0;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <div style="margin-bottom: 8px;">
+          <span class="badge badge-db">🗄️ Spanner</span>
+          <span class="badge badge-ga">GA (一般提供)</span>
+          <span class="badge">GoogleSQL</span>
+          <span class="badge">PostgreSQL</span>
+        </div>
+        <h1>📊 Spanner が近似集計関数をサポート</h1>
+        <div class="subtitle">GoogleSQL / PostgreSQL 両ダイアレクトで APPROX_COUNT_DISTINCT と HyperLogLog++ 関数が利用可能に</div>
+      </div>
+      <div class="subtitle">リリース日: 2026-10-20</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>💡 概要</h2>
+      <p>
+        Spanner が <span class="highlight">GoogleSQL と PostgreSQL の両ダイアレクト</span>で
+        <strong>近似集計関数 (approximate aggregate functions)</strong> をサポートしました。
+        個別値カウント (distinct count) の<strong>統計的推定値</strong>を生成し、
+        <code>COUNT(DISTINCT ...)</code> による正確な集計と比較して
+        <span class="highlight">高速かつ省リソース</span>で結果を計算できます。
+      </p>
+      <p>提供される機能は大きく 2 系統です。</p>
+      <div class="card">
+        <div class="card-title">⚡ APPROX_COUNT_DISTINCT</div>
+        入力データから直接推定値を計算するシンプルな近似集計関数。PostgreSQL ダイアレクトでは <code>spanner.approx_count_distinct</code>。詳細な制御が不要なクイックなクエリ向け。
+      </div>
+      <div class="card">
+        <div class="card-title">🧮 HyperLogLog++ (HLL++) 関数群</div>
+        <code>HLL_COUNT.INIT</code> / <code>EXTRACT</code> / <code>MERGE</code> / <code>MERGE_PARTIAL</code>。
+        「スケッチ」と呼ばれるコンパクトなサマリーを生成・保存・マージでき、精度のカスタマイズ (10〜24) にも対応。
+      </div>
+      <p>
+        ユニークユーザー数などの集計を頻繁に実行するワークロードで、クエリ実行時間とコンピュートリソース消費を大きく削減できます。
+        BigQuery で長らく提供されてきた同等機能が、オペレーショナルデータベースである Spanner でも利用可能になりました。
+      </p>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before: アップデート前の課題</h3>
+          <ul>
+            <li><code>COUNT(DISTINCT ...)</code> による正確な集計しか選択肢がなく、入力データ量に対して<strong>線形にメモリを消費</strong>。大規模データストリームでは実行時間とリソース消費が大きい</li>
+            <li>中間結果 (スケッチ) を保存して後からマージする<strong>インクリメンタル集計</strong>を Spanner の SQL だけで実現できない</li>
+            <li>近似集計には <strong>BigQuery など他サービスへのデータ移送</strong>が必要</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After: アップデート後の改善</h3>
+          <ul>
+            <li><code>APPROX_COUNT_DISTINCT</code> により、近似結果を<strong>少ないリソースで高速に取得</strong></li>
+            <li>HLL++ 関数により、スケッチの<strong>生成・保存・部分集計・再集計 (マージ)</strong> が可能に。精度 (10〜24) も指定可能</li>
+            <li><strong>GoogleSQL / PostgreSQL のどちらでも</strong>同等の近似集計が利用可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図: Before / After</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Before["Before: 正確な集計のみ"]
+        U1([👤 アナリスト/アプリ]) --> Q1["📝 COUNT(DISTINCT user_id)"]
+        Q1 --> S1["⚙️ 全個別値を保持して集計<br/>メモリ使用量がデータ量に比例"]
+        S1 --> R1["✅ 正確な値<br/>🐢 大規模データでは低速・高コスト"]
+    end
+
+    subgraph After["After: 近似集計関数"]
+        U2([👤 アナリスト/アプリ]) --> Q2["📝 APPROX_COUNT_DISTINCT(user_id)<br/>または HLL_COUNT.INIT/MERGE/EXTRACT"]
+        Q2 --> S2["⚙️ HLL++ スケッチで推定<br/>コンパクトなサマリーを利用"]
+        S2 --> R2["📊 統計的推定値<br/>🚀 高速・省リソース"]
+        S2 -.->|"スケッチを保存・マージ可能"| D2[("🗄️ Spanner テーブル<br/>(BYTES 列)")]
+    end
+        </pre>
+      </div>
+      <p style="font-size: 14px;">
+        従来の <code>COUNT(DISTINCT ...)</code> による正確な集計 (Before) と、HLL++ スケッチに基づく近似集計 (After) の比較です。
+        近似集計ではスケッチを BYTES として保存し、後からマージ・再集計するインクリメンタルな処理も可能になります。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>🔧 主要機能</h2>
+
+      <div class="card">
+        <div class="card-title">1️⃣ APPROX_COUNT_DISTINCT (GoogleSQL)</div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>COUNT(DISTINCT expression)</code> の近似結果を返す集計関数 (返り値は <code>INT64</code>)</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>統計的推定値のため精度は落ちるが、非常に大きな入力に対して<strong>高いパフォーマンス</strong>を発揮</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>入力データから直接計算するため、スケッチの保存や精度指定は不可 (詳細な制御が不要なクイックなクエリ向け)</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">2️⃣ HyperLogLog++ (HLL++) 関数 (GoogleSQL)</div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>HLL_COUNT.INIT(input [, precision])</code>: 入力値を HLL++ スケッチ (BYTES) に集約。精度 10〜24 (デフォルト 15)</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>HLL_COUNT.MERGE(sketch)</code>: 複数スケッチの和集合からカーディナリティ (INT64) を返す</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>HLL_COUNT.MERGE_PARTIAL(sketch)</code>: 複数スケッチをマージして新しいスケッチ (BYTES) を返す</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>HLL_COUNT.EXTRACT(sketch)</code>: 単一スケッチからカーディナリティ推定値を抽出</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">3️⃣ PostgreSQL ダイアレクト対応</div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>spanner.approx_count_distinct(expression)</code>: 非 NULL の個別値数の近似カウント (<code>int8</code>)</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>hll_count.init</code> / <code>extract</code> / <code>merge</code> / <code>merge_partial</code> も同様に提供</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>パフォーマンス最大化にはカラムナストレージ有効化 (<code>COLUMNAR POLICY enabled</code>) とカラムナスキャンヒント (<code>/*@ scan_method=columnar */</code>) の併用を推奨</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">4️⃣ スケッチ (Sketches) の保存と連携</div>
+        <div class="icon-text"><span class="arrow">→</span><span>スケッチはデータ集約の<strong>コンパクトなサマリー</strong>。保存して後からマージ (再集計) できる</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Dataflow、Apache Spark、ZetaSketch</strong> などの外部アプリケーションで構築した HLL++ スケッチを GoogleSQL で利用でき、その逆も可能</span></div>
+      </div>
+
+      <div class="flow-diagram">
+        <div class="flow-step">📥 HLL_COUNT.INIT<br/>スケッチ生成</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🗄️ BYTES 列に保存</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🔀 MERGE_PARTIAL<br/>部分集計</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">📊 MERGE / EXTRACT<br/>推定値を取得</div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>⚙️ 技術仕様</h2>
+
+      <h3>📋 関数一覧と入出力型</h3>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>関数 (GoogleSQL / PostgreSQL)</th>
+              <th>入力型</th>
+              <th>返り値</th>
+              <th>説明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>APPROX_COUNT_DISTINCT</code> /<br/><code>spanner.approx_count_distinct</code></td>
+              <td>GoogleSQL: ARRAY・STRUCT・PROTO・INTERVAL 以外の任意の型<br/>PostgreSQL: int8, text, varchar, bytea, numeric, bool, float4, float8, timestamptz, date, uuid (interval 非対応)</td>
+              <td><code>INT64</code> / <code>int8</code></td>
+              <td><code>COUNT(DISTINCT ...)</code> の近似結果</td>
+            </tr>
+            <tr>
+              <td><code>HLL_COUNT.INIT</code> /<br/><code>hll_count.init</code></td>
+              <td>GoogleSQL: INT64, NUMERIC, STRING, BYTES<br/>PostgreSQL: int8, text, varchar, bytea, numeric</td>
+              <td><code>BYTES</code> / <code>bytea</code></td>
+              <td>入力値から HLL++ スケッチを生成 (精度 10〜24、デフォルト 15)</td>
+            </tr>
+            <tr>
+              <td><code>HLL_COUNT.EXTRACT</code> /<br/><code>hll_count.extract</code></td>
+              <td>BYTES / bytea</td>
+              <td><code>INT64</code> / <code>int8</code></td>
+              <td>スケッチからカーディナリティ推定値を抽出</td>
+            </tr>
+            <tr>
+              <td><code>HLL_COUNT.MERGE</code> /<br/><code>hll_count.merge</code></td>
+              <td>BYTES / bytea</td>
+              <td><code>INT64</code> / <code>int8</code></td>
+              <td>スケッチをマージして推定値を返す</td>
+            </tr>
+            <tr>
+              <td><code>HLL_COUNT.MERGE_PARTIAL</code> /<br/><code>hll_count.merge_partial</code></td>
+              <td>BYTES / bytea</td>
+              <td><code>BYTES</code> / <code>bytea</code></td>
+              <td>スケッチをマージして新しいスケッチを返す</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>🎯 HLL++ スケッチの精度と誤差 (抜粋)</h3>
+      <p style="font-size: 14px;">精度を上げるほど誤差は小さくなりますが、スケッチの処理・保存に必要なメモリ/ストレージが増加します。</p>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>精度</th>
+              <th>最大ストレージサイズ</th>
+              <th>65% CI</th>
+              <th>95% CI</th>
+              <th>99% CI</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>10</td><td>1 KiB + 28 B</td><td>±3.25%</td><td>±6.50%</td><td>±9.75%</td></tr>
+            <tr><td>12</td><td>4 KiB + 28 B</td><td>±1.63%</td><td>±3.25%</td><td>±4.88%</td></tr>
+            <tr><td><strong>15 (デフォルト)</strong></td><td>32 KiB + 30 B</td><td>±0.57%</td><td>±1.15%</td><td>±1.72%</td></tr>
+            <tr><td>20</td><td>1024 KiB + 30 B</td><td>±0.10%</td><td>±0.20%</td><td>±0.30%</td></tr>
+            <tr><td>24</td><td>16384 KiB + 32 B</td><td>±0.03%</td><td>±0.05%</td><td>±0.08%</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">10〜24</div>
+          <div class="stat-label">指定可能な HLL++ 精度 (デフォルト 15)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">±1.15%</div>
+          <div class="stat-label">デフォルト精度 15 の誤差 (95% CI)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">2 系統</div>
+          <div class="stat-label">APPROX_COUNT_DISTINCT と HLL++ 関数群</div>
+        </div>
+      </div>
+
+      <h3>💻 クエリ例</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">近似集計関数の基本的な使い方 (GoogleSQL)</span>
+        </div>
+        <pre><code class="language-sql">-- APPROX_COUNT_DISTINCT: シンプルな近似個別値カウント
+SELECT APPROX_COUNT_DISTINCT(x) AS approx_distinct
+FROM UNNEST([0, 1, 1, 2, 3, 5]) AS x;
+-- 結果: 5
+
+-- HLL++: 国別にスケッチを生成し、マージして全体のユニーク顧客数を推定
+SELECT HLL_COUNT.MERGE(hll_sketch) AS distinct_customers_with_open_invoice
+FROM (
+  SELECT country, HLL_COUNT.INIT(customer_id) AS hll_sketch
+  FROM Invoices
+  GROUP BY country
+);</code></pre>
+      </div>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>✨ メリット</h2>
+
+      <h3>💼 ビジネス面</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>コスト削減</strong>: 正確な集計 (<code>COUNT(DISTINCT ...)</code>) と比較して使用リソースが少なく、大規模データセットに対する分析クエリのコンピュート消費を抑えられる</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>分析の内製化</strong>: ユニークユーザー数などの集計のために BigQuery へデータを移送しなくても、Spanner 上で直接近似集計を実行できる</span></div>
+
+      <h3>🔬 技術面</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>スケーラビリティ</strong>: 線形のメモリ使用が現実的でない大規模データストリームにも適用できる</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>インクリメンタル集計</strong>: スケッチを BYTES として保存し、<code>MERGE</code> / <code>MERGE_PARTIAL</code> で部分集計・再集計できるため、日次スケッチを保存して月次集計するといったパターンが実現できる</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>精度の制御</strong>: HLL++ 関数では精度 (10〜24) を指定して、誤差とストレージ/メモリのトレードオフを調整できる</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>エコシステム連携</strong>: Dataflow、Apache Spark、ZetaSketch で生成したスケッチと相互運用できる</span></div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>🚫 制限事項</h3>
+      <div class="check-item"><span class="cross-icon">✗</span><span>返り値は<strong>統計的推定値</strong>であり、正確な値が必要なユースケース (課金、会計など) には適さない</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span><code>APPROX_COUNT_DISTINCT</code> は精度指定、スケッチの保存、部分集計・再集計に非対応 (必要な場合は HLL++ 関数を使用)</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>GoogleSQL の <code>APPROX_COUNT_DISTINCT</code> は ARRAY、STRUCT、PROTO、INTERVAL 型の入力に非対応</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>異なる型で初期化されたスケッチ同士はマージ不可。PostgreSQL の <code>numeric</code> から初期化したスケッチと GoogleSQL の <code>NUMERIC</code> から初期化したスケッチもマージ不可</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>HLL++ スケッチから値を削除することはできない</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>異なる精度のスケッチをマージすると、<strong>最も低い精度にダウングレード</strong>される</span></div>
+
+      <h3>🤔 考慮すべき点</h3>
+      <div class="warning-box">
+        <strong>⚠️ 注意:</strong>
+        <ul class="plain-list" style="margin-bottom: 0;">
+          <li>精度を上げるとスケッチの最大ストレージサイズが増加する (精度 15 で約 32 KiB、精度 24 で約 16 MiB)。保存するスケッチ数と精度のバランスを検討すること</li>
+          <li>PostgreSQL ダイアレクトで最良のパフォーマンスを得るには、<strong>カラムナストレージの有効化</strong>と<strong>カラムナスキャンヒント</strong>の使用が推奨されている</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <div class="usecase-title">📈 ユースケース 1: ダッシュボード向けユニークユーザー数の高速集計</div>
+        <p style="font-size: 14px;">
+          <strong>シナリオ</strong>: 数十億行のイベントテーブルから、日次アクティブユーザー数 (DAU) をダッシュボードに表示したい。
+          正確な値である必要はなく、応答速度とリソース消費を優先したい。
+        </p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">直近 30 日の近似 DAU を取得</span>
+          </div>
+          <pre><code class="language-sql">SELECT event_date, APPROX_COUNT_DISTINCT(user_id) AS approx_dau
+FROM UserEvents
+WHERE event_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+GROUP BY event_date;</code></pre>
+        </div>
+        <div class="success-box" style="margin-bottom: 0;">
+          <strong>✅ 効果:</strong> <code>COUNT(DISTINCT user_id)</code> と比較して高速かつ省リソースで日次ユニークユーザー数を取得できる。
+        </div>
+      </div>
+
+      <div class="usecase">
+        <div class="usecase-title">🔀 ユースケース 2: スケッチの保存によるインクリメンタルなユニーク数集計</div>
+        <p style="font-size: 14px;">
+          <strong>シナリオ</strong>: 日次でユニーク顧客数のスケッチを計算・保存しておき、月次や四半期のユニーク顧客数は
+          保存済みスケッチのマージだけで算出したい (生データの再スキャンを避けたい)。
+        </p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">日次スケッチの保存と月次マージ集計</span>
+          </div>
+          <pre><code class="language-sql">-- 日次バッチ: スケッチを生成して保存 (BYTES 列)
+INSERT INTO DailyCustomerSketches (sketch_date, hll_sketch)
+SELECT CURRENT_DATE(), HLL_COUNT.INIT(customer_id, 15)
+FROM Orders
+WHERE order_date = CURRENT_DATE();
+
+-- 月次集計: 保存済みスケッチをマージするだけ
+SELECT HLL_COUNT.MERGE(hll_sketch) AS monthly_unique_customers
+FROM DailyCustomerSketches
+WHERE sketch_date BETWEEN '2026-10-01' AND '2026-10-31';</code></pre>
+        </div>
+        <div class="success-box" style="margin-bottom: 0;">
+          <strong>✅ 効果:</strong> 月次集計時に生データを再スキャンする必要がなく、コンパクトなスケッチのマージのみで推定値を取得できる。
+        </div>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <div class="note-box">
+        <strong>💡 ポイント:</strong> 近似集計関数の利用自体に<strong>追加料金はなし</strong>。
+        Spanner の通常の料金体系 (コンピュート容量、ストレージ、ネットワーク) が適用されます。
+        近似集計は正確な集計よりも少ないリソースでクエリを実行できるため、同じワークロードに必要な
+        <span class="highlight">コンピュート消費の削減</span>につながります。
+      </div>
+      <p style="font-size: 14px;">詳細は <a href="https://cloud.google.com/spanner/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Spanner の料金ページ</a> を参照してください。</p>
+    </div>
+
+    <!-- 関連サービス・機能 -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <div class="card-title">📊 BigQuery</div>
+        <code>APPROX_COUNT_DISTINCT</code> に加えて <code>APPROX_QUANTILES</code>、<code>APPROX_TOP_COUNT</code>、<code>APPROX_TOP_SUM</code>、HLL++ 関数、KLL 関数など、より広範な近似集計機能を以前から提供。Spanner との間でスケッチベースの集計パターンを揃えやすくなった。
+      </div>
+      <div class="card">
+        <div class="card-title">🌊 Dataflow / Apache Spark / ZetaSketch</div>
+        外部アプリケーションで構築した HLL++ スケッチを Spanner の GoogleSQL で利用でき、その逆も可能。
+      </div>
+      <div class="card">
+        <div class="card-title">🗂️ Spanner カラムナエンジン</div>
+        PostgreSQL ダイアレクトの近似集計関数で最良のパフォーマンスを得るために、カラムナストレージの有効化とカラムナスキャンヒントの使用が推奨されている。
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="success-box">
+        <p style="margin-top: 0;">
+          Spanner の近似集計関数は、大規模データセットに対する個別値カウントを
+          <span class="highlight">「正確さと引き換えに高速・省リソース」</span>で実行する選択肢を、
+          GoogleSQL / PostgreSQL 両ダイアレクトにもたらしました。
+        </p>
+        <p style="margin-bottom: 0;">
+          ダッシュボードやレポートで <code>COUNT(DISTINCT ...)</code> を多用しているワークロードでは、
+          <strong><code>APPROX_COUNT_DISTINCT</code> への置き換え</strong>や、
+          <strong>HLL++ スケッチを保存するインクリメンタル集計パターン</strong>の導入を検討することを推奨します。
+        </p>
+      </div>
+      <p style="font-size: 14px;">
+        <strong>🏷️ タグ</strong>: Spanner, GoogleSQL, PostgreSQL, APPROX_COUNT_DISTINCT, HyperLogLog++, スケッチ, 近似集計, GA
+      </p>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p><strong>📎 出典・参考リンク</strong></p>
+      <ul class="plain-list">
+        <li>📰 公式リリースノート: <a href="https://docs.cloud.google.com/release-notes#October_20_2026" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/release-notes#October_20_2026</a></li>
+        <li>📚 近似集計関数 (GoogleSQL): <a href="https://docs.cloud.google.com/spanner/docs/reference/standard-sql/approximate_aggregate_functions" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/spanner/docs/reference/standard-sql/approximate_aggregate_functions</a></li>
+        <li>📚 近似集計関数 (PostgreSQL): <a href="https://docs.cloud.google.com/spanner/docs/reference/postgresql/functions" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/spanner/docs/reference/postgresql/functions</a></li>
+        <li>📚 HyperLogLog++ 関数: <a href="https://docs.cloud.google.com/spanner/docs/reference/standard-sql/hll_functions" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/spanner/docs/reference/standard-sql/hll_functions</a></li>
+        <li>📚 スケッチ (Sketches): <a href="https://docs.cloud.google.com/spanner/docs/reference/standard-sql/sketches" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/spanner/docs/reference/standard-sql/sketches</a></li>
+        <li>💰 料金ページ: <a href="https://cloud.google.com/spanner/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">https://cloud.google.com/spanner/pricing</a></li>
+      </ul>
+      <p>本インフォグラフィックは Google Cloud News レポート (2026-10-20) をもとに生成されました。</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Looker: インスタンス削除時のゴミ箱機能と復元サポート</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1 {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-yellow {
+      border-left-color: var(--gc-yellow);
+    }
+
+    .card-red {
+      border-left-color: var(--gc-red);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-green);
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid) {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 20px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.green {
+      background: linear-gradient(135deg, var(--gc-green), #1E8E3E);
+    }
+
+    .stat-card.yellow {
+      background: linear-gradient(135deg, #F9AB00, #E37400);
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before h3, .after h3 {
+      margin-top: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-800);
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stat-cards { grid-template-columns: 1fr; }
+      .flow-diagram { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>🗑️ Looker: ゴミ箱機能と復元サポート</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Looker (Google Cloud core)</span>
+          <span class="badge-ga">GA</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-07-07</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        Looker (Google Cloud core) インスタンスの削除操作に<span class="highlight">ゴミ箱機能</span>が導入されました。
+        インスタンスを削除すると即座に完全削除されるのではなく、まずゴミ箱に移動され、<span class="highlight">7日間の猶予期間</span>が設けられます。
+        この期間中であれば、設定、ユーザー、接続情報を含むすべてのデータを保持したままインスタンスを復元できます。
+      </p>
+
+      <!-- Before / After -->
+      <div class="before-after">
+        <div class="before">
+          <h3>❌ Before</h3>
+          <ul style="margin: 0; padding-left: 20px;">
+            <li>削除すると即座に完全削除</li>
+            <li>復元が不可能</li>
+            <li>誤操作に対するセーフティネットなし</li>
+            <li>後から必要になっても対応不可</li>
+          </ul>
+        </div>
+        <div class="after">
+          <h3>✅ After</h3>
+          <ul style="margin: 0; padding-left: 20px;">
+            <li>ゴミ箱に移動、7日間復元可能</li>
+            <li>全データを保持したまま復元</li>
+            <li>クォータは即座に解放</li>
+            <li>コンソール/gcloud CLI 両対応</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stat-cards">
+      <div class="stat-card">
+        <div class="stat-value">7日間</div>
+        <div class="stat-label">復元猶予期間</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-value">100%</div>
+        <div class="stat-label">データ保持率 (設定・ユーザー・接続)</div>
+      </div>
+      <div class="stat-card yellow">
+        <div class="stat-value">即時</div>
+        <div class="stat-label">クォータ解放タイミング</div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>Looker インスタンスの削除から完全削除までのライフサイクルを示しています。削除操作によりゴミ箱に移動し、7日間の猶予期間内であれば復元が可能です。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    A[稼働中のインスタンス] -->|"削除操作(コンソール/gcloud)"| B[ゴミ箱に移動]
+    B -->|"ステータス: Updating"| C[ゴミ箱内 ステータス: Stopped]
+    C -->|"7日以内に復元"| D[復元処理 ステータス: Updating]
+    D -->|"復元完了"| A
+    C -->|"7日経過"| E[完全削除 復元不可]
+
+    B -.->|"クォータ即時解放"| F[クォータプール]
+    D -.->|"クォータ必要"| F
+
+    style A fill:#34A853,color:#fff
+    style C fill:#FBBC04,color:#000
+    style E fill:#EA4335,color:#fff
+    style F fill:#4285F4,color:#fff
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+
+      <div class="card">
+        <h3>🗑️ ゴミ箱への移動 (Soft Delete)</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span>インスタンス削除時、即座に完全削除されずゴミ箱に移動</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>ゴミ箱内のインスタンスは使用不可だが、データは保持</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>移動中は「Updating」、完了後は「Stopped」と表示</span></div>
+      </div>
+
+      <div class="card card-green">
+        <h3>🔄 7日間の復元猶予期間</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span>ゴミ箱移動から7日間は復元可能</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>すべてのデータ (設定、ユーザー、接続情報) が元の状態に復帰</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>7日経過後は自動的に完全削除、復元不可能</span></div>
+      </div>
+
+      <div class="card card-yellow">
+        <h3>📊 クォータ管理</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span>ゴミ箱移動時にクォータは即座に解放</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>復元時には十分なクォータが必要</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>クォータ不足の場合、復元は失敗する</span></div>
+      </div>
+
+      <div class="card card-purple">
+        <h3>🛠️ メンテナンスウィンドウとの連携</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span>ゴミ箱内のインスタンスはアップデートを受信しない</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>復元後は次のメンテナンスウィンドウでアップデート適用</span></div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3>インスタンスのステータス遷移</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>状態</th>
+            <th>ステータス</th>
+            <th>説明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>削除処理中</td>
+            <td><code>Updating</code></td>
+            <td>ゴミ箱への移動中</td>
+          </tr>
+          <tr>
+            <td>ゴミ箱内</td>
+            <td><code>Stopped</code></td>
+            <td>ゴミ箱に正常に移動完了</td>
+          </tr>
+          <tr>
+            <td>復元処理中</td>
+            <td><code>Updating</code></td>
+            <td>インスタンスの復元中</td>
+          </tr>
+          <tr>
+            <td>復元完了</td>
+            <td><code>Active</code></td>
+            <td>正常に復元され稼働中</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>必要な IAM ロール</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>ロール</th>
+            <th>リソースレベル</th>
+            <th>説明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>roles/looker.admin</code> (Looker Admin)</td>
+            <td>プロジェクト</td>
+            <td>インスタンスの削除・復元に必要</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup Instructions -->
+    <div class="section">
+      <h2>📝 設定方法</h2>
+
+      <div class="note-box">
+        <strong>前提条件:</strong> Google Cloud プロジェクトで Looker (Google Cloud core) インスタンスが作成済み、かつ <code>roles/looker.admin</code> IAM ロールが付与されていること。
+      </div>
+
+      <h3>ステップ 1: インスタンスをゴミ箱に移動 (削除)</h3>
+      <p><strong>Google Cloud コンソール:</strong> Instances ページ → 三点メニュー → 「Move to Trash」→ 確認ダイアログで再度「Move to Trash」</p>
+      <p><strong>gcloud CLI:</strong></p>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud looker instances delete INSTANCE_NAME \
+    --region=REGION \
+    --async</code></pre>
+
+      <h3>ステップ 2: ゴミ箱内のインスタンスを確認</h3>
+      <p><strong>Google Cloud コンソール:</strong> Instances ページ → 「Trashed instances」ボタンをクリック</p>
+      <p><strong>gcloud CLI:</strong></p>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud looker instances list</code></pre>
+
+      <h3>ステップ 3: インスタンスの復元</h3>
+      <p><strong>Google Cloud コンソール:</strong> 「Trashed instances」→ 三点メニュー → 「Restore」→ 確認ダイアログで再度「Restore」</p>
+      <p><strong>gcloud CLI:</strong></p>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud looker undelete INSTANCE_NAME \
+    --region=REGION \
+    --async</code></pre>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+
+      <h3>ビジネス面</h3>
+      <div class="card card-green">
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>誤削除からの保護:</strong> 管理者の誤操作やコミュニケーションミスによるインスタンスの意図しない削除から保護され、ビジネス継続性が向上</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>意思決定の柔軟性:</strong> 削除後も7日間の猶予があるため、削除判断を再検討する余地がある</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>ダウンタイムの最小化:</strong> 誤削除発生時も、復元によりインスタンスの再構築が不要</span></div>
+      </div>
+
+      <h3>技術面</h3>
+      <div class="card">
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>データ完全性の保証:</strong> 復元時に設定、ユーザー、接続情報が完全に復元、再設定の手間が不要</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>クォータの効率的管理:</strong> ゴミ箱移動時にクォータが即座に解放、新規インスタンスの作成がブロックされない</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>既存ワークフローとの互換性:</strong> コンソールおよび gcloud CLI の両方で操作可能</span></div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <div class="warning-box">
+        <strong>制限事項:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>7日間の猶予期間は変更不可。7日経過後は復元不可能</li>
+          <li>ゴミ箱内のインスタンスはソフトウェアアップデートを受信しない</li>
+          <li>復元にはインスタンスに対応するクォータが必要 (不足時は失敗)</li>
+          <li>変更中 (修正処理中) のインスタンスはゴミ箱に移動できない</li>
+        </ul>
+      </div>
+
+      <div class="error-box">
+        <strong>考慮すべき点:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>Data Studio Pro サブスクリプション関連インスタンスを削除すると、補完的な Data Studio Pro ライセンスは即座に有料ライセンスに変換</li>
+          <li>ゴミ箱への移動や復元が失敗した場合、インスタンスは以前のステータスに戻る</li>
+          <li>復元後のインスタンスは次のメンテナンスウィンドウまでアップデートが適用されない (セキュリティパッチの遅延リスク)</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>🆘 ユースケース 1: 誤操作からのリカバリー</h4>
+        <p><strong>シナリオ:</strong> 管理者が本番環境のインスタンスを誤ってステージング環境と間違えて削除</p>
+        <span class="code-label">Bash</span>
+        <pre><code class="language-bash"># 誤って削除されたインスタンスを確認
+gcloud looker instances list
+
+# インスタンスを復元
+gcloud looker undelete my-production-instance \
+    --region=us-central1 \
+    --async</code></pre>
+        <p><strong>効果:</strong> 本番環境のダウンタイムを最小限に抑え、すべての設定・ユーザー・接続情報を保持したまま迅速に復旧</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>🔄 ユースケース 2: インスタンス統合の見直し</h4>
+        <p><strong>シナリオ:</strong> コスト最適化のため複数インスタンスを統合する計画で一部を削除したが、パフォーマンス問題が判明</p>
+        <p><strong>効果:</strong> 7日以内であれば削除したインスタンスを復元でき、統合計画を再検討する時間的余裕が生まれる</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>⚖️ ユースケース 3: コンプライアンス対応</h4>
+        <p><strong>シナリオ:</strong> インスタンス削除後に、そのインスタンス内のデータに対する法的保全要求 (リティゲーションホールド) が発生</p>
+        <p><strong>効果:</strong> 7日以内であればインスタンスを復元し、必要なデータの保全に対応可能</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <div class="success-box">
+        <strong>ゴミ箱機能自体に追加料金は発生しません。</strong>
+      </div>
+      <ul>
+        <li>ゴミ箱に移動した時点でインスタンスのクォータは解放される</li>
+        <li>復元時には対応するクォータが必要</li>
+        <li>Looker (Google Cloud core) の料金はエディション (Standard / Enterprise / Embed) により異なる</li>
+      </ul>
+    </div>
+
+    <!-- Regions -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <p>本機能は Looker (Google Cloud core) が利用可能な<span class="highlight">すべてのリージョン</span>で提供されます。すべてのエディション (Standard、Enterprise、Embed) で利用可能です。</p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <div class="icon-text"><span>📦</span><span><strong>Looker バックアップと復元</strong> - インスタンス全体のバックアップ・リストア機能。特定時点のスナップショットを30日間保持</span></div>
+      </div>
+      <div class="card">
+        <div class="icon-text"><span>🔧</span><span><strong>Looker メンテナンス</strong> - インスタンスのアップデート管理。復元後は次のメンテナンスウィンドウでアップデート適用</span></div>
+      </div>
+      <div class="card">
+        <div class="icon-text"><span>🔒</span><span><strong>IAM (Identity and Access Management)</strong> - インスタンスの削除・復元に必要な権限管理</span></div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="list-style: none; padding: 0; margin: 4px 0;">
+        <li><a href="https://cloud.google.com/looker/docs/looker-core-delete#instance-delete" target="_blank" rel="noopener noreferrer">Looker (Google Cloud core) インスタンスの削除</a></li>
+        <li><a href="https://cloud.google.com/looker/docs/looker-core-delete#restore" target="_blank" rel="noopener noreferrer">ゴミ箱からのインスタンス復元</a></li>
+        <li><a href="https://cloud.google.com/release-notes#July_07_2026" target="_blank" rel="noopener noreferrer">公式リリースノート (July 07, 2026)</a></li>
+        <li><a href="https://cloud.google.com/looker/pricing" target="_blank" rel="noopener noreferrer">Looker (Google Cloud core) 料金ページ</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: #9AA0A6;">Generated on 2026-07-08</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <!-- highlight.js -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

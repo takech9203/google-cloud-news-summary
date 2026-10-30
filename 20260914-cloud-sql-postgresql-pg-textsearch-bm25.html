@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cloud SQL for PostgreSQL: pg_textsearch 拡張機能による BM25 全文検索</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+:root {
+  --gc-blue: #4285F4;
+  --gc-red: #EA4335;
+  --gc-yellow: #FBBC04;
+  --gc-green: #34A853;
+  --gc-blue-900: #174EA6;
+  --gc-blue-800: #185ABC;
+  --gc-blue-700: #1967D2;
+  --gc-blue-600: #1A73E8;
+  --gc-blue-500: #4285F4;
+  --gc-blue-300: #669DF6;
+  --gc-blue-200: #8AB4F8;
+  --gc-blue-100: #AECBFA;
+  --gc-blue-50: #E8F0FE;
+  --gc-on-surface: #202124;
+  --gc-on-surface-variant: #5F6368;
+  --gc-outline: #80868B;
+  --gc-surface: #FFFFFF;
+  --gc-surface-container-lowest: #F8F9FA;
+  --gc-surface-container-low: #F1F3F4;
+  --gc-surface-container: #E8EAED;
+  --gc-outline-variant: #DADCE0;
+  --gc-blue-tint: #E8F0FE;
+  --gc-green-tint: #E6F4EA;
+  --gc-red-tint: #FCE8E6;
+  --gc-yellow-tint: #FEF7E0;
+  --gc-purple-tint: #F3E8FD;
+  --gc-teal-tint: #E0F7FA;
+  --gc-purple: #A142F4;
+  --gc-teal: #00BCD4;
+  --gc-orange: #FF6D00;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background-color: var(--gc-surface);
+  font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+  color: var(--gc-on-surface-variant);
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 20px;
+  margin: 0;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.header {
+  margin-bottom: 32px;
+  padding-bottom: 16px;
+  border-bottom: 3px solid var(--gc-blue-600);
+}
+
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+h1, .title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--gc-on-surface);
+  margin: 0 0 8px 0;
+  line-height: 1.4;
+}
+
+h2, .section-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 16px 0 8px 0;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: var(--gc-outline);
+}
+
+.section {
+  background: var(--gc-surface-container-low);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid var(--gc-outline-variant);
+}
+
+.highlight {
+  background-color: var(--gc-blue-50);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--gc-blue-800);
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+.card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border-left: 4px solid var(--gc-blue-600);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+}
+
+.card h3 { margin-top: 0; }
+
+.gc-link {
+  color: var(--gc-blue-600);
+  text-decoration: none;
+}
+
+.gc-link:hover {
+  color: var(--gc-blue-800);
+  text-decoration: underline;
+}
+
+.badge,
+.badge-ga,
+.badge-preview,
+.badge-deprecated {
+  display: inline-block;
+  color: #FFFFFF;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+  margin: 4px 8px 4px 0;
+}
+
+.badge { background: var(--gc-blue-600); }
+.badge-ga { background: var(--gc-green); color: #FFFFFF; }
+.badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+.badge-deprecated { background: var(--gc-red); color: #FFFFFF; }
+
+/* Before/After 比較 */
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+@media (max-width: 720px) {
+  .before-after { grid-template-columns: 1fr; }
+}
+
+.before-box, .after-box {
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.before-box {
+  background: var(--gc-red-tint);
+  border: 1px solid rgba(234, 67, 53, 0.35);
+}
+
+.after-box {
+  background: var(--gc-green-tint);
+  border: 1px solid rgba(52, 168, 83, 0.35);
+}
+
+.before-box h3, .after-box h3 { margin-top: 0; }
+.before-box h3 { color: #C5221F; }
+.after-box h3 { color: #188038; }
+
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.check-icon { color: var(--gc-green); font-size: 18px; flex-shrink: 0; }
+.cross-icon { color: var(--gc-red); font-size: 18px; flex-shrink: 0; }
+
+/* フロー図 */
+.flow-diagram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 24px 0;
+}
+
+.flow-step {
+  background: var(--gc-surface);
+  border: 2px solid var(--gc-blue-600);
+  border-radius: 12px;
+  padding: 12px 20px;
+  text-align: center;
+  min-width: 100px;
+  color: var(--gc-on-surface);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+  font-size: 14px;
+}
+
+.flow-arrow {
+  color: var(--gc-blue-600);
+  font-size: 24px;
+  font-weight: bold;
+}
+
+/* コードブロック */
+.code-block {
+  background: #1E1E1E;
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 16px 0;
+}
+
+.code-header {
+  background: #2D2D2D;
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.code-lang {
+  color: #9CDCFE;
+  font-weight: bold;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.code-title { color: #AAAAAA; }
+
+.code-block pre {
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+}
+
+pre:not(.mermaid) {
+  background: #1E1E1E;
+  border-radius: 8px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: #E8E8E8;
+  margin: 16px 0;
+}
+
+.code-block code {
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 16px !important;
+  display: block;
+}
+
+pre code {
+  background: none;
+  border: none;
+  font-size: inherit;
+}
+
+/* インラインコード */
+code:not(pre code) {
+  background: var(--gc-surface-container-lowest);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 0.9em;
+  color: var(--gc-blue-900);
+}
+
+/* テーブル */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--gc-outline-variant);
+  background: var(--gc-surface);
+}
+
+th {
+  background: var(--gc-blue-50);
+  color: var(--gc-blue-900);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 2px solid var(--gc-blue-200);
+}
+
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--gc-outline-variant);
+  font-size: 14px;
+}
+
+tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+tr:hover { background: var(--gc-blue-50); }
+
+/* ボックス */
+.note-box {
+  background: var(--gc-blue-tint);
+  border-left: 4px solid var(--gc-blue-600);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.warning-box {
+  background: var(--gc-yellow-tint);
+  border-left: 4px solid var(--gc-yellow);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.ai-box {
+  background: var(--gc-purple-tint);
+  border-left: 4px solid var(--gc-purple);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.success-box {
+  background: var(--gc-green-tint);
+  border-left: 4px solid var(--gc-green);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+/* 統計カード */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.stat-card {
+  background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+  color: var(--gc-surface);
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 30px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.stat-label { font-size: 14px; opacity: 0.9; }
+
+/* Mermaid コンテナ */
+.mermaid-container {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 20px 0;
+  border: 2px solid rgba(66, 133, 244, 0.3);
+  overflow-x: auto;
+}
+
+.mermaid {
+  display: flex;
+  justify-content: center;
+}
+
+/* ユースケースカード */
+.usecase-card {
+  background: var(--gc-blue-tint);
+  border: 1px solid var(--gc-blue-200);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 16px 0;
+}
+
+.usecase-card h3 {
+  margin-top: 0;
+  color: var(--gc-blue-900);
+}
+
+/* 機能カードグリッド */
+.feature-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--gc-blue-600);
+  color: #FFFFFF;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 14px;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.tag {
+  display: inline-block;
+  background: var(--gc-surface);
+  border: 1px solid var(--gc-blue-200);
+  color: var(--gc-blue-800);
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 13px;
+  margin: 2px 4px 2px 0;
+}
+
+ul { padding-left: 24px; margin: 8px 0; }
+li { margin: 6px 0; }
+
+footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gc-outline-variant);
+  font-size: 13px;
+  color: var(--gc-outline);
+}
+
+footer a { word-break: break-all; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ヘッダー -->
+  <div class="header">
+    <div class="header-top">
+      <div>
+        <span class="badge">☁️ Cloud SQL for PostgreSQL</span>
+        <span class="badge badge-ga">GA (一般提供)</span>
+      </div>
+      <div class="subtitle">📅 リリース日: 2026-09-14</div>
+    </div>
+    <h1>🔍 pg_textsearch 拡張機能による BM25 全文検索</h1>
+    <div class="subtitle">Elasticsearch 級の関連性スコアリングを PostgreSQL 単体で — 外部検索エンジンとデータ同期からの解放</div>
+  </div>
+
+  <!-- 概要 -->
+  <div class="section">
+    <h2>📌 概要</h2>
+    <p>
+      Cloud SQL for PostgreSQL で <code>pg_textsearch</code> 拡張機能が利用可能になりました。業界標準の
+      <span class="highlight">BM25 (Best Matching 25)</span> スコアリングアルゴリズムによる全文検索を
+      PostgreSQL 内で直接実行できます。Timescale が開発するオープンソースプロジェクトとして GitHub で公開されています。
+    </p>
+    <p>
+      BM25 は<strong>逆文書頻度 (IDF)</strong>・<strong>単語頻度の飽和</strong>・<strong>文書長の正規化</strong>を考慮した確率的ランキングアルゴリズムで、
+      PostgreSQL 組み込みの <code>ts_rank</code> より関連性の高い検索結果を返します。
+      PostgreSQL の標準ストレージページ上で直接動作するため、外部検索エンジンの導入や二重クラスタの運用・データ同期が不要になります。
+    </p>
+
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-value">BM25</div>
+        <div class="stat-label">業界標準の関連性スコアリング</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">PostgreSQL 17+</div>
+        <div class="stat-label">R20260712.01_06 以降で利用可能</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">1 つの DB</div>
+        <div class="stat-label">外部検索エンジン・同期が不要に</div>
+      </div>
+    </div>
+
+    <div class="before-after">
+      <div class="before-box">
+        <h3>❌ Before: アップデート前の課題</h3>
+        <div class="check-item"><span class="cross-icon">✗</span><span>組み込み全文検索 (<code>tsvector</code> / <code>ts_rank</code>) は IDF や文書長正規化を考慮せず、関連性スコアリングの精度に限界</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>BM25 相当のランキングには Elasticsearch / OpenSearch などの外部検索エンジン + データ同期パイプラインが必要</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>検索エンジンと DB の二重クラスタ運用で、運用コストと整合性管理の負担が発生</span></div>
+      </div>
+      <div class="after-box">
+        <h3>✅ After: アップデート後の改善</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span><code>CREATE EXTENSION</code> だけで BM25 スコアリングによる高精度な全文検索が利用可能に</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>外部検索エンジンの構築・データ同期が不要になり、PostgreSQL エコシステム内で完結</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><code>&lt;@&gt;</code> 演算子を SQL に直接組み込め、pgvector と組み合わせた RRF ベースのハイブリッド検索も単一 DB で実現</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- アーキテクチャ図 -->
+  <div class="section">
+    <h2>🏗️ アーキテクチャ図</h2>
+    <div class="mermaid-container">
+      <pre class="mermaid">
+flowchart TD
+    subgraph Before["従来: 外部検索エンジン構成"]
+        APP1([🧑‍💻 アプリケーション]) --> DB1[(🐘 Cloud SQL<br>PostgreSQL)]
+        APP1 --> ES[🔍 Elasticsearch など<br>外部検索エンジン]
+        DB1 -. データ同期<br>パイプラインが必要 .-> ES
+    end
+
+    subgraph After["今回: pg_textsearch による統合構成"]
+        APP2([🧑‍💻 アプリケーション]) --> DB2[(🐘 Cloud SQL<br>PostgreSQL 17+)]
+        DB2 --> BM25[📇 BM25 インデックス<br>pg_textsearch]
+        DB2 --> VEC[🧭 ベクトル検索<br>pgvector]
+        BM25 --> RRF{{"⚖️ RRF で統合<br>(ハイブリッド検索)"}}
+        VEC --> RRF
+    end
+
+    Before ~~~ After
+      </pre>
+    </div>
+    <p>
+      従来は BM25 相当の関連性スコアリングに外部検索エンジンとデータ同期が必要でしたが、
+      <span class="highlight">pg_textsearch により Cloud SQL 単体で BM25 全文検索とベクトル検索を組み合わせたハイブリッド検索まで完結</span>できます。
+    </p>
+  </div>
+
+  <!-- 主要機能 -->
+  <div class="section">
+    <h2>⚡ 主要機能</h2>
+    <div class="feature-grid">
+      <div class="card">
+        <h3>🎯 1. BM25 スコアリングによる全文検索</h3>
+        <ul>
+          <li>業界標準の <strong>BM25 (Best Matching 25)</strong> アルゴリズムで文書の関連性をスコアリング</li>
+          <li>逆文書頻度 (tf-idf)・単語頻度の飽和・文書長の正規化をサポートし、組み込みの <code>ts_rank</code> より高精度な結果を返す</li>
+          <li><code>USING bm25</code> 構文で専用インデックスを作成し、<code>&lt;@&gt;</code> 演算子でクエリとの BM25 スコアを計算</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>🗄️ 2. PostgreSQL ネイティブなストレージ統合</h3>
+        <ul>
+          <li>PostgreSQL の標準ストレージページ上で直接動作するため、外部エンジンのインストールが不要</li>
+          <li>二重クラスタの保守やデータ同期の考慮が不要で、<strong>トランザクションと一貫した検索</strong>が可能</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>🧭 3. ベクトル検索とのハイブリッド検索</h3>
+        <ul>
+          <li><code>vector</code> 拡張機能 (pgvector) と組み合わせ、BM25 のキーワード検索とセマンティック検索を <strong>RRF (Reciprocal Rank Fusion)</strong> で統合可能</li>
+          <li><code>google_ml_integration</code> 拡張機能の埋め込み生成 (例: <code>gemini-embedding-001</code>) と連携した構成例が公式ドキュメントで提供</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 技術仕様 -->
+  <div class="section">
+    <h2>🔧 技術仕様</h2>
+
+    <h3>📋 前提条件・要件</h3>
+    <table>
+      <tr><th>項目</th><th>詳細</th></tr>
+      <tr><td>PostgreSQL バージョン</td><td>PostgreSQL 17 以降</td></tr>
+      <tr><td>Cloud SQL リリース</td><td>PostgreSQL リリース R20260712.01_06 以降</td></tr>
+      <tr><td>必要なデータベースフラグ</td><td><code>cloudsql.enable_pg_textsearch = on</code> (<code>shared_preload_libraries</code> に追加される)</td></tr>
+      <tr><td>拡張機能の有効化</td><td><code>CREATE EXTENSION pg_textsearch;</code> (データベースごと)</td></tr>
+      <tr><td>提供元</td><td>Timescale によるオープンソースプロジェクト (<a class="gc-link" href="https://github.com/timescale/pg_textsearch" target="_blank" rel="noopener noreferrer">GitHub</a>)</td></tr>
+    </table>
+
+    <h3>📝 主なクエリ構文</h3>
+    <table>
+      <tr><th>要素</th><th>説明</th></tr>
+      <tr><td><code>USING bm25</code></td><td>BM25 インデックスのアクセスメソッド。<code>WITH (text_config = 'english')</code> でテキスト検索設定を指定</td></tr>
+      <tr><td><code>&lt;@&gt;</code> 演算子</td><td>テキスト列とクエリ文字列の BM25 スコアを計算。スコアは負の値で返り、関連性が高いほど小さい (<code>ASC</code> でソート)</td></tr>
+    </table>
+
+    <h3>⚙️ 拡張機能の設定パラメータ</h3>
+    <table>
+      <tr><th>パラメータ</th><th>説明</th><th>デフォルト</th></tr>
+      <tr><td><code>pg_textsearch.bulk_load_threshold</code></td><td>自動スピルまでのトランザクションあたりの語数 (0 で無効)</td><td>100,000</td></tr>
+      <tr><td><code>pg_textsearch.compress_segments</code></td><td>新規セグメントのポスティングブロックを圧縮</td><td>on</td></tr>
+      <tr><td><code>pg_textsearch.default_limit</code></td><td><code>LIMIT</code> 句がない場合にスコアリングする最大文書数</td><td>1,000</td></tr>
+      <tr><td><code>pg_textsearch.memtable_pages_threshold</code></td><td>自動スピルまでにチェーンされるページ数 (0 で無効)</td><td>64</td></tr>
+      <tr><td><code>pg_textsearch.segments_per_level</code></td><td>自動コンパクションまでのレベルあたりのセグメント数 (2〜64)</td><td>8</td></tr>
+    </table>
+  </div>
+
+  <!-- 設定方法 -->
+  <div class="section">
+    <h2>🛠️ 設定方法</h2>
+
+    <div class="flow-diagram">
+      <div class="flow-step">🚩 ステップ 1<br>DB フラグ設定</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">🧩 ステップ 2<br>拡張機能の作成</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">📇 ステップ 3<br>インデックス作成</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">🔍 BM25 検索実行</div>
+    </div>
+
+    <div class="note-box">
+      <strong>💡 前提条件:</strong> PostgreSQL 17 以降を実行する Cloud SQL for PostgreSQL インスタンス (リリース R20260712.01_06 以降) と、データベースフラグを変更できる権限が必要です。
+    </div>
+
+    <h3><span class="step-number">1</span>データベースフラグの設定</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Bash</span>
+        <span class="code-title">gcloud でフラグを有効化</span>
+      </div>
+      <pre><code class="language-bash">gcloud sql instances patch INSTANCE_NAME \
+  --database-flags=cloudsql.enable_pg_textsearch=on</code></pre>
+    </div>
+    <p><code>cloudsql.enable_pg_textsearch</code> フラグを有効にし、<code>pg_textsearch</code> を <code>shared_preload_libraries</code> に追加します。</p>
+
+    <h3><span class="step-number">2</span>拡張機能の作成</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">SQL</span>
+        <span class="code-title">拡張機能の有効化とバージョン確認</span>
+      </div>
+      <pre><code class="language-sql">CREATE EXTENSION pg_textsearch;
+
+-- バージョン確認
+SELECT extversion FROM pg_extension WHERE extname = 'pg_textsearch';</code></pre>
+    </div>
+    <p>対象のデータベースに接続し、拡張機能を作成します。</p>
+
+    <h3><span class="step-number">3</span>BM25 インデックスの作成と検索</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">SQL</span>
+        <span class="code-title">BM25 インデックスと関連性検索</span>
+      </div>
+      <pre><code class="language-sql">-- BM25 インデックスの作成
+CREATE INDEX idx_docs_bm25
+  ON documents
+  USING bm25 (content)
+  WITH (text_config = 'english');
+
+-- BM25 スコアによる関連性検索 (スコアは負の値、ASC で関連度順)
+SELECT doc_id, content, content &lt;@&gt; 'database system' AS score
+FROM documents
+ORDER BY content &lt;@&gt; 'database system' ASC
+LIMIT 5;</code></pre>
+    </div>
+    <p><code>&lt;@&gt;</code> 演算子で BM25 スコアを計算し、昇順ソートで関連性の高い順に結果を取得します。</p>
+  </div>
+
+  <!-- メリット -->
+  <div class="section">
+    <h2>👍 メリット</h2>
+    <div class="success-box">
+      <strong>💼 ビジネス面</strong>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>インフラコストの削減</strong>: Elasticsearch などの外部検索エンジンのクラスタ構築・運用が不要になり、検索基盤のコストと運用負荷を削減</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>開発スピードの向上</strong>: 既存の Cloud SQL データに対して SQL だけで高精度な検索機能を追加でき、実装リードタイムを短縮</span></div>
+    </div>
+    <div class="success-box">
+      <strong>⚙️ 技術面</strong>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>高精度な関連性スコアリング</strong>: tf-idf・単語頻度の飽和・文書長正規化を考慮する BM25 により、組み込みの <code>ts_rank</code> より関連性の高い結果を取得</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>データ整合性の簡素化</strong>: DB と検索インデックスが同一ストレージ上にあるため、同期遅延や整合性ずれが発生しない</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>ハイブリッド検索への拡張性</strong>: pgvector と組み合わせ、キーワード検索とセマンティック検索を RRF で統合した RAG 向け検索を単一 DB で構築可能</span></div>
+    </div>
+  </div>
+
+  <!-- デメリット・制約事項 -->
+  <div class="section">
+    <h2>⚠️ デメリット・制約事項</h2>
+    <div class="warning-box">
+      <strong>🚧 制限事項</strong>
+      <ul>
+        <li>PostgreSQL 17 以降のインスタンスでのみ利用可能 (それ以前のメジャーバージョンでは使用不可)</li>
+        <li>PostgreSQL リリース R20260712.01_06 以降が必要 (古いメンテナンスバージョンのインスタンスは更新が必要)</li>
+        <li>利用にはデータベースフラグ <code>cloudsql.enable_pg_textsearch</code> の設定が必要</li>
+      </ul>
+    </div>
+    <div class="note-box">
+      <strong>🤔 考慮すべき点</strong>
+      <ul>
+        <li><code>&lt;@&gt;</code> 演算子のスコアは<strong>負の値</strong>で返るため、関連度順のソートは <code>ASC</code> を使用する必要があり、直感と異なる点に注意</li>
+        <li><code>LIMIT</code> 句がないクエリでは <code>pg_textsearch.default_limit</code> (デフォルト 1,000 件) までしかスコアリングされないため、大量の結果が必要な場合はパラメータ調整を検討</li>
+        <li>全文検索はキーワードの語形変化には対応するが、同義語や概念の一致は扱えないため、セマンティック検索が必要な場合はベクトル検索との併用を検討</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ユースケース -->
+  <div class="section">
+    <h2>🎯 ユースケース</h2>
+
+    <div class="usecase-card">
+      <h3>🛒 ユースケース 1: 外部検索エンジンの Cloud SQL への統合</h3>
+      <p><strong>シナリオ</strong>: EC サイトの商品検索に Elasticsearch を使用しているが、商品マスタ (Cloud SQL) との同期パイプラインの運用負荷が高い。BM25 相当の検索精度を維持したまま検索基盤を統合したい。</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">商品検索の実装例</span>
+        </div>
+        <pre><code class="language-sql">CREATE INDEX idx_products_bm25
+  ON products
+  USING bm25 (description)
+  WITH (text_config = 'english');
+
+SELECT product_id, name, description &lt;@&gt; 'wireless noise cancelling headphones' AS score
+FROM products
+ORDER BY score ASC
+LIMIT 20;</code></pre>
+      </div>
+      <p><strong>効果</strong>: 外部検索エンジンとデータ同期パイプラインを廃止し、検索精度を維持しながら運用コストを削減できる。</p>
+    </div>
+
+    <div class="usecase-card">
+      <h3>🤖 ユースケース 2: RAG アプリケーション向けハイブリッド検索</h3>
+      <p><strong>シナリオ</strong>: 社内ドキュメント検索を行う RAG アプリケーションで、セマンティック検索 (pgvector) だけでは製品名や型番などの固有キーワードの一致精度が不足している。</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">RRF によるハイブリッド検索の実装例</span>
+        </div>
+        <pre><code class="language-sql">WITH vector_search AS (
+  SELECT doc_id,
+         RANK() OVER (ORDER BY text_embedding &lt;=&gt; google_ml.embedding('gemini-embedding-001', 'database')) AS rank
+  FROM documents
+  ORDER BY text_embedding &lt;=&gt; google_ml.embedding('gemini-embedding-001', 'database')
+  LIMIT 10
+),
+text_search AS (
+  SELECT doc_id,
+         RANK() OVER (ORDER BY content &lt;@&gt; 'database' ASC) AS rank
+  FROM documents
+  ORDER BY content &lt;@&gt; 'database' ASC
+  LIMIT 10
+)
+SELECT COALESCE(vector_search.doc_id, text_search.doc_id) AS doc_id,
+       COALESCE(1.0 / (60 + vector_search.rank), 0.0)
+     + COALESCE(1.0 / (60 + text_search.rank), 0.0) AS rrf_score
+FROM vector_search
+FULL OUTER JOIN text_search ON vector_search.doc_id = text_search.doc_id
+ORDER BY rrf_score DESC
+LIMIT 5;</code></pre>
+      </div>
+      <p><strong>効果</strong>: BM25 のキーワード一致精度とベクトル検索の意味理解を RRF で統合し、RAG の検索品質を単一のデータベースで向上できる。</p>
+    </div>
+  </div>
+
+  <!-- 料金・リージョン -->
+  <div class="section">
+    <h2>💰 料金・利用可能リージョン</h2>
+    <div class="card">
+      <h3>💵 料金</h3>
+      <p>
+        <code>pg_textsearch</code> 拡張機能自体の<span class="highlight">追加料金の記載はなし</span>。
+        通常の Cloud SQL for PostgreSQL のインスタンス料金 (vCPU、メモリ、ストレージ、ネットワーク) が適用されます。
+        BM25 インデックスはインスタンスのストレージを消費するため、インデックスサイズに応じたストレージ料金が発生します。
+      </p>
+      <p>詳細は <a class="gc-link" href="https://cloud.google.com/sql/pricing" target="_blank" rel="noopener noreferrer">Cloud SQL 料金ページ</a> を参照。</p>
+    </div>
+    <div class="card">
+      <h3>🌏 利用可能リージョン</h3>
+      <p>リージョン固有の制限に関する記載はありません。PostgreSQL 17 以降かつ PostgreSQL リリース R20260712.01_06 以降のインスタンスで利用できます。</p>
+    </div>
+  </div>
+
+  <!-- 関連サービス -->
+  <div class="section">
+    <h2>🔗 関連サービス・機能</h2>
+    <div class="card">
+      <h3>🐘 AlloyDB for PostgreSQL</h3>
+      <p>同じく <code>pg_textsearch</code> による BM25 インデックスをサポート (PostgreSQL 17/18、Preview)。より高い性能が必要な場合の移行先候補。</p>
+    </div>
+    <div class="card">
+      <h3>🧭 pgvector (vector 拡張機能)</h3>
+      <p>ベクトル類似検索を提供。pg_textsearch と組み合わせたハイブリッド検索が可能。</p>
+    </div>
+    <div class="ai-box">
+      <strong>🤖 google_ml_integration 拡張機能 / Vertex AI</strong>
+      <p style="margin: 8px 0 0 0;">
+        Vertex AI の埋め込みモデル (<code>gemini-embedding-001</code> など) を SQL から呼び出してベクトル埋め込みを生成し、ハイブリッド検索のベクトル側を担います。
+        Vertex AI は RAG アプリケーション構築時の埋め込み生成・LLM 推論基盤として連携できます。
+      </p>
+    </div>
+  </div>
+
+  <!-- まとめ -->
+  <div class="section">
+    <h2>📝 まとめ</h2>
+    <div class="success-box">
+      <p style="margin-top: 0;">
+        pg_textsearch の登場により、<span class="highlight">Cloud SQL for PostgreSQL 単体で Elasticsearch 級の BM25 関連性スコアリング</span>を備えた全文検索が実現でき、
+        外部検索エンジンの運用とデータ同期から解放されます。
+      </p>
+      <div class="check-item"><span class="check-icon">✓</span><span>PostgreSQL 17 以降のインスタンス利用中なら、<code>cloudsql.enable_pg_textsearch</code> フラグを有効にして既存の検索機能や RAG でのハイブリッド検索を評価することを推奨</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>PostgreSQL 16 以前のインスタンスでは、メジャーバージョンアップグレードの計画に本機能を組み込む価値あり</span></div>
+    </div>
+    <div>
+      <span class="tag">Cloud SQL</span>
+      <span class="tag">PostgreSQL</span>
+      <span class="tag">pg_textsearch</span>
+      <span class="tag">BM25</span>
+      <span class="tag">全文検索</span>
+      <span class="tag">ハイブリッド検索</span>
+      <span class="tag">pgvector</span>
+      <span class="tag">RAG</span>
+    </div>
+  </div>
+
+  <!-- フッター -->
+  <footer>
+    <p><strong>📎 出典・参考リンク</strong></p>
+    <ul style="padding-left: 20px;">
+      <li>公式リリースノート: <a class="gc-link" href="https://docs.cloud.google.com/release-notes#September_14_2026" target="_blank" rel="noopener noreferrer">https://docs.cloud.google.com/release-notes#September_14_2026</a></li>
+      <li>ドキュメント (Full-text search using pg_textsearch): <a class="gc-link" href="https://docs.cloud.google.com/sql/docs/postgres/pg-textsearch" target="_blank" rel="noopener noreferrer">https://docs.cloud.google.com/sql/docs/postgres/pg-textsearch</a></li>
+      <li>Cloud SQL for PostgreSQL 拡張機能一覧: <a class="gc-link" href="https://docs.cloud.google.com/sql/docs/postgres/extensions" target="_blank" rel="noopener noreferrer">https://docs.cloud.google.com/sql/docs/postgres/extensions</a></li>
+      <li>pg_textsearch (GitHub): <a class="gc-link" href="https://github.com/timescale/pg_textsearch" target="_blank" rel="noopener noreferrer">https://github.com/timescale/pg_textsearch</a></li>
+      <li>料金ページ: <a class="gc-link" href="https://cloud.google.com/sql/pricing" target="_blank" rel="noopener noreferrer">https://cloud.google.com/sql/pricing</a></li>
+    </ul>
+    <p>本インフォグラフィックは Google Cloud News レポート (2026-09-14) を基に生成されました。</p>
+  </footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+    mermaid.initialize({
+        startOnLoad: true,
+        theme: 'base',
+        themeVariables: {
+            primaryColor: '#4285F4',
+            primaryTextColor: '#202124',
+            primaryBorderColor: '#4285F4',
+            lineColor: '#4285F4',
+            secondaryColor: '#F1F3F4',
+            tertiaryColor: '#FAFAFA',
+            background: '#FFFFFF',
+            mainBkg: '#E8F0FE',
+            nodeBorder: '#4285F4',
+            clusterBkg: '#E8F0FE',
+            clusterBorder: '#4285F4',
+            edgeLabelBackground: '#FFFFFF',
+            textColor: '#202124'
+        }
+    });
+</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Run: スケーリングコントロールによるカスタムターゲット CPU / 同時実行使用率の指定が GA</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 720px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-box h3 { color: #C5221F; }
+    .after-box h3 { color: #188038; }
+
+    .before-box ul, .after-box ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 6px 0;
+    }
+
+    /* チェックリストスタイル */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    /* コードブロック (pre:not(.mermaid) で Mermaid 図を除外) */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-lowest);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* テーブルスタイル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* 統計カード */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border: 1px solid var(--gc-blue-200);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+    }
+
+    /* 設定手順ステップ */
+    .step {
+      display: flex;
+      gap: 12px;
+      margin: 16px 0;
+      align-items: flex-start;
+    }
+
+    .step-number {
+      background: var(--gc-blue-600);
+      color: #FFFFFF;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .step-body {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .step-body h3 {
+      margin-top: 2px;
+    }
+
+    /* メリット/デメリット比較 */
+    .pros-cons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 720px) {
+      .pros-cons {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    ul {
+      margin: 8px 0;
+      padding-left: 24px;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <div style="margin-bottom: 8px;">
+          <span class="badge">⚡ Cloud Run</span>
+          <span class="badge badge-ga">GA (一般提供)</span>
+        </div>
+        <h1>📈 Cloud Run: スケーリングコントロールによる<br>カスタムターゲット CPU / 同時実行使用率の指定が GA</h1>
+        <div class="subtitle">スケーリングコントロール (カスタムターゲット CPU / 同時実行使用率)</div>
+      </div>
+      <div class="subtitle">📅 リリース日: 2026-09-29</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📌 概要</h2>
+      <p>
+        Cloud Run の<span class="highlight">スケーリングコントロール (scaling controls)</span> を使用して、カスタムのターゲット CPU 使用率およびターゲット同時実行 (concurrency) 使用率を指定する機能が<span class="highlight">一般提供 (GA)</span> になりました。
+        Cloud Run サービスはデフォルトで CPU と同時実行の両方について <strong>60%</strong> の使用率ターゲットで自動スケーリングしますが、この機能により、どのスケーリング要因を使うか (例: CPU のみ) を選択し、使用率ターゲットをワークロードの要件に合わせてカスタマイズできます。
+      </p>
+      <p>
+        オーバースケーリングを防いで<strong>コストを最適化</strong>したり、ターゲットを低く設定して積極的にスケールアウトさせ<strong>急激なトラフィックスパイクに備えたり</strong>と、スケーリング挙動を要件に応じてコントロールできます。コスト効率と予測可能性の両立を求める本番ワークロードの運用者に有用なアップデートです。
+      </p>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before (アップデート前の課題)</h3>
+          <ul>
+            <li>Preview 段階では <code>gcloud beta run services update</code> や YAML の <code>run.googleapis.com/launch-stage: BETA</code> アノテーションが必要で、Pre-GA 利用規約の下での限定的なサポートのみ</li>
+            <li>スケーリングコントロール導入以前は、CPU / 同時実行の使用率ターゲットは <strong>60% 固定</strong>で調整手段がなかった</li>
+            <li>スケーリングのトリガー要因 (CPU か同時実行か) を選択できず、ワークロード特性に合わせた調整が困難</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After (アップデート後の改善)</h3>
+          <ul>
+            <li>GA となり、<strong>本番ワークロードで正式サポート</strong>の下で利用可能に</li>
+            <li><code>gcloud run services update</code> (beta 不要)、コンソール、YAML、Terraform (<code>google_cloud_run_v2_service</code>) のいずれからも設定可能に</li>
+            <li>ターゲット CPU 使用率 (10〜90%)、ターゲット同時実行使用率 (10〜95%) を個別にカスタマイズ、または片方のドライバーを無効化 (両方の無効化は不可)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- 数字で見るアップデート -->
+    <div class="section">
+      <h2>📊 数字で見るアップデート</h2>
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">60%</div>
+          <div class="stat-label">CPU / 同時実行の<br>デフォルト使用率ターゲット</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">10〜90%</div>
+          <div class="stat-label">カスタム設定可能な<br>ターゲット CPU 使用率</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">10〜95%</div>
+          <div class="stat-label">カスタム設定可能な<br>ターゲット同時実行使用率</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">4 種類</div>
+          <div class="stat-label">設定インターフェース<br>(gcloud / コンソール / YAML / Terraform)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>
+        Cloud Run のオートスケーラーは <span class="highlight">CPU 使用率と同時実行使用率の 2 つのドライバー</span>を監視し、値が高い方に基づいてインスタンス数を決定します。
+        GA により、各ドライバーのターゲット値のカスタマイズや片方の無効化を gcloud / コンソール / YAML / Terraform から設定できます。
+      </p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    U([👥 リクエスト]) --> LB[🌐 Cloud Run サービス]
+    LB --> I1[📦 インスタンス群]
+
+    subgraph AS[⚙️ Cloud Run オートスケーラー]
+        M1[📊 CPU 使用率<br/>ターゲット: 10〜90%<br/>デフォルト 60%]
+        M2[📊 同時実行使用率<br/>ターゲット: 10〜95%<br/>デフォルト 60%]
+        D{最も高い<br/>ドライバーで判断}
+    end
+
+    I1 -. メトリクス .-> M1
+    I1 -. メトリクス .-> M2
+    M1 --> D
+    M2 --> D
+    D -- スケールイン/アウト --> I1
+
+    C[🛠️ gcloud / コンソール / YAML / Terraform<br/>--scaling-cpu-target<br/>--scaling-concurrency-target] -- ターゲット設定 --> AS
+        </pre>
+      </div>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>🚀 主要機能</h2>
+
+      <div class="card">
+        <h3>1️⃣ カスタム使用率ターゲットの設定</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span>ターゲット CPU 使用率: <strong>0.1〜0.90 (10〜90%)</strong>、小数点以下 2 桁まで指定可能</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>ターゲット同時実行使用率: <strong>0.1〜0.95 (10〜95%)</strong>、小数点以下 2 桁まで指定可能</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>設定変更のたびに新しいリビジョンが作成され、以降のリビジョンにも設定が引き継がれる</span></div>
+      </div>
+
+      <div class="card">
+        <h3>2️⃣ スケーリングドライバーの無効化</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span>CPU または同時実行のどちらか一方のターゲットを <code>disabled</code> に設定し、そのメトリクスをスケーリング判断から除外できる (例: CPU のみでスケーリング)</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>両方を同時に無効化することは不可。常に少なくとも 1 つのスケーリングドライバーが有効である必要がある</span></div>
+      </div>
+
+      <div class="card">
+        <h3>3️⃣ 強化されたスケーリング挙動へのオプトイン</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span>デフォルトの 60% ターゲットを維持する場合でも、明示的にターゲットを設定することで、インスタンス数が少ないサービスでも設定したターゲットに忠実に応答する<strong>改善されたオートスケーラー挙動</strong>を利用できる</span></div>
+      </div>
+
+      <div class="card">
+        <h3>4️⃣ デフォルト値への復元</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span><code>--scaling-cpu-target=default</code> / <code>--scaling-concurrency-target=default</code> を指定するか、YAML からアノテーションを削除することで、デフォルトの 60% ターゲットに戻せる</span></div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3>📐 設定可能な範囲</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>スケーリングドライバー</th><th>デフォルト</th><th>最小</th><th>最大</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>CPU ターゲット使用率</td><td>60%</td><td>10%</td><td>90%</td></tr>
+            <tr><td>同時実行ターゲット使用率</td><td>60%</td><td>10%</td><td>95%</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>🛠️ 設定インターフェース</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>方法</th><th>設定内容</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Google Cloud コンソール</td><td>サービスの「Scaling」タブ →「Customize autoscaling factors」</td></tr>
+            <tr><td>gcloud CLI</td><td><code>--scaling-cpu-target</code> / <code>--scaling-concurrency-target</code> フラグ</td></tr>
+            <tr><td>YAML</td><td><code>run.googleapis.com/scaling-cpu-target</code> / <code>run.googleapis.com/scaling-concurrency-target</code> アノテーション</td></tr>
+            <tr><td>Terraform</td><td><code>google_cloud_run_v2_service</code> の <code>template.scaling.cpu_utilization</code> / <code>concurrency_utilization</code> (0 で無効化)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>📄 YAML 設定例</h3>
+      <span class="code-label">YAML</span>
+      <pre><code class="language-yaml">apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: SERVICE
+spec:
+  template:
+    metadata:
+      annotations:
+        run.googleapis.com/scaling-cpu-target: '0.7'
+        run.googleapis.com/scaling-concurrency-target: '0.8'</code></pre>
+
+      <h3>📝 補足事項</h3>
+      <div class="note-box">
+        <div class="check-item"><span class="check-icon">→</span><span>カスタム同時実行ターゲットを設定した場合や CPU ベースのスケーリングを無効化した場合でも、<strong>Adaptive Concurrency Tuning (ACT) は有効なまま</strong>動作する</span></div>
+        <div class="check-item"><span class="check-icon">→</span><span>低いターゲット (例: 10%) は早期にスケールアウトしてアイドル容量のバッファを確保できる一方、インスタンス数の増加により課金が増える可能性がある</span></div>
+        <div class="check-item"><span class="check-icon">→</span><span>高いターゲットはスケーリングの許容範囲 (トレランス) が広がり、スケーリングが滑らかな曲線ではなく一斉に発生する挙動になる場合がある</span></div>
+      </div>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>⚙️ 設定方法</h2>
+
+      <div class="note-box">
+        <strong>📋 前提条件:</strong> Cloud Run サービスがデプロイ済みであること (設定変更は新しいリビジョンのデプロイとして適用される)
+      </div>
+
+      <div class="step">
+        <div class="step-number">1</div>
+        <div class="step-body">
+          <h3>現在のスケーリング要因を特定する</h3>
+          <p style="font-size: 14px;">Metrics Explorer で <code>run.googleapis.com/scaling/recommended_instances</code> メトリクスを Unaggregated で確認し、スケーリングドライバー別の推奨インスタンス数を確認します。値が最も高いドライバーが現在のインスタンス数を決めている要因です。</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-number">2</div>
+        <div class="step-body">
+          <h3>カスタムターゲットを設定する</h3>
+          <span class="code-label">Bash</span>
+          <pre><code class="language-bash"># CPU ターゲット 70%、同時実行ターゲット 80% に設定
+gcloud run services update SERVICE \
+  --scaling-cpu-target=0.7 \
+  --scaling-concurrency-target=0.8</code></pre>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-number">3</div>
+        <div class="step-body">
+          <h3>(必要に応じて) 片方のドライバーを無効化する</h3>
+          <span class="code-label">Bash</span>
+          <pre><code class="language-bash"># CPU のみでスケーリングする (同時実行ターゲットを無効化)
+gcloud run services update SERVICE --scaling-concurrency-target=disabled
+
+# 同時実行のみでスケーリングする (CPU ターゲットを無効化)
+gcloud run services update SERVICE --scaling-cpu-target=disabled</code></pre>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-number">4</div>
+        <div class="step-body">
+          <h3>設定を確認する</h3>
+          <span class="code-label">Bash</span>
+          <pre><code class="language-bash">gcloud run services describe SERVICE
+# 出力の Target CPU utilization: / Target concurrency utilization: を確認</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- メリット / デメリット -->
+    <div class="section">
+      <h2>⚖️ メリット / デメリット・制約事項</h2>
+
+      <div class="pros-cons">
+        <div>
+          <div class="success-box">
+            <h3 style="margin-top: 0;">💼 ビジネス面のメリット</h3>
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>コスト最適化</strong>: ターゲットを高めに設定してオーバースケーリングを防ぎ、必要以上のインスタンス起動による課金を抑制</span></div>
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>本番利用の安心感</strong>: GA となり正式サポートの対象に</span></div>
+          </div>
+          <div class="success-box">
+            <h3 style="margin-top: 0;">🔬 技術面のメリット</h3>
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>予測可能性向上</strong>: オートスケーラーが設定ターゲットに忠実に応答し、インスタンス数が少ないサービスでも挙動が予測しやすい</span></div>
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>ワークロード特性への適合</strong>: CPU バウンドは CPU のみ、リクエスト処理主体は同時実行のみ、といったドライバー選択が可能</span></div>
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>IaC 対応</strong>: Terraform で宣言的に管理できる</span></div>
+          </div>
+        </div>
+        <div>
+          <div class="error-box">
+            <h3 style="margin-top: 0;">🚧 制限事項</h3>
+            <div class="check-item"><span class="cross-icon">✗</span><span>CPU ターゲットは 10〜90%、同時実行ターゲットは 10〜95% の範囲のみ (小数点以下 2 桁まで)</span></div>
+            <div class="check-item"><span class="cross-icon">✗</span><span>両方のスケーリングドライバーの同時無効化は不可</span></div>
+            <div class="check-item"><span class="cross-icon">✗</span><span>設定変更のたびに新しいリビジョンが作成される</span></div>
+          </div>
+          <div class="warning-box">
+            <h3 style="margin-top: 0;">⚠️ 考慮すべき点</h3>
+            <div class="check-item"><span class="check-icon">→</span><span>低いターゲット (例: 10%) は可用性とスパイク耐性を高める一方、アイドルインスタンス増によるコスト増とスケーリング判断の頻発を招く</span></div>
+            <div class="check-item"><span class="check-icon">→</span><span>高いターゲットはトレランスが広がり、スケーリングが一斉に発生する挙動になり得る</span></div>
+            <div class="check-item"><span class="check-icon">→</span><span>ターゲットは段階的に調整し、変更後は数分待ってパフォーマンスへの影響を観察する</span></div>
+            <div class="check-item"><span class="check-icon">→</span><span>新ターゲットの検証には<strong>トラフィック分割</strong>を使い、一部のトラフィックのみを新リビジョンに向けてからロールアウトするのがベストプラクティス</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>💰 ユースケース 1: コスト重視のバックエンド API のオーバースケーリング抑制</h3>
+        <p style="font-size: 14px;"><strong>シナリオ</strong>: 内部向け API サービスで、多少のレイテンシ増加は許容できるためインスタンス数を抑えてコストを削減したい。</p>
+        <span class="code-label">Bash</span>
+        <pre><code class="language-bash">gcloud run services update internal-api \
+  --scaling-cpu-target=0.85 \
+  --scaling-concurrency-target=0.9</code></pre>
+        <p style="font-size: 14px; margin-bottom: 0;"><strong>効果</strong>: 使用率ターゲットを高く設定することで各インスタンスをより高い使用率まで活用し、インスタンス数と課金を抑制できる。</p>
+      </div>
+
+      <div class="usecase">
+        <h3>🖼️ ユースケース 2: CPU バウンドなワークロードの CPU のみによるスケーリング</h3>
+        <p style="font-size: 14px;"><strong>シナリオ</strong>: 画像処理などリクエスト数よりも CPU 負荷がボトルネックになるサービスで、同時実行数に左右されず CPU 使用率だけでスケーリングさせたい。</p>
+        <span class="code-label">Bash</span>
+        <pre><code class="language-bash">gcloud run services update image-processor \
+  --scaling-cpu-target=0.6 \
+  --scaling-concurrency-target=disabled</code></pre>
+        <p style="font-size: 14px; margin-bottom: 0;"><strong>効果</strong>: 同時実行メトリクスがスケーリング判断から除外され、CPU 使用率のみに基づいた一貫性のあるスケーリング挙動が得られる。</p>
+      </div>
+
+      <div class="usecase">
+        <h3>📈 ユースケース 3: スパイクの激しいサービスの可用性向上</h3>
+        <p style="font-size: 14px;"><strong>シナリオ</strong>: トラフィックスパイクが突発的に発生するユーザー向けサービスで、レイテンシ悪化を避けるために早めにスケールアウトさせたい。</p>
+        <span class="code-label">Bash</span>
+        <pre><code class="language-bash">gcloud run services update spiky-frontend \
+  --scaling-cpu-target=0.3 \
+  --scaling-concurrency-target=0.3</code></pre>
+        <p style="font-size: 14px; margin-bottom: 0;"><strong>効果</strong>: 低いターゲットにより早期にスケールアウトしてアイドル容量のバッファを確保し、突発的なスパイクをレイテンシ悪化なしに吸収できる (その分コストは増加するためバランスの検討が必要)。</p>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>
+        スケーリングコントロール自体に<span class="highlight">追加料金はありません</span>が、設定する使用率ターゲットによって起動されるインスタンス数が変わるため、Cloud Run の課金額に直接影響します。
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>ターゲット設定</th><th>インスタンス数</th><th>課金への影響</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>低いターゲット (例: 30%)</td><td>増加 (早期スケールアウト)</td><td>課金が増加する方向</td></tr>
+            <tr><td>高いターゲット (例: 85%)</td><td>抑制 (高使用率まで活用)</td><td>課金を削減する方向</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>詳細は <a href="https://cloud.google.com/run/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud Run 料金ページ</a> を参照してください。</p>
+    </div>
+
+    <!-- 関連サービス・機能 -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <div class="check-item"><span class="check-icon">→</span><span><strong>Cloud Run インスタンス自動スケーリング</strong>: スケーリングコントロールの基盤となる機能。デフォルトの自動スケーリング挙動や Adaptive Concurrency Tuning (ACT) について解説されている</span></div>
+        <div class="check-item"><span class="check-icon">→</span><span><strong>Cloud Run 最大/最小インスタンス数設定</strong>: <code>max-instances</code> / <code>min-instances</code> と組み合わせて、スケーリングの上限・下限とターゲット使用率の両面から挙動を制御できる</span></div>
+        <div class="check-item"><span class="check-icon">→</span><span><strong>Cloud Run 最大同時リクエスト数 (concurrency) 設定</strong>: インスタンスあたりの同時リクエスト上限。同時実行使用率ターゲットはこの設定値に対する使用率として機能する</span></div>
+        <div class="check-item"><span class="check-icon">→</span><span><strong>Cloud Monitoring (Metrics Explorer)</strong>: <code>run.googleapis.com/scaling/recommended_instances</code> メトリクスでスケーリングドライバー別の推奨インスタンス数を確認し、ターゲット調整の判断材料にできる</span></div>
+        <div class="check-item"><span class="check-icon">→</span><span><strong>Terraform (google_cloud_run_v2_service)</strong>: <code>template.scaling</code> ブロックでスケーリングコントロールを宣言的に管理できる</span></div>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="note-box">
+        <p style="margin: 0;">
+          Cloud Run のスケーリングコントロールが GA となり、<strong>CPU / 同時実行の使用率ターゲットのカスタマイズやスケーリングドライバーの選択</strong>を、本番ワークロードで gcloud / コンソール / YAML / Terraform から正式に利用できるようになりました。
+          まずは Metrics Explorer の <code>run.googleapis.com/scaling/recommended_instances</code> メトリクスで現在のスケーリング要因を把握し、<strong>トラフィック分割を活用しながら段階的にターゲットを調整</strong>することを推奨します。
+        </p>
+      </div>
+      <div style="margin-top: 12px;">
+        <span class="badge">Cloud Run</span>
+        <span class="badge">オートスケーリング</span>
+        <span class="badge">スケーリングコントロール</span>
+        <span class="badge">サーバーレス</span>
+        <span class="badge">コスト最適化</span>
+        <span class="badge badge-ga">GA</span>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="padding-left: 20px; margin: 4px 0;">
+        <li><a href="https://docs.cloud.google.com/release-notes#September_29_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026-09-29)</a></li>
+        <li><a href="https://docs.cloud.google.com/run/docs/configuring/scaling-controls" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: Configure custom scaling controls for services</a></li>
+        <li><a href="https://docs.cloud.google.com/run/docs/about-instance-autoscaling" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: About instance autoscaling in Cloud Run services</a></li>
+        <li><a href="https://cloud.google.com/run/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud Run 料金ページ</a></li>
+      </ul>
+      <p>本インフォグラフィックは Google Cloud News レポート (2026-09-29) を基に作成されました。</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BigQuery: 継続クエリの出力を Apache Iceberg マネージドテーブルに直接書き込み可能に</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    /* Before / After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 720px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border: 1px solid rgba(234, 67, 53, 0.3);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border: 1px solid rgba(52, 168, 83, 0.3);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-card h3 {
+      color: var(--gc-red);
+      margin-top: 0;
+    }
+
+    .after-card h3 {
+      color: var(--gc-green);
+      margin-top: 0;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* コードブロック */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* テーブル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border: 1px solid var(--gc-blue-100);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-800);
+    }
+
+    /* ステップ */
+    .step {
+      display: flex;
+      gap: 16px;
+      margin: 16px 0;
+      align-items: flex-start;
+    }
+
+    .step-number {
+      background: var(--gc-blue-600);
+      color: #FFFFFF;
+      width: 36px;
+      height: 36px;
+      min-width: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 18px;
+    }
+
+    .step-content {
+      flex: 1;
+    }
+
+    .step-content h3 {
+      margin-top: 4px;
+    }
+
+    ul {
+      padding-left: 24px;
+      margin: 8px 0;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <div style="margin-bottom: 8px;">
+          <span class="badge">📊 BigQuery</span>
+          <span class="badge-ga">提供開始 (Feature)</span>
+        </div>
+        <h1>🧊 継続クエリの出力を Apache Iceberg マネージドテーブルへ直接書き込み可能に</h1>
+        <div class="subtitle" style="margin-top: 8px;">Continuous Queries × Apache Iceberg — SQL だけでストリーミング処理からレイクハウス反映まで</div>
+      </div>
+      <div class="subtitle">リリース日: 2026-09-28</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📝 概要</h2>
+      <p>
+        BigQuery の<span class="highlight">継続クエリ (Continuous Queries)</span> が生成する出力行を、
+        <span class="highlight">Apache Iceberg マネージドテーブル</span>に直接書き込めるようになりました。
+        継続クエリは BigQuery に到着するストリーミングデータをリアルタイムに分析・変換し続ける SQL ステートメントで、
+        <code>INSERT</code> DML ステートメントを使用するだけで、処理結果をオープンフォーマットのレイクハウスへ継続的に書き込めます。
+      </p>
+      <p>
+        リアルタイムの<strong>リバース ETL</strong>、<strong>データエンリッチメント</strong>、<strong>フィルタリング</strong>の結果を
+        Cloud Storage 上の Iceberg 形式で保持でき、BigQuery 以外のエンジン (オープンソースの Iceberg 対応エンジンなど) からも同じデータを利用可能。
+        レイクハウスアーキテクチャを採用する組織にとって、ストリーミング処理とオープンフォーマットの橋渡しとなるアップデートです。
+      </p>
+      <div class="note-box">
+        <strong>💡 ポイント:</strong> 書き込み先の指定は通常の BigQuery テーブルへの <code>INSERT INTO</code> と完全に同一の構文。
+        接続 (Google Cloud リソース接続) やストレージバケットの設定は宛先テーブル側に定義されているため、SQL ステートメント内での指定は不要です。
+      </div>
+
+      <div class="before-after">
+        <div class="before-card">
+          <h3>❌ Before (アップデート前)</h3>
+          <div class="check-item"><span class="cross-icon">✗</span><span>継続クエリの出力先は BigQuery テーブル、Pub/Sub、Bigtable、Spanner などに限定され、Iceberg マネージドテーブルへ直接書き込めなかった</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>ストリーミング処理結果をオープンフォーマットのレイクハウスに反映するには、BigQuery テーブル書き込み後に別途エクスポートなど追加ステップが必要だった</span></div>
+        </div>
+        <div class="after-card">
+          <h3>✅ After (アップデート後)</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span>継続クエリの <code>INSERT</code> DML で Iceberg マネージドテーブルを宛先として直接指定できる</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>ストリーミングデータをリアルタイムに処理し、そのままオープンフォーマットのレイクハウスへ継続的に書き込める</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>構文は通常テーブルへの書き込みと同一。接続・バケットのオプション指定は不要</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    A([📱 ストリーミングソース<br>Pub/Sub / Storage Write API / Dataflow]) --> B[(📊 BigQuery<br>標準テーブル)]
+    B --> C{{"⚙️ 継続クエリ<br>INSERT INTO ... SELECT<br>+ APPENDS TVF"}}
+    C -->|フィルタリング / 変換 / エンリッチメント| D[(🧊 Iceberg<br>マネージドテーブル)]
+    D --> E[(🗄️ Cloud Storage<br>Parquet + Iceberg メタデータ)]
+    E --> F([🔍 オープンソース<br>Iceberg 対応エンジン])
+    D --> G([📈 BigQuery での<br>ダウンストリーム分析])
+        </pre>
+      </div>
+      <p>
+        ストリーミングデータが BigQuery 標準テーブルに到着すると、継続クエリがリアルタイムに変換・フィルタリングし、その結果を
+        <code>INSERT</code> DML で Iceberg マネージドテーブルへ書き込みます。データは Cloud Storage 上にオープンな Iceberg フォーマットで保存されるため、
+        BigQuery と外部エンジンの両方から利用できます。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="card">
+        <h3>1️⃣ INSERT DML による Iceberg マネージドテーブルへの継続書き込み</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>継続クエリの出力行を <code>INSERT INTO</code> ステートメントで Iceberg マネージドテーブルに直接書き込める</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>構文は標準の BigQuery テーブルへの書き込みと同一</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>接続情報やレイクハウスのストレージ設定は宛先テーブル側に定義されるため、SQL 内での指定は不要</span></div>
+      </div>
+      <div class="card">
+        <h3>2️⃣ リアルタイムのリバース ETL・データエンリッチメント</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>BigQuery に書き込まれるイベントデータを SQL 関数や ML モデルでリアルタイムに変換・エンリッチし、レイクハウスへ反映</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>APPENDS</code> TVF の <code>start_timestamp</code> により、処理を開始する時点を指定可能</span></div>
+      </div>
+      <div class="card">
+        <h3>3️⃣ オープンフォーマットレイクハウスとの統合</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>Iceberg マネージドテーブルは Cloud Storage 上に Parquet データと Iceberg メタデータを保存</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>EXPORT TABLE METADATA</code> によるメタデータスナップショット作成と組み合わせ、外部の Iceberg 対応エンジンからもデータを参照可能</span></div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3>📋 Iceberg マネージドテーブルへ書き込む際の要件</h3>
+      <table>
+        <tr><th>項目</th><th>詳細</th></tr>
+        <tr><td>宛先テーブル</td><td>継続クエリの作成前に Iceberg マネージドテーブルが存在している必要がある</td></tr>
+        <tr><td>クエリ構文</td><td>標準の BigQuery テーブルへの <code>INSERT</code> と同一。接続・バケットオプションの指定は不要</td></tr>
+        <tr><td>実行アカウントの権限</td><td>宛先テーブル、Google Cloud リソース接続、基盤の Cloud Storage バケットに対する権限が必要</td></tr>
+        <tr><td>予約 (Reservation)</td><td>Enterprise または Enterprise Plus エディションの予約と <code>CONTINUOUS</code> ジョブタイプの予約割り当てが必要 (オンデマンド課金は非対応)</td></tr>
+        <tr><td>データソースとしての Iceberg</td><td>Iceberg マネージドテーブルは継続クエリの<strong>ソース</strong>としては非対応 (宛先としてのみ対応)</td></tr>
+        <tr><td>実行時間</td><td>ユーザーアカウント実行は最大 2 日間、サービスアカウント実行は最大 150 日間</td></tr>
+      </table>
+
+      <h3>🔑 必要な IAM 権限・ロール</h3>
+      <p>BigQuery の権限 (<code>bigquery.jobs.create</code>、<code>bigquery.tables.updateData</code> など) に加えて、以下が必要です。</p>
+      <table>
+        <tr><th>対象</th><th>必要なロール / 権限</th></tr>
+        <tr><td>継続クエリの実行アカウント</td><td>Iceberg マネージドテーブルに関連付けられたリソース接続を使用するための <strong>BigQuery Connection User (<code>roles/bigquery.connectionUser</code>)</strong></td></tr>
+        <tr><td>接続に関連付けられたサービスアカウント</td><td>基盤の Cloud Storage バケットに対する権限 (例: <code>roles/storage.objectUser</code> および <code>roles/storage.legacyBucketReader</code>)</td></tr>
+      </table>
+
+      <h3>💻 SQL 例</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">継続クエリによる Iceberg マネージドテーブルへの書き込み</span>
+        </div>
+        <pre><code class="language-sql">INSERT INTO `myproject.real_time_taxi_streaming.transformed_taxirides`
+SELECT
+  timestamp,
+  meter_reading,
+  ride_status,
+  passenger_count,
+  ST_Distance(
+    ST_GeogPoint(pickup_longitude, pickup_latitude),
+    ST_GeogPoint(dropoff_longitude, dropoff_latitude)) AS euclidean_trip_distance,
+  SAFE_DIVIDE(meter_reading, passenger_count) AS cost_per_passenger
+FROM
+  APPENDS(TABLE `myproject.real_time_taxi_streaming.taxirides`,
+    -- APPENDS TVF の start_timestamp で処理開始時点を指定
+    CURRENT_TIMESTAMP() - INTERVAL 10 MINUTE)
+WHERE
+  ride_status = 'dropoff';</code></pre>
+      </div>
+      <div class="note-box">
+        <strong>💡 ヒント:</strong> 宛先の <code>myproject.real_time_taxi_streaming.transformed_taxirides</code> を
+        Iceberg マネージドテーブル名に置き換えるだけで、Iceberg マネージドテーブルへの書き込みになります。構文は標準テーブルと同一です。
+      </div>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>✅ 前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>Enterprise または Enterprise Plus エディションの予約を作成し、<code>CONTINUOUS</code> ジョブタイプの予約割り当てを作成する (オートスケーリングとアイドルスロット共有を利用可能)</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>宛先の Iceberg マネージドテーブルを事前に作成しておく</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>実行アカウントに必要な IAM 権限 (BigQuery 権限 + <code>roles/bigquery.connectionUser</code>) を付与し、接続のサービスアカウントに Cloud Storage バケットの権限を付与する</span></div>
+
+      <div class="step">
+        <div class="step-number">1</div>
+        <div class="step-content">
+          <h3>予約と CONTINUOUS 割り当ての作成</h3>
+          <p>Enterprise / Enterprise Plus エディションの予約を作成し、<code>CONTINUOUS</code> ジョブタイプの予約割り当てを作成します。<code>CONTINUOUS</code> 割り当てに関連付けられた予約は最大 500 スロットに制限されます。</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-number">2</div>
+        <div class="step-content">
+          <h3>継続クエリの実行 (サービスアカウント使用)</h3>
+          <div class="code-block">
+            <div class="code-header">
+              <span class="code-lang">Bash</span>
+              <span class="code-title">bq コマンドによる継続クエリの実行</span>
+            </div>
+            <pre><code class="language-bash">bq query --project_id=PROJECT_ID --use_legacy_sql=false \
+  --continuous=true \
+  --connection_property=service_account=SERVICE_ACCOUNT_EMAIL \
+  'INSERT INTO `myproject.mydataset.my_iceberg_table`
+   SELECT ...
+   FROM APPENDS(TABLE `myproject.mydataset.source_table`,
+     CURRENT_TIMESTAMP() - INTERVAL 10 MINUTE)'</code></pre>
+          </div>
+          <p>サービスアカウントで実行した継続クエリは最大 150 日間実行でき、コンソールやターミナルを閉じてもクエリの実行は中断されません。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>👍 メリット</h2>
+      <h3>💼 ビジネス面</h3>
+      <div class="card" style="border-left-color: var(--gc-green);">
+        <div class="icon-text"><span class="check-icon">✓</span><span><strong>レイクハウス戦略との整合</strong>: ストリーミング処理の結果をオープンな Iceberg フォーマットで保持でき、特定エンジンへのロックインを避けつつリアルタイムデータ活用が可能</span></div>
+        <div class="icon-text"><span class="check-icon">✓</span><span><strong>パイプラインの簡素化</strong>: BigQuery テーブルへの書き込みと別途のエクスポート処理を組み合わせる必要がなく、1 つの SQL ステートメントでストリーミング処理からレイクハウス反映までを完結</span></div>
+      </div>
+      <h3>⚙️ 技術面</h3>
+      <div class="card" style="border-left-color: var(--gc-green);">
+        <div class="icon-text"><span class="check-icon">✓</span><span><strong>同一構文での宛先切り替え</strong>: 標準 BigQuery テーブルと Iceberg マネージドテーブルで <code>INSERT INTO</code> の構文が同一のため、既存の継続クエリの宛先変更が容易</span></div>
+        <div class="icon-text"><span class="check-icon">✓</span><span><strong>SQL のみで実現</strong>: Dataflow などの別のストリーミング処理基盤を構築せずに、SQL だけでリアルタイムの変換・書き込みパイプラインを構築できる</span></div>
+        <div class="icon-text"><span class="check-icon">✓</span><span><strong>自動テーブル管理</strong>: Iceberg マネージドテーブルはコンパクション、クラスタリング、ガベージコレクションなどの自動テーブル管理を提供</span></div>
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <h3>🚫 制限事項</h3>
+      <div class="error-box">
+        <div class="check-item"><span class="cross-icon">✗</span><span>宛先の Iceberg マネージドテーブルは、継続クエリの作成前に存在している必要がある</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>Iceberg マネージドテーブルは継続クエリの<strong>データソース</strong>としては使用できない (宛先としてのみサポート)</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>継続クエリはオンデマンド課金モデルをサポートせず、Enterprise / Enterprise Plus エディションの <code>CONTINUOUS</code> 予約割り当てが必須</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span><code>CONTINUOUS</code> 割り当てに関連付けられた予約は最大 500 スロット (上限緩和は問い合わせが必要)</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>継続クエリでは <code>INSERT</code> 以外の DML、DDL、ユーザー定義関数、外部テーブルなど一部の SQL 機能が使用できない</span></div>
+      </div>
+      <h3>🤔 考慮すべき点</h3>
+      <div class="warning-box">
+        <div class="check-item"><span style="flex-shrink:0;">⚠️</span><span>一時的な問題により継続クエリの一部が自動再処理され、出力に重複データが発生する可能性があるため、ダウンストリームシステムは重複を許容する設計にする</span></div>
+        <div class="check-item"><span style="flex-shrink:0;">⚠️</span><span>継続クエリのアウトプットウォーターマーク遅延が 48 時間を超えるとジョブが失敗する。再実行時は <code>APPENDS</code> 関数で停止時点から処理を再開できる</span></div>
+        <div class="check-item"><span style="flex-shrink:0;">⚠️</span><span>新しい継続クエリの実行には 1 ジョブあたり 10 スロットのしきい値が必要。スロットオートスケーリングの利用が推奨される</span></div>
+        <div class="check-item"><span style="flex-shrink:0;">⚠️</span><span>ユーザーアカウントでの実行は最大 2 日間のため、長期運用にはサービスアカウント (最大 150 日間) を使用する</span></div>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>🚕 ユースケース 1: リアルタイムのリバース ETL によるレイクハウスへのデータ反映</h3>
+        <p><strong>シナリオ</strong>: タクシー配車サービスのイベントデータが Storage Write API 経由で BigQuery に書き込まれている。乗車完了 (dropoff) イベントのみを抽出し、移動距離や乗客あたりコストを計算した上で、他の分析エンジンからも参照可能な Iceberg マネージドテーブルに継続的に反映したい。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">実装例</span>
+          </div>
+          <pre><code class="language-sql">INSERT INTO `myproject.lakehouse.transformed_taxirides`  -- Iceberg マネージドテーブル
+SELECT timestamp, meter_reading, ride_status, passenger_count,
+  ST_Distance(
+    ST_GeogPoint(pickup_longitude, pickup_latitude),
+    ST_GeogPoint(dropoff_longitude, dropoff_latitude)) AS euclidean_trip_distance,
+  SAFE_DIVIDE(meter_reading, passenger_count) AS cost_per_passenger
+FROM APPENDS(TABLE `myproject.real_time_taxi_streaming.taxirides`,
+  CURRENT_TIMESTAMP() - INTERVAL 10 MINUTE)
+WHERE ride_status = 'dropoff';</code></pre>
+        </div>
+        <div class="success-box">
+          <strong>✅ 効果:</strong> ストリーミングデータの変換結果がリアルタイムでオープンフォーマットのレイクハウスに反映され、BigQuery と外部の Iceberg 対応エンジンの双方でダウンストリーム分析が可能になる。
+        </div>
+      </div>
+
+      <div class="usecase">
+        <h3>🧹 ユースケース 2: リアルタイムのデータエンリッチメントとフィルタリング</h3>
+        <p><strong>シナリオ</strong>: BigQuery に到着する生イベントストリームから、SQL 関数によるフィルタリング・エンリッチメントをリアルタイムに実施し、クレンジング済みデータのみを Iceberg マネージドテーブルへ書き込んで、レイクハウス上のデータ品質を担保したい。</p>
+        <div class="success-box">
+          <strong>✅ 効果:</strong> バッチ変換の完了を待たずに、クレンジング・エンリッチ済みデータが継続的にレイクハウスへ供給され、データ鮮度が向上する。
+        </div>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>
+        継続クエリは <span class="highlight">Enterprise / Enterprise Plus エディションの予約</span> (スロット時間単位の容量課金) で実行され、
+        オンデマンド課金モデルはサポートされません。
+      </p>
+      <p>Iceberg マネージドテーブル側の料金は以下で構成されます。</p>
+      <table>
+        <tr><th>項目</th><th>課金内容</th></tr>
+        <tr><td>ストレージ</td><td>データはすべて Cloud Storage に保存され、Cloud Storage の料金が適用される (BigQuery 固有のストレージ料金はなし)</td></tr>
+        <tr><td>ストレージ最適化</td><td>コンパクション、クラスタリング、ガベージコレクションなどの自動テーブル管理は Data Compute Unit (DCU) 単位で秒単位課金</td></tr>
+        <tr><td>クエリとジョブ</td><td>通常の BigQuery と同様に、オンデマンド (読み取りバイト数) または容量課金 (スロット時間) が適用される</td></tr>
+      </table>
+      <p>
+        詳細は <a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">BigQuery の料金</a> および
+        <a href="https://cloud.google.com/products/biglake/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">BigLake (Iceberg マネージドテーブル) の料金</a> を参照してください。
+      </p>
+    </div>
+
+    <!-- 関連サービス・機能 -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card"><strong>🧊 Apache Iceberg マネージドテーブル (BigLake)</strong>: 今回の書き込み先。Cloud Storage 上にオープンな Iceberg フォーマットでデータを保存し、自動テーブル管理を提供する</div>
+      <div class="card"><strong>🗄️ Cloud Storage</strong>: Iceberg マネージドテーブルのデータ (Parquet) とメタデータの保存先</div>
+      <div class="card"><strong>📨 Pub/Sub</strong>: BigQuery サブスクリプションによる Iceberg マネージドテーブルへのストリーミング取り込みや、継続クエリのエクスポート先としても利用可能</div>
+      <div class="card"><strong>⚡ Bigtable / Spanner</strong>: 継続クエリのその他の出力先。低レイテンシのアプリケーションサービング向けのリバース ETL に利用される</div>
+      <div class="card"><strong>🎟️ BigQuery Reservations</strong>: 継続クエリの実行に必要な <code>CONTINUOUS</code> ジョブタイプの予約割り当てを管理する</div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📌 まとめ</h2>
+      <div class="success-box">
+        <p style="margin: 0;">
+          BigQuery 継続クエリの出力先に <strong>Apache Iceberg マネージドテーブル</strong>が加わり、
+          <strong>SQL だけ</strong>でストリーミングデータのリアルタイム処理結果をオープンフォーマットのレイクハウスへ継続的に反映できるようになりました。
+          レイクハウスアーキテクチャを採用している、または検討している組織は、既存の継続クエリの宛先を Iceberg マネージドテーブルへ切り替えるだけで移行できるため、
+          まずは <code>CONTINUOUS</code> 予約割り当てと宛先テーブル・権限の準備から検証を始めることを推奨します。
+        </p>
+      </div>
+      <div style="margin-top: 12px;">
+        <span class="badge">BigQuery</span>
+        <span class="badge">Continuous Queries</span>
+        <span class="badge">Apache Iceberg</span>
+        <span class="badge">BigLake</span>
+        <span class="badge">レイクハウス</span>
+        <span class="badge">ストリーミング</span>
+        <span class="badge">リバース ETL</span>
+        <span class="badge">INSERT DML</span>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p><strong>📎 出典・参考リンク</strong></p>
+      <ul style="list-style: none; padding-left: 0;">
+        <li>📰 <a href="https://docs.cloud.google.com/release-notes#September_28_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026-09-28)</a></li>
+        <li>📖 <a href="https://docs.cloud.google.com/bigquery/docs/continuous-queries-introduction" target="_blank" rel="noopener noreferrer" class="gc-link">継続クエリの概要</a></li>
+        <li>📖 <a href="https://docs.cloud.google.com/bigquery/docs/continuous-queries#write-bigquery" target="_blank" rel="noopener noreferrer" class="gc-link">継続クエリの作成 (Iceberg マネージドテーブルへの書き込み)</a></li>
+        <li>📖 <a href="https://docs.cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery" target="_blank" rel="noopener noreferrer" class="gc-link">Apache Iceberg マネージドテーブルの作成と使用</a></li>
+        <li>💰 <a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">BigQuery の料金</a></li>
+      </ul>
+      <p>本インフォグラフィックは Google Cloud News レポート (2026-09-28) に基づいて生成されました。</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

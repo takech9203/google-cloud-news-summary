@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gemini Cloud Assist: カスタム IAM ロールの権限移行</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+    hljs.highlightAll();
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-deprecated { background: var(--gc-red); color: #FFFFFF; }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-red {
+      border-left-color: var(--gc-red);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-yellow {
+      border-left-color: var(--gc-yellow);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow { color: var(--gc-blue-600); font-size: 20px; }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .warning-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-card h3 { color: var(--gc-red); }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-card h3 { color: var(--gc-green); }
+
+    .before-card ul, .after-card ul {
+      list-style: none;
+      padding: 0;
+      margin: 8px 0 0 0;
+    }
+
+    .before-card li, .after-card li {
+      padding: 4px 0;
+      font-size: 14px;
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.red { background: linear-gradient(135deg, var(--gc-red), #C62828); }
+    .stat-card.green { background: linear-gradient(135deg, var(--gc-green), #1B5E20); }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-block {
+      overflow: hidden;
+      padding: 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre:not(.mermaid) {
+      margin: 0;
+      border-radius: 0;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase h3 {
+      color: var(--gc-blue-800);
+      margin-bottom: 8px;
+    }
+
+    .timeline {
+      position: relative;
+      padding-left: 32px;
+      margin: 16px 0;
+    }
+
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 12px;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: var(--gc-blue-300);
+    }
+
+    .timeline-item {
+      position: relative;
+      padding: 12px 0;
+    }
+
+    .timeline-item::before {
+      content: '';
+      position: absolute;
+      left: -26px;
+      top: 18px;
+      width: 14px;
+      height: 14px;
+      background: var(--gc-blue-600);
+      border-radius: 50%;
+      border: 3px solid var(--gc-surface);
+      box-shadow: 0 0 0 2px var(--gc-blue-300);
+    }
+
+    .timeline-item.active::before {
+      background: var(--gc-red);
+      box-shadow: 0 0 0 2px var(--gc-red);
+    }
+
+    .timeline-date {
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      font-size: 14px;
+    }
+
+    .timeline-item.active .timeline-date {
+      color: var(--gc-red);
+    }
+
+    .timeline-desc {
+      font-size: 14px;
+      color: var(--gc-on-surface-variant);
+      margin-top: 4px;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stat-cards { grid-template-columns: 1fr; }
+      .header { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>&#x1F512; Gemini Cloud Assist: カスタム IAM ロールの権限移行</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Gemini Cloud Assist</span>
+          <span class="badge">IAM</span>
+          <span class="badge-deprecated badge">Deprecated</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-04-06</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>&#x1F4CB; 概要</h2>
+      <p>
+        2026 年 4 月 8 日より、Gemini Cloud Assist の IAM 権限体系が変更されます。従来の
+        <code>cloudaicompanion.instances.completeTask</code> 権限が廃止され、新しい
+        <code>geminicloudassist.agents.invoke</code> 権限に置き換えられます。
+        これは、権限体系を <span class="highlight">cloudaicompanion</span> 名前空間から
+        <span class="highlight">geminicloudassist</span> 名前空間へ段階的に移行する取り組みの一環です。
+      </p>
+
+      <div class="warning-box" style="margin-top: 16px;">
+        <strong>&#x26A0;&#xFE0F; 重要:</strong> カスタム IAM ロールを使用している場合は、<strong>2026 年 4 月 8 日まで</strong>に手動で権限を更新する必要があります。対応しない場合、Gemini Cloud Assist へのアクセスが失われる可能性があります。
+      </div>
+
+      <div class="success-box">
+        <strong>&#x2705; 事前定義済みロール利用者:</strong> <code>roles/geminicloudassist.user</code> などの標準ロールを使用している場合は、Google が自動的にロールを更新するため、対応は不要です。
+      </div>
+    </div>
+
+    <!-- Before / After -->
+    <div class="section">
+      <h2>&#x1F504; Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-card">
+          <h3>&#x274C; 変更前 (Before)</h3>
+          <ul>
+            <li>&#x2022; 権限が <code>cloudaicompanion</code> 名前空間に分散</li>
+            <li>&#x2022; <code>cloudaicompanion.instances.completeTask</code> は汎用的な名前</li>
+            <li>&#x2022; サービス固有の権限管理が困難</li>
+            <li>&#x2022; IAM ポリシーの可読性が低い</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h3>&#x2705; 変更後 (After)</h3>
+          <ul>
+            <li>&#x2022; <code>geminicloudassist.agents.invoke</code> でエージェント呼び出し権限が明確</li>
+            <li>&#x2022; 権限名がサービス名と整合</li>
+            <li>&#x2022; IAM ポリシーの可読性が向上</li>
+            <li>&#x2022; 将来の権限追加・細分化が体系的</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid from report) -->
+    <div class="section">
+      <h2>&#x1F3D7;&#xFE0F; アーキテクチャ図</h2>
+      <p>カスタム IAM ロールに含まれる旧権限を新権限に置き換える必要があります。事前定義済みロールは自動的に更新されます。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TB
+    subgraph before["変更前 (2026-04-08 まで)"]
+        direction LR
+        U1[ユーザー] --> CR1[カスタム IAM ロール]
+        CR1 --> P1["cloudaicompanion\n.instances.completeTask"]
+        P1 --> GCA1[Gemini Cloud Assist]
+    end
+
+    subgraph after["変更後 (2026-04-08 以降)"]
+        direction LR
+        U2[ユーザー] --> CR2[カスタム IAM ロール]
+        CR2 --> P2["geminicloudassist\n.agents.invoke"]
+        P2 --> GCA2[Gemini Cloud Assist]
+    end
+
+    before --> |"権限移行"| after
+
+    style before fill:#FFF3E0,stroke:#FF9800
+    style after fill:#E8F5E9,stroke:#4CAF50
+    style P1 fill:#FFCDD2,color:#000
+    style P2 fill:#C8E6C9,color:#000
+    style GCA1 fill:#4285F4,color:#fff
+    style GCA2 fill:#4285F4,color:#fff
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Stats -->
+    <div class="section">
+      <h2>&#x1F4CA; 数字で見るアップデート</h2>
+      <div class="stat-cards">
+        <div class="stat-card red">
+          <div class="stat-value">4/8</div>
+          <div class="stat-label">移行期限 (2026年)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">第2段階</div>
+          <div class="stat-label">権限移行フェーズ</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-value">自動</div>
+          <div class="stat-label">標準ロールの更新</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>&#x2B50; 主要機能</h2>
+
+      <div class="card">
+        <h3>&#x1F3F7;&#xFE0F; 1. IAM 権限の名前空間移行</h3>
+        <div class="icon-text">
+          <span class="arrow">&#x2192;</span>
+          <span><code>cloudaicompanion.instances.completeTask</code> が廃止され、<code>geminicloudassist.agents.invoke</code> に置き換え</span>
+        </div>
+        <div class="icon-text">
+          <span class="arrow">&#x2192;</span>
+          <span>2026年2月の <code>generateChat</code> / <code>generateCode</code> 廃止に続く第2段階の権限移行</span>
+        </div>
+        <div class="icon-text">
+          <span class="arrow">&#x2192;</span>
+          <span>最終的に全ての権限が <code>geminicloudassist</code> 名前空間に統合される方向</span>
+        </div>
+      </div>
+
+      <div class="card card-green">
+        <h3>&#x2705; 2. 事前定義済みロールの自動更新</h3>
+        <div class="icon-text">
+          <span class="arrow">&#x2192;</span>
+          <span><code>roles/geminicloudassist.user</code> などの標準ロールは Google が自動的に更新</span>
+        </div>
+        <div class="icon-text">
+          <span class="arrow">&#x2192;</span>
+          <span>標準ロールを使用している場合、ユーザー側での操作は不要</span>
+        </div>
+        <div class="icon-text">
+          <span class="arrow">&#x2192;</span>
+          <span>更新は 2026 年 4 月 8 日に自動適用</span>
+        </div>
+      </div>
+
+      <div class="card card-red">
+        <h3>&#x26A0;&#xFE0F; 3. カスタムロールの手動更新が必要</h3>
+        <div class="icon-text">
+          <span class="arrow">&#x2192;</span>
+          <span>カスタム IAM ロールで <code>cloudaicompanion.instances.completeTask</code> を使用している場合、手動での更新が必須</span>
+        </div>
+        <div class="icon-text">
+          <span class="arrow">&#x2192;</span>
+          <span>期限 (2026-04-08) を過ぎると旧権限が無効化され、アクセスが失われる可能性がある</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specs -->
+    <div class="section">
+      <h2>&#x1F527; 技術仕様</h2>
+
+      <h3>権限の変更内容</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>変更前</th>
+            <th>変更後</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>権限名</td>
+            <td><code>cloudaicompanion.instances.completeTask</code></td>
+            <td><code>geminicloudassist.agents.invoke</code></td>
+          </tr>
+          <tr>
+            <td>名前空間</td>
+            <td><code>cloudaicompanion</code></td>
+            <td><code>geminicloudassist</code></td>
+          </tr>
+          <tr>
+            <td>有効期限</td>
+            <td>2026-04-08 まで</td>
+            <td>2026-04-08 以降</td>
+          </tr>
+          <tr>
+            <td>影響範囲</td>
+            <td>カスタム IAM ロールのみ</td>
+            <td>全ロール (標準ロールは自動更新)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top: 24px;">&#x1F4C5; 権限移行の履歴</h3>
+      <div class="timeline">
+        <div class="timeline-item">
+          <div class="timeline-date">2026-02-01</div>
+          <div class="timeline-desc">
+            <code>cloudaicompanion.companions.generateChat</code> &#x2192; <code>cloudaicompanion.instances.completeTask</code> / <code>generateText</code>
+          </div>
+          <div class="timeline-desc">
+            <code>cloudaicompanion.companions.generateCode</code> &#x2192; <code>cloudaicompanion.instances.completeCode</code> / <code>generateCode</code>
+          </div>
+        </div>
+        <div class="timeline-item active">
+          <div class="timeline-date">2026-04-08 (今回)</div>
+          <div class="timeline-desc">
+            <code>cloudaicompanion.instances.completeTask</code> &#x2192; <code>geminicloudassist.agents.invoke</code>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Setup Steps -->
+    <div class="section">
+      <h2>&#x1F6E0;&#xFE0F; 設定方法</h2>
+
+      <div class="note-box" style="margin-bottom: 16px;">
+        <strong>&#x1F4DD; 前提条件:</strong>
+        <ul style="list-style: none; padding: 0; margin-top: 8px;">
+          <li>&#x2713; Gemini Cloud Assist へのアクセスにカスタム IAM ロールを使用していること</li>
+          <li>&#x2713; Google Cloud コンソールまたは gcloud CLI へのアクセス権限があること</li>
+          <li>&#x2713; カスタムロールの編集権限 (<code>roles/iam.organizationRoleAdmin</code> または <code>roles/iam.roleAdmin</code>) を持っていること</li>
+        </ul>
+      </div>
+
+      <h3>Step 1: カスタムロールの確認</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">カスタムロールの一覧表示と確認</span>
+        </div>
+        <pre><code class="language-bash"># プロジェクト内のカスタムロールを一覧表示
+gcloud iam roles list --project=PROJECT_ID --format="table(name, title)"
+
+# 特定のカスタムロールの権限を確認
+gcloud iam roles describe ROLE_ID --project=PROJECT_ID</code></pre>
+      </div>
+      <p style="font-size: 14px; margin-top: 8px;">Google Cloud コンソールの [IAM と管理] > [ロール] ページからも確認できます。フィルタフィールドに <code>cloudaicompanion.instances.completeTask</code> と入力すると、該当するロールを検索できます。</p>
+
+      <h3 style="margin-top: 20px;">Step 2: カスタムロールに新しい権限を追加</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">新しい権限の追加</span>
+        </div>
+        <pre><code class="language-bash"># カスタムロールに新しい権限を追加
+gcloud iam roles update ROLE_ID \
+  --project=PROJECT_ID \
+  --add-permissions=geminicloudassist.agents.invoke</code></pre>
+      </div>
+      <p style="font-size: 14px; margin-top: 8px;">まず新しい権限を追加し、旧権限も残しておくことで移行期間中のアクセスを確保します。</p>
+
+      <h3 style="margin-top: 20px;">Step 3: 旧権限の削除 (2026-04-08 以降)</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">旧権限の削除</span>
+        </div>
+        <pre><code class="language-bash"># 2026-04-08 以降、旧権限を削除
+gcloud iam roles update ROLE_ID \
+  --project=PROJECT_ID \
+  --remove-permissions=cloudaicompanion.instances.completeTask</code></pre>
+      </div>
+
+      <h3 style="margin-top: 24px;">&#x1F4A1; 推奨される移行フロー</h3>
+      <div class="flow-diagram">
+        <div class="flow-step">&#x1F50D; ロール確認</div>
+        <span class="flow-arrow">&#x2192;</span>
+        <div class="flow-step">&#x2795; 新権限追加</div>
+        <span class="flow-arrow">&#x2192;</span>
+        <div class="flow-step">&#x2705; 動作検証</div>
+        <span class="flow-arrow">&#x2192;</span>
+        <div class="flow-step">&#x1F5D1;&#xFE0F; 旧権限削除</div>
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>&#x1F4C8; メリット</h2>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div>
+          <h3>&#x1F4BC; ビジネス面</h3>
+          <div class="card card-green">
+            <div class="icon-text">
+              <span class="arrow">&#x2192;</span>
+              <span><strong>権限管理の明確化:</strong> サービス名と一致した権限名により、IAM ポリシーの監査やレビューが容易に</span>
+            </div>
+            <div class="icon-text">
+              <span class="arrow">&#x2192;</span>
+              <span><strong>ガバナンスの強化:</strong> <code>geminicloudassist</code> 名前空間への統一により、権限の一元管理が可能</span>
+            </div>
+          </div>
+        </div>
+        <div>
+          <h3>&#x2699;&#xFE0F; 技術面</h3>
+          <div class="card card-green">
+            <div class="icon-text">
+              <span class="arrow">&#x2192;</span>
+              <span><strong>命名規則の一貫性:</strong> <code>geminicloudassist.agents.invoke</code> で操作内容が明確に表現</span>
+            </div>
+            <div class="icon-text">
+              <span class="arrow">&#x2192;</span>
+              <span><strong>将来の拡張性:</strong> 名前空間統合により、今後の権限追加が体系的に</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>&#x26A0;&#xFE0F; デメリット・制約事項</h2>
+
+      <div class="card card-red">
+        <h3>&#x1F6AB; 制限事項</h3>
+        <div class="icon-text">
+          <span>&#x2022;</span>
+          <span>カスタム IAM ロール使用時、2026-04-08 までに手動更新しないとアクセスが失われる</span>
+        </div>
+        <div class="icon-text">
+          <span>&#x2022;</span>
+          <span>移行期限が約 2 日間と非常に短いため、迅速な対応が必要</span>
+        </div>
+      </div>
+
+      <div class="card card-yellow">
+        <h3>&#x1F4AD; 考慮すべき点</h3>
+        <div class="icon-text">
+          <span>&#x2022;</span>
+          <span>組織内で複数のプロジェクトにまたがるカスタムロールがある場合、全てのプロジェクトで更新が必要</span>
+        </div>
+        <div class="icon-text">
+          <span>&#x2022;</span>
+          <span>Terraform や Deployment Manager などの IaC ツールでカスタムロールを管理している場合、コード側の更新も必要</span>
+        </div>
+        <div class="icon-text">
+          <span>&#x2022;</span>
+          <span>過去の権限移行 (2026年2月) で <code>cloudaicompanion.instances.completeTask</code> を追加したばかりの場合、再度の更新作業が発生</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>&#x1F4A1; ユースケース</h2>
+
+      <div class="usecase">
+        <h3>&#x1F512; ユースケース 1: 最小権限の原則に基づくカスタムロール運用</h3>
+        <p><strong>シナリオ:</strong> セキュリティポリシーにより事前定義済みロールの使用を避け、必要最小限の権限のみを付与するカスタムロールで Gemini Cloud Assist を利用している組織。</p>
+        <div class="code-block" style="margin-top: 12px;">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">カスタムロールの更新</span>
+          </div>
+          <pre><code class="language-bash"># カスタムロールの更新
+gcloud iam roles update geminiCloudAssistMinimal \
+  --project=my-project \
+  --add-permissions=geminicloudassist.agents.invoke \
+  --remove-permissions=cloudaicompanion.instances.completeTask</code></pre>
+        </div>
+        <p style="font-size: 14px; margin-top: 8px;"><strong>効果:</strong> 移行期限前にカスタムロールを更新することで、Gemini Cloud Assist へのアクセスを中断なく維持できる。</p>
+      </div>
+
+      <div class="usecase">
+        <h3>&#x1F4BB; ユースケース 2: IaC によるカスタムロール管理</h3>
+        <p><strong>シナリオ:</strong> Terraform で IAM カスタムロールを管理しており、権限変更をコードベースで追跡している組織。</p>
+        <div class="code-block" style="margin-top: 12px;">
+          <div class="code-header">
+            <span class="code-lang">HCL</span>
+            <span class="code-title">Terraform でのカスタムロール定義</span>
+          </div>
+          <pre><code class="language-hcl">resource "google_project_iam_custom_role" "gemini_assist_user" {
+  role_id     = "geminiCloudAssistUser"
+  title       = "Gemini Cloud Assist User"
+  description = "Custom role for Gemini Cloud Assist access"
+  permissions = [
+    "geminicloudassist.agents.invoke",  # 新しい権限
+    "serviceusage.services.use",
+    # "cloudaicompanion.instances.completeTask",  # 削除
+  ]
+}</code></pre>
+        </div>
+        <p style="font-size: 14px; margin-top: 8px;"><strong>効果:</strong> IaC のコード変更として権限移行を管理でき、変更履歴の追跡とロールバックが容易になる。</p>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#x1F517; 関連サービス・リソース</h2>
+      <div class="card">
+        <div class="icon-text">
+          <span>&#x1F4D6;</span>
+          <span><a href="https://cloud.google.com/cloud-assist/iam-requirements" target="_blank" class="gc-link">Gemini Cloud Assist IAM 要件</a> - 必要な IAM ロールと権限の詳細</span>
+        </div>
+        <div class="icon-text">
+          <span>&#x1F527;</span>
+          <span><a href="https://cloud.google.com/iam/docs/creating-custom-roles" target="_blank" class="gc-link">IAM カスタムロール</a> - カスタムロールの作成・更新方法</span>
+        </div>
+        <div class="icon-text">
+          <span>&#x2699;&#xFE0F;</span>
+          <span><a href="https://cloud.google.com/cloud-assist/set-up-gemini" target="_blank" class="gc-link">Gemini Cloud Assist セットアップ</a> - 初期設定手順</span>
+        </div>
+        <div class="icon-text">
+          <span>&#x1F4C3;</span>
+          <span><a href="https://cloud.google.com/gemini/docs/deprecations/permissions" target="_blank" class="gc-link">Gemini Cloud Assist 権限廃止履歴</a> - 過去の権限移行に関する情報</span>
+        </div>
+        <div class="icon-text">
+          <span>&#x1F3F7;&#xFE0F;</span>
+          <span><a href="https://cloud.google.com/iam/docs/roles-permissions/geminicloudassist" target="_blank" class="gc-link">IAM ロールと権限 - Gemini Cloud Assist</a></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section" style="background: var(--gc-blue-tint); border-color: var(--gc-blue-300);">
+      <h2>&#x1F4DD; まとめ</h2>
+      <p>
+        Gemini Cloud Assist の IAM 権限が <code>cloudaicompanion.instances.completeTask</code> から
+        <code>geminicloudassist.agents.invoke</code> に移行されます。
+        事前定義済みロールは自動更新されますが、<strong>カスタム IAM ロールを使用している場合は 2026 年 4 月 8 日までに手動で権限を更新する必要があります。</strong>
+      </p>
+      <div class="warning-box" style="margin-top: 12px;">
+        <strong>&#x1F6A8; アクション:</strong> カスタムロールを使用している組織は直ちに影響範囲を確認し、権限の更新作業を実施することを強く推奨します。
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>&#x1F4CE; 出典:</strong></p>
+      <ul style="list-style: none; padding: 0; margin-top: 4px;">
+        <li><a href="https://docs.cloud.google.com/release-notes#April_06_2026" target="_blank" rel="noopener noreferrer">Google Cloud Release Notes - April 06, 2026</a></li>
+        <li><a href="https://cloud.google.com/cloud-assist/iam-requirements" target="_blank" rel="noopener noreferrer">Gemini Cloud Assist IAM 要件</a></li>
+        <li><a href="https://cloud.google.com/iam/docs/creating-custom-roles" target="_blank" rel="noopener noreferrer">カスタムロールの作成と管理</a></li>
+      </ul>
+      <p style="margin-top: 8px; font-size: 11px; color: #9E9E9E;">Generated by Google Cloud News Summary</p>
+    </footer>
+
+  </div>
+</body>
+</html>

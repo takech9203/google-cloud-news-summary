@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Firestore with MongoDB compatibility: TTL インデックス管理サポート</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-yellow {
+      border-left-color: var(--gc-yellow);
+    }
+
+    .card-red {
+      border-left-color: var(--gc-red);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+    }
+
+    /* Before/After comparison */
+    .comparison-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .before-card h3 {
+      color: var(--gc-red);
+      margin-top: 0;
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .after-card h3 {
+      color: var(--gc-green);
+      margin-top: 0;
+    }
+
+    /* Code blocks */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-block {
+      overflow: hidden;
+      padding: 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Table styles */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* Note/Warning boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Stat cards */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Mermaid container */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Feature cards grid */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    /* Use case cards */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+    }
+
+    .usecase-card h3 {
+      color: var(--gc-blue-800);
+      margin-top: 0;
+    }
+
+    /* Region tags */
+    .region-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    .region-tag {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-800);
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .region-tag.multi {
+      background: var(--gc-green-tint);
+      color: #137333;
+      border-color: var(--gc-green);
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1, .title { font-size: 24px; }
+      h2, .section-title { font-size: 20px; }
+      .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+      .comparison-grid { grid-template-columns: 1fr; }
+      .stat-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>🗄️ Firestore with MongoDB compatibility<br>TTL インデックス管理サポート</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Firestore</span>
+          <span class="badge" style="background: #F4B400; color: #FFFFFF;">MongoDB 互換</span>
+          <span class="badge badge-ga">GA</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-03-16</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>Firestore with MongoDB compatibility において、<span class="highlight">MongoDB API を通じた TTL (Time-To-Live) インデックスの管理</span>が新たにサポートされました。MongoDB の標準的なドライバーやツールから直接 TTL インデックスを作成・管理できるようになり、既存の MongoDB アプリケーションコードをより少ない変更で Firestore に移行できるようになりました。</p>
+      <p>TTL インデックスは、指定されたフィールドの有効期限に基づいてドキュメントを自動的に削除する機能です。セッションデータ、一時キャッシュ、ログデータなど、一定期間後に不要となるデータの管理に広く使われています。</p>
+    </div>
+
+    <!-- Before/After Comparison -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="comparison-grid">
+        <div class="before-card">
+          <h3>❌ Before</h3>
+          <div class="check-item">
+            <span class="cross-icon">✗</span>
+            <span>MongoDB API の <code>createIndexes</code> で TTL インデックスプロパティが未サポート</span>
+          </div>
+          <div class="check-item">
+            <span class="cross-icon">✗</span>
+            <span>TTL ポリシー設定には Google Cloud コンソール / gcloud CLI が必要</span>
+          </div>
+          <div class="check-item">
+            <span class="cross-icon">✗</span>
+            <span>移行時にインデックス管理コードの書き換えが必要</span>
+          </div>
+        </div>
+        <div class="after-card">
+          <h3>✅ After</h3>
+          <div class="check-item">
+            <span class="check-icon">✓</span>
+            <span>MongoDB API 標準コマンド (<code>createIndex</code>) で TTL インデックス作成可能</span>
+          </div>
+          <div class="check-item">
+            <span class="check-icon">✓</span>
+            <span>既存 MongoDB アプリの TTL 管理コードをそのまま利用可能</span>
+          </div>
+          <div class="check-item">
+            <span class="check-icon">✓</span>
+            <span>MongoDB ドライバーを通じた統一的なインデックス管理が実現</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    subgraph Client["MongoDB クライアント"]
+        A["MongoDB ドライバー"]
+    end
+
+    subgraph API["Firestore with MongoDB compatibility"]
+        B["MongoDB 互換 API エンドポイント"]
+        C["TTL インデックス管理"]
+        D["TTL ポリシーエンジン"]
+    end
+
+    subgraph Storage["Firestore"]
+        E["ドキュメントストレージ"]
+        F["TTL による自動削除"]
+    end
+
+    A -->|"createIndex&#10;expireAfterSeconds"| B
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+    F -->|"期限切れドキュメント&#10;を自動削除"| E
+        </pre>
+      </div>
+      <p>MongoDB ドライバーから <code>createIndex</code> コマンドで <code>expireAfterSeconds</code> オプションを指定することにより、Firestore with MongoDB compatibility 上で TTL インデックスが作成され、期限切れドキュメントが自動的に削除されます。</p>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h3>📝 MongoDB API 経由の TTL インデックス作成</h3>
+          <div class="icon-text">
+            <span class="arrow">→</span>
+            <span>MongoDB の <code>createIndex()</code> メソッドで <code>expireAfterSeconds</code> を指定して TTL インデックスを作成</span>
+          </div>
+          <div class="icon-text">
+            <span class="arrow">→</span>
+            <span>pymongo, mongosh, Node.js driver 等の既存ドライバーからそのまま利用可能</span>
+          </div>
+        </div>
+        <div class="card card-green">
+          <h3>🗑️ TTL による自動ドキュメント削除</h3>
+          <div class="icon-text">
+            <span class="arrow">→</span>
+            <span>指定フィールド (Date 型) の値に基づき、有効期限を過ぎたドキュメントを自動削除</span>
+          </div>
+          <div class="icon-text">
+            <span class="arrow">→</span>
+            <span>削除は通常、有効期限から 24 時間以内に低優先度で処理</span>
+          </div>
+        </div>
+        <div class="card card-yellow">
+          <h3>🔧 TTL インデックスの管理操作</h3>
+          <div class="icon-text">
+            <span class="arrow">→</span>
+            <span><code>listIndexes</code> で確認、<code>dropIndexes</code> で削除が可能</span>
+          </div>
+          <div class="icon-text">
+            <span class="arrow">→</span>
+            <span>Google Cloud コンソール / gcloud CLI からも引き続き管理可能</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>📐 技術仕様</h2>
+      <h3>TTL インデックスの制約</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>TTL フィールド数</td>
+            <td>コレクションあたり <strong>1 フィールドのみ</strong></td>
+          </tr>
+          <tr>
+            <td>フィールドレベル TTL 設定数上限</td>
+            <td>最大 <strong>500</strong></td>
+          </tr>
+          <tr>
+            <td>対応フィールド型</td>
+            <td>Date and time / BSON Date 値、または Date 値を含む配列</td>
+          </tr>
+          <tr>
+            <td>削除タイミング</td>
+            <td>有効期限から通常 <strong>24 時間以内</strong></td>
+          </tr>
+          <tr>
+            <td>削除の順序保証</td>
+            <td>タイムスタンプ順での削除は<strong>保証されない</strong></td>
+          </tr>
+          <tr>
+            <td>トランザクション削除</td>
+            <td>TTL 削除は<strong>トランザクショナルではない</strong></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="warning-box">
+        <strong>⚠️ 注意:</strong> TTL フィールドにインデックスを付与する場合、タイムスタンプフィールドのインデックスはトラフィック量が多い場合にホットスポットが発生する可能性があります。
+      </div>
+    </div>
+
+    <!-- Setup Guide -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+      <h3>前提条件</h3>
+      <div class="icon-text">
+        <span class="check-icon">✓</span>
+        <span>Firestore with MongoDB compatibility が有効なプロジェクト</span>
+      </div>
+      <div class="icon-text">
+        <span class="check-icon">✓</span>
+        <span>IAM ロール: <code>roles/datastore.owner</code>, <code>roles/datastore.indexAdmin</code>, <code>roles/editor</code>, または <code>roles/owner</code></span>
+      </div>
+
+      <h3>ステップ 1: TTL インデックスの作成</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">JavaScript</span>
+          <span class="code-title">mongosh / MongoDB ドライバーで TTL インデックスを作成</span>
+        </div>
+        <pre><code class="language-javascript">// mongosh または MongoDB ドライバーを使用
+db.sessions.createIndex(
+  { "lastAccess": 1 },
+  { expireAfterSeconds: 3600 }  // 1時間後に期限切れ
+)</code></pre>
+      </div>
+
+      <h3>ステップ 2: TTL インデックスの確認</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">JavaScript</span>
+          <span class="code-title">インデックス一覧の確認</span>
+        </div>
+        <pre><code class="language-javascript">// インデックス一覧の確認
+db.sessions.getIndexes()</code></pre>
+      </div>
+
+      <h3>ステップ 3: (代替) gcloud CLI での確認</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">Google Cloud 側からの TTL ポリシー確認</span>
+        </div>
+        <pre><code class="language-bash"># TTL ポリシーの一覧表示
+gcloud firestore fields ttls list --collection-group=sessions</code></pre>
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div class="comparison-grid">
+        <div>
+          <h3>💼 ビジネス面</h3>
+          <div class="card card-green">
+            <div class="icon-text">
+              <span class="check-icon">✓</span>
+              <span><strong>移行コストの削減</strong>: 既存 MongoDB アプリの TTL インデックス管理コードをそのまま利用でき、コード変更が削減</span>
+            </div>
+          </div>
+          <div class="card card-green">
+            <div class="icon-text">
+              <span class="check-icon">✓</span>
+              <span><strong>ストレージコストの最適化</strong>: 不要データの自動削除でストレージ使用量を抑制しコスト削減</span>
+            </div>
+          </div>
+        </div>
+        <div>
+          <h3>🔧 技術面</h3>
+          <div class="card card-green">
+            <div class="icon-text">
+              <span class="check-icon">✓</span>
+              <span><strong>運用の統一</strong>: MongoDB API でインデックス管理を一元化、ツール間の行き来が不要に</span>
+            </div>
+          </div>
+          <div class="card card-green">
+            <div class="icon-text">
+              <span class="check-icon">✓</span>
+              <span><strong>MongoDB エコシステムとの互換性向上</strong>: より多くの MongoDB ワークロードの移行が可能に</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <div class="card card-red">
+        <h3>制限事項</h3>
+        <div class="check-item">
+          <span class="cross-icon">✗</span>
+          <span>コレクションあたり TTL フィールドは 1 つのみ</span>
+        </div>
+        <div class="check-item">
+          <span class="cross-icon">✗</span>
+          <span>フィールドレベル TTL 設定はデータベース全体で最大 500 まで</span>
+        </div>
+        <div class="check-item">
+          <span class="cross-icon">✗</span>
+          <span>削除は即時ではなく、通常 24 時間以内に実行</span>
+        </div>
+        <div class="check-item">
+          <span class="cross-icon">✗</span>
+          <span>TTL 削除はトランザクショナルではない</span>
+        </div>
+      </div>
+      <div class="warning-box">
+        <strong>⚠️ 考慮すべき点:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>TTL フィールドへのインデックス付与はホットスポットの原因となる可能性</li>
+          <li>既存コレクションへの TTL ポリシー適用時、期限切れデータの一括削除が発生</li>
+          <li>TTL 削除操作はドキュメント削除コストとして課金される</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+      <div class="usecase-card">
+        <h3>💻 ユースケース 1: セッション管理の自動クリーンアップ</h3>
+        <p><strong>シナリオ:</strong> Web アプリケーションのセッションデータを Firestore に保存し、非アクティブなセッションを自動削除したい。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">JavaScript</span>
+            <span class="code-title">セッション TTL の実装例</span>
+          </div>
+          <pre><code class="language-javascript">// セッションコレクションに TTL インデックスを作成
+// 最終アクセスから 30 分後にセッションを自動削除
+db.sessions.createIndex(
+  { "lastActivity": 1 },
+  { expireAfterSeconds: 1800 }
+)
+
+// セッションドキュメントの挿入
+db.sessions.insertOne({
+  sessionId: "abc123",
+  userId: "user456",
+  lastActivity: new Date(),
+  data: { cart: [...] }
+})</code></pre>
+        </div>
+        <p><strong>効果:</strong> クリーンアップ処理の自前実装が不要になり、ストレージコストも自動最適化されます。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>🗃️ ユースケース 2: 一時データ・キャッシュの有効期限管理</h3>
+        <p><strong>シナリオ:</strong> API レスポンスのキャッシュデータを一定期間保持した後、自動的に削除したい。MongoDB からの移行で、既存の TTL インデックス設定をそのまま利用する。</p>
+        <p><strong>効果:</strong> 既存 MongoDB アプリコードを変更することなく、Firestore with MongoDB compatibility 上で同じ TTL ベースのキャッシュ管理を実現できます。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>TTL による削除操作はドキュメント削除コストとして課金されます。Firestore with MongoDB compatibility は Firestore Enterprise edition の一部であり、Enterprise edition の料金体系が適用されます。</p>
+      <h3>料金例 (us-central1)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>料金</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>書き込みユニット (削除を含む)</td>
+            <td><strong>$0.26</strong> / 100 万書き込みユニット</td>
+          </tr>
+          <tr>
+            <td>読み取りユニット</td>
+            <td><strong>$0.05</strong> / 100 万読み取りユニット</td>
+          </tr>
+          <tr>
+            <td>ストレージ</td>
+            <td><strong>$0.00032</strong> / GiB 時間</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="note-box">
+        <strong>💡 メモ:</strong> TTL 削除はマネージド削除サービスとして <code>document/billable_managed_delete_write_units</code> メトリクスで追跡されます。
+      </div>
+    </div>
+
+    <!-- Regions -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <h3>マルチリージョン</h3>
+      <div class="region-tags">
+        <span class="region-tag multi">eur3 (ヨーロッパ)</span>
+        <span class="region-tag multi">nam5 (米国中部)</span>
+        <span class="region-tag multi">nam7 (米国中部・東部)</span>
+      </div>
+      <h3>リージョン (一部抜粋)</h3>
+      <div class="region-tags">
+        <span class="region-tag">us-central1 (アイオワ)</span>
+        <span class="region-tag">us-east1 (サウスカロライナ)</span>
+        <span class="region-tag">us-east4 (バージニア北部)</span>
+        <span class="region-tag">europe-west1 (ベルギー)</span>
+        <span class="region-tag">europe-west4 (オランダ)</span>
+        <span class="region-tag">asia-northeast1 (東京)</span>
+        <span class="region-tag">asia-northeast2 (大阪)</span>
+        <span class="region-tag">asia-south1 (ムンバイ)</span>
+        <span class="region-tag">asia-southeast1 (シンガポール)</span>
+      </div>
+      <p style="font-size: 14px; color: var(--gc-outline);">他、全 30 以上のリージョンに対応</p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <div class="icon-text">
+          <span>☁️</span>
+          <span><strong>Firestore Enterprise edition</strong> - MongoDB compatibility の基盤。ユニットベースの料金体系とパイプライン操作をサポート</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="icon-text">
+          <span>📊</span>
+          <span><strong>Cloud Monitoring</strong> - TTL 削除件数 (<code>ttl_deletion_count</code>) や削除遅延 (<code>ttl_expiration_to_deletion_delays</code>) を監視</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="icon-text">
+          <span>🗄️</span>
+          <span><strong>Firestore ネイティブモード</strong> - 標準の Firestore API。TTL ポリシーは同様にサポート</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section" style="background: var(--gc-blue-tint); border-color: var(--gc-blue-300);">
+      <h2>📌 まとめ</h2>
+      <p>Firestore with MongoDB compatibility における MongoDB API 経由の TTL インデックス管理サポートは、<span class="highlight">MongoDB からの移行をさらに容易にする</span>重要なアップデートです。既存の MongoDB アプリケーションで TTL インデックスを使用しているワークロードは、<strong>コードの変更なく</strong> Firestore に移行できるようになりました。</p>
+      <p>TTL インデックスを活用したデータのライフサイクル管理を必要とするアプリケーションの移行を検討している場合は、本機能の導入を推奨します。</p>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="margin: 4px 0; padding-left: 20px;">
+        <li><a href="https://cloud.google.com/release-notes#March_16_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li><a href="https://cloud.google.com/firestore/mongodb-compatibility/docs/ttl" target="_blank" rel="noopener noreferrer">Firestore with MongoDB compatibility - TTL ドキュメント</a></li>
+        <li><a href="https://cloud.google.com/firestore/mongodb-compatibility/docs/indexing" target="_blank" rel="noopener noreferrer">Firestore with MongoDB compatibility - インデックス管理</a></li>
+        <li><a href="https://cloud.google.com/firestore/enterprise/pricing" target="_blank" rel="noopener noreferrer">Firestore Enterprise edition 料金</a></li>
+      </ul>
+      <p style="margin-top: 12px; font-size: 11px; color: #999;">Generated on 2026-03-17</p>
+    </footer>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

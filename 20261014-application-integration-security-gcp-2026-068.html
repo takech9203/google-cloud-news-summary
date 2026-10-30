@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Application Integration: セキュリティ情報 GCP-2026-068 (AuthConfig 検証における Incorrect Authorization 脆弱性)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 12px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .highlight-red {
+      background-color: var(--gc-red-tint);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: #B3261E;
+      border-bottom: 2px solid var(--gc-red);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card.security {
+      border-left-color: var(--gc-red);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated,
+    .badge-critical,
+    .badge-fixed {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); }
+    .badge-preview { background: var(--gc-orange); }
+    .badge-deprecated { background: var(--gc-red); }
+    .badge-critical { background: var(--gc-red); font-weight: 700; }
+    .badge-fixed { background: var(--gc-green); }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box, .after-box {
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-box h3 { color: #B3261E; }
+    .after-box h3 { color: #1E7E34; }
+
+    .before-box ul, .after-box ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 6px 0;
+    }
+
+    @media (max-width: 700px) {
+      .before-after { grid-template-columns: 1fr; }
+      .stat-grid { grid-template-columns: 1fr 1fr !important; }
+      h1 { font-size: 24px; }
+    }
+
+    /* 統計カード */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px 12px;
+      text-align: center;
+    }
+
+    .stat-card.critical {
+      background: linear-gradient(135deg, #D93025, #B3261E);
+    }
+
+    .stat-card.fixed {
+      background: linear-gradient(135deg, #34A853, #1E7E34);
+    }
+
+    .stat-value {
+      font-size: 26px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      line-height: 1.3;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    /* チェックリスト */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon { color: var(--gc-green); font-size: 18px; }
+    .cross-icon { color: var(--gc-red); font-size: 18px; }
+
+    /* コードブロック (pre:not(.mermaid) で Mermaid を除外) */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    ul.plain-list {
+      margin: 8px 0;
+      padding-left: 24px;
+    }
+
+    ul.plain-list li {
+      margin: 6px 0;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer ul {
+      padding-left: 20px;
+      margin: 8px 0;
+    }
+
+    footer li {
+      margin: 4px 0;
+    }
+
+    .tags {
+      margin-top: 12px;
+    }
+
+    .tag {
+      display: inline-block;
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-800);
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      margin: 2px 4px 2px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <h1>🛡️ Application Integration セキュリティ情報 GCP-2026-068</h1>
+        <div style="margin-top: 12px;">
+          <span class="badge">Application Integration</span>
+          <span class="badge-critical">重大度: Critical</span>
+          <span class="badge-fixed">✅ パッチ適用済み・顧客対応不要</span>
+        </div>
+        <div class="subtitle" style="margin-top: 8px;">AuthConfig 検証における Incorrect Authorization 脆弱性 (CVE-2026-85298)</div>
+      </div>
+      <div class="subtitle" style="text-align: right;">
+        <strong>公開日: 2026-10-14</strong><br>
+        パッチ適用日: 2026-08-27
+      </div>
+    </div>
+
+    <!-- 統計カード -->
+    <div class="stat-grid">
+      <div class="stat-card critical">
+        <div class="stat-value">Critical</div>
+        <div class="stat-label">重大度評価</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="font-size: 20px;">CVE-2026-85298</div>
+        <div class="stat-label">割り当て CVE</div>
+      </div>
+      <div class="stat-card fixed">
+        <div class="stat-value" style="font-size: 22px;">2026-08-27</div>
+        <div class="stat-label">パッチ適用日 (修正済み)</div>
+      </div>
+      <div class="stat-card fixed">
+        <div class="stat-value">対応不要</div>
+        <div class="stat-label">必要な顧客対応</div>
+      </div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        Google Cloud は 2026 年 10 月 14 日、Application Integration に関するセキュリティ情報
+        <span class="highlight">GCP-2026-068</span> を公開しました。2026 年 8 月 27 日より前のバージョンにおいて、
+        <span class="highlight-red">AuthConfig (認証プロファイル) の検証処理とインテグレーション実行ランタイムに
+        Incorrect Authorization (不適切な認可) の脆弱性</span>が存在していました。
+        この脆弱性には <strong>CVE-2026-85298</strong> が割り当てられ、重大度は <strong>Critical (重大)</strong> と評価されています。
+      </p>
+      <p>
+        悪用された場合、<strong>認証済みのユーザーが権限を昇格させ、Google Cloud プロジェクト内のサービスアカウントになりすます</strong>ことが可能でした。
+        AuthConfig はサービスアカウントや OAuth 2.0、JWT などの認証情報を保持してタスク実行時に利用される仕組みであるため、
+        認可検証の不備は本来許可されていないサービスアカウント権限での操作につながる恐れがありました。
+      </p>
+      <div class="success-box">
+        <strong>✅ 対応状況:</strong> この脆弱性は <strong>2026 年 8 月 27 日にパッチ適用済み</strong>であり、<strong>ユーザー側での対応は不要</strong>です。
+        Application Integration はフルマネージドサービスのため、修正はサービス側で自動的に展開されています。
+      </div>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>🔓 アップデート前の課題 (脆弱性の内容)</h3>
+          <ul>
+            <li>2026 年 8 月 27 日より前のバージョンでは、AuthConfig の検証処理とインテグレーション実行ランタイムに不適切な認可 (Incorrect Authorization) の欠陥が存在</li>
+            <li>認証済みユーザーが本来の権限を超えて権限昇格を行い、プロジェクト内のサービスアカウントになりすますことが可能だった</li>
+            <li>重大度は Critical。サービスアカウントの権限を介したプロジェクト内リソースへの不正アクセスにつながる恐れ</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>🔒 アップデート後の改善 (修正内容)</h3>
+          <ul>
+            <li>2026 年 8 月 27 日にサービス側でパッチが適用され、脆弱性は解消済み</li>
+            <li>フルマネージドサービスのため、ユーザー側での対応 (アップグレードや設定変更) は一切不要</li>
+            <li>AuthConfig の検証と実行ランタイムにおける認可チェックが是正され、意図しないサービスアカウントのなりすましを防止</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図: 修正前後の比較</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Before["🔓 修正前 (2026-08-27 より前)"]
+        U1([👤 認証済みユーザー]) -->|AuthConfig を悪用| AC1[🔑 AuthConfig 検証<br/>認可チェックに不備]
+        AC1 --> RT1[⚙️ インテグレーション実行ランタイム]
+        RT1 -.->|権限昇格・なりすまし| SA1[🤖 サービスアカウント]
+        SA1 -.->|不正アクセスの恐れ| RES1[(☁️ プロジェクト内リソース)]
+    end
+
+    subgraph After["🔒 修正後 (2026-08-27 以降・パッチ適用済み)"]
+        U2([👤 認証済みユーザー]) -->|正規の権限のみ| AC2[🔑 AuthConfig 検証<br/>認可チェック是正]
+        AC2 --> RT2[⚙️ インテグレーション実行ランタイム]
+        RT2 -->|許可された権限の範囲内| SA2[🤖 サービスアカウント]
+    end
+
+    Before -->|GCP-2026-068 パッチ適用| After
+        </pre>
+      </div>
+      <p>
+        修正前は AuthConfig 検証と実行ランタイムの認可不備により、認証済みユーザーがサービスアカウントになりすまして
+        プロジェクト内リソースへアクセスできる恐れがありました。パッチ適用後は認可チェックが是正され、
+        このセキュリティ境界の侵害が防止されます。
+      </p>
+    </div>
+
+    <!-- 脆弱性の詳細 -->
+    <div class="section">
+      <h2>🔍 脆弱性の概要</h2>
+      <div class="card security">
+        <h3>1️⃣ 脆弱性の種類: Incorrect Authorization (不適切な認可)</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>Application Integration の AuthConfig (認証プロファイル) の検証処理と、インテグレーション実行ランタイムに存在</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>2026 年 8 月 27 日より前のバージョンが影響を受ける</span></div>
+      </div>
+      <div class="card security">
+        <h3>2️⃣ 想定される影響: 権限昇格とサービスアカウントのなりすまし</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>認証済みユーザーが権限を昇格させ、Google Cloud プロジェクト内のサービスアカウントになりすますことが可能だった</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>AuthConfig はサービスアカウント・OAuth 2.0・JWT などの認証情報を保持し、タスク実行時の外部接続や Google API 呼び出しに使用されるため、認可不備は保持された認証情報の権限での不正操作につながり得る</span></div>
+      </div>
+      <div class="card">
+        <h3>3️⃣ 対応状況: パッチ適用済み・顧客対応不要</h3>
+        <div class="icon-text"><span class="check-icon">✓</span><span>2026 年 8 月 27 日にサービス側で修正が適用済み</span></div>
+        <div class="icon-text"><span class="check-icon">✓</span><span>フルマネージドサービスのため、ユーザーによるアップグレードや設定変更は不要</span></div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>📑 技術仕様: セキュリティ情報の詳細</h2>
+      <table>
+        <tr><th>項目</th><th>詳細</th></tr>
+        <tr><td>セキュリティ情報 ID</td><td><strong>GCP-2026-068</strong></td></tr>
+        <tr><td>公開日</td><td>2026-10-14</td></tr>
+        <tr><td>CVE</td><td><strong>CVE-2026-85298</strong></td></tr>
+        <tr><td>重大度</td><td><span class="badge-critical" style="margin: 0;">Critical (重大)</span></td></tr>
+        <tr><td>影響を受けるサービス</td><td>Application Integration</td></tr>
+        <tr><td>影響を受けるバージョン</td><td>2026 年 8 月 27 日より前のバージョン</td></tr>
+        <tr><td>脆弱性の種類</td><td>Incorrect Authorization (不適切な認可)</td></tr>
+        <tr><td>影響箇所</td><td>AuthConfig 検証、インテグレーション実行ランタイム</td></tr>
+        <tr><td>パッチ適用日</td><td>2026-08-27</td></tr>
+        <tr><td>必要な顧客対応</td><td><span class="badge-fixed" style="margin: 0;">なし</span></td></tr>
+      </table>
+
+      <h3>🔑 AuthConfig (認証プロファイル) について</h3>
+      <p>
+        AuthConfig は、Application Integration のタスクが外部アプリケーションやサービス、データソースに接続する際の
+        認証情報を保存・管理する仕組みです。以下の認証タイプをサポートしています。
+      </p>
+      <ul class="plain-list">
+        <li>🎫 Auth token (Basic / Bearer / MAC)</li>
+        <li>🪪 Google OIDC ID Token (サービスアカウントベース)</li>
+        <li>🔏 JSON Web Token (JWT)</li>
+        <li>🔐 OAuth 2.0 (認可コード / クライアントクレデンシャル / リソースオーナーパスワード)</li>
+        <li>📜 SSL/TLS クライアント証明書</li>
+        <li>🤖 サービスアカウント</li>
+      </ul>
+      <div class="note-box">
+        <strong>💡 補足:</strong> AuthConfig の管理には <code>roles/integrations.integrationAdmin</code> または
+        <code>roles/integrations.integrationEditor</code> などの IAM ロールが必要です。
+      </div>
+    </div>
+
+    <!-- 推奨される対応 -->
+    <div class="section">
+      <h2>✅ 推奨される対応</h2>
+      <div class="success-box">
+        <strong>🎯 必須の対応: なし。</strong> 本脆弱性は 2026 年 8 月 27 日にサービス側でパッチが適用済みであり、ユーザー側での対応は不要です。
+      </div>
+      <h3>🔎 推奨されるセキュリティレビュー (任意)</h3>
+      <p>本件を機に、以下の確認を行うことを推奨します。</p>
+      <div class="card">
+        <h3>1. AuthConfig の棚卸し</h3>
+        <p style="margin: 0;">Application Integration の「Auth Profiles」ページで、使用中の認証プロファイルと、紐づくサービスアカウントの権限を確認する</p>
+      </div>
+      <div class="card">
+        <h3>2. 最小権限の確認</h3>
+        <p style="margin: 0;">認証プロファイルで使用するサービスアカウントに過剰な権限 (特に <code>roles/owner</code> や <code>roles/editor</code> などの広範なロール) が付与されていないか確認する</p>
+      </div>
+      <div class="card">
+        <h3>3. 監査ログの確認</h3>
+        <p style="margin: 0;">必要に応じて Cloud Audit Logs でサービスアカウントの利用状況に不審なアクティビティがないか確認する</p>
+      </div>
+      <div class="card">
+        <h3>4. セキュリティ情報の購読</h3>
+        <p style="margin: 0;">Google Cloud セキュリティ速報の XML フィード (<a href="https://cloud.google.com/feeds/google-cloud-security-bulletins.xml" target="_blank" rel="noopener noreferrer" class="gc-link">google-cloud-security-bulletins.xml</a>) を購読し、今後の情報を迅速に把握する</p>
+      </div>
+    </div>
+
+    <!-- メリット / 考慮点 -->
+    <div class="section">
+      <h2>⚖️ メリットと考慮すべき点</h2>
+      <h3>💼 ビジネス面のメリット</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>対応コストゼロ</strong>: フルマネージドサービス側で修正が完了しており、ユーザー側の計画停止やアップグレード作業が不要</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>透明性の確保</strong>: CVE 採番とセキュリティ速報による公開で、組織のセキュリティ・コンプライアンス報告に必要な情報が得られる</span></div>
+
+      <h3>🔧 技術面のメリット</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>認可境界の強化</strong>: AuthConfig 検証と実行ランタイムの認可チェックが是正され、サービスアカウントなりすましの経路が遮断された</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>自動的な保護</strong>: 全ユーザーに修正が自動展開されるため、パッチ未適用の環境が残らない</span></div>
+
+      <h3>⚠️ 考慮すべき点</h3>
+      <div class="warning-box">
+        <div class="check-item" style="margin-top: 0;"><span class="cross-icon">•</span><span>本脆弱性は「認証済みユーザー」による悪用が前提であり、プロジェクト内の内部ユーザーの権限管理 (最小権限の原則) の重要性を再認識する必要がある</span></div>
+        <div class="check-item" style="margin-bottom: 0;"><span class="cross-icon">•</span><span>パッチ適用 (2026 年 8 月 27 日) 以前の期間における悪用有無については、セキュリティ速報には記載がない。懸念がある場合は監査ログの確認を検討する</span></div>
+      </div>
+    </div>
+
+    <!-- 関連サービス -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <h3>🪪 IAM (Identity and Access Management)</h3>
+        <p style="margin: 0;">サービスアカウントの権限管理と最小権限の原則の適用。なりすまし被害の影響範囲は、サービスアカウントに付与された IAM ロールに依存する</p>
+      </div>
+      <div class="card">
+        <h3>📜 Cloud Audit Logs</h3>
+        <p style="margin: 0;">サービスアカウントの利用状況やインテグレーション実行の監査証跡の確認に使用</p>
+      </div>
+      <div class="card">
+        <h3>🔌 Integration Connectors</h3>
+        <p style="margin: 0;">Application Integration と組み合わせて外部システムに接続する際にも認証設定を使用するサービス</p>
+      </div>
+      <div class="card security">
+        <h3>🛡️ GCP-2026-066</h3>
+        <p style="margin: 0;">同じく Application Integration の Email Task コンポーネントに関するセキュリティ情報 (2026-09-28 公開、6 月 30 日修正済み)。Application Integration では近接した時期に複数のセキュリティ修正が公開されている</p>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>🎯 まとめ</h2>
+      <div class="note-box">
+        <p style="margin: 0 0 8px;">
+          Application Integration の AuthConfig 検証と実行ランタイムに存在した <strong>Critical の認可脆弱性 (CVE-2026-85298)</strong> は、
+          <strong>2026 年 8 月 27 日にサービス側で修正済み</strong>であり、<strong>ユーザー側の対応は不要</strong>です。
+        </p>
+        <p style="margin: 0;">
+          ただし、認証済みユーザーによる権限昇格とサービスアカウントなりすましが可能だったという内容を踏まえ、
+          <span class="highlight">認証プロファイルに紐づくサービスアカウントの権限が最小権限になっているか</span>を確認する良い機会といえます。
+          セキュリティ速報フィードを購読し、今後の情報も継続的に把握することを推奨します。
+        </p>
+      </div>
+      <div class="tags">
+        <span class="tag">#ApplicationIntegration</span>
+        <span class="tag">#セキュリティ</span>
+        <span class="tag">#脆弱性</span>
+        <span class="tag">#CVE-2026-85298</span>
+        <span class="tag">#GCP-2026-068</span>
+        <span class="tag">#サービスアカウント</span>
+        <span class="tag">#IAM</span>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul>
+        <li><a href="https://docs.cloud.google.com/release-notes#October_14_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026-10-14)</a></li>
+        <li><a href="https://cloud.google.com/support/bulletins#gcp-2026-068" target="_blank" rel="noopener noreferrer" class="gc-link">セキュリティ速報 GCP-2026-068</a></li>
+        <li><a href="https://docs.cloud.google.com/application-integration/docs/configure-authentication-profiles" target="_blank" rel="noopener noreferrer" class="gc-link">Application Integration ドキュメント: 認証プロファイルの管理</a></li>
+        <li><a href="https://docs.cloud.google.com/application-integration/docs/integrations-access-permissions" target="_blank" rel="noopener noreferrer" class="gc-link">Application Integration の IAM ロールと権限</a></li>
+      </ul>
+      <p>レポート: reports/2026/2026-10-14-application-integration-security-gcp-2026-068.md | 生成日: 2026-10-15</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+</body>
+</html>

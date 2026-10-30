@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AlloyDB for PostgreSQL: BigQuery リアルタイムデータアクセスに Limit プッシュダウンとランタイムプロジェクトが追加 (Preview)</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+:root {
+  --gc-blue: #4285F4;
+  --gc-red: #EA4335;
+  --gc-yellow: #FBBC04;
+  --gc-green: #34A853;
+  --gc-blue-900: #174EA6;
+  --gc-blue-800: #185ABC;
+  --gc-blue-700: #1967D2;
+  --gc-blue-600: #1A73E8;
+  --gc-blue-500: #4285F4;
+  --gc-blue-300: #669DF6;
+  --gc-blue-200: #8AB4F8;
+  --gc-blue-100: #AECBFA;
+  --gc-blue-50: #E8F0FE;
+  --gc-on-surface: #202124;
+  --gc-on-surface-variant: #5F6368;
+  --gc-outline: #80868B;
+  --gc-surface: #FFFFFF;
+  --gc-surface-container-lowest: #F8F9FA;
+  --gc-surface-container-low: #F1F3F4;
+  --gc-surface-container: #E8EAED;
+  --gc-outline-variant: #DADCE0;
+  --gc-blue-tint: #E8F0FE;
+  --gc-green-tint: #E6F4EA;
+  --gc-red-tint: #FCE8E6;
+  --gc-yellow-tint: #FEF7E0;
+  --gc-purple-tint: #F3E8FD;
+  --gc-teal-tint: #E0F7FA;
+  --gc-purple: #A142F4;
+  --gc-teal: #00BCD4;
+  --gc-orange: #FF6D00;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background-color: var(--gc-surface);
+  font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+  color: var(--gc-on-surface-variant);
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 20px;
+  margin: 0;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.header {
+  margin-bottom: 32px;
+  padding-bottom: 16px;
+  border-bottom: 3px solid var(--gc-blue-600);
+}
+
+h1, .title {
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--gc-on-surface);
+  margin: 8px 0;
+  line-height: 1.4;
+}
+
+h2, .section-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin-top: 0;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 20px 0 8px;
+}
+
+.subtitle {
+  font-size: 15px;
+  color: var(--gc-outline);
+}
+
+.section {
+  background: var(--gc-surface-container-low);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid var(--gc-outline-variant);
+}
+
+.highlight {
+  background-color: var(--gc-blue-50);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--gc-blue-800);
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+.card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border-left: 4px solid var(--gc-blue-600);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+}
+
+.card h3 { margin-top: 0; }
+
+.gc-link {
+  color: var(--gc-blue-600);
+  text-decoration: none;
+}
+.gc-link:hover {
+  color: var(--gc-blue-800);
+  text-decoration: underline;
+}
+
+.badge,
+.badge-ga,
+.badge-preview,
+.badge-deprecated {
+  display: inline-block;
+  color: #FFFFFF;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+  margin: 4px 8px 4px 0;
+}
+.badge { background: var(--gc-blue-600); }
+.badge-ga { background: var(--gc-green); }
+.badge-preview { background: var(--gc-orange); }
+.badge-deprecated { background: var(--gc-red); }
+
+/* Before / After 比較 */
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+.before-box, .after-box {
+  border-radius: 12px;
+  padding: 20px;
+}
+.before-box {
+  background: var(--gc-red-tint);
+  border: 1px solid rgba(234, 67, 53, 0.35);
+}
+.after-box {
+  background: var(--gc-green-tint);
+  border: 1px solid rgba(52, 168, 83, 0.35);
+}
+.before-box h3, .after-box h3 { margin-top: 0; }
+.before-box h3 { color: #C5221F; }
+.after-box h3 { color: #188038; }
+.before-box ul, .after-box ul { margin: 8px 0 0; padding-left: 20px; }
+.before-box li, .after-box li { margin: 8px 0; font-size: 14.5px; }
+
+@media (max-width: 720px) {
+  .before-after { grid-template-columns: 1fr; }
+  h1 { font-size: 24px; }
+}
+
+/* チェックリスト */
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 10px 0;
+}
+.check-icon { color: var(--gc-green); font-size: 18px; flex-shrink: 0; }
+.cross-icon { color: var(--gc-red); font-size: 18px; flex-shrink: 0; }
+
+/* Mermaid コンテナ */
+.mermaid-container {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 20px 0;
+  border: 2px solid rgba(66, 133, 244, 0.3);
+  overflow-x: auto;
+}
+.mermaid {
+  display: flex;
+  justify-content: center;
+}
+
+/* コードブロック (Mermaid の pre は除外) */
+.code-block,
+pre:not(.mermaid) {
+  background: #1E1E1E;
+  border-radius: 8px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: #E8E8E8;
+  margin: 16px 0;
+}
+
+.code-block { overflow: hidden; }
+.code-header {
+  background: #2D2D2D;
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+.code-lang { color: #9CDCFE; font-weight: bold; }
+.code-title { color: #AAAAAA; }
+.code-block pre {
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+}
+.code-block code {
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 16px !important;
+  display: block;
+}
+
+/* インラインコード */
+code:not(pre code) {
+  background: var(--gc-surface-container-low);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 0.9em;
+  color: var(--gc-blue-900);
+}
+
+.section code:not(pre code) {
+  background: var(--gc-surface);
+}
+
+/* テーブル */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--gc-outline-variant);
+  background: var(--gc-surface);
+}
+th {
+  background: var(--gc-blue-50);
+  color: var(--gc-blue-900);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 2px solid var(--gc-blue-200);
+}
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--gc-outline-variant);
+  font-size: 14px;
+}
+tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+tr:hover { background: var(--gc-blue-50); }
+
+/* ボックス */
+.note-box {
+  background: var(--gc-blue-tint);
+  border-left: 4px solid var(--gc-blue-600);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+.warning-box {
+  background: var(--gc-yellow-tint);
+  border-left: 4px solid var(--gc-yellow);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+.error-box {
+  background: var(--gc-red-tint);
+  border-left: 4px solid var(--gc-red);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+.success-box {
+  background: var(--gc-green-tint);
+  border-left: 4px solid var(--gc-green);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+/* ステップ */
+.step-item {
+  display: flex;
+  gap: 16px;
+  margin: 20px 0;
+  align-items: flex-start;
+}
+.step-number {
+  background: var(--gc-blue-600);
+  color: #FFFFFF;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.step-content { flex: 1; min-width: 0; }
+.step-content h3 { margin-top: 2px; }
+
+/* ユースケース */
+.usecase-box {
+  background: var(--gc-blue-tint);
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin: 16px 0;
+  border: 1px solid var(--gc-blue-100);
+}
+.usecase-box h3 { margin-top: 0; color: var(--gc-blue-900); }
+
+ul { padding-left: 22px; }
+li { margin: 6px 0; }
+
+.meta-badges { margin-top: 12px; }
+
+footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gc-outline-variant);
+  font-size: 12px;
+  color: var(--gc-outline);
+}
+footer a { word-break: break-all; }
+footer ul { padding-left: 20px; margin: 8px 0; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ヘッダー -->
+  <div class="header">
+    <div class="subtitle">📅 リリース日: 2026-09-02 | Google Cloud リリースノート</div>
+    <h1>🗄️ AlloyDB for PostgreSQL × BigQuery<br>Limit プッシュダウン &amp; ランタイムプロジェクト</h1>
+    <div class="subtitle">BigQuery リアルタイムデータアクセス (レイクハウスフェデレーション) の 2 つの新機能</div>
+    <div class="meta-badges">
+      <span class="badge">AlloyDB for PostgreSQL</span>
+      <span class="badge">BigQuery</span>
+      <span class="badge badge-preview">Preview</span>
+      <span class="badge">bigquery_fdw</span>
+      <span class="badge">HTAP</span>
+    </div>
+  </div>
+
+  <!-- 概要 -->
+  <div class="section">
+    <h2>📌 概要</h2>
+    <p>
+      AlloyDB for PostgreSQL の <span class="highlight">BigQuery リアルタイムデータアクセス (Preview)</span> に、
+      <strong>Limit プッシュダウン</strong>と<strong>ランタイムプロジェクト</strong>の 2 つの機能が追加されました。
+      この機能は <code>bigquery_fdw</code> 拡張機能 (Foreign Data Wrapper) によるレイクハウスフェデレーションの一部で、
+      AlloyDB から標準の PostgreSQL 構文で BigQuery の最新データを <strong>ETL パイプラインなし</strong>に直接クエリできる仕組みを強化します。
+    </p>
+    <div class="card">
+      <h3>⚡ Limit プッシュダウン</h3>
+      <p>外部テーブルへのクエリの <code>LIMIT</code>/<code>OFFSET</code> 句が自動的に BigQuery 側へプッシュダウンされ、要求された行のサブセットのみが返される。<strong>ネットワーク転送量が削減され、クエリ応答時間が改善</strong>。従来のフィルタプッシュダウン (<code>WHERE</code> 句)、集計プッシュダウン (<code>SUM</code>、<code>COUNT</code> など) に加わる <span class="highlight">3 つ目のプッシュダウン最適化</span>。</p>
+    </div>
+    <div class="card">
+      <h3>💳 ランタイムプロジェクト</h3>
+      <p>クエリを実行しコンピュートコストを負担するプロジェクト (課金プロジェクト) を、<strong>データを保存するプロジェクトとは独立して指定</strong>できる。外部サーバーレベルまたは外部テーブルレベルで指定でき、<span class="highlight">コスト分離・クォータ独立管理・ワークロード別支出管理</span>を実現。HTAP ワークロードの運用者や複数チームで BigQuery データを共有する組織に有用。</p>
+    </div>
+
+    <div class="before-after">
+      <div class="before-box">
+        <h3>❌ アップデート前の課題</h3>
+        <ul>
+          <li><code>LIMIT</code>/<code>OFFSET</code> 句はプッシュダウンされず、必要以上の行が AlloyDB に転送され、少数行取得でも転送量とレイテンシが大きかった</li>
+          <li>クエリ実行 (コンピュート) コストは常にデータ保存プロジェクトに課金され、ワークロードやコストセンターごとに分離できなかった</li>
+          <li>クォータもデータ保存プロジェクト側で消費され、複数ワークロードでのクォータ管理が困難だった</li>
+        </ul>
+      </div>
+      <div class="after-box">
+        <h3>✅ アップデート後の改善</h3>
+        <ul>
+          <li>条件を満たす <code>LIMIT</code>/<code>OFFSET</code> 句が自動的に BigQuery へプッシュダウンされ、要求行のみ転送 (設定不要)</li>
+          <li><code>runtime_project</code> オプションで実行プロジェクトを指定でき、データを移動せずコンピュートコストを特定コストセンターに分離</li>
+          <li>テーブルレベル指定はサーバーレベル指定をオーバーライドし、テーブル単位で柔軟な課金先の使い分けが可能</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- アーキテクチャ図 -->
+  <div class="section">
+    <h2>🏗️ アーキテクチャ図</h2>
+    <div class="mermaid-container">
+      <pre class="mermaid">
+flowchart LR
+    subgraph AlloyDB["🗄️ AlloyDB for PostgreSQL"]
+        Q["📝 SQL クエリ<br/>SELECT ... LIMIT 10 OFFSET 20"]
+        FDW["🔌 bigquery_fdw<br/>(外部テーブル)"]
+    end
+
+    subgraph BQ["📊 BigQuery"]
+        DP[("💾 データプロジェクト<br/>(データ保存)")]
+        RP["⚙️ ランタイムプロジェクト<br/>(クエリ実行・課金)"]
+    end
+
+    APP(["👤 アプリケーション"]) --> Q
+    Q --> FDW
+    FDW -- "プッシュダウン<br/>WHERE / 集計 / LIMIT・OFFSET" --> RP
+    RP -- "クエリ実行" --> DP
+    DP -- "必要な行のみ返却<br/>(転送量削減)" --> FDW
+    FDW --> APP
+      </pre>
+    </div>
+    <p>
+      アプリケーションが AlloyDB の外部テーブルにクエリを発行すると、<code>WHERE</code> 句・集計に加えて
+      <code>LIMIT</code>/<code>OFFSET</code> 句も BigQuery にプッシュダウンされ、<strong>必要な行のみ</strong>が AlloyDB に返されます。
+      クエリの実行と課金は、データ保存プロジェクトとは別に指定した<strong>ランタイムプロジェクト</strong>で行えます。
+    </p>
+  </div>
+
+  <!-- 主要機能 -->
+  <div class="section">
+    <h2>🚀 主要機能</h2>
+
+    <div class="card">
+      <h3>1️⃣ Limit プッシュダウン (OFFSET プッシュダウンを含む)</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><code>LIMIT</code> 句と <code>OFFSET</code> 句を AlloyDB から BigQuery に移動する最適化技術</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>BigQuery が要求された特定の行サブセットのみを返すため、<strong>ネットワークトラフィックとクエリレイテンシが大幅に削減</strong></span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>可能な場合に<strong>自動的に適用</strong>され、ユーザー側の設定は不要</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>適用条件: <code>FETCH FIRST</code> 句の <code>WITH TIES</code> オプションを使用していないこと、<code>LIMIT</code>/<code>OFFSET</code> の式が基本的な定数またはリモートで評価可能な式であること</span></div>
+    </div>
+
+    <div class="card">
+      <h3>2️⃣ ランタイムプロジェクト (課金プロジェクト)</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>クエリ実行とコンピュートコスト負担のプロジェクトを、データ保存プロジェクトから<strong>分離して指定可能</strong></span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>外部サーバーレベルで指定すると、関連付けられたすべての外部テーブルに適用</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>外部テーブルレベルで指定すると、サーバーレベルの設定を<strong>オーバーライド</strong></span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>指定しない場合は、従来どおりデータを所有するプロジェクトに課金</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>コストセンターごとのコスト分離、クォータの独立管理、ワークロード横断の支出管理を<strong>データ移動なし</strong>で実現</span></div>
+    </div>
+
+    <div class="card">
+      <h3>3️⃣ 最小権限のセキュリティコントロール (ベストプラクティス)</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><code>bigquery_fdw</code> 経由のクエリは <strong>AlloyDB クラスタのサービスアカウント</strong>で認証されるため、一般ユーザーが未承認テーブルをマッピングできないよう制御が重要</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>外部サーバーの <code>USAGE</code> 権限を制限 (<code>PUBLIC</code> から <code>REVOKE</code>) し、管理者以外による <code>CREATE FOREIGN TABLE</code> を防止</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>外部テーブルの作成を管理者 (<code>alloydbsuperuser</code> など) に集約し、<code>GRANT SELECT</code> で選択的な読み取りアクセスを付与</span></div>
+    </div>
+  </div>
+
+  <!-- 技術仕様 -->
+  <div class="section">
+    <h2>⚙️ 技術仕様</h2>
+
+    <h3>📊 プッシュダウン最適化の種類</h3>
+    <table>
+      <thead>
+        <tr><th>プッシュダウン</th><th>対象</th><th>サポートされる操作</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>フィルタプッシュダウン</td>
+          <td><code>WHERE</code> 句</td>
+          <td>比較演算子 (<code>=</code>, <code>&lt;</code>, <code>&gt;</code>, <code>&lt;=</code>, <code>&gt;=</code>, <code>&lt;&gt;</code>)、論理演算子 (<code>AND</code>, <code>OR</code>, <code>NOT</code>)、<code>LIKE</code>/<code>NOT LIKE</code>、<code>IS NULL</code>/<code>IS NOT NULL</code>、<code>IN</code>/<code>NOT IN</code></td>
+        </tr>
+        <tr>
+          <td>集計プッシュダウン</td>
+          <td>集計関数</td>
+          <td><code>SUM</code>, <code>COUNT</code>, <code>AVG</code>, <code>MIN</code>, <code>MAX</code></td>
+        </tr>
+        <tr>
+          <td><strong>Limit プッシュダウン (新規) 🆕</strong></td>
+          <td><code>LIMIT</code>/<code>OFFSET</code> 句</td>
+          <td><code>WITH TIES</code> を使用せず、式が定数またはリモート評価可能な場合に自動適用</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>🎚️ ランタイムプロジェクトの指定レベル</h3>
+    <table>
+      <thead>
+        <tr><th>指定レベル</th><th>適用範囲</th><th>優先度</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>外部サーバーレベル<br>(<code>CREATE SERVER ... OPTIONS (runtime_project '...')</code>)</td>
+          <td>そのサーバーに関連付けられたすべての外部テーブル</td>
+          <td>テーブルレベル指定がある場合はオーバーライドされる</td>
+        </tr>
+        <tr>
+          <td>外部テーブルレベル<br>(<code>CREATE FOREIGN TABLE ... OPTIONS (runtime_project '...')</code>)</td>
+          <td>そのテーブルのみ</td>
+          <td><strong>サーバーレベルの指定より優先</strong></td>
+        </tr>
+        <tr>
+          <td>指定なし</td>
+          <td>-</td>
+          <td>データを所有するプロジェクトに課金 (デフォルト)</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>🔑 必要な IAM ロール (AlloyDB クラスタサービスアカウント)</h3>
+    <table>
+      <thead>
+        <tr><th>ロール</th><th>用途</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>BigQuery Data Viewer<br>(<code>roles/bigquery.dataViewer</code>)</td>
+          <td>テーブル/ビューのデータとメタデータの読み取り</td>
+        </tr>
+        <tr>
+          <td>BigQuery Read Session User<br>(<code>roles/bigquery.readSessionUser</code>)</td>
+          <td>読み取りセッションの作成と使用</td>
+        </tr>
+        <tr>
+          <td>BigQuery Job User<br>(<code>roles/bigquery.jobUser</code>)</td>
+          <td>クエリジョブの実行。<strong>ランタイムプロジェクトを指定した場合は、ランタイムプロジェクト側でこのロールの付与が必要</strong></td>
+        </tr>
+        <tr>
+          <td>Storage Object Viewer<br>(<code>roles/storage.objectViewer</code>)</td>
+          <td>BigQuery 外部テーブル (Cloud Storage 上の Iceberg テーブルなど) へのアクセス</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 設定方法 -->
+  <div class="section">
+    <h2>🛠️ 設定方法</h2>
+
+    <div class="note-box">
+      <strong>📋 前提条件:</strong>
+      <ul style="margin: 8px 0 0;">
+        <li>AlloyDB インスタンスで <code>bigquery_fdw.enabled</code> フラグを有効化</li>
+        <li>AlloyDB API、BigQuery API、BigQuery Storage API などの必要な Cloud API を有効化</li>
+        <li>AlloyDB クラスタのサービスアカウントに必要な IAM ロールを付与 (ランタイムプロジェクトを使用する場合は、ランタイムプロジェクトに対して BigQuery Job User を付与)</li>
+      </ul>
+    </div>
+
+    <div class="step-item">
+      <div class="step-number">1</div>
+      <div class="step-content">
+        <h3>拡張機能の作成</h3>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">SQL</span><span class="code-title">BigQuery アクセスが必要な全データベースで実行</span></div>
+          <pre><code class="language-sql">CREATE EXTENSION bigquery_fdw;</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="step-item">
+      <div class="step-number">2</div>
+      <div class="step-content">
+        <h3>ランタイムプロジェクトを指定して外部サーバーを作成</h3>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">SQL</span><span class="code-title">runtime_project は省略可能 (省略時はデータ保存プロジェクトに課金)</span></div>
+          <pre><code class="language-sql">CREATE SERVER bq_server
+  FOREIGN DATA WRAPPER bigquery_fdw
+  OPTIONS (runtime_project 'RUNTIME_PROJECT_ID');</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="step-item">
+      <div class="step-number">3</div>
+      <div class="step-content">
+        <h3>最小権限の設定とユーザーマッピングの作成 (管理者が実行)</h3>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">SQL</span><span class="code-title">USAGE 権限の制限で未承認のテーブル作成を防止</span></div>
+          <pre><code class="language-sql">-- 未承認のテーブル作成を防ぐため USAGE を PUBLIC から剥奪
+REVOKE ALL ON FOREIGN SERVER bq_server FROM PUBLIC;
+
+-- 一般ユーザーのユーザーマッピングを作成
+CREATE USER MAPPING FOR bob SERVER bq_server;</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="step-item">
+      <div class="step-number">4</div>
+      <div class="step-content">
+        <h3>外部テーブルの作成と選択的なアクセス付与 (管理者が実行)</h3>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">SQL</span><span class="code-title">テーブルレベルで runtime_project をオーバーライド可能</span></div>
+          <pre><code class="language-sql">-- テーブルレベルで runtime_project をオーバーライド可能
+CREATE FOREIGN TABLE example_table (
+  id INT,
+  state VARCHAR
+) SERVER bq_server OPTIONS (
+  project 'BIGQUERY_PROJECT_ID',
+  dataset 'BIGQUERY_DATASET_NAME',
+  table 'example_table',
+  runtime_project 'RUNTIME_PROJECT_ID'
+);
+
+-- 特定のユーザーに読み取りアクセスを付与
+GRANT SELECT ON public.example_table TO bob;</code></pre>
+        </div>
+        <p>作成後は AlloyDB の通常のテーブルと同じようにクエリ可能。<code>LIMIT</code>/<code>OFFSET</code> 句を含むクエリは、条件を満たせば<strong>自動的に BigQuery へプッシュダウン</strong>されます。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- メリット -->
+  <div class="section">
+    <h2>💡 メリット</h2>
+
+    <h3>💼 ビジネス面</h3>
+    <div class="success-box">
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>コストの可視化と分離</strong>: ランタイムプロジェクトにより、フェデレーテッドクエリのコンピュートコストをコストセンターやチームごとのプロジェクトに割り当てられ、データ移動なしでチャージバック運用が可能</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>クエリコストの削減</strong>: Limit プッシュダウンにより転送データ量が減り、探索的なクエリや上位 N 件取得のコスト効率が向上</span></div>
+    </div>
+
+    <h3>🔧 技術面</h3>
+    <div class="success-box">
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>クエリ応答時間の改善</strong>: <code>LIMIT</code>/<code>OFFSET</code> を BigQuery 側で処理することで、ネットワーク転送量とレイテンシが削減 (自動適用のためアプリケーション変更は不要)</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>クォータの独立管理</strong>: クエリジョブがランタイムプロジェクト側で実行されるため、データ保存プロジェクトのクォータを消費せず、ワークロードごとにクォータを管理可能</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>セキュリティガバナンスの強化</strong>: 外部サーバーの <code>USAGE</code> 制限により、サービスアカウント権限を悪用した未承認データセットへのマッピングを防止</span></div>
+    </div>
+  </div>
+
+  <!-- デメリット・制約事項 -->
+  <div class="section">
+    <h2>⚠️ デメリット・制約事項</h2>
+
+    <h3>🚧 制限事項</h3>
+    <div class="warning-box">
+      <div class="check-item"><span class="cross-icon">▲</span><span>本機能は <strong>Preview</strong> であり、Pre-GA Offerings Terms が適用される (サポートが限定される可能性がある)</span></div>
+      <div class="check-item"><span class="cross-icon">▲</span><span>Limit プッシュダウンは、<code>FETCH FIRST</code> 句の <code>WITH TIES</code> オプションを使用するクエリや、<code>LIMIT</code>/<code>OFFSET</code> の式がリモートで評価できない場合には適用されない</span></div>
+      <div class="check-item"><span class="cross-icon">▲</span><span>プッシュダウン適用後も大量データを返すクエリは最適化されず、BigQuery API のレスポンスサイズ上限によりクエリが失敗する可能性がある</span></div>
+      <div class="check-item"><span class="cross-icon">▲</span><span>AlloyDB と BigQuery でデフォルトの照合順序 (collation) が異なるため、ソート順や文字列比較の結果が異なる場合がある (AlloyDB 側で ICU なしの <code>C.UTF-8</code>、BigQuery 側でデフォルト照合順序の使用を推奨)</span></div>
+      <div class="check-item"><span class="cross-icon">▲</span><span>外部テーブル作成時に、リモートの BigQuery テーブルの存在やスキーマは検証されない</span></div>
+      <div class="check-item"><span class="cross-icon">▲</span><span>Database Migration Service は <code>bigquery_fdw</code> で作成した外部テーブルの移行をサポートしない (移行前に削除し、移行後に再作成が必要)</span></div>
+    </div>
+
+    <h3>🤔 考慮すべき点</h3>
+    <div class="note-box">
+      <div class="check-item"><span class="check-icon">👉</span><span>BigQuery へのアクセス権限は <strong>AlloyDB クラスタのサービスアカウント</strong>で評価される。IAM データベース認証でサインインしたユーザーでも、個々の IAM ユーザー権限は BigQuery テーブルに対してチェックされないため、外部サーバーの <code>USAGE</code> 制限などの最小権限コントロールの適用を検討すべき</span></div>
+      <div class="check-item"><span class="check-icon">👉</span><span>ランタイムプロジェクトを指定する場合、ランタイムプロジェクト側で AlloyDB クラスタサービスアカウントに <strong>BigQuery Job User</strong> ロールの付与が必要</span></div>
+      <div class="check-item"><span class="check-icon">👉</span><span>PostgreSQL と BigQuery で小数の精度の扱いが異なるため、複雑な計算で精度損失やオーバーフローが発生する可能性がある</span></div>
+    </div>
+  </div>
+
+  <!-- ユースケース -->
+  <div class="section">
+    <h2>🎯 ユースケース</h2>
+
+    <div class="usecase-box">
+      <h3>📈 ユースケース 1: 運用ダッシュボードでの上位 N 件表示 (HTAP)</h3>
+      <p><strong>シナリオ</strong>: AlloyDB 上の業務アプリケーションのダッシュボードで、BigQuery に蓄積された大規模な分析データから最新の上位 100 件を表示したい。</p>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">SQL</span><span class="code-title">実装例</span></div>
+        <pre><code class="language-sql">SELECT order_id, amount, created_at
+FROM bq_sales_history
+WHERE region = 'apac'
+ORDER BY created_at DESC
+LIMIT 100;</code></pre>
+      </div>
+      <p><strong>効果</strong>: <code>WHERE</code> 句のフィルタプッシュダウンに加えて <code>LIMIT 100</code> が BigQuery にプッシュダウンされ、100 件のみが AlloyDB に転送される。ネットワーク転送量が削減され、ダッシュボードの応答時間が改善する。</p>
+    </div>
+
+    <div class="usecase-box">
+      <h3>👥 ユースケース 2: チーム別のコスト分離とクォータ管理</h3>
+      <p><strong>シナリオ</strong>: 全社共通のデータプロジェクトに保存された BigQuery データを、分析チームとアプリケーションチームがそれぞれ AlloyDB 経由で参照する。各チームのクエリコストを自チームのプロジェクトに計上したい。</p>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">SQL</span><span class="code-title">実装例</span></div>
+        <pre><code class="language-sql">-- 分析チーム用の外部サーバー (分析チームのプロジェクトに課金)
+CREATE SERVER bq_analytics
+  FOREIGN DATA WRAPPER bigquery_fdw
+  OPTIONS (runtime_project 'analytics-team-project');
+
+-- アプリチーム用の外部サーバー (アプリチームのプロジェクトに課金)
+CREATE SERVER bq_app
+  FOREIGN DATA WRAPPER bigquery_fdw
+  OPTIONS (runtime_project 'app-team-project');</code></pre>
+      </div>
+      <p><strong>効果</strong>: データを移動・複製することなく、クエリのコンピュートコストとクォータ消費をチームごとのプロジェクトに分離できる。コストセンター別のチャージバックと独立したクォータ管理が実現する。</p>
+    </div>
+  </div>
+
+  <!-- 料金 -->
+  <div class="section">
+    <h2>💰 料金</h2>
+    <p>BigQuery Foreign Data Wrapper の利用には、以下の BigQuery 料金が適用されます。</p>
+    <div class="check-item"><span class="check-icon">💵</span><span><strong>BigQuery コンピュート料金</strong> (クエリ実行)</span></div>
+    <div class="check-item"><span class="check-icon">💵</span><span><strong>BigQuery Storage API 料金</strong> (データ読み取り)</span></div>
+    <div class="note-box">
+      <strong>💡 ポイント:</strong> ランタイムプロジェクトを指定した場合、クエリのコンピュートコストは<strong>ランタイムプロジェクト</strong>に課金されます。指定しない場合は、データを所有するプロジェクトに課金されます。
+      詳細は <a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">BigQuery の料金ページ</a>、AlloyDB 自体の料金は <a href="https://cloud.google.com/alloydb/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">AlloyDB の料金ページ</a>を参照してください。
+    </div>
+  </div>
+
+  <!-- 関連サービス・機能 -->
+  <div class="section">
+    <h2>🔗 関連サービス・機能</h2>
+    <div class="card">
+      <h3>📊 BigQuery</h3>
+      <p>フェデレーション先の分析データウェアハウス。組み込みストレージのほか、BigLake 外部テーブル経由で Cloud Storage 上の Apache Iceberg テーブルにもアクセス可能。</p>
+    </div>
+    <div class="card">
+      <h3>🔄 BigQuery から AlloyDB へのデータ同期 (Preview)</h3>
+      <p>リアルタイムアクセスとは逆方向のアプローチとして、BigQuery のテーブルを AlloyDB に一回限りまたは定期的に同期する機能も提供されている (2026 年 8 月発表)。</p>
+    </div>
+    <div class="card">
+      <h3>🔐 IAM (Identity and Access Management)</h3>
+      <p>AlloyDB クラスタサービスアカウントへのロール付与により BigQuery データへのアクセスを集中管理。</p>
+    </div>
+    <div class="card">
+      <h3>🤖 AlloyDB AI / カラムナエンジン</h3>
+      <p>外部の分析データを AlloyDB にマテリアライズすることで、ベクトル検索や AI ワークフローと組み合わせた活用が可能。</p>
+    </div>
+  </div>
+
+  <!-- まとめ -->
+  <div class="section">
+    <h2>✅ まとめ</h2>
+    <div class="success-box">
+      <p style="margin-top: 0;">
+        AlloyDB の BigQuery リアルタイムデータアクセスは、<span class="highlight">Limit プッシュダウンによるクエリ性能の向上</span>と、
+        <span class="highlight">ランタイムプロジェクトによるコスト・クォータ管理の柔軟化</span>により、HTAP ワークロードの実用性が一段と高まりました。
+      </p>
+      <p style="margin-bottom: 0;">
+        既に <code>bigquery_fdw</code> を利用している場合、Limit プッシュダウンは<strong>自動適用のため追加設定は不要</strong>です。
+        複数チームでデータを共有する環境では、<strong>ランタイムプロジェクトの導入</strong>と、外部サーバーの <code>USAGE</code> 権限制限による<strong>最小権限コントロールの適用</strong>を検討することを推奨します。
+      </p>
+    </div>
+  </div>
+
+  <!-- フッター -->
+  <footer>
+    <p><strong>📎 出典・参考リンク</strong></p>
+    <ul>
+      <li>公式リリースノート: <a href="https://docs.cloud.google.com/release-notes#September_02_2026" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/release-notes#September_02_2026</a></li>
+      <li>Access to real-time data in BigQuery overview: <a href="https://docs.cloud.google.com/alloydb/docs/access-real-time-data-overview" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/alloydb/docs/access-real-time-data-overview</a></li>
+      <li>Configure access to real-time data in BigQuery: <a href="https://docs.cloud.google.com/alloydb/docs/configure-access-real-time-data" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/alloydb/docs/configure-access-real-time-data</a></li>
+      <li>Secure BigQuery data access using the foreign data wrapper: <a href="https://docs.cloud.google.com/alloydb/docs/security-best-practices#secure-bq-fdw" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/alloydb/docs/security-best-practices#secure-bq-fdw</a></li>
+      <li>Choose how to access BigQuery data from AlloyDB: <a href="https://docs.cloud.google.com/alloydb/docs/choose-access-bigquery-data-from-alloydb" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/alloydb/docs/choose-access-bigquery-data-from-alloydb</a></li>
+      <li>BigQuery 料金ページ: <a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">https://cloud.google.com/bigquery/pricing</a></li>
+    </ul>
+    <p>🏷️ タグ: AlloyDB, PostgreSQL, BigQuery, レイクハウスフェデレーション, Foreign Data Wrapper, プッシュダウン, ランタイムプロジェクト, HTAP, Preview</p>
+    <p>生成日: 2026-09-03 | Google Cloud News インフォグラフィック</p>
+  </footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#4285F4',
+      primaryTextColor: '#202124',
+      primaryBorderColor: '#4285F4',
+      lineColor: '#4285F4',
+      secondaryColor: '#F1F3F4',
+      tertiaryColor: '#FAFAFA',
+      background: '#FFFFFF',
+      mainBkg: '#E8F0FE',
+      nodeBorder: '#4285F4',
+      clusterBkg: '#E8F0FE',
+      clusterBorder: '#4285F4',
+      edgeLabelBackground: '#FFFFFF',
+      textColor: '#202124'
+    }
+  });
+</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

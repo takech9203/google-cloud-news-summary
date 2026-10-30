@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Billing: 料金データの BigQuery エクスポートに SKU 属性と詳細使用量単位を追加 (Preview)</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .badge-deprecated {
+      background: var(--gc-red);
+      color: #FFFFFF;
+    }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-box h3 {
+      color: #C5221F;
+    }
+
+    .after-box h3 {
+      color: #188038;
+    }
+
+    .before-after ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+    }
+
+    .before-after li {
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    @media (max-width: 720px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* フロー図スタイル */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* チェックリストスタイル */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* コードブロック */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block {
+      overflow: hidden;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブルスタイル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .ai-box {
+      background: var(--gc-purple-tint);
+      border-left: 4px solid var(--gc-purple);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* 属性サンプルチップ */
+    .attr-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    .attr-chip {
+      background: var(--gc-blue-50);
+      border: 1px solid var(--gc-blue-200);
+      border-radius: 16px;
+      padding: 4px 14px;
+      font-size: 13px;
+      color: var(--gc-blue-900);
+      font-family: 'Roboto Mono', 'Courier New', monospace;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-100);
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+    }
+
+    /* 2 カラムグリッド */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 720px) {
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    ul {
+      padding-left: 22px;
+      margin: 8px 0;
+    }
+
+    li {
+      margin-bottom: 6px;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      word-break: break-all;
+    }
+
+    footer ul {
+      list-style: none;
+      padding-left: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <div style="margin-bottom: 8px;">
+          <span class="badge">💳 Cloud Billing</span>
+          <span class="badge" style="background: var(--gc-green);">🗄️ BigQuery</span>
+          <span class="badge badge-preview">🧪 Preview</span>
+        </div>
+        <h1>💳 Cloud Billing 料金エクスポートに<br>SKU 属性と詳細使用量単位を追加</h1>
+        <div class="subtitle" style="margin-top: 8px;">料金データの BigQuery エクスポートで生成 AI SKU のモデル別・トークン単位分析が可能に</div>
+      </div>
+      <div class="subtitle" style="text-align: right;">
+        <div>📅 リリース日: <strong>2026-10-21</strong></div>
+        <div>🏷️ sku_attributes / sku_granular_usage_units</div>
+      </div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📝 概要</h2>
+      <p>
+        Cloud Billing の<span class="highlight">料金データ (pricing data) の BigQuery エクスポート</span>に、
+        <strong>SKU 属性 (<code>sku_attributes</code>)</strong> と
+        <strong>詳細使用量単位 (<code>sku_granular_usage_units</code>)</strong> の 2 つのフィールドが
+        <span class="highlight">Preview</span> として追加されました。
+        エクスポートされた料金テーブルから SKU のメタデータを<strong>構造化データ</strong>として取得できます。
+      </p>
+      <p>
+        <code>sku_attributes</code> は SKU を説明する key-value ペアで、例えば
+        Key: <code>model_name</code> / Value: <code>gemini_2_5_flash</code> のように、
+        <strong>どの生成 AI モデルに対応する SKU か</strong>をプログラムから判別できます。
+        <code>sku_granular_usage_units</code> は <code>tokens</code> のような SKU の詳細な使用量単位を示します。
+      </p>
+      <div class="ai-box">
+        <strong>🤖 対象は生成 AI SKU:</strong> いずれのフィールドも現時点では生成 AI (Generative AI) 関連の SKU に限定されています。
+        Vertex AI や Gemini API の利用が拡大する中で、モデル別・モダリティ別・トークン種別ごとの単価分析を
+        BigQuery 上で機械的に行いたい <strong>FinOps チーム</strong>やコスト管理担当者に有用なアップデートです。
+      </div>
+
+      <h3>🔄 Before / After</h3>
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before: アップデート前の課題</h3>
+          <ul>
+            <li>SKU 情報は <code>sku.id</code> と人間可読の <code>sku.description</code> (文字列) が中心で、「どのモデルの SKU か」「入力/出力どちらのトークンか」は<strong>説明文の文字列解析</strong>に頼る必要があった</li>
+            <li>使用量単位は <code>pricing_unit</code> (例: <code>GiBy.mo</code>) と <code>pricing_unit_description</code> のみで、生成 AI 特有の「トークン」粒度の単位情報を構造化データとして取得できなかった</li>
+            <li>モデル単位の単価比較やトークン単価の集計など、生成 AI コスト分析のクエリを<strong>安定して書くことが難しかった</strong></li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After: アップデート後の改善</h3>
+          <ul>
+            <li><code>sku_attributes</code> の key-value ペア (例: <code>model_name</code>, <code>serving_method</code>, <code>modality</code>, <code>token_type</code>) で SKU の属性を<strong>クエリで直接フィルタ・集計</strong>できる</li>
+            <li><code>sku_granular_usage_units</code> により <code>tokens</code> のような詳細な使用量単位を取得できる</li>
+            <li>モデル別 (<code>gemini_2_5_flash</code>)、提供方式別 (<code>batch</code>)、モダリティ別 (<code>text</code>)、トークン種別 (<code>input</code>) といった軸での料金分析が <strong>SQL で可能</strong>に</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    A[💳 Cloud Billing<br>料金データ<br>毎日生成] -->|料金データエクスポート<br>BigQuery Data Transfer Service| B[(🗄️ BigQuery<br>cloud_pricing_export)]
+    B --> C[🆕 sku_attributes<br>model_name / token_type など]
+    B --> D[🆕 sku_granular_usage_units<br>例: tokens]
+    C --> E[📊 分析<br>SQL / Looker Studio<br>FinOps レポート]
+    D --> E
+        </pre>
+      </div>
+      <p>
+        Cloud Billing の料金データは<strong>毎日 BigQuery にエクスポート</strong>され、新フィールドの
+        <code>sku_attributes</code> と <code>sku_granular_usage_units</code> を使って
+        生成 AI SKU のモデル別・トークン単位の料金分析が可能になります。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+
+      <div class="card">
+        <h3>🏷️ 1. SKU 属性 (<code>sku_attributes</code>)</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span>SKU を説明する key-value ペアの<strong>構造体 (Struct)</strong></span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>Key の例: <code>model_name</code>, <code>serving_method</code>, <code>modality</code>, <code>token_type</code></span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>Value の例: <code>gemini_2_5_flash</code>, <code>batch</code>, <code>text</code>, <code>input</code></span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>生成 AI SKU に限定して提供される</span></div>
+        <div class="attr-chips">
+          <span class="attr-chip">model_name = gemini_2_5_flash</span>
+          <span class="attr-chip">serving_method = batch</span>
+          <span class="attr-chip">modality = text</span>
+          <span class="attr-chip">token_type = input</span>
+        </div>
+      </div>
+
+      <div class="card" style="border-left-color: var(--gc-green);">
+        <h3>📏 2. 詳細使用量単位 (<code>sku_granular_usage_units</code>)</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span>SKU の詳細な使用量単位を示す<strong>文字列 (String)</strong> フィールド</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>例: <code>tokens</code></span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>従来の <code>pricing_unit</code> (例: <code>GiBy.mo</code>) より<strong>生成 AI の課金実態に即した粒度</strong>の単位情報を提供</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>生成 AI SKU に限定して提供される</span></div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3>🆕 追加されたフィールド</h3>
+      <table>
+        <thead>
+          <tr><th>フィールド</th><th>型</th><th>説明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>sku_attributes</code></td><td>Struct</td><td>SKU を説明する key-value ペア。Preview であり形式は変更される可能性あり</td></tr>
+          <tr><td><code>sku_attributes.key</code></td><td>String</td><td>属性のキー。例: <code>model_name</code>, <code>serving_method</code>, <code>modality</code>, <code>token_type</code></td></tr>
+          <tr><td><code>sku_attributes.value</code></td><td>String</td><td>属性の値。例: <code>gemini_2_5_flash</code>, <code>batch</code>, <code>text</code>, <code>input</code></td></tr>
+          <tr><td><code>sku_granular_usage_units</code></td><td>String</td><td>SKU の詳細な使用量単位。例: <code>tokens</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3>🔗 関連する既存フィールド</h3>
+      <table>
+        <thead>
+          <tr><th>フィールド</th><th>説明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>sku.id</code> / <code>sku.description</code></td><td>SKU の一意な ID と人間可読の説明</td></tr>
+          <tr><td><code>pricing_unit</code> / <code>pricing_unit_description</code></td><td>料金設定の単位 (例: <code>GiBy.mo</code> / gibibyte month)</td></tr>
+          <tr><td><code>product_taxonomy</code></td><td>SKU に適用される製品カテゴリのリスト (Preview)</td></tr>
+          <tr><td><code>geo_taxonomy</code></td><td>SKU に関連する地理的メタデータ (Preview)</td></tr>
+          <tr><td><code>tiered_rates</code></td><td>料金ティアの情報 (USD 単価、ティア開始量など)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+      <p>
+        新フィールドは料金データエクスポートのテーブルに追加されるため、<strong>既存の設定手順と同じ</strong>です。
+        料金データエクスポートを未設定の場合は以下の手順で有効化します。
+      </p>
+
+      <h3>✅ 前提条件</h3>
+      <div class="check-item"><span class="check-icon">1️⃣</span><span>Cloud Billing アカウントに対する <strong>Billing Account Administrator</strong> ロール (料金データエクスポートの有効化に必要)</span></div>
+      <div class="check-item"><span class="check-icon">2️⃣</span><span>エクスポート先データセットを含むプロジェクトに対する <strong>BigQuery Admin</strong> ロールと <code>resourcemanager.projects.update</code> 権限</span></div>
+      <div class="check-item"><span class="check-icon">3️⃣</span><span><strong>BigQuery Data Transfer Service API</strong> の有効化 (料金データエクスポートに必須)</span></div>
+
+      <div class="flow-diagram">
+        <div class="flow-step">🧰 ステップ 1<br>エクスポート先の準備</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">⚙️ ステップ 2<br>料金エクスポート有効化</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">📊 ステップ 3<br>新フィールドをクエリ</div>
+      </div>
+
+      <h3>🧰 ステップ 1: エクスポート先の準備</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">API 有効化とデータセット作成</span>
+        </div>
+        <pre><code class="language-bash"># BigQuery Data Transfer Service API を有効化
+gcloud services enable bigquerydatatransfer.googleapis.com --project=BILLING_EXPORT_PROJECT
+
+# エクスポート先データセットを作成 (マルチリージョン推奨)
+bq mk --dataset --location=US BILLING_EXPORT_PROJECT:billing_export</code></pre>
+      </div>
+      <p>エクスポート先のデータセットは<strong>マルチリージョン (EU / US)</strong> またはサポート対象のリージョンロケーションで作成します。</p>
+
+      <h3>⚙️ ステップ 2: 料金データエクスポートの有効化</h3>
+      <p>
+        Google Cloud コンソールの「お支払い」→「課金データのエクスポート」(Billing export) ページで、
+        <span class="highlight">Pricing (料金)</span> エクスポートを有効化し、プロジェクトとデータセットを選択して保存します。
+      </p>
+
+      <h3>📊 ステップ 3: 新フィールドのクエリ</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">生成 AI SKU の属性と詳細使用量単位を確認する例</span>
+        </div>
+        <pre><code class="language-sql">-- 生成 AI SKU の属性と詳細使用量単位を確認する例
+SELECT
+  sku.id AS sku_id,
+  sku.description AS sku_description,
+  attr.key AS attribute_key,
+  attr.value AS attribute_value,
+  sku_granular_usage_units
+FROM
+  `BILLING_EXPORT_PROJECT.billing_export.cloud_pricing_export`,
+  UNNEST(sku_attributes) AS attr
+WHERE
+  attr.key = 'model_name'</code></pre>
+      </div>
+      <p>
+        エクスポートされた <code>cloud_pricing_export</code> テーブルに対して、<code>sku_attributes</code> を展開して
+        モデル名などの属性でフィルタできます (フィールド形式は Preview のため変更される可能性があります)。
+      </p>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>💡 メリット</h2>
+      <div class="grid-2">
+        <div class="card" style="border-left-color: var(--gc-green); margin: 0;">
+          <h3>💼 ビジネス面</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>生成 AI コストの可視化</strong>: どのモデル (例: Gemini 2.5 Flash) にどのような単価が設定されているかを構造化データで把握でき、FinOps レポートの精度が向上</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>コスト予測の精緻化</strong>: トークンなどの詳細使用量単位をもとに、生成 AI ワークロードの単価分析とコスト見積もりがしやすくなる</span></div>
+        </div>
+        <div class="card" style="border-left-color: var(--gc-blue-600); margin: 0;">
+          <h3>⚙️ 技術面</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>文字列解析からの脱却</strong>: <code>sku.description</code> の文字列パースに依存せず、key-value 属性で安定したクエリを記述できる</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>既存パイプラインへの統合</strong>: 既存テーブルにフィールドが追加される形のため、既存の BigQuery 分析基盤やダッシュボードに組み込みやすい</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>🚫 制限事項</h3>
+      <div class="error-box">
+        <div class="check-item"><span class="cross-icon">✗</span><span><strong>Preview 機能</strong>であり、<code>sku_attributes</code> および <code>sku_granular_usage_units</code> のフィールド形式とデータは今後変更される可能性がある</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>両フィールドとも対象は<strong>生成 AI SKU に限定</strong>されている</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>料金データエクスポートは<strong>有効化した日以降のデータのみ</strong>が収集され、過去に遡ってのバックフィルは行われない</span></div>
+      </div>
+
+      <h3>🤔 考慮すべき点</h3>
+      <div class="warning-box">
+        <div class="check-item"><span class="arrow">→</span><span>形式変更の可能性があるため、本番のダッシュボードや自動処理に組み込む場合は<strong>スキーマ変更への耐性</strong>を考慮する</span></div>
+        <div class="check-item"><span class="arrow">→</span><span>BigQuery へのエクスポートデータの保存と分析には <strong>BigQuery のストレージ料金とクエリ (コンピューティング) 料金</strong>が発生する</span></div>
+        <div class="check-item"><span class="arrow">→</span><span>料金データエクスポートの有効化には <strong>Billing Account Administrator</strong> という強い権限が必要なため、権限付与の運用に注意する</span></div>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>📒 ユースケース 1: Gemini モデル別の単価カタログ作成</h3>
+        <p>
+          <strong>シナリオ</strong>: 複数の Gemini モデルを利用する組織で、モデルごと・トークン種別 (入力/出力) ごとの単価一覧を自動生成し、社内のコスト見積もりに活用したい。
+        </p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">モデル別・トークン種別の単価カタログ</span>
+          </div>
+          <pre><code class="language-sql">SELECT
+  MAX(IF(attr.key = 'model_name', attr.value, NULL)) AS model_name,
+  MAX(IF(attr.key = 'token_type', attr.value, NULL)) AS token_type,
+  sku_granular_usage_units,
+  sku.description
+FROM
+  `BILLING_EXPORT_PROJECT.billing_export.cloud_pricing_export`,
+  UNNEST(sku_attributes) AS attr
+GROUP BY
+  sku.id, sku_granular_usage_units, sku.description</code></pre>
+        </div>
+        <div class="success-box" style="margin-bottom: 0;">
+          <strong>✅ 効果:</strong> モデル名やトークン種別を文字列解析なしで取得でき、単価カタログの生成・更新を自動化できる。
+        </div>
+      </div>
+
+      <div class="usecase">
+        <h3>🧭 ユースケース 2: FinOps チームによる生成 AI コストガバナンス</h3>
+        <p>
+          <strong>シナリオ</strong>: FinOps チームが、バッチ処理 (<code>serving_method: batch</code>) とオンライン処理で単価がどう異なるかを分析し、コスト最適化の推奨 (バッチ API への移行など) を行いたい。
+        </p>
+        <div class="success-box" style="margin-bottom: 0;">
+          <strong>✅ 効果:</strong> 提供方式やモダリティといった属性軸で単価を比較でき、データに基づいた生成 AI コスト最適化の提案が可能になる。
+        </div>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>
+        新フィールド自体の<strong>追加料金はリリースノートおよびドキュメントに記載されていません</strong>。
+        ただし、Cloud Billing データを BigQuery にエクスポートして保存・分析する際には、
+        BigQuery の<strong>ストレージ料金</strong>と<strong>クエリ処理 (コンピューティング) 料金</strong>が発生します。
+      </p>
+      <div class="icon-text"><span class="arrow">→</span><a class="gc-link" href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer">BigQuery の料金</a></div>
+      <div class="icon-text"><span class="arrow">→</span><a class="gc-link" href="https://docs.cloud.google.com/billing/docs/how-to/export-data-bigquery#cost" target="_blank" rel="noopener noreferrer">Cloud Billing データエクスポートのコストについて</a></div>
+    </div>
+
+    <!-- 関連サービス・機能 -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card"><strong>🗄️ BigQuery</strong>: 料金データのエクスポート先。エクスポートには BigQuery Data Transfer Service API が必要</div>
+      <div class="card"><strong>📤 Cloud Billing データエクスポート (使用コストデータ)</strong>: Standard / Detailed usage cost エクスポートと組み合わせることで、実際の使用コストと料金 (単価) の両面から分析が可能</div>
+      <div class="card"><strong>🧾 FOCUS usage cost エクスポート (Preview)</strong>: FinOps Open Cost and Usage Specification (FOCUS) 標準に正規化されたコストデータのエクスポート</div>
+      <div class="card"><strong>📚 Cloud Billing Catalog API / Pricing Table レポート</strong>: <code>sku.id</code> をキーに公開リスト価格と対応付けが可能</div>
+      <div class="card"><strong>🤖 Vertex AI / Gemini API</strong>: 今回の新フィールドの対象となる生成 AI SKU を提供するサービス</div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>🎉 まとめ</h2>
+      <div class="note-box">
+        <p style="margin: 0 0 8px;">
+          生成 AI の利用拡大に伴い、モデル別・トークン単位でのコスト分析のニーズが高まる中、
+          料金データエクスポートに<span class="highlight">構造化された SKU 属性と詳細使用量単位</span>が追加されたことで、
+          BigQuery 上での<strong>生成 AI 単価分析が大幅に容易</strong>になります。
+        </p>
+        <p style="margin: 0;">
+          Preview 段階のためフィールド形式の変更には注意が必要ですが、FinOps チームはまず料金データエクスポートを有効化し、
+          <code>sku_attributes</code> を使った<strong>モデル別単価分析</strong>を試すことをおすすめします。
+        </p>
+      </div>
+      <div>
+        <span class="badge">Cloud Billing</span>
+        <span class="badge">BigQuery</span>
+        <span class="badge">FinOps</span>
+        <span class="badge" style="background: var(--gc-purple);">生成AI</span>
+        <span class="badge" style="background: var(--gc-purple);">Gemini</span>
+        <span class="badge">コスト管理</span>
+        <span class="badge badge-preview">Preview</span>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul>
+        <li>→ <a href="https://docs.cloud.google.com/release-notes#October_21_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026-10-21)</a></li>
+        <li>→ <a href="https://docs.cloud.google.com/billing/docs/how-to/export-data-bigquery-tables/pricing-data" target="_blank" rel="noopener noreferrer" class="gc-link">料金データエクスポートのスキーマ</a></li>
+        <li>→ <a href="https://docs.cloud.google.com/billing/docs/how-to/export-data-bigquery-tables/pricing-data#sku_attributes" target="_blank" rel="noopener noreferrer" class="gc-link">SKU 属性のドキュメント</a></li>
+        <li>→ <a href="https://docs.cloud.google.com/billing/docs/how-to/export-data-bigquery-tables/pricing-data#sku_granular_usage_units" target="_blank" rel="noopener noreferrer" class="gc-link">詳細使用量単位のドキュメント</a></li>
+        <li>→ <a href="https://docs.cloud.google.com/billing/docs/how-to/export-data-bigquery-setup" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud Billing データエクスポートの設定</a></li>
+        <li>→ <a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">BigQuery の料金</a></li>
+      </ul>
+      <p>このインフォグラフィックは Google Cloud News レポート (2026-10-21) を基に生成されました。</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

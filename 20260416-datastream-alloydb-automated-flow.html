@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Datastream: AlloyDB for PostgreSQL 自動フローによるストリーム作成</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; min-width: 280px; }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 10px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green { border-left-color: var(--gc-green); }
+    .card-orange { border-left-color: var(--gc-orange); }
+    .card-purple { border-left-color: var(--gc-purple); }
+    .card-teal { border-left-color: var(--gc-teal); }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); color: #FFFFFF; }
+    .badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .ai-box {
+      background: var(--gc-purple-tint);
+      border-left: 4px solid var(--gc-purple);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 20px 0;
+    }
+
+    .stat-card-green {
+      background: linear-gradient(135deg, var(--gc-green), #1B7A36);
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card-orange {
+      background: linear-gradient(135deg, var(--gc-orange), #E65100);
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card-teal {
+      background: linear-gradient(135deg, var(--gc-teal), #00838F);
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 20px 0;
+    }
+
+    .before {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 20px;
+    }
+
+    .before h3 { color: var(--gc-red); margin-bottom: 12px; }
+
+    .after {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 20px;
+    }
+
+    .after h3 { color: var(--gc-green); margin-bottom: 12px; }
+
+    .before ul, .after ul { list-style: none; padding: 0; }
+
+    .before li, .after li {
+      padding: 6px 0;
+      font-size: 14px;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h3 { color: var(--gc-blue-800); margin-bottom: 8px; }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .merit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .link-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .link-list li {
+      padding: 8px 0;
+      border-bottom: 1px solid var(--gc-outline-variant);
+    }
+
+    .link-list li:last-child { border-bottom: none; }
+
+    .step-list {
+      counter-reset: step-counter;
+      list-style: none;
+      padding: 0;
+    }
+
+    .step-list li {
+      counter-increment: step-counter;
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      margin: 16px 0;
+      padding: 16px;
+      background: var(--gc-surface);
+      border-radius: 12px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .step-list li::before {
+      content: counter(step-counter);
+      background: var(--gc-blue-600);
+      color: #FFFFFF;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    footer {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    footer a:hover { text-decoration: underline; }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .before-after { grid-template-columns: 1fr; }
+      .feature-grid { grid-template-columns: 1fr; }
+      .merit-grid { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .header { flex-direction: column; gap: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>🔄 Datastream: AlloyDB for PostgreSQL 自動フローによるストリーム作成</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Datastream</span>
+          <span class="badge">AlloyDB for PostgreSQL</span>
+          <span class="badge">BigQuery</span>
+          <span class="badge badge-ga">Feature</span>
+        </div>
+      </div>
+      <div class="subtitle" style="text-align: right;">
+        <div>📅 2026-04-16</div>
+        <div style="margin-top: 4px;">AlloyDB 概要ページからワンクリックで<br/>BigQuery へのストリーミングを実現</div>
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>Google Cloud は、AlloyDB for PostgreSQL のインスタンス概要ページから直接 Datastream ストリームを作成できる<span class="highlight">自動フロー (Automated Flow)</span> 機能を発表しました。この機能により、AlloyDB から BigQuery へのデータレプリケーションプロセスが大幅に簡素化され、従来必要だった複数の手動ステップが自動化されます。</p>
+      <p style="margin-top: 12px;">自動フローでは、VPC 接続のセキュリティ設定、データベース構成、ストリーム接続リソースの作成を Datastream が自動的に処理します。複雑なネットワーク構成やレプリケーション設定を個別に行うことなく、<span class="highlight">数クリックで AlloyDB のデータを BigQuery に継続的にストリーミング</span>できるようになります。</p>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value">9 → 5</div>
+        <div class="stat-label">手動ステップが自動フローで大幅削減</div>
+      </div>
+      <div class="stat-card-green">
+        <div class="stat-value">9 リソース</div>
+        <div class="stat-label">VPC、接続プロファイル等を自動作成</div>
+      </div>
+      <div class="stat-card-teal">
+        <div class="stat-value">数分</div>
+        <div class="stat-label">従来数時間の設定作業を短縮</div>
+      </div>
+      <div class="stat-card-orange">
+        <div class="stat-value">20 MB</div>
+        <div class="stat-label">最大イベントサイズ</div>
+      </div>
+    </div>
+
+    <!-- Before / After -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before">
+          <h3>❌ Before (従来の手動フロー)</h3>
+          <ul>
+            <li><span class="cross-icon">✕</span> TCP プロキシをコンシューマープロジェクト内に手動で作成・構成する必要あり</li>
+            <li><span class="cross-icon">✕</span> <code>alloydb.logical_decoding</code> フラグの有効化、レプリケーションスロットの作成、パブリケーションの作成を個別に実行</li>
+            <li><span class="cross-icon">✕</span> 専用ユーザーの作成と権限付与が必要</li>
+            <li><span class="cross-icon">✕</span> ソース・宛先の接続プロファイルをそれぞれ手動で作成</li>
+            <li><span class="cross-icon">✕</span> VPC ネットワーク構成、ファイアウォールルール、IP アドレス範囲を個別に設定</li>
+            <li><span class="cross-icon">✕</span> 合計 9 ステップの複雑な手順</li>
+          </ul>
+        </div>
+        <div class="after">
+          <h3>✅ After (自動フロー)</h3>
+          <ul>
+            <li><span class="check-icon">✓</span> AlloyDB 概要ページから「Create stream」ボタンで直接作成可能</li>
+            <li><span class="check-icon">✓</span> VPC リソース (内部 IP、サブネットワーク、ネットワークアタッチメント) が自動作成</li>
+            <li><span class="check-icon">✓</span> CDC 用テーブル構成、レプリケーションスロット、パブリケーション、専用ユーザーが自動セットアップ</li>
+            <li><span class="check-icon">✓</span> プライベート接続構成、ソース・宛先接続プロファイルが自動作成</li>
+            <li><span class="check-icon">✓</span> ストリームモニタリングを AlloyDB の概要ページから直接確認可能</li>
+            <li><span class="check-icon">✓</span> わずか 5 ステップ + 自動処理で完了</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>従来の手動フロー (9 ステップ) と新しい自動フロー (5 ステップ + 自動処理) の比較、および AlloyDB から BigQuery へのデータフローを示しています。自動フローでは、VPC リソース作成や CDC 構成などの複雑な処理がバックグラウンドで自動実行されます。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TB
+    subgraph before["従来の手動フロー"]
+        direction TB
+        A1["1. TCP プロキシ作成"] --> A2["2. 論理レプリケーション有効化"]
+        A2 --> A3["3. レプリケーションスロット作成"]
+        A3 --> A4["4. パブリケーション作成"]
+        A4 --> A5["5. Datastream ユーザー作成"]
+        A5 --> A6["6. ソース接続プロファイル作成"]
+        A6 --> A7["7. 宛先接続プロファイル作成"]
+        A7 --> A8["8. VPC / ファイアウォール構成"]
+        A8 --> A9["9. ストリーム作成・開始"]
+    end
+
+    subgraph after["自動フロー (新機能)"]
+        direction TB
+        B1["1. AlloyDB 概要ページで\n'Create stream' をクリック"]
+        B1 --> B2["2. ストリーム名・認証方法を設定"]
+        B2 --> B3["3. レプリケーション対象を選択"]
+        B3 --> B4["4. BigQuery 宛先を確認"]
+        B4 --> B5["5. 作成・開始"]
+        B5 -.->|自動| B6["VPC リソース作成\nCDC 構成\n接続プロファイル作成\nレプリケーション設定"]
+    end
+
+    subgraph dataflow["データフロー"]
+        direction LR
+        C1[("AlloyDB for\nPostgreSQL")] -->|CDC| C2["Datastream"]
+        C2 -->|Storage Write API| C3[("BigQuery")]
+    end
+
+    style before fill:#fff3e0,stroke:#ff9800
+    style after fill:#e8f5e9,stroke:#4caf50
+    style dataflow fill:#e3f2fd,stroke:#2196f3
+    style B6 fill:#c8e6c9,stroke:#4caf50
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+
+      <div class="card card-green">
+        <h3>☁️ 1. AlloyDB 概要ページからのワンクリックストリーム作成</h3>
+        <p style="margin-top: 8px;">AlloyDB for PostgreSQL インスタンスの概要ページに「Stream data into BigQuery」セクションが追加されました。「Create stream」ボタンから直接ストリームを作成でき、Datastream コンソールに移動することなく、AlloyDB の管理画面内で完結するワークフローを提供します。</p>
+      </div>
+
+      <div class="card card-teal">
+        <h3>🔧 2. インフラストラクチャの自動プロビジョニング</h3>
+        <p style="margin-top: 8px;">以下のリソースが全て自動的に作成・構成されます。</p>
+        <ul style="margin-top: 8px; padding-left: 20px;">
+          <li>VPC リソース (内部 IP アドレス範囲、サブネットワーク、ネットワークアタッチメント)</li>
+          <li>プライベート接続構成の自動セットアップ</li>
+          <li>ソースおよび宛先の接続プロファイル</li>
+          <li>Private Service Connect インターフェースを使用した接続タイプ</li>
+        </ul>
+      </div>
+
+      <div class="card card-purple">
+        <h3>🗄️ 3. データベースレプリケーションの自動構成</h3>
+        <p style="margin-top: 8px;">CDC (Change Data Capture) に必要なデータベースリソースが全て自動的にセットアップされます。</p>
+        <ul style="margin-top: 8px; padding-left: 20px;">
+          <li>CDC 用テーブルの自動構成</li>
+          <li>レプリケーションスロットの自動セットアップ</li>
+          <li>全テーブル用パブリケーションの自動作成</li>
+          <li>専用 Datastream ユーザーの自動作成と権限付与</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>📊 4. 概要ページからのストリームモニタリング</h3>
+        <p style="margin-top: 8px;">ストリームステータス、ストリーム名、宛先 BigQuery データセット、宛先プロジェクト ID を AlloyDB の概要ページで確認可能。ストリームの開始、停止、一時停止アクションを概要ページから直接実行でき、より詳細なモニタリングが必要な場合はストリーム名をクリックして Datastream に遷移します。</p>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>📐 技術仕様</h2>
+
+      <h3 style="margin-top: 0;">自動フローの要件と構成</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>サポートソース</strong></td>
+            <td>AlloyDB for PostgreSQL</td>
+          </tr>
+          <tr>
+            <td><strong>宛先</strong></td>
+            <td>BigQuery</td>
+          </tr>
+          <tr>
+            <td><strong>接続要件</strong></td>
+            <td>Private Services Access が有効であること</td>
+          </tr>
+          <tr>
+            <td><strong>接続タイプ</strong></td>
+            <td>Private Service Connect インターフェース</td>
+          </tr>
+          <tr>
+            <td><strong>認証方式</strong></td>
+            <td>IAM データベース認証 / ビルトインデータベース認証</td>
+          </tr>
+          <tr>
+            <td><strong>CDC 方式</strong></td>
+            <td>PostgreSQL 論理デコーディング (pgoutput プラグイン)</td>
+          </tr>
+          <tr>
+            <td><strong>書き込みモード</strong></td>
+            <td>Merge (デフォルト) / Append-only</td>
+          </tr>
+          <tr>
+            <td><strong>最大イベントサイズ</strong></td>
+            <td>20 MB</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>自動作成されるリソース</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>リソース</th>
+            <th>説明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>VPC 内部 IP アドレス範囲</td>
+            <td>Datastream とソース間の通信用</td>
+          </tr>
+          <tr>
+            <td>サブネットワーク</td>
+            <td>プライベート接続用のネットワークセグメント</td>
+          </tr>
+          <tr>
+            <td>ネットワークアタッチメント</td>
+            <td>VPC ネットワーク間の接続ポイント</td>
+          </tr>
+          <tr>
+            <td>プライベート接続構成</td>
+            <td>セキュアなプライベートネットワーク接続</td>
+          </tr>
+          <tr>
+            <td>ソース接続プロファイル</td>
+            <td>AlloyDB への接続情報</td>
+          </tr>
+          <tr>
+            <td>宛先接続プロファイル</td>
+            <td>BigQuery への接続情報</td>
+          </tr>
+          <tr>
+            <td>レプリケーションスロット</td>
+            <td>PostgreSQL の論理レプリケーション用スロット</td>
+          </tr>
+          <tr>
+            <td>パブリケーション</td>
+            <td>レプリケーション対象テーブルのグループ</td>
+          </tr>
+          <tr>
+            <td>Datastream ユーザー</td>
+            <td>レプリケーション権限を持つ専用ユーザー</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>認証方式の選択</h3>
+      <span class="code-label">SQL</span>
+      <pre><code class="language-sql">-- IAM データベース認証を使用する場合:
+-- ユーザーに IAM プリンシパル ID が割り当てられている必要あり
+-- 手動で cloudsqlsuperuser ロールと CREATEROLE 権限を付与する必要あり
+
+GRANT cloudsqlsuperuser TO "USER_NAME";
+ALTER ROLE "USER_NAME" CREATEROLE;
+
+-- ビルトインデータベース認証を使用する場合:
+-- cloudsqlsuperuser ロールを持つユーザー名とパスワードを指定
+-- レプリケーション対象テーブルへの GRANT 権限が必要</code></pre>
+    </div>
+
+    <!-- Setup Instructions -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>前提条件</h3>
+      <div class="check-item">
+        <span class="check-icon">✓</span>
+        <span>Datastream、Network Connectivity、Compute Engine API が有効化されていること</span>
+      </div>
+      <div class="check-item">
+        <span class="check-icon">✓</span>
+        <span>Datastream リソースの作成・管理に必要な IAM 権限が付与されていること</span>
+      </div>
+      <div class="check-item">
+        <span class="check-icon">✓</span>
+        <span>AlloyDB for PostgreSQL インスタンスが Private Services Access を使用するよう構成されていること</span>
+      </div>
+      <div class="check-item">
+        <span class="check-icon">✓</span>
+        <span>(推奨) ストリーム作成前に論理レプリケーションを有効化しておくこと</span>
+      </div>
+
+      <div class="warning-box">
+        <strong>⚠️ 注意:</strong> 論理レプリケーションが有効化されていない場合、Datastream が自動で有効化しますが、AlloyDB インスタンスの再起動が発生します。
+      </div>
+
+      <h3 style="margin-top: 20px;">セットアップ手順</h3>
+      <ol class="step-list">
+        <li>
+          <div>
+            <strong>AlloyDB 概要ページへ移動</strong>
+            <p style="font-size: 14px; margin-top: 4px;">Google Cloud コンソールで対象の AlloyDB for PostgreSQL インスタンスの概要ページを開き、「Stream data into BigQuery」セクションの「Create stream」ボタンをクリック。</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <strong>ストリーム基本設定</strong>
+            <p style="font-size: 14px; margin-top: 4px;">ストリーム名を入力し、認証方式 (IAM データベース認証 / ビルトインデータベース認証) を選択。リージョン、暗号化、ラベルなどを必要に応じて変更。</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <strong>ソースの構成</strong>
+            <p style="font-size: 14px; margin-top: 4px;">レプリケーション対象のデータベースとテーブルを選択。バックフィルモードや最大同時バックフィル接続数などの詳細設定を必要に応じて変更。</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <strong>宛先の構成</strong>
+            <p style="font-size: 14px; margin-top: 4px;">BigQuery 宛先の設定を確認・調整。データセット構成 (スキーマごと / 単一)、書き込みモード (Merge / Append-only)、データ鮮度 (<code>max_staleness</code>) を設定。</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <strong>ストリームの作成と開始</strong>
+            <p style="font-size: 14px; margin-top: 4px;">「Create and start later」で後から手動開始、または「Start」で即時開始を選択。確認ダイアログで VPC リソース作成、CDC 構成、接続プロファイル作成の自動実行タスクを確認して実行。</p>
+          </div>
+        </li>
+      </ol>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div class="merit-grid">
+        <div>
+          <h3>💼 ビジネス面</h3>
+          <div class="card" style="border-left-color: var(--gc-green);">
+            <div class="icon-text"><span class="arrow">→</span><span><strong>Time-to-Value の大幅短縮</strong>: 従来数時間かかっていた設定作業が数分に短縮され、データ分析基盤の構築を迅速に開始可能</span></div>
+            <div class="icon-text"><span class="arrow">→</span><span><strong>運用コストの削減</strong>: インフラストラクチャの手動構成が不要になり、データエンジニアは高付加価値な分析作業に集中可能</span></div>
+            <div class="icon-text"><span class="arrow">→</span><span><strong>リアルタイム分析の民主化</strong>: 複雑なネットワーク・データベース知識がなくても、AlloyDB のデータを BigQuery でリアルタイムに分析可能</span></div>
+          </div>
+        </div>
+        <div>
+          <h3>🔧 技術面</h3>
+          <div class="card" style="border-left-color: var(--gc-blue);">
+            <div class="icon-text"><span class="arrow">→</span><span><strong>設定ミスの防止</strong>: 手動構成で発生しがちなネットワーク設定やレプリケーション構成のエラーを自動化により排除</span></div>
+            <div class="icon-text"><span class="arrow">→</span><span><strong>一貫したセキュリティ</strong>: Private Service Connect を使用したセキュアな接続が自動的に確立され、ベストプラクティスに準拠した構成を保証</span></div>
+            <div class="icon-text"><span class="arrow">→</span><span><strong>統合管理</strong>: AlloyDB の概要ページからストリームの状態監視と操作が可能になり、複数のコンソール間を行き来する必要がなくなる</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>制限事項</h3>
+      <div class="error-box">
+        <ul style="padding-left: 20px;">
+          <li>自動フローは <strong>AlloyDB for PostgreSQL から BigQuery</strong> へのレプリケーションのみをサポートしており、Cloud Storage への宛先は対象外</li>
+          <li>Private Services Access が有効で、Private Service Connect インターフェースの接続タイプを使用するインスタンスのみが対象</li>
+          <li>ストリーム削除時、一部のリソース (パブリケーション、Datastream リーダーユーザー、接続プロファイル、プライベート接続リソース、ネットワークリソース) は<strong>手動で削除が必要</strong></li>
+          <li>論理レプリケーションが有効化されていない場合、Datastream が自動で有効化するが、ソースインスタンスの<strong>再起動が発生</strong></li>
+        </ul>
+      </div>
+
+      <h3 style="margin-top: 16px;">考慮すべき点</h3>
+      <div class="warning-box">
+        <ul style="padding-left: 20px;">
+          <li>BigQuery の CDC コストは Datastream とは別に課金されるため、<code>max_staleness</code> パラメータの適切なチューニングが重要</li>
+          <li>自動フローで作成されたリソースの管理責任は利用者側にあり、不要になった場合は手動でのクリーンアップが必要</li>
+          <li>レプリケーション対象テーブルが多い場合、ソースデータベースと Datastream の負荷が増加する可能性がある</li>
+          <li>パブリケーションはデータベース管理者ユーザーで作成されるため、削除はその所有者のみが実行可能</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h3>🛒 ユースケース 1: HTAP (Hybrid Transactional/Analytical Processing) の実現</h3>
+        <p><strong>シナリオ:</strong> EC サイトの注文管理システムが AlloyDB for PostgreSQL 上で稼働しており、マーケティングチームが注文データのリアルタイム分析を BigQuery で実行したい場合。</p>
+        <span class="code-label">手順</span>
+        <pre><code class="language-bash">1. AlloyDB の概要ページで「Create stream」をクリック
+2. 注文関連テーブル (orders, order_items, customers) を選択
+3. BigQuery の宛先データセットを指定
+4. 書き込みモードを「Merge」に設定して開始</code></pre>
+        <div class="success-box">
+          <strong>✅ 効果:</strong> 注文データが数秒以内に BigQuery に反映され、マーケティングチームはリアルタイムで売上ダッシュボードや顧客行動分析を実行可能。従来のバッチ ETL と比較してデータ鮮度が大幅に向上。
+        </div>
+      </div>
+
+      <div class="usecase-card">
+        <h3>🏦 ユースケース 2: 本番データベースへの影響を最小化したレポーティング</h3>
+        <p><strong>シナリオ:</strong> 金融サービス企業が AlloyDB で取引処理を行いながら、規制レポートの生成に BigQuery を使用したい場合。AlloyDB への分析クエリの負荷を避けたい。</p>
+        <div class="success-box">
+          <strong>✅ 効果:</strong> AlloyDB のトランザクション処理性能に影響を与えることなく、BigQuery 上で大規模な集計や複雑な分析クエリを実行可能。レポート生成の SLA を確保しつつ、本番システムの安定性を維持。
+        </div>
+      </div>
+
+      <div class="usecase-card">
+        <h3>🔗 ユースケース 3: マイクロサービスのイベントデータ統合</h3>
+        <p><strong>シナリオ:</strong> 複数のマイクロサービスがそれぞれ AlloyDB インスタンスを使用しており、全サービスのデータを BigQuery に集約して横断的な分析を行いたい場合。</p>
+        <div class="success-box">
+          <strong>✅ 効果:</strong> 各 AlloyDB インスタンスの概要ページから自動フローでストリームを作成するだけで、全サービスのデータが BigQuery に統合される。データパイプラインの構築・保守の工数を大幅に削減。
+        </div>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>Datastream は、ソースから宛先に処理されたデータ量 (GB) に基づいて課金されます。BigQuery へのストリーミング時には、Datastream の料金に加えて BigQuery の料金 (Storage Write API 使用分、ストレージ、CDC マージジョブの計算リソース) が別途発生します。</p>
+
+      <table style="margin-top: 16px;">
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>月額料金 (概算)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Datastream データ処理 (100 GB/月)</td>
+            <td>処理データ量に比例 (<a href="https://cloud.google.com/datastream/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Datastream Pricing</a> 参照)</td>
+          </tr>
+          <tr>
+            <td>BigQuery ストレージ (100 GB)</td>
+            <td>BigQuery ストレージ料金に準拠</td>
+          </tr>
+          <tr>
+            <td>BigQuery CDC マージジョブ</td>
+            <td>Analysis SKU として課金 (BigQuery Reservations の利用を推奨)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="note-box" style="margin-top: 16px;">
+        <strong>💡 コスト最適化のポイント:</strong>
+        <ul style="padding-left: 20px; margin-top: 8px;">
+          <li>BigQuery の <code>max_staleness</code> パラメータを適切に設定し、不要に高頻度なマージジョブを回避</li>
+          <li>BigQuery Reservations を購入して CDC マージジョブのコストを予測可能にする</li>
+          <li>レプリケーション対象テーブルを必要最小限に絞ることでデータ処理量を抑制</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Regions -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <p>Datastream は全ての Google Cloud リージョンで利用可能です (2021 年 11 月の GA 以降)。AlloyDB for PostgreSQL のインスタンスと Datastream ストリームは同一リージョンに配置することが推奨されます。</p>
+      <p style="margin-top: 8px;">2025 年以降、以下のリージョンも追加されています。</p>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0;">
+        <span style="background: var(--gc-blue-50); color: var(--gc-blue-800); padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 500; border: 1px solid var(--gc-blue-200);">europe-west10 (Berlin)</span>
+        <span style="background: var(--gc-blue-50); color: var(--gc-blue-800); padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 500; border: 1px solid var(--gc-blue-200);">europe-west12 (Turin)</span>
+        <span style="background: var(--gc-blue-50); color: var(--gc-blue-800); padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 500; border: 1px solid var(--gc-blue-200);">me-central1 (Doha)</span>
+        <span style="background: var(--gc-blue-50); color: var(--gc-blue-800); padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 500; border: 1px solid var(--gc-blue-200);">me-west1 (Tel Aviv)</span>
+        <span style="background: var(--gc-blue-50); color: var(--gc-blue-800); padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 500; border: 1px solid var(--gc-blue-200);">northamerica-south1 (Mexico)</span>
+      </div>
+      <p style="margin-top: 8px; font-size: 14px;">利用可能なリージョンの完全なリストは <a href="https://cloud.google.com/datastream/docs/ip-allowlists-and-regions" target="_blank" rel="noopener noreferrer" class="gc-link">IP allowlists and regions</a> を参照してください。BigQuery データセットのロケーションも同一リージョンに設定することで、コストとパフォーマンスの最適化が可能です。</p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h3>🗄️ AlloyDB for PostgreSQL</h3>
+          <p style="font-size: 14px;">フルマネージドの PostgreSQL 互換データベースサービス。今回のアップデートのデータソース。</p>
+        </div>
+        <div class="card card-green">
+          <h3>📊 BigQuery</h3>
+          <p style="font-size: 14px;">サーバーレスのデータウェアハウス。Datastream のストリーミング先として CDC データをリアルタイムで受信。</p>
+        </div>
+        <div class="card card-teal">
+          <h3>🔄 Datastream</h3>
+          <p style="font-size: 14px;">サーバーレスの CDC およびレプリケーションサービス。AlloyDB と BigQuery 間のデータ同期を担当。</p>
+        </div>
+        <div class="card card-purple">
+          <h3>🔒 Private Service Connect</h3>
+          <p style="font-size: 14px;">Google Cloud のプライベートネットワーク接続機能。自動フローで自動的に構成される。</p>
+        </div>
+        <div class="card card-orange">
+          <h3>☁️ Cloud SQL 用自動フロー</h3>
+          <p style="font-size: 14px;">Cloud SQL for PostgreSQL、MySQL、SQL Server でも同様の自動フロー機能が提供されている。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reference Links -->
+    <div class="section">
+      <h2>📚 参考リンク</h2>
+      <ul class="link-list">
+        <li>📄 <a href="https://cloud.google.com/release-notes#April_16_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート</a></li>
+        <li>📘 <a href="https://cloud.google.com/datastream/docs/create-a-stream-automated" target="_blank" rel="noopener noreferrer" class="gc-link">自動フローを使用した AlloyDB for PostgreSQL ストリームの作成</a></li>
+        <li>🔧 <a href="https://cloud.google.com/datastream/docs/configure-alloydb-psql" target="_blank" rel="noopener noreferrer" class="gc-link">AlloyDB for PostgreSQL の CDC 構成</a></li>
+        <li>📖 <a href="https://cloud.google.com/datastream/docs" target="_blank" rel="noopener noreferrer" class="gc-link">Datastream ドキュメント</a></li>
+        <li>💰 <a href="https://cloud.google.com/datastream/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Datastream 料金ページ</a></li>
+        <li>📊 <a href="https://cloud.google.com/bigquery/docs/change-data-capture" target="_blank" rel="noopener noreferrer" class="gc-link">BigQuery CDC ドキュメント</a></li>
+      </ul>
+    </div>
+
+    <!-- Summary -->
+    <div class="section" style="background: var(--gc-blue-tint); border-color: var(--gc-blue-600);">
+      <h2>📝 まとめ</h2>
+      <p>今回のアップデートにより、AlloyDB for PostgreSQL から BigQuery へのデータレプリケーションが大幅に簡素化されました。従来は TCP プロキシの構築、論理レプリケーションの構成、接続プロファイルの作成など<span class="highlight">多数の手動ステップ</span>が必要でしたが、自動フローにより AlloyDB の概要ページから<span class="highlight">数クリックで完了</span>できるようになりました。</p>
+      <div class="ai-box" style="margin-top: 16px;">
+        <strong>🚀 推奨アクション:</strong>
+        <ul style="padding-left: 20px; margin-top: 8px;">
+          <li>AlloyDB を OLTP ワークロードに使用しながら BigQuery でリアルタイム分析を行いたいチームは、この自動フローを活用してデータパイプラインの構築時間を大幅に短縮</li>
+          <li>ストリーム作成前に論理レプリケーションを有効化しておくことで、インスタンス再起動を回避</li>
+          <li>BigQuery の <code>max_staleness</code> パラメータを適切に設定して CDC コストを最適化</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="list-style: none; padding: 0; margin-top: 4px;">
+        <li><a href="https://cloud.google.com/release-notes#April_16_2026" target="_blank" rel="noopener noreferrer">https://cloud.google.com/release-notes#April_16_2026</a></li>
+        <li><a href="https://cloud.google.com/datastream/docs/create-a-stream-automated" target="_blank" rel="noopener noreferrer">https://cloud.google.com/datastream/docs/create-a-stream-automated</a></li>
+        <li><a href="https://cloud.google.com/datastream/docs/configure-alloydb-psql" target="_blank" rel="noopener noreferrer">https://cloud.google.com/datastream/docs/configure-alloydb-psql</a></li>
+      </ul>
+      <p style="margin-top: 8px;">Generated on 2026-04-16</p>
+    </footer>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dataflow: Streaming Engine 水平オートスケーリングのレイテンシティアとオートスケーリングスケジュール</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Google Brand Colors */
+  --gc-blue: #4285F4;
+  --gc-red: #EA4335;
+  --gc-yellow: #FBBC04;
+  --gc-green: #34A853;
+
+  /* Google Cloud UI Blue Scale */
+  --gc-blue-900: #174EA6;
+  --gc-blue-800: #185ABC;
+  --gc-blue-700: #1967D2;
+  --gc-blue-600: #1A73E8;
+  --gc-blue-500: #4285F4;
+  --gc-blue-300: #669DF6;
+  --gc-blue-200: #8AB4F8;
+  --gc-blue-100: #AECBFA;
+  --gc-blue-50: #E8F0FE;
+
+  /* Text Colors */
+  --gc-on-surface: #202124;
+  --gc-on-surface-variant: #5F6368;
+  --gc-outline: #80868B;
+
+  /* Surface Colors */
+  --gc-surface: #FFFFFF;
+  --gc-surface-container-lowest: #F8F9FA;
+  --gc-surface-container-low: #F1F3F4;
+  --gc-surface-container: #E8EAED;
+  --gc-outline-variant: #DADCE0;
+
+  /* Semantic Tints */
+  --gc-blue-tint: #E8F0FE;
+  --gc-green-tint: #E6F4EA;
+  --gc-red-tint: #FCE8E6;
+  --gc-yellow-tint: #FEF7E0;
+  --gc-purple-tint: #F3E8FD;
+  --gc-teal-tint: #E0F7FA;
+
+  /* Extended Colors */
+  --gc-purple: #A142F4;
+  --gc-teal: #00BCD4;
+  --gc-orange: #FF6D00;
+}
+
+body {
+  background-color: var(--gc-surface);
+  font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+  color: var(--gc-on-surface-variant);
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 20px;
+  margin: 0;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 16px;
+  border-bottom: 3px solid var(--gc-blue-600);
+}
+
+h1, .title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--gc-on-surface);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.title-area {
+  flex: 1 1 600px;
+}
+
+.title-sub {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gc-blue-700);
+  margin-top: 8px;
+}
+
+h2, .section-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 20px 0 8px 0;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: var(--gc-outline);
+  text-align: right;
+}
+
+.section {
+  background: var(--gc-surface-container-low);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid var(--gc-outline-variant);
+}
+
+.highlight {
+  background-color: var(--gc-blue-50);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--gc-blue-800);
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+.card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border-left: 4px solid var(--gc-blue-600);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+}
+
+.card h3 {
+  margin-top: 0;
+}
+
+.icon-text {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+  color: var(--gc-on-surface-variant);
+}
+
+.arrow {
+  color: var(--gc-blue-600);
+  font-size: 20px;
+}
+
+.gc-link {
+  color: var(--gc-blue-600);
+  text-decoration: none;
+}
+
+.gc-link:hover {
+  color: var(--gc-blue-800);
+  text-decoration: underline;
+}
+
+/* サービスバッジ */
+.badge,
+.badge-ga,
+.badge-preview,
+.badge-deprecated {
+  display: inline-block;
+  color: #FFFFFF;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+  margin: 4px 8px 4px 0;
+}
+
+.badge {
+  background: var(--gc-blue-600);
+}
+
+.badge-ga {
+  background: var(--gc-green);
+  color: #FFFFFF;
+}
+
+.badge-analytics {
+  background: var(--gc-green);
+}
+
+/* Before/After 比較 */
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+@media (max-width: 760px) {
+  .before-after {
+    grid-template-columns: 1fr;
+  }
+}
+
+.before-box, .after-box {
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.before-box {
+  background: var(--gc-red-tint);
+  border: 1px solid #F5C6C0;
+}
+
+.after-box {
+  background: var(--gc-green-tint);
+  border: 1px solid #B7E1C3;
+}
+
+.before-box h3, .after-box h3 {
+  margin-top: 0;
+  font-size: 16px;
+}
+
+.before-box h3 { color: #C5221F; }
+.after-box h3 { color: #188038; }
+
+.before-box ul, .after-box ul {
+  margin: 8px 0 0 0;
+  padding-left: 20px;
+}
+
+.before-box li, .after-box li {
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+/* フロー図スタイル */
+.flow-diagram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 24px 0;
+}
+
+.flow-step {
+  background: var(--gc-surface);
+  border: 2px solid var(--gc-blue-600);
+  border-radius: 12px;
+  padding: 12px 20px;
+  text-align: center;
+  min-width: 100px;
+  color: var(--gc-on-surface);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+}
+
+.flow-arrow {
+  color: var(--gc-blue-600);
+  font-size: 24px;
+  font-weight: bold;
+}
+
+/* チェックリストスタイル */
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.check-icon {
+  color: var(--gc-green);
+  font-size: 18px;
+}
+
+.cross-icon {
+  color: var(--gc-red);
+  font-size: 18px;
+}
+
+/* Mermaid コンテナ */
+.mermaid-container {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 20px 0;
+  border: 2px solid rgba(66, 133, 244, 0.3);
+  overflow-x: auto;
+}
+
+.mermaid {
+  display: flex;
+  justify-content: center;
+}
+
+/* コードブロック */
+.code-block,
+pre:not(.mermaid) {
+  background: #1E1E1E;
+  border-radius: 8px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: #E8E8E8;
+  margin: 16px 0;
+}
+
+.code-block {
+  overflow: hidden;
+}
+
+.code-header {
+  background: #2D2D2D;
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.code-lang {
+  color: #9CDCFE;
+  font-weight: bold;
+}
+
+.code-title {
+  color: #AAAAAA;
+}
+
+.code-block pre {
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+}
+
+.code-block code {
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 16px !important;
+  display: block;
+}
+
+pre code {
+  background: none;
+  border: none;
+  font-size: inherit;
+}
+
+/* インラインコード */
+code:not(pre code) {
+  background: var(--gc-surface-container-lowest);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 0.9em;
+  color: var(--gc-blue-900);
+}
+
+/* テーブルスタイル */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--gc-outline-variant);
+  background: var(--gc-surface);
+}
+
+th {
+  background: var(--gc-blue-50);
+  color: var(--gc-blue-900);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 2px solid var(--gc-blue-200);
+}
+
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--gc-outline-variant);
+  font-size: 14px;
+}
+
+tr:nth-child(even) {
+  background: var(--gc-surface-container-lowest);
+}
+
+tr:hover {
+  background: var(--gc-blue-50);
+}
+
+/* 注意・警告ボックス */
+.note-box {
+  background: var(--gc-blue-tint);
+  border-left: 4px solid var(--gc-blue-600);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.warning-box {
+  background: var(--gc-yellow-tint);
+  border-left: 4px solid var(--gc-yellow);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.error-box {
+  background: var(--gc-red-tint);
+  border-left: 4px solid var(--gc-red);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.success-box {
+  background: var(--gc-green-tint);
+  border-left: 4px solid var(--gc-green);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+/* ユースケースボックス */
+.usecase-box {
+  background: var(--gc-blue-tint);
+  border: 1px solid var(--gc-blue-100);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 16px 0;
+}
+
+.usecase-box h3 {
+  margin-top: 0;
+  color: var(--gc-blue-900);
+}
+
+/* ティアカード */
+.tier-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin: 16px 0;
+}
+
+@media (max-width: 760px) {
+  .tier-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tier-card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  border-top: 6px solid var(--gc-blue-600);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+}
+
+.tier-card.tier-low { border-top-color: var(--gc-blue-600); }
+.tier-card.tier-medium { border-top-color: var(--gc-yellow); }
+.tier-card.tier-high { border-top-color: var(--gc-green); }
+
+.tier-name {
+  font-family: 'Roboto Mono', monospace;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--gc-on-surface);
+}
+
+.tier-value {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 8px 0;
+  color: var(--gc-blue-800);
+}
+
+.tier-card.tier-medium .tier-value { color: #B05A00; }
+.tier-card.tier-high .tier-value { color: #188038; }
+
+.tier-desc {
+  font-size: 13px;
+  color: var(--gc-on-surface-variant);
+}
+
+/* メリットグリッド */
+.merit-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+@media (max-width: 760px) {
+  .merit-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+ul {
+  padding-left: 22px;
+  margin: 8px 0;
+}
+
+li {
+  margin-bottom: 6px;
+}
+
+footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gc-outline-variant);
+  font-size: 12px;
+  color: var(--gc-outline);
+  word-break: break-all;
+}
+
+footer ul {
+  list-style: none;
+  padding-left: 0;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- タイトルエリア -->
+  <div class="header">
+    <div class="title-area">
+      <div>
+        <span class="badge badge-analytics">☁️ Dataflow</span>
+        <span class="badge">Streaming Engine</span>
+        <span class="badge badge-ga">GA (一般提供)</span>
+      </div>
+      <h1>⚡ Streaming Engine 水平オートスケーリングの新チューニング機能</h1>
+      <div class="title-sub">⏱️ レイテンシティア &amp; 🗓️ オートスケーリングスケジュール</div>
+    </div>
+    <div class="subtitle">リリース日: 2026-10-29</div>
+  </div>
+
+  <!-- 概要 -->
+  <div class="section">
+    <h2>📝 概要</h2>
+    <p>
+      Dataflow は、Streaming Engine を使用するストリーミングジョブの<span class="highlight">水平オートスケーリング (Horizontal Autoscaling)</span> をチューニングするための 2 つの新機能を追加しました。
+    </p>
+    <div class="card">
+      <h3>⏱️ レイテンシティア (Latency tiers)</h3>
+      <p style="margin: 0;">オートスケーラーがスケーリング判断に使用する<strong>バックログ時間のしきい値</strong>を <code>low_latency</code> / <code>medium_latency</code> / <code>high_latency</code> の 3 段階から選択。レイテンシ要件とリソースコストのバランスをワークロードごとに調整できます。</p>
+    </div>
+    <div class="card">
+      <h3>🗓️ オートスケーリングスケジュール (Autoscaling schedules)</h3>
+      <p style="margin: 0;"><strong>crontab 形式の定期スケジュール</strong>に基づき、最小/最大ワーカー数・ワーカー使用率ヒント・レイテンシティアなどのパラメータオーバーライドを特定の時間帯に自動適用できます。</p>
+    </div>
+    <div class="note-box">
+      <strong>💡 ポイント:</strong> どちらの機能もジョブ作成時の設定に加え、実行中のジョブへの<span class="highlight">インフライト更新 (in-flight update)</span> に対応。ジョブを停止・再起動することなくオートスケーリングの挙動を調整できます。
+    </div>
+    <p>
+      <strong>🎯 対象ユーザー:</strong> Pub/Sub などからの変動するストリーミングデータを処理しており、「ピーク時間帯は低レイテンシを維持したいが、夜間はコストを抑えたい」といった時間帯や要件に応じたきめ細かなリソース制御を求めるデータエンジニアリングチーム。
+    </p>
+
+    <div class="before-after">
+      <div class="before-box">
+        <h3>❌ Before (アップデート前の課題)</h3>
+        <ul>
+          <li>バックログしきい値は<strong>約 15 秒に固定</strong>。ラグ許容ワークロードでも低レイテンシ基準でスケールアップされ、コストが高くなりがち</li>
+          <li>ピーク/オフピークなど予測可能な負荷変動への対応は、その都度<strong>手動でジョブを更新</strong>する必要があった</li>
+          <li>レイテンシ要件とコストのトレードオフを宣言的に指定する手段がなく、最小/最大ワーカー数の調整などで間接的に制御するしかなかった</li>
+        </ul>
+      </div>
+      <div class="after-box">
+        <h3>✅ After (アップデート後の改善)</h3>
+        <ul>
+          <li>許容バックログ時間 (<strong>15 秒未満 / 2 分未満 / 10 分未満</strong>) を宣言的に指定。バックログを蓄積させてコストを削減できる</li>
+          <li><strong>最大 10 件のスケジュール</strong>をジョブごとに定義。ピーク時のスケールアップやオフピーク時の縮小が自動化され、手動更新が不要に</li>
+          <li>実行中のジョブにも <code>gcloud dataflow jobs update-options</code> による<strong>インフライト更新</strong>で設定変更が可能</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- アーキテクチャ図 -->
+  <div class="section">
+    <h2>🏗️ アーキテクチャ図</h2>
+    <div class="mermaid-container">
+      <pre class="mermaid">
+flowchart TD
+    SRC[("📨 入力ソース&lt;br/&gt;(Pub/Sub など)")] --&gt;|未処理データ| BACKLOG["📊 推定バックログ時間の算出&lt;br/&gt;(スループット + 残バイト数)"]
+    SCHED["🗓️ オートスケーリングスケジュール&lt;br/&gt;(crontab + 継続時間 + 優先度)"] --&gt;|"時間帯別オーバーライド&lt;br/&gt;min/max workers・utilization hint・latency tier"| PARAMS["⚙️ 有効なオートスケーラー設定"]
+    TIERDEF["⏱️ レイテンシティア&lt;br/&gt;low: &amp;lt;15秒 / medium: &amp;lt;2分 / high: &amp;lt;10分"] --&gt; PARAMS
+    PARAMS --&gt; DECIDE{"🤖 バックログ時間が&lt;br/&gt;しきい値を超過?"}
+    BACKLOG --&gt; DECIDE
+    DECIDE --&gt;|"超過が数分間継続"| UP["⬆️ スケールアップ"]
+    DECIDE --&gt;|"しきい値を十分下回り&lt;br/&gt;CPU 使用率も目標未満"| DOWN["⬇️ スケールダウン"]
+    UP --&gt; POOL["👷 ワーカープール"]
+    DOWN --&gt; POOL
+    POOL --&gt;|処理| SINK[("📤 出力先")]
+      </pre>
+    </div>
+    <p>
+      オートスケーラーは入力ソースの<strong>推定バックログ時間</strong>を、選択したレイテンシティアのしきい値と比較してスケーリングを判断します。スケジュールが有効な時間帯には、ワーカー数範囲・使用率ヒント・レイテンシティアのオーバーライドが自動適用され、ウィンドウ終了後は<strong>ジョブのデフォルト設定に自動で戻ります</strong>。
+    </p>
+  </div>
+
+  <!-- 主要機能 -->
+  <div class="section">
+    <h2>🚀 主要機能</h2>
+
+    <div class="card">
+      <h3>1️⃣ レイテンシティア (Latency tiers)</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>バックログしきい値を <strong>3 段階のティア</strong>で指定し、オートスケーラーのバックログ時間への感度を設定</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>バックログ時間がしきい値を<strong>数分間超え続けた場合にのみ</strong>スケーリング判断がトリガーされる</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>未指定時のデフォルトは <code>low_latency</code> (従来どおり 15 秒未満を目標)</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>スケールダウン判断でも、ティアに基づく目標バックログが<strong>最優先の要素</strong>として使用される</span></div>
+    </div>
+
+    <div class="card">
+      <h3>2️⃣ オートスケーリングスケジュール (Autoscaling schedules)</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>crontab 式</strong>で開始タイミングを指定し、指定した継続時間 (最低 5 分) の間だけオーバーライドを適用</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>オーバーライド可能: 最小/最大ワーカー数、CPU 使用率目標 (0.1〜0.9)、レイテンシティア</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>タイムゾーン (tz database 形式、デフォルト UTC) と優先度 (大きい値が優先) を指定可能</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>1 ジョブあたり<strong>最大 10 件</strong>。ウィンドウ終了後は自動的にデフォルト設定へ復帰</span></div>
+    </div>
+
+    <div class="card">
+      <h3>3️⃣ ジョブ作成時・実行中どちらでも設定可能</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>ジョブ作成時はパイプラインオプション (<code>--experiments=...</code>) で指定</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>実行中のジョブにはインフライト更新 (<code>gcloud dataflow jobs update-options</code>) で適用。<strong>ジョブの再起動が不要</strong></span></div>
+    </div>
+  </div>
+
+  <!-- 技術仕様 -->
+  <div class="section">
+    <h2>⚙️ 技術仕様</h2>
+
+    <h3>⏱️ レイテンシティア: 3 段階の許容バックログ時間</h3>
+    <div class="tier-grid">
+      <div class="tier-card tier-low">
+        <div class="tier-name">low_latency</div>
+        <div class="tier-value">&lt; 15 秒</div>
+        <div class="tier-desc">迅速なスケールアップを優先。<br>未指定時のデフォルト</div>
+      </div>
+      <div class="tier-card tier-medium">
+        <div class="tier-name">medium_latency</div>
+        <div class="tier-value">&lt; 2 分</div>
+        <div class="tier-desc">レイテンシとコストの<br>バランスを取る中間設定</div>
+      </div>
+      <div class="tier-card tier-high">
+        <div class="tier-name">high_latency</div>
+        <div class="tier-value">&lt; 10 分</div>
+        <div class="tier-desc">バックログ蓄積を許容しコスト削減を優先。<br>ラグ許容ワークロード向け</div>
+      </div>
+    </div>
+
+    <h3>🗓️ オートスケーリングスケジュールの属性</h3>
+    <table>
+      <thead>
+        <tr><th>属性</th><th>必須/任意</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>name</code></td><td>必須</td><td>スケジュールの一意な識別子</td></tr>
+        <tr><td><code>crontab</code></td><td>必須</td><td>スケジュールのトリガータイミングを指定する crontab 式</td></tr>
+        <tr><td><code>duration</code></td><td>必須</td><td>オーバーライドを適用する継続時間 (秒)。最低 300 秒 (5 分)</td></tr>
+        <tr><td><code>timezone</code></td><td>任意</td><td>tz database のタイムゾーン名 (例: <code>Asia/Tokyo</code>)。デフォルトは UTC</td></tr>
+        <tr><td><code>min_workers</code> / <code>max_workers</code></td><td>任意</td><td>スケジュール有効中の最小/最大ワーカー数 (<code>max_workers</code> &gt;= <code>min_workers</code>)</td></tr>
+        <tr><td><code>cpu_utilization_target</code></td><td>任意</td><td>ワーカー CPU 使用率目標。範囲は [0.1, 0.9]</td></tr>
+        <tr><td><code>latency_tier</code></td><td>任意</td><td>スケジュール有効中のレイテンシティア</td></tr>
+        <tr><td><code>priority</code></td><td>任意</td><td>重複時に適用するスケジュールの優先度。値が大きいほど優先</td></tr>
+      </tbody>
+    </table>
+
+    <h3>🔀 スケジュールの競合解決ルール</h3>
+    <div class="note-box">
+      <div class="icon-text"><span class="arrow">→</span><span>同時に有効なスケジュールは<strong>常に 1 件のみ</strong></span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>時間帯が重複する場合は <code>priority</code> の値が<strong>大きい</strong>スケジュールが適用される</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>優先度が同じ場合は、<strong>最後に更新された</strong>スケジュールが適用される</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>継続時間が終了すると、他に有効なスケジュールがあればそれを適用。なければ<strong>ジョブのデフォルト設定に復帰</strong></span></div>
+    </div>
+  </div>
+
+  <!-- 設定方法 -->
+  <div class="section">
+    <h2>🔧 設定方法</h2>
+
+    <h3>📋 前提条件</h3>
+    <div class="check-item"><span class="check-icon">✓</span><span>ストリーミングジョブが <a class="gc-link" href="https://docs.cloud.google.com/dataflow/docs/streaming-engine" target="_blank" rel="noopener noreferrer">Streaming Engine</a> を使用していること (両機能とも Streaming Engine ジョブが対象)</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span>水平オートスケーリングが有効であること (Streaming Engine ジョブではデフォルトで有効)</span></div>
+
+    <h3>ステップ 1: ジョブ作成時にレイテンシティアを設定する</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Bash</span>
+        <span class="code-title">パイプラインオプション (Java/Python/Go 共通)</span>
+      </div>
+      <pre><code class="language-bash"># パイプラインオプションでレイテンシティアを指定 (Java/Python/Go 共通)
+--experiments=enable_latency_tier_lightweight_update=medium_latency</code></pre>
+    </div>
+    <p><code>low_latency</code>、<code>medium_latency</code>、<code>high_latency</code> のいずれかを指定します。</p>
+
+    <h3>ステップ 2: 実行中のジョブのレイテンシティアを更新する</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Bash</span>
+        <span class="code-title">インフライト更新 (ジョブ停止不要)</span>
+      </div>
+      <pre><code class="language-bash">gcloud dataflow jobs update-options \
+  --region=REGION \
+  --latency-tier=high_latency \
+  JOB_ID
+
+# デフォルト (低レイテンシ) の挙動に戻す場合
+gcloud dataflow jobs update-options \
+  --unset-latency-tier \
+  --region=REGION \
+  JOB_ID</code></pre>
+    </div>
+    <p>インフライト更新のため、ジョブを停止せずにティアを変更できます。</p>
+
+    <h3>ステップ 3: ジョブ作成時にオートスケーリングスケジュールを設定する</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Bash</span>
+        <span class="code-title">平日 9 時 (東京時間) から 8 時間、ピーク向け設定を適用する例</span>
+      </div>
+      <pre><code class="language-bash">--experiments=autoscaling_schedule="name=business-hours;crontab=0 9 * * 1-5;duration=28800;timezone=Asia/Tokyo;min_workers=10;max_workers=50;cpu_utilization_target=0.7;latency_tier=low_latency;priority=10"</code></pre>
+    </div>
+    <p>セミコロン区切りの key:value 形式で指定します。REST API の場合は <code>runtimeUpdatableParams.schedules</code> フィールドで指定します。</p>
+    <div class="warning-box">
+      <strong>⚠️ 注意:</strong> ジョブ起動時に <code>--experiments</code> で指定する crontab 式には<strong>カンマを含められません</strong> (例: <code>1,15 * * * *</code> は不可)。カンマが必要な場合は複数のスケジュールに分割するか、起動後にインフライト更新で設定します。
+    </div>
+  </div>
+
+  <!-- メリット -->
+  <div class="section">
+    <h2>💡 メリット</h2>
+    <div class="merit-grid">
+      <div class="success-box" style="margin: 0;">
+        <h3 style="margin-top: 0;">💼 ビジネス面</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>コスト最適化</strong>: ラグ許容ワークロードで <code>high_latency</code> ティアを選択すれば、バックログ蓄積を許容する分だけワーカー数が抑えられ、コンピュートコストを削減できる</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>運用負荷の削減</strong>: ピーク/オフピークに合わせた設定変更が自動化され、手動でのジョブ更新作業やその運用ミスのリスクがなくなる</span></div>
+      </div>
+      <div class="success-box" style="margin: 0;">
+        <h3 style="margin-top: 0;">🔧 技術面</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>宣言的なレイテンシ/コスト制御</strong>: 「許容バックログ時間」という SLO に近い概念でオートスケーラーの挙動を直接指定できる</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>無停止での調整</strong>: ティアもスケジュールもインフライト更新に対応。ジョブの再起動やドレインが不要</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>柔軟なスケジューリング</strong>: crontab + タイムゾーン + 優先度により、平日/週末、月初バッチ流入など複雑な負荷パターンに対応</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- デメリット・制約事項 -->
+  <div class="section">
+    <h2>⚠️ デメリット・制約事項</h2>
+
+    <h3>🚧 制限事項</h3>
+    <div class="error-box">
+      <div class="check-item"><span class="cross-icon">✕</span><span>両機能とも <strong>Streaming Engine を使用するストリーミングジョブのみ</strong>が対象 (Streaming Engine 非使用ジョブ・バッチジョブは利用不可)</span></div>
+      <div class="check-item"><span class="cross-icon">✕</span><span>オートスケーリングスケジュールは 1 ジョブあたり<strong>最大 10 件</strong>まで</span></div>
+      <div class="check-item"><span class="cross-icon">✕</span><span>スケジュールの継続時間は<strong>最低 5 分 (300 秒)</strong></span></div>
+      <div class="check-item"><span class="cross-icon">✕</span><span><code>cpu_utilization_target</code> は [0.1, 0.9] の範囲、<code>max_workers</code> &gt;= <code>min_workers</code> の制約がある</span></div>
+      <div class="check-item"><span class="cross-icon">✕</span><span>ジョブ起動時の <code>--experiments</code> で指定する crontab 式にカンマを含められない (パイプラインオプションの区切り文字と競合するため)</span></div>
+    </div>
+
+    <h3>🤔 考慮すべき点</h3>
+    <div class="warning-box">
+      <div class="icon-text"><span class="arrow">→</span><span><code>high_latency</code> ティアでは推定バックログが<strong>最大 10 分近くまで蓄積</strong>し得るため、下流システムの鮮度要件 (ダッシュボード更新頻度、SLA など) を確認してから選択する</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>スケジュールのデフォルトタイムゾーンは <strong>UTC</strong>。日本時間で運用する場合は <code>timezone=Asia/Tokyo</code> を明示し、サマータイムの影響有無も確認する</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>時間帯が重複する場合は優先度ルールにより 1 件のみ適用。意図した設定が有効かをコンソールの「Autoscaling」タブや <code>gcloud dataflow jobs describe</code> で確認する</span></div>
+    </div>
+  </div>
+
+  <!-- ユースケース -->
+  <div class="section">
+    <h2>🎯 ユースケース</h2>
+
+    <div class="usecase-box">
+      <h3>📉 ユースケース 1: ラグ許容な分析パイプラインのコスト削減</h3>
+      <p><strong>シナリオ:</strong> Pub/Sub から収集したログを集計して BigQuery に書き込むパイプラインで、集計結果の利用は 1 時間ごとのレポートのみ。秒単位のリアルタイム性は不要だが、デフォルト設定では流量スパイクのたびにスケールアップが発生しコストが膨らんでいる。</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">実装例</span>
+        </div>
+        <pre><code class="language-bash">gcloud dataflow jobs update-options \
+  --region=asia-northeast1 \
+  --latency-tier=high_latency \
+  JOB_ID</code></pre>
+      </div>
+      <p style="margin-bottom: 0;"><strong>✅ 効果:</strong> バックログを最大 10 分まで許容することで一時的なスパイクでのスケールアップが抑制され、ワーカー数が平準化されてコンピュートコストを削減できる。</p>
+    </div>
+
+    <div class="usecase-box">
+      <h3>🛒 ユースケース 2: 業務時間帯と夜間で挙動を切り替える EC サイトのイベント処理</h3>
+      <p><strong>シナリオ:</strong> EC サイトのクリックストリームを処理するパイプラインで、日中 (9:00〜21:00 JST) はレコメンドの鮮度のため低レイテンシが必須だが、深夜帯はトラフィックが少なくコスト優先で運用したい。</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">日中はピーク対応 (低レイテンシ + 広いワーカーレンジ) のスケジュールを設定</span>
+        </div>
+        <pre><code class="language-bash">--experiments=autoscaling_schedule="name=daytime-peak;crontab=0 9 * * *;duration=43200;timezone=Asia/Tokyo;min_workers=20;max_workers=100;latency_tier=low_latency;priority=10"</code></pre>
+      </div>
+      <p style="margin-bottom: 0;"><strong>✅ 効果:</strong> 日中は 12 時間 (43200 秒) にわたり低レイテンシ設定が自動適用され、ウィンドウ終了後はジョブのデフォルト設定 (コスト優先) に自動復帰する。手動でのジョブ更新作業が不要になる。</p>
+    </div>
+  </div>
+
+  <!-- 料金 -->
+  <div class="section">
+    <h2>💰 料金</h2>
+    <p>
+      レイテンシティアおよびオートスケーリングスケジュール自体に<span class="highlight">追加料金はありません</span> (リリースノート・ドキュメントに追加課金の記載なし)。Dataflow の料金は従来どおり、ジョブが消費するワーカーの vCPU・メモリ・ストレージおよび Streaming Engine の処理データ量 (または Streaming Engine Compute Unit) に基づいて課金されます。
+    </p>
+    <div class="note-box">
+      <strong>💡 ヒント:</strong> 本機能はワーカー数の推移に直接影響するため、設定次第で月額コストが変動します。<code>high_latency</code> ティアやオフピークのワーカー縮小スケジュールを活用することで、コンピュート課金の削減が期待できます。
+    </div>
+    <p style="margin-bottom: 0;">詳細は <a class="gc-link" href="https://cloud.google.com/dataflow/pricing" target="_blank" rel="noopener noreferrer">Dataflow 料金ページ</a> を参照してください。</p>
+  </div>
+
+  <!-- 利用可能リージョン -->
+  <div class="section">
+    <h2>🌏 利用可能リージョン</h2>
+    <p style="margin-bottom: 0;">
+      リリースノートにリージョン制限の記載はありません。<strong>Streaming Engine が利用可能なリージョン</strong>で使用できます。詳細は <a class="gc-link" href="https://docs.cloud.google.com/dataflow/docs/concepts/regional-endpoints" target="_blank" rel="noopener noreferrer">Dataflow のリージョンエンドポイント</a> および <a class="gc-link" href="https://docs.cloud.google.com/dataflow/docs/streaming-engine" target="_blank" rel="noopener noreferrer">Streaming Engine のドキュメント</a> を参照してください。
+    </p>
+  </div>
+
+  <!-- 関連サービス・機能 -->
+  <div class="section">
+    <h2>🔗 関連サービス・機能</h2>
+    <div class="card">
+      <div class="icon-text"><span class="arrow">→</span><span><strong>Streaming Engine</strong>: 本機能の前提となる Dataflow のバックエンド。ワーカー VM からステート管理をオフロードし、柔軟なオートスケーリングを実現する</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span><strong>Pub/Sub</strong>: ストリーミングパイプラインの代表的な入力ソース。バックログ (未 ACK メッセージ) の推定時間がスケーリング判断の主要素となる</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span><strong>Cloud Monitoring / オートスケーリング指標</strong>: ジョブ詳細ページの「Autoscaling」タブで、スケーリング判断の要因や有効なスケジュールを確認できる</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span><strong>gcloud CLI (<code>dataflow jobs update-options</code>)</strong>: 実行中ジョブへのインフライト更新 (レイテンシティア、ワーカー数範囲など) に使用する</span></div>
+    </div>
+  </div>
+
+  <!-- まとめ -->
+  <div class="section">
+    <h2>📌 まとめ</h2>
+    <p>
+      今回のアップデートにより、Dataflow Streaming Engine ジョブのオートスケーリングを<span class="highlight">「許容バックログ時間」</span>と<span class="highlight">「時間帯別スケジュール」</span>という 2 つの軸で宣言的に制御できるようになり、レイテンシ要件とコストのトレードオフをワークロードごとに最適化できます。
+    </p>
+    <div class="flow-diagram">
+      <div class="flow-step">1️⃣ ラグ許容ジョブを特定</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">2️⃣ <code>medium</code>/<code>high_latency</code> を<br>インフライト適用で試す</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">3️⃣ 負荷パターンが予測可能なら<br>スケジュール導入を検討</div>
+    </div>
+    <div class="success-box">
+      <strong>✅ 推奨アクション:</strong> リアルタイム性が必須でないストリーミングジョブを運用しているチームは、まず <code>medium_latency</code> / <code>high_latency</code> ティアのインフライト適用から試し、負荷パターンが予測可能なジョブにはオートスケーリングスケジュールの導入を検討しましょう。
+    </div>
+  </div>
+
+  <!-- フッター -->
+  <footer>
+    <p><strong>📎 出典・参考リンク</strong></p>
+    <ul>
+      <li>📰 公式リリースノート: <a href="https://docs.cloud.google.com/release-notes#October_29_2026" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/release-notes#October_29_2026</a></li>
+      <li>📖 ドキュメント: Tune Horizontal Autoscaling (Set the latency tier / Schedule autoscaling changes): <a href="https://docs.cloud.google.com/dataflow/docs/guides/tune-horizontal-autoscaling" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/dataflow/docs/guides/tune-horizontal-autoscaling</a></li>
+      <li>📖 ドキュメント: Horizontal Autoscaling: <a href="https://docs.cloud.google.com/dataflow/docs/horizontal-autoscaling" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/dataflow/docs/horizontal-autoscaling</a></li>
+      <li>📖 ドキュメント: パイプラインのインフライト更新: <a href="https://docs.cloud.google.com/dataflow/docs/guides/updating-a-pipeline#in-flight-updates" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/dataflow/docs/guides/updating-a-pipeline#in-flight-updates</a></li>
+      <li>💰 料金ページ: <a href="https://cloud.google.com/dataflow/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">https://cloud.google.com/dataflow/pricing</a></li>
+    </ul>
+    <p>🏷️ タグ: Dataflow / Streaming Engine / Horizontal Autoscaling / Latency Tier / Autoscaling Schedule / コスト最適化 / ストリーミング処理</p>
+    <p>本インフォグラフィックは Google Cloud News レポート (2026-10-29) を基に生成されました。</p>
+  </footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+    mermaid.initialize({
+        startOnLoad: true,
+        theme: 'base',
+        themeVariables: {
+            primaryColor: '#4285F4',
+            primaryTextColor: '#202124',
+            primaryBorderColor: '#4285F4',
+            lineColor: '#4285F4',
+            secondaryColor: '#F1F3F4',
+            tertiaryColor: '#FAFAFA',
+            background: '#FFFFFF',
+            mainBkg: '#E8F0FE',
+            nodeBorder: '#4285F4',
+            clusterBkg: '#E8F0FE',
+            clusterBorder: '#4285F4',
+            edgeLabelBackground: '#FFFFFF',
+            textColor: '#202124'
+        }
+    });
+</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

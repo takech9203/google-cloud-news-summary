@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud SQL for PostgreSQL: Logical Replication Failover Slot (GA)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1 {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .card-teal {
+      border-left-color: var(--gc-teal);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-green);
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid) {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.green {
+      background: linear-gradient(135deg, var(--gc-green), #1B5E20);
+    }
+
+    .stat-card.orange {
+      background: linear-gradient(135deg, var(--gc-orange), #E65100);
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border: 1px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-card h4 {
+      color: var(--gc-red);
+      margin: 0 0 12px 0;
+      font-size: 16px;
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border: 1px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-card h4 {
+      color: var(--gc-green);
+      margin: 0 0 12px 0;
+      font-size: 16px;
+    }
+
+    .before-card ul, .after-card ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-card li, .after-card li {
+      margin: 6px 0;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-800);
+      margin: 0 0 8px 0;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .tag {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-800);
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stat-cards { grid-template-columns: 1fr; }
+      .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>🗄️ Cloud SQL for PostgreSQL:<br>Logical Replication Failover Slot</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Cloud SQL for PostgreSQL</span>
+          <span class="badge-ga">GA</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-07-24</div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>Cloud SQL for PostgreSQL において、<span class="highlight">論理レプリケーションのフェイルオーバースロット</span>が一般提供 (GA) となりました。Advanced Disaster Recovery (DR) のスイッチオーバーおよびレプリカフェイルオーバー操作において、論理レプリケーションスロットの継続性が保証され、ビジネス継続性が大幅に向上します。</p>
+
+      <div class="note-box">
+        <strong>💡 ポイント:</strong> DR 操作後も論理レプリケーションが自動的に継続され、CDC (Change Data Capture) パイプラインやリアルタイムデータストリーミングの信頼性が確保されます。
+      </div>
+    </div>
+
+    <!-- Before/After Section -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-card">
+          <h4>❌ Before (従来)</h4>
+          <ul>
+            <li>DR 操作で論理レプリケーションスロットが失われる</li>
+            <li>DR 後にデータコンシューマーへのレプリケーションを手動再構成</li>
+            <li>DR レプリカに <code>cloudsql.logical_decoding</code> フラグを設定不可</li>
+            <li>DR 操作とリアルタイムパイプラインの両立が困難</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>✅ After (改善後)</h4>
+          <ul>
+            <li>DR 操作後もスロットが新プライマリに自動引き継ぎ</li>
+            <li>レプリケーションが継続、手動再構成が不要</li>
+            <li>CDC パイプラインのビジネス継続性が保証</li>
+            <li>論理レプリケーションと Advanced DR の併用が可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats Section -->
+    <div class="section">
+      <h2>📊 数字で見るアップデート</h2>
+      <div class="stat-cards">
+        <div class="stat-card green">
+          <div class="stat-value">0</div>
+          <div class="stat-label">手動再構成の必要回数</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">4096</div>
+          <div class="stat-label">最大レプリケーションスロット数</div>
+        </div>
+        <div class="stat-card orange">
+          <div class="stat-value">$0</div>
+          <div class="stat-label">追加料金</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>Logical Replication Failover Slot を使用した Advanced DR アーキテクチャ。プライマリの論理レプリケーションスロットが DR 操作時に DR レプリカへ引き継がれ、下流 CDC パイプラインが中断なく継続します。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph RegionA["リージョン A - プライマリ"]
+        Primary["Cloud SQL Primary\n(Enterprise Plus)"]
+        LogicalSlot["Logical Replication\nFailover Slot"]
+        Primary --> LogicalSlot
+    end
+
+    subgraph RegionB["リージョン B - DR"]
+        DRReplica["DR Replica\n(Enterprise Plus)"]
+        NewSlot["Logical Replication\nSlot - 引き継ぎ"]
+        DRReplica -.-> NewSlot
+    end
+
+    subgraph Downstream["下流システム"]
+        Datastream["Datastream"]
+        BigQuery["BigQuery"]
+        External["外部システム"]
+    end
+
+    Primary -->|"非同期レプリケーション"| DRReplica
+    LogicalSlot -->|"CDC ストリーム"| Datastream
+    NewSlot -.->|"フェイルオーバー後 CDC 継続"| Datastream
+    Datastream --> BigQuery
+    Datastream --> External
+
+    Primary -->|"スイッチオーバー / フェイルオーバー"| DRReplica
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+
+      <div class="card">
+        <h3>🔁 論理レプリケーションフェイルオーバースロット</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>DR スイッチオーバー/レプリカフェイルオーバー時にスロット状態を新プライマリに自動引き継ぎ</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>スロットの位置情報 (LSN) が保持され、データ欠落なくストリーミング継続</span></div>
+      </div>
+
+      <div class="card card-green">
+        <h3>🛡️ Advanced DR との統合</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>Cloud SQL Enterprise Plus エディションの Advanced DR 機能と完全統合</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>スイッチオーバー (計画的) とレプリカフェイルオーバー (障害時) の両方に対応</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>DNS ライトエンドポイントとの組み合わせで、アプリ変更なしの DR 操作が可能</span></div>
+      </div>
+
+      <div class="card card-purple">
+        <h3>📊 CDC パイプラインの継続性保証</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>Datastream や外部 CDC ツールへの論理レプリケーションが DR 後も中断なく継続</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>WAL (Write-Ahead Log) の変更データが新プライマリから自動ストリーミング</span></div>
+      </div>
+    </div>
+
+    <!-- Technical Specs -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3>前提条件と要件</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Cloud SQL エディション</td><td><strong>Enterprise Plus (必須)</strong></td></tr>
+          <tr><td>PostgreSQL バージョン</td><td>PostgreSQL 12 以降</td></tr>
+          <tr><td>DR レプリカ</td><td>クロスリージョンの指定 DR レプリカが必要</td></tr>
+          <tr><td>PITR</td><td>プライマリインスタンスで有効化が必要</td></tr>
+          <tr><td>トランザクションログ</td><td>Cloud Storage に保存</td></tr>
+          <tr><td>gcloud CLI バージョン</td><td>502.0.0 以降</td></tr>
+        </tbody>
+      </table>
+
+      <h3>レプリケーションスロットの制限</h3>
+      <table>
+        <thead>
+          <tr><th>最大メモリ (GB)</th><th>最大レプリケーションスロット数</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>4</td><td>10</td></tr>
+          <tr><td>16</td><td>32</td></tr>
+          <tr><td>32</td><td>128</td></tr>
+          <tr><td>64</td><td>256</td></tr>
+          <tr><td>128</td><td>512</td></tr>
+          <tr><td>256</td><td>1,024</td></tr>
+          <tr><td>512</td><td>2,048</td></tr>
+          <tr><td>512+</td><td>4,096</td></tr>
+        </tbody>
+      </table>
+
+      <h3>関連フラグ設定</h3>
+      <span class="code-label">SQL</span>
+      <pre><code class="language-sql">-- 論理デコーディングの有効化 (Cloud SQL 固有のフラグ)
+cloudsql.logical_decoding = on
+
+-- WAL センダーの最大数 (デフォルト: 10)
+max_wal_senders = 10
+
+-- レプリケーションスロットの最大数
+max_replication_slots = 10</code></pre>
+    </div>
+
+    <!-- Setup Steps -->
+    <div class="section">
+      <h2>🚀 設定方法</h2>
+
+      <div class="warning-box">
+        <strong>⚠️ 前提条件:</strong> Cloud SQL Enterprise Plus エディション、クロスリージョン DR レプリカ、PITR 有効化、gcloud CLI 502.0.0 以降が必要です。
+      </div>
+
+      <h3>Step 1: 論理デコーディングの有効化</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># プライマリインスタンスで cloudsql.logical_decoding フラグを有効化
+gcloud sql instances patch PRIMARY_INSTANCE_NAME \
+  --database-flags cloudsql.logical_decoding=on</code></pre>
+
+      <h3>Step 2: レプリケーションユーザーの作成</h3>
+      <span class="code-label">SQL</span>
+      <pre><code class="language-sql">-- REPLICATION 属性を持つユーザーを作成
+CREATE USER replication_user WITH REPLICATION
+  IN ROLE cloudsqlsuperuser
+  LOGIN PASSWORD 'your_secure_password';</code></pre>
+
+      <h3>Step 3: パブリケーションとスロットの作成</h3>
+      <span class="code-label">SQL</span>
+      <pre><code class="language-sql">-- レプリケーション対象テーブルのパブリケーションを作成
+CREATE PUBLICATION my_publication FOR TABLE schema1.table1, schema2.table2;
+
+-- フェイルオーバースロットを使用した論理レプリケーションスロットの作成
+SELECT PG_CREATE_LOGICAL_REPLICATION_SLOT('my_failover_slot', 'pgoutput');</code></pre>
+
+      <h3>Step 4: DR レプリカの指定</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># DR レプリカを指定
+gcloud sql instances patch DR_REPLICA_NAME \
+  --failover-dr-replica-name=PRIMARY_INSTANCE_NAME</code></pre>
+
+      <h3>Step 5: スイッチオーバーの実行</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># DR レプリカへのスイッチオーバー
+gcloud sql instances switchover DR_REPLICA_NAME \
+  --db-timeout=TIMEOUT_DURATION</code></pre>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+
+      <h3>ビジネス面</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>ダウンタイムの最小化</strong>: DR 操作時にデータパイプラインの再構成が不要、ビジネス影響を最小限に抑制</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>データ損失リスクの低減</strong>: 論理レプリケーションスロットの引き継ぎにより、CDC パイプラインでのデータ欠落を防止</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>運用コストの削減</strong>: DR 操作後の手動復旧作業が不要、運用チームの負荷を軽減</span></div>
+
+      <h3>技術面</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>自動フェイルオーバー</strong>: 論理レプリケーションスロットの状態が自動的に新プライマリに引き継ぎ</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>エンドツーエンドの継続性</strong>: WAL ストリームの位置情報が保持、重複やギャップなしにレプリケーション再開</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>柔軟な DR アーキテクチャ</strong>: 論理レプリケーションと物理レプリケーションを同一環境で併用可能</span></div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ 制約事項・考慮点</h2>
+
+      <h3>制限事項</h3>
+      <div class="check-item"><span class="cross-icon">✗</span><span>Cloud SQL Enterprise Plus エディションでのみ利用可能 (Enterprise エディション不可)</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>PostgreSQL 12 以降が必要</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>DR レプリカはプライマリと異なるリージョンに配置する必要あり</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>カスケードレプリカは DR レプリカとして使用不可</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>DR レプリカはプライマリの直接レプリカである必要あり</span></div>
+
+      <h3>考慮すべき点</h3>
+      <div class="warning-box">
+        <ul style="margin: 0; padding-left: 20px;">
+          <li>非同期レプリケーション使用のため、フェイルオーバー時の RPO はゼロにならない可能性あり</li>
+          <li>未使用のレプリケーションスロットは WAL セグメントの無限蓄積を引き起こすため、モニタリングが必要</li>
+          <li>DR レプリカとプライマリの機材タイプ (tier) とサイズを揃えることが推奨</li>
+          <li><code>max_connections</code>, <code>max_worker_processes</code> 等のフラグ値は DR レプリカでプライマリと同等以上に設定が必要</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>🛒 ユースケース 1: リアルタイム分析パイプラインの DR 保護</h4>
+        <p><strong>シナリオ:</strong> EC サイトのトランザクションデータを Cloud SQL for PostgreSQL から Datastream 経由で BigQuery にリアルタイムストリーミングしている環境で、リージョン障害に備えた DR を構成したい。</p>
+        <span class="code-label">Bash</span>
+        <pre><code class="language-bash"># プライマリ (asia-northeast1) に論理レプリケーションを設定
+gcloud sql instances patch ecommerce-primary \
+  --database-flags cloudsql.logical_decoding=on
+
+# DR レプリカ (us-central1) を指定
+gcloud sql instances patch ecommerce-dr-replica \
+  --failover-dr-replica-name=ecommerce-primary</code></pre>
+        <div class="success-box">
+          <strong>効果:</strong> リージョン障害発生時に DR レプリカへフェイルオーバーしても、Datastream への CDC ストリーミングが自動継続、BigQuery のリアルタイムダッシュボードが中断なく稼働。
+        </div>
+      </div>
+
+      <div class="usecase-card">
+        <h4>🔗 ユースケース 2: マイクロサービス間のイベント駆動アーキテクチャ</h4>
+        <p><strong>シナリオ:</strong> PostgreSQL の論理レプリケーションで注文管理サービスから在庫管理・通知サービスにイベントを伝播。DR 切り替え時もイベントの欠落を防ぎたい。</p>
+        <div class="success-box">
+          <strong>効果:</strong> DR スイッチオーバー後も論理レプリケーションスロットが保持され、すべてのイベントが欠落なく下流サービスに伝達。計画メンテナンス時のスイッチオーバーでもサービス間の整合性が維持。
+        </div>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金情報</h2>
+      <div class="note-box">
+        <strong>💡 追加料金なし:</strong> Logical Replication Failover Slot の利用に追加料金は発生しません。Cloud SQL Enterprise Plus エディションの通常料金のみが適用されます。
+      </div>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>料金</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Compute (Enterprise Plus)</td><td>$0.05369/vCPU/時間〜</td></tr>
+          <tr><td>Memory (Enterprise Plus)</td><td>$0.0091/GB/時間〜</td></tr>
+          <tr><td>Storage (SSD)</td><td>$0.17/GB/月</td></tr>
+          <tr><td>PITR ログ (Cloud Storage)</td><td>無料 (最大 35 日間)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Region -->
+    <div class="section">
+      <h2>🌐 利用可能リージョン</h2>
+      <p>Cloud SQL Enterprise Plus エディションが利用可能な<span class="highlight">すべてのリージョン</span>で利用可能です。DR レプリカはプライマリとは異なるリージョンに配置する必要があります。</p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Cloud SQL Advanced DR</strong>: フェイルオーバースロットが統合される基盤機能。スイッチオーバーとレプリカフェイルオーバーを提供</span></div>
+      </div>
+      <div class="card card-teal">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Datastream</strong>: Cloud SQL からの CDC を実現するサービス。論理レプリケーションスロットでデータ変更をストリーミング</span></div>
+      </div>
+      <div class="card card-green">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>BigQuery</strong>: Datastream と組み合わせたリアルタイム分析の宛先として利用</span></div>
+      </div>
+      <div class="card card-orange">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Cloud SQL PITR</strong>: Advanced DR の前提条件。トランザクションログを Cloud Storage に保存</span></div>
+      </div>
+      <div class="card card-purple">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>DNS ライトエンドポイント</strong>: DR 操作後にエンドポイントを自動更新し、アプリ変更なしで接続を切り替え</span></div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <p>Cloud SQL for PostgreSQL の Logical Replication Failover Slot の GA は、Advanced DR 環境において論理レプリケーションとディザスタリカバリの両立を実現する重要なアップデートです。</p>
+      <div class="success-box">
+        <strong>推奨アクション:</strong> CDC パイプラインや外部システムへのデータストリーミングを行っている環境では、DR 操作時のデータパイプライン中断リスクが解消されるため、早期の導入検討を推奨します。Cloud SQL Enterprise Plus エディションを利用中で、論理レプリケーションと DR を併用しているユーザーは、フェイルオーバースロットの設定を確認し、DR テスト計画に組み込むことをお勧めします。
+      </div>
+
+      <div class="tags">
+        <span class="tag">#CloudSQL</span>
+        <span class="tag">#PostgreSQL</span>
+        <span class="tag">#LogicalReplication</span>
+        <span class="tag">#DisasterRecovery</span>
+        <span class="tag">#FailoverSlot</span>
+        <span class="tag">#CDC</span>
+        <span class="tag">#EnterprisePlus</span>
+        <span class="tag">#HighAvailability</span>
+        <span class="tag">#BusinessContinuity</span>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="list-style: none; padding: 0; margin: 4px 0;">
+        <li><a href="https://docs.cloud.google.com/release-notes#July_24_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li><a href="https://docs.cloud.google.com/sql/docs/postgres/use-advanced-disaster-recovery" target="_blank" rel="noopener noreferrer">Advanced disaster recovery (DR) with logical failover slot</a></li>
+        <li><a href="https://docs.cloud.google.com/sql/docs/postgres/replication/configure-logical-replication" target="_blank" rel="noopener noreferrer">Cloud SQL for PostgreSQL 論理レプリケーション設定</a></li>
+        <li><a href="https://cloud.google.com/sql/pricing" target="_blank" rel="noopener noreferrer">Cloud SQL 料金ページ</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline);">Generated: 2026-07-24 | Google Cloud News Infographic</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

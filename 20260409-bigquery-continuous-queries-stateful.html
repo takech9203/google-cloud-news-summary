@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BigQuery: Continuous Queries でのステートフル操作のサポート</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    /* Google Cloud Light Theme Base Styles */
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1 {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+      text-align: right;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .card-teal {
+      border-left-color: var(--gc-teal);
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    /* Before/After comparison */
+    .comparison-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 600px) {
+      .comparison-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-card h3 {
+      color: var(--gc-red);
+      margin-top: 0;
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-card h3 {
+      color: var(--gc-green);
+      margin-top: 0;
+    }
+
+    .before-card ul, .after-card ul {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    .before-card li, .after-card li {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    /* Stats grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.green {
+      background: linear-gradient(135deg, var(--gc-green), #1B8A3A);
+    }
+
+    .stat-card.orange {
+      background: linear-gradient(135deg, var(--gc-orange), #E65100);
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Feature cards grid */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .feature-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .feature-card .feature-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .feature-card p, .feature-card ul {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    .feature-card ul {
+      padding-left: 20px;
+    }
+
+    .feature-card li {
+      margin: 4px 0;
+    }
+
+    /* Use case cards */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h3 {
+      color: var(--gc-blue-900);
+      margin-top: 0;
+    }
+
+    .usecase-card p {
+      font-size: 14px;
+    }
+
+    /* Table styles */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    /* Mermaid */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Code blocks */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      background: none;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid) {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    /* Note/Warning boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Flow diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Pricing table */
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .pricing-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      border: 2px solid var(--gc-outline-variant);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .pricing-card h3 {
+      margin-top: 0;
+      color: var(--gc-blue-600);
+    }
+
+    .pricing-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    .pricing-row:last-child {
+      border-bottom: none;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* Related services */
+    .related-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .related-item {
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--gc-on-surface);
+    }
+
+    .related-item .related-icon {
+      font-size: 28px;
+      margin-bottom: 8px;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    footer ul {
+      list-style: none;
+      padding: 0;
+      margin: 8px 0;
+    }
+
+    footer li {
+      margin: 4px 0;
+    }
+
+    @media (max-width: 600px) {
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .header { flex-direction: column; }
+      .subtitle { text-align: left; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .pricing-grid { grid-template-columns: 1fr; }
+      .related-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>📊 BigQuery: Continuous Queries でのステートフル操作のサポート</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">BigQuery</span>
+          <span class="badge badge-preview">Preview</span>
+          <span class="badge" style="background: var(--gc-green);">Continuous Queries</span>
+        </div>
+      </div>
+      <div class="subtitle">
+        2026-04-09<br>
+        Google Cloud Update
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>🔍 概要</h2>
+      <p>
+        BigQuery の <span class="highlight">Continuous Queries (継続クエリ)</span> において、<span class="highlight">ステートフル操作</span>が Preview として利用可能になりました。
+        これにより、<strong>JOIN 操作</strong>や<strong>ウィンドウ集計関数</strong>を使用して、複数の行や時間間隔にわたる情報を保持しながら複雑なリアルタイム分析を実行できるようになります。
+      </p>
+      <p>
+        従来は Dataflow などの専用ストリーミング処理基盤が必要だったワークロードの一部を、BigQuery の SQL だけで実現できる可能性が広がります。
+      </p>
+
+      <div class="note-box">
+        <strong>💡 ポイント:</strong> Enterprise または Enterprise Plus エディションのリザベーションが必要です。Preview 段階のため SLA 適用対象外。
+      </div>
+    </div>
+
+    <!-- Before / After -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="comparison-grid">
+        <div class="before-card">
+          <h3>❌ Before (アップデート前)</h3>
+          <ul>
+            <li>Continuous Queries はステートレスな処理のみサポート</li>
+            <li>JOIN 操作が使用できなかった</li>
+            <li>集計関数 (GROUP BY, HAVING) やウィンドウ関数が使用不可</li>
+            <li>ストリーミングデータの結合には Dataflow 等の別基盤が必要</li>
+            <li>リアルタイムエンリッチメントを BigQuery 単体で実現不可</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h3>✅ After (アップデート後)</h3>
+          <ul>
+            <li>Continuous Queries 内で JOIN 操作が利用可能に</li>
+            <li>ウィンドウ集計でリアルタイム時間ベース集計が可能</li>
+            <li>複数行にまたがる状態保持ロジックを SQL で記述可能</li>
+            <li>Dataflow なしでストリーミング分析パターンを BigQuery 内で完結</li>
+            <li>参照テーブルとの結合がリアルタイムで実行可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Key Stats -->
+    <div class="section">
+      <h2>📈 数字で見るアップデート</h2>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value">500</div>
+          <div class="stat-label">最大スロット数 (リザベーション)</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-value">150日</div>
+          <div class="stat-label">最大実行時間 (サービスアカウント)</div>
+        </div>
+        <div class="stat-card orange">
+          <div class="stat-value">4</div>
+          <div class="stat-label">出力先 (BQ / Pub/Sub / Bigtable / Spanner)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>Continuous Query のステートフル操作では、APPENDS 関数で取得したストリーミングデータに対して JOIN やウィンドウ集計を適用し、複数行にわたる状態を保持しながらリアルタイム処理を実行します。処理結果は BigQuery テーブル、Pub/Sub、Bigtable、Spanner のいずれかに出力できます。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Sources["データソース"]
+        S1["ストリーミング\nテーブル A\n(イベントデータ)"]
+        S2["参照テーブル B\n(マスターデータ)"]
+    end
+
+    subgraph CQ["Continuous Query (ステートフル操作)"]
+        direction TB
+        APPENDS["APPENDS() 関数\n開始時刻の指定"]
+        JOIN["JOIN 操作\nストリーミングデータと\n参照データの結合"]
+        WINDOW["ウィンドウ集計\n時間間隔ベースの\n集計処理"]
+        STATE["状態管理\n複数行にわたる\n情報の保持"]
+        APPENDS --> JOIN
+        APPENDS --> WINDOW
+        JOIN --> STATE
+        WINDOW --> STATE
+    end
+
+    subgraph Dest["出力先"]
+        BQ["BigQuery テーブル\n(INSERT)"]
+        PS["Pub/Sub トピック"]
+        BT["Bigtable テーブル"]
+        SP["Spanner テーブル"]
+    end
+
+    S1 --> APPENDS
+    S2 --> JOIN
+    STATE --> BQ
+    STATE --> PS
+    STATE --> BT
+    STATE --> SP
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-title">🔗 JOIN 操作のサポート</div>
+          <ul>
+            <li>Continuous Queries 内でストリーミングデータと他のテーブルを JOIN で結合可能</li>
+            <li>ストリーミングイベントデータにマスターデータを付加するリアルタイムエンリッチメントが実現可能</li>
+            <li>複数のストリーミングソースを結合した複合的なリアルタイム分析に対応</li>
+          </ul>
+        </div>
+        <div class="feature-card" style="border-left-color: var(--gc-green);">
+          <div class="feature-title">🪟 ウィンドウ集計 (Windowing Aggregations) のサポート</div>
+          <ul>
+            <li>時間間隔に基づくデータの集計処理が可能</li>
+            <li>タンブリングウィンドウ (固定長の非重複時間間隔) やホッピングウィンドウ (重複する時間間隔) など一般的なストリーミングウィンドウパターンへの対応</li>
+            <li>GROUP BY 句や集計関数と組み合わせたリアルタイム集約処理</li>
+          </ul>
+        </div>
+        <div class="feature-card" style="border-left-color: var(--gc-purple);">
+          <div class="feature-title">🧠 状態管理 (Stateful Processing)</div>
+          <ul>
+            <li>複数の行にわたる情報を保持しながら処理を実行</li>
+            <li>時間間隔をまたいだデータの蓄積と分析が可能</li>
+            <li>BigQuery のマネージドインフラ上で状態管理が自動的に行われるため、ユーザーが状態ストアを管理する必要がない</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>📋 技術仕様</h2>
+
+      <h3>Continuous Queries の基本仕様</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>ステータス</td><td>Preview (ステートフル操作)</td></tr>
+          <tr><td>必要エディション</td><td>Enterprise または Enterprise Plus</td></tr>
+          <tr><td>課金モデル</td><td>Capacity compute pricing (スロット課金)</td></tr>
+          <tr><td>ジョブタイプ</td><td>CONTINUOUS</td></tr>
+          <tr><td>最大実行時間 (ユーザーアカウント)</td><td>2 日間</td></tr>
+          <tr><td>最大実行時間 (サービスアカウント)</td><td>150 日間</td></tr>
+          <tr><td>最大スロット数 (リザベーション)</td><td>500 スロット (上限引き上げリクエスト可能)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>既存のサポート済み操作 (GA) と新規操作 (Preview)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>操作</th>
+            <th>説明</th>
+            <th>ステータス</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>INSERT ステートメント</td><td>BigQuery テーブルへのデータ書き込み</td><td><span class="badge badge-ga" style="font-size:11px;">GA</span></td></tr>
+          <tr><td>EXPORT DATA (Pub/Sub / Bigtable / Spanner)</td><td>各サービスへのデータエクスポート</td><td><span class="badge badge-ga" style="font-size:11px;">GA</span></td></tr>
+          <tr><td>AI/ML 関数</td><td>AI.GENERATE, ML.UNDERSTAND_TEXT, ML.TRANSLATE</td><td><span class="badge badge-ga" style="font-size:11px;">GA</span></td></tr>
+          <tr><td>APPENDS 関数</td><td>開始時刻を指定した継続的データ処理</td><td><span class="badge badge-ga" style="font-size:11px;">GA</span></td></tr>
+          <tr><td>ステートレス関数</td><td>変換関数など行単位の独立した処理</td><td><span class="badge badge-ga" style="font-size:11px;">GA</span></td></tr>
+          <tr><td><strong>JOIN 操作</strong></td><td>複数テーブルの結合</td><td><span class="badge badge-preview" style="font-size:11px;">Preview</span></td></tr>
+          <tr><td><strong>ウィンドウ集計</strong></td><td>時間間隔に基づく集計処理</td><td><span class="badge badge-preview" style="font-size:11px;">Preview</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup -->
+    <div class="section">
+      <h2>🔧 設定方法</h2>
+      <p><strong>前提条件:</strong> Enterprise / Enterprise Plus エディションのリザベーション作成済み、CONTINUOUS ジョブタイプの割り当て設定済み、<code>roles/bigquery.admin</code> または適切な IAM ロールが付与されていること。</p>
+
+      <h3>ステップ 1: Enterprise リザベーションの作成</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">Enterprise エディションのリザベーション作成</span>
+        </div>
+        <pre><code class="language-bash"># Enterprise エディションのリザベーションを作成
+bq mk --reservation \
+  --project_id=PROJECT_ID \
+  --location=LOCATION \
+  --reservation_id=continuous_reservation \
+  --slots=100 \
+  --edition=ENTERPRISE</code></pre>
+      </div>
+
+      <h3>ステップ 2: CONTINUOUS ジョブタイプのリザベーション割り当て</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">CONTINUOUS ジョブタイプの割り当て</span>
+        </div>
+        <pre><code class="language-bash"># CONTINUOUS ジョブタイプの割り当てを作成
+bq mk --reservation_assignment \
+  --project_id=PROJECT_ID \
+  --location=LOCATION \
+  --reservation_id=continuous_reservation \
+  --assignee_id=PROJECT_ID \
+  --assignee_type=PROJECT \
+  --job_type=CONTINUOUS</code></pre>
+      </div>
+
+      <h3>ステップ 3: ステートフル Continuous Query の実行</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">JOIN を使ったリアルタイムエンリッチメント例</span>
+        </div>
+        <pre><code class="language-sql">-- bq query --use_legacy_sql=false --continuous=true
+INSERT INTO `myproject.dataset.enriched_events`
+SELECT
+  e.event_id,
+  e.event_timestamp,
+  e.user_id,
+  u.user_name,
+  u.segment
+FROM APPENDS(
+  TABLE `myproject.dataset.raw_events`,
+  CURRENT_TIMESTAMP() - INTERVAL 10 MINUTE
+) AS e
+JOIN `myproject.dataset.users` AS u
+  ON e.user_id = u.user_id</code></pre>
+      </div>
+
+      <h3>ステップ 4: Google Cloud コンソールでの実行</h3>
+      <div class="flow-diagram">
+        <div class="flow-step">🌐 BigQuery<br>ページを開く</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">⚙️ クエリモード<br>「Continuous query」選択</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">📝 SQL 入力<br>(ステートフル操作)</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">▶️ Run<br>をクリック</div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h3>🛒 ユースケース 1: リアルタイムデータエンリッチメント</h3>
+        <p><strong>シナリオ:</strong> EC サイトのクリックストリームデータにユーザー属性情報や商品マスター情報を JOIN で付加し、リアルタイムでエンリッチメントされたデータを下流システムに提供。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">クリックストリームエンリッチメント</span>
+          </div>
+          <pre><code class="language-sql">INSERT INTO `myproject.analytics.enriched_clickstream`
+SELECT
+  c.event_id, c.event_timestamp, c.user_id,
+  u.user_segment, u.registration_date,
+  c.product_id, p.product_name, p.category
+FROM APPENDS(
+  TABLE `myproject.analytics.raw_clickstream`,
+  CURRENT_TIMESTAMP() - INTERVAL 10 MINUTE
+) AS c
+JOIN `myproject.master.users` AS u
+  ON c.user_id = u.user_id
+JOIN `myproject.master.products` AS p
+  ON c.product_id = p.product_id</code></pre>
+        </div>
+        <p>✅ <strong>効果:</strong> Dataflow パイプラインなしで BigQuery SQL だけでリアルタイムエンリッチメントを実現。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>🌡️ ユースケース 2: リアルタイムウィンドウ集計によるモニタリング</h3>
+        <p><strong>シナリオ:</strong> IoT センサーから継続的に取り込まれる温度・湿度データを一定時間ごとに集計し、異常検知やダッシュボード表示用のデータを生成。</p>
+        <p>✅ <strong>効果:</strong> ウィンドウ集計 (例: 5 分間隔のタンブリングウィンドウ) で平均温度や最大値を計算し、Bigtable や Pub/Sub に出力。リアルタイムモニタリングパイプラインを BigQuery 内で完結。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>🔒 ユースケース 3: ストリーミング JOIN による不正検知</h3>
+        <p><strong>シナリオ:</strong> 金融取引データとブラックリストテーブルを JOIN し、疑わしい取引をリアルタイムで検出して Pub/Sub 経由でアラートシステムに通知。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">不正取引のリアルタイム検知</span>
+          </div>
+          <pre><code class="language-sql">EXPORT DATA OPTIONS (
+  format = 'CLOUD_PUBSUB',
+  uri = 'https://pubsub.googleapis.com/projects/myproject/topics/fraud-alerts'
+) AS (
+  SELECT TO_JSON_STRING(
+    STRUCT(t.transaction_id, t.amount, t.timestamp, b.risk_level)
+  ) AS message
+  FROM APPENDS(
+    TABLE `myproject.finance.transactions`,
+    CURRENT_TIMESTAMP() - INTERVAL 5 MINUTE
+  ) AS t
+  JOIN `myproject.finance.blacklist` AS b
+    ON t.account_id = b.account_id
+  WHERE t.amount > 10000
+)</code></pre>
+        </div>
+        <p>✅ <strong>効果:</strong> 取引データとブラックリストのリアルタイム結合で不正検知レイテンシを大幅短縮。従来 Dataflow で構築していたパイプラインを BigQuery SQL で実装。</p>
+      </div>
+    </div>
+
+    <!-- Merits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div>
+          <h3>ビジネス面</h3>
+          <div class="card card-green">
+            <strong>🏗️ ストリーミング分析基盤の簡素化</strong>
+            <p style="font-size:14px; margin:4px 0;">Dataflow などの別途基盤なしで BigQuery SQL だけでリアルタイム JOIN / ウィンドウ集計を実現。アーキテクチャの複雑さとコストを削減。</p>
+          </div>
+          <div class="card card-green">
+            <strong>⚡ リアルタイムインサイトの迅速な獲得</strong>
+            <p style="font-size:14px; margin:4px 0;">ストリーミングデータにマスターデータを即座に結合し、エンリッチメントされた情報をリアルタイムで下流システムに提供。</p>
+          </div>
+          <div class="card card-green">
+            <strong>🎓 SQL スキルの活用</strong>
+            <p style="font-size:14px; margin:4px 0;">標準 SQL を使用するため、既存 SQL スキルでストリーミング処理を実装可能。専門フレームワークの学習コスト削減。</p>
+          </div>
+        </div>
+        <div>
+          <h3>技術面</h3>
+          <div class="card card-teal">
+            <strong>🤖 マネージドな状態管理</strong>
+            <p style="font-size:14px; margin:4px 0;">BigQuery が状態管理を自動で実行。ユーザーが状態ストアの運用やスケーリングを行う必要なし。</p>
+          </div>
+          <div class="card card-teal">
+            <strong>🔌 既存エコシステムとの統合</strong>
+            <p style="font-size:14px; margin:4px 0;">リザベーション、オートスケーリング、アイドルスロット共有など既存の BigQuery リソース管理機能をそのまま利用可能。</p>
+          </div>
+          <div class="card card-teal">
+            <strong>📤 多様な出力先</strong>
+            <p style="font-size:14px; margin:4px 0;">JOIN やウィンドウ集計の結果を BigQuery テーブル、Pub/Sub、Bigtable、Spanner に出力。リバース ETL やイベント駆動アーキテクチャに対応。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>制限事項</h3>
+      <div class="error-box">
+        <ul style="margin: 0; padding-left: 20px; font-size: 14px;">
+          <li>Preview 段階であり、<strong>SLA 適用対象外</strong>。本番ワークロードでの利用には注意が必要</li>
+          <li>オンデマンド課金モデルではサポートされず、Enterprise / Enterprise Plus リザベーションが必須</li>
+          <li>CONTINUOUS リザベーション割り当ては<strong>最大 500 スロット</strong>に制限 (上限引き上げは問い合わせ)</li>
+          <li>ユーザーアカウントでの最大実行時間は <strong>2 日間</strong></li>
+          <li>実行中の Continuous Query の SQL を変更することはできない</li>
+          <li>出力ウォーターマークラグが 48 時間を超えるとジョブが失敗</li>
+        </ul>
+      </div>
+
+      <h3>考慮すべき点</h3>
+      <div class="warning-box">
+        <ul style="margin: 0; padding-left: 20px; font-size: 14px;">
+          <li>一時的な問題による再処理で出力に重複データが含まれる可能性あり。下流システムでの冪等性処理を考慮</li>
+          <li>エクスポート先は BigQuery データセットと<strong>同一リージョン</strong>のリソースのみ対応</li>
+          <li>列レベル・行レベルのセキュリティ機能は未サポート</li>
+          <li>Preview 段階のため、GA に向けて仕様変更の可能性あり</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金情報</h2>
+      <p>Continuous Queries は BigQuery の <strong>Capacity compute pricing (スロットベースの課金)</strong> を使用します。ステートフル操作も同様のスロット課金モデルが適用されます。</p>
+
+      <div class="pricing-grid">
+        <div class="pricing-card">
+          <h3>Enterprise</h3>
+          <div class="pricing-row"><span>Pay-As-You-Go</span><strong>$0.06/スロット時間</strong></div>
+          <div class="pricing-row"><span>1 年コミットメント</span><strong>$0.04/スロット時間</strong></div>
+          <div class="pricing-row"><span>3 年コミットメント</span><strong>$0.03/スロット時間</strong></div>
+        </div>
+        <div class="pricing-card">
+          <h3>Enterprise Plus</h3>
+          <div class="pricing-row"><span>Pay-As-You-Go</span><strong>$0.10/スロット時間</strong></div>
+          <div class="pricing-row"><span>1 年コミットメント</span><strong>$0.064/スロット時間</strong></div>
+          <div class="pricing-row"><span>3 年コミットメント</span><strong>$0.048/スロット時間</strong></div>
+        </div>
+      </div>
+
+      <div class="note-box">
+        <strong>💡 注意:</strong> Continuous Query はアイドル状態でも最低約 1 スロットを消費します。オートスケーリングによりワークロードに応じてスロット数が動的に調整されます。出力先サービス (Pub/Sub, Bigtable, Spanner) の利用料金は各サービスの料金体系に従います。
+      </div>
+    </div>
+
+    <!-- Available Regions -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <p>BigQuery Continuous Queries がサポートされているリージョンで利用可能です。詳細は <a href="https://cloud.google.com/bigquery/docs/locations#continuous-query-loc" target="_blank" class="gc-link">BigQuery continuous query locations</a> を参照してください。</p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス</h2>
+      <div class="related-grid">
+        <div class="related-item">
+          <div class="related-icon">📊</div>
+          <div>BigQuery<br>Continuous Queries<br>(GA 機能)</div>
+        </div>
+        <div class="related-item">
+          <div class="related-icon">🌊</div>
+          <div>Dataflow</div>
+        </div>
+        <div class="related-item">
+          <div class="related-icon">📨</div>
+          <div>Pub/Sub</div>
+        </div>
+        <div class="related-item">
+          <div class="related-icon">🗄️</div>
+          <div>Bigtable</div>
+        </div>
+        <div class="related-item">
+          <div class="related-icon">🌐</div>
+          <div>Spanner</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>📌 まとめ</h2>
+      <p>
+        BigQuery Continuous Queries におけるステートフル操作 (JOIN / ウィンドウ集計) のサポートは、BigQuery のリアルタイム処理能力を大幅に拡張する重要なアップデートです。
+        これまで明示的にサポート対象外とされていた JOIN や集計関数が Preview として利用可能になったことで、<span class="highlight">Dataflow などの別途ストリーミング基盤を構築せずに</span>、BigQuery の SQL だけでより多くのリアルタイム分析パターンを実現できるようになります。
+      </p>
+      <p>
+        Enterprise / Enterprise Plus エディションのリザベーションが必要ですが、リアルタイムデータエンリッチメントやストリーミング集計のニーズがあるチームは、<strong>Preview 段階のうちに検証を開始することを推奨</strong>します。
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>出典:</strong></p>
+      <ul>
+        <li>📎 <a href="https://docs.cloud.google.com/release-notes#April_09_2026" target="_blank" rel="noopener noreferrer">公式リリースノート (2026-04-09)</a></li>
+        <li>📎 <a href="https://docs.cloud.google.com/bigquery/docs/continuous-queries-introduction#supported_stateful_operations" target="_blank" rel="noopener noreferrer">Continuous Queries のステートフル操作 (ドキュメント)</a></li>
+        <li>📎 <a href="https://cloud.google.com/bigquery/docs/continuous-queries-introduction" target="_blank" rel="noopener noreferrer">Continuous Queries の概要</a></li>
+        <li>📎 <a href="https://cloud.google.com/bigquery/docs/continuous-queries" target="_blank" rel="noopener noreferrer">Continuous Queries の作成</a></li>
+        <li>📎 <a href="https://cloud.google.com/bigquery/docs/editions-intro" target="_blank" rel="noopener noreferrer">BigQuery エディションの概要</a></li>
+        <li>📎 <a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer">BigQuery 料金ページ</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline);">#BigQuery #ContinuousQueries #ステートフル操作 #JOIN #ウィンドウ集計 #ストリーミング分析 #リアルタイム処理 #Preview</p>
+    </footer>
+
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>
