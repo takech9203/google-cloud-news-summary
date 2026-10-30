@@ -5,11 +5,22 @@
 
 ## 2026 年
 
+- [2026-10-30 - SAP on Google Cloud: Google SecOps for SAP が一般提供 (GA) 開始](2026/2026-10-30-google-secops-for-sap-ga.md)
+- [2026-10-30 - Datastream: Knowledge Catalog 統合が一般提供 (GA) に](2026/2026-10-30-datastream-knowledge-catalog-ga.md)
+- [2026-10-30 - Backup and DR: Cloud SQL インスタンス向けバックアップ プランの編集機能](2026/2026-10-30-backup-dr-cloud-sql-backup-plan-editing.md)
+- [2026-10-30 - Bigtable: Knowledge Catalog によるビュー (承認済み / 論理 / 連続マテリアライズド) の検出が GA](2026/2026-10-30-bigtable-knowledge-catalog-views-ga.md)
 - [2026-10-29 - Anti Money Laundering AI: リテール向け v004.011 系の新マイナーエンジンバージョン (202610-000) リリース](2026/2026-10-29-aml-ai-retail-v004-011-minor-engine-version.md)
 - [2026-10-29 - VPC Service Controls: App Optimize API との統合を Preview でサポート](2026/2026-10-29-vpc-service-controls-app-optimize-api.md)
 - [2026-10-29 - Model Armor: ブラジル (southamerica-east1) リージョンで利用可能に](2026/2026-10-29-model-armor-southamerica-east1-region.md)
+- [2026-10-29 - Apigee hybrid: v1.17.3 パッチリリース (重要なバグ修正とセキュリティ修正)](2026/2026-10-29-apigee-hybrid-v1-17-3.md)
+- [2026-10-29 - Dialogflow ES: LINE インテグレーションの Webhook 署名検証 (X-Line-Signature)](2026/2026-10-29-dialogflow-es-line-webhook-signature-validation.md)
+- [2026-10-29 - Google SecOps: Emerging Threats Center の Operations 機能が GA に](2026/2026-10-29-google-secops-emerging-threats-center-operations-ga.md)
+- [2026-10-29 - AlloyDB for PostgreSQL: AlloyDB AI の事前登録 Gemini モデル刷新 (google_ml_integration 1.6.5)](2026/2026-10-29-alloydb-ai-gemini-model-updates.md)
+- [2026-10-29 - Looker: 新 Explore エクスペリエンス GA をはじめとする大型機能アップデート (17 項目)](2026/2026-10-29-looker-feature-updates-ga.md)
 - [2026-10-29 - SAP on Google Cloud: ABAP SDK for Google Cloud バージョン 1.15 (オンプレミスまたは任意のクラウド向けエディション) GA](2026/2026-10-29-sap-abap-sdk-v1-15-ga.md)
 - [2026-10-29 - Dataflow: Streaming Engine 水平オートスケーリングのレイテンシティアとオートスケーリングスケジュール](2026/2026-10-29-dataflow-streaming-autoscaling-latency-tiers-schedules.md)
+- [2026-10-29 - Google Kubernetes Engine: Managed OpenTelemetry for GKE が一般提供 (GA) に](2026/2026-10-29-gke-managed-opentelemetry-ga.md)
+- [2026-10-29 - Identity and Access Management: 新しい基本ロール Admin / Writer / Reader が GA](2026/2026-10-29-iam-basic-roles-admin-writer-reader-ga.md)
 - [2026-10-28 - Bigtable: マイクロ秒タイムスタンプ粒度のテーブルが GA](2026/2026-10-28-bigtable-microsecond-timestamp-granularity.md)
 - [2026-10-28 - Application Integration: エージェントスキルが公開 google/skills リポジトリで利用可能に](2026/2026-10-28-application-integration-agent-skills.md)
 - [2026-10-28 - Cloud SQL for MySQL: マネージドレプリカインデックスが一般提供 (GA) 開始](2026/2026-10-28-cloud-sql-mysql-managed-replica-indexes-ga.md)
