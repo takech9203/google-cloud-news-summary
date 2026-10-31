@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spanner: JSONB / JSON 値の比較・ソートと検索インデックスによる等価比較の高速化</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+      --gc-database: #F4B400;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      margin-bottom: 32px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 8px 0 0 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* バッジ */
+    .badge,
+    .badge-ga,
+    .badge-date {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .badge-date {
+      background: var(--gc-outline);
+    }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 720px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-box h3 { color: #C5221F; }
+    .after-box h3 { color: #188038; }
+
+    .before-box ul, .after-box ul {
+      margin: 8px 0 0 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 6px 0;
+    }
+
+    /* チェックリスト */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* コードブロック */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      border-radius: 0;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* 順序比較の並び */
+    .order-chain {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 20px 0;
+    }
+
+    .order-item {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-database);
+      border-radius: 10px;
+      padding: 8px 16px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      font-family: 'Roboto Mono', monospace;
+      font-size: 14px;
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .order-lt {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+      border: 1px solid var(--gc-blue-100);
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+    }
+
+    /* メリット/デメリットのグリッド */
+    .pros-cons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 720px) {
+      .pros-cons {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    ul {
+      padding-left: 22px;
+      margin: 8px 0;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer ul {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    footer li {
+      margin: 4px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div class="header-meta">
+        <div>
+          <span class="badge">🗄️ Spanner</span>
+          <span class="badge-ga">一般提供 (GA)</span>
+        </div>
+        <div class="subtitle">📅 リリース日: 2026-10-30</div>
+      </div>
+      <h1>JSONB / JSON 値の比較・ソートと<br>検索インデックスによる等価比較の高速化</h1>
+      <div class="subtitle" style="margin-top: 8px;">JSON 値をそのまま比較・GROUP BY / ORDER BY。CAST AS JSON と検索インデックスで半構造化データの活用がさらに進化</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        Spanner が <span class="highlight">JSONB (PostgreSQL ダイアレクト)</span> および <span class="highlight">JSON (GoogleSQL ダイアレクト)</span> 値に対する等価比較 (<code>=</code>, <code>!=</code>, <code>IN</code> など) と順序比較 (<code>&lt;</code>, <code>&lt;=</code>, <code>&gt;</code>, <code>&gt;=</code> など) をサポート。JSON / JSONB 値を他のデータ型へ変換することなく、そのまま <span class="highlight">GROUP BY 句や ORDER BY 句で使用</span>できるようになりました。
+      </p>
+      <p>
+        さらに GoogleSQL では <code>CAST(expression AS JSON)</code> により幅広いデータ型を JSON に変換できるほか、JSON 値と非 JSON 値の直接比較では非 JSON 値を<span class="highlight">暗黙的に JSON へ型強制 (coercion)</span> して比較します。加えて、<span class="highlight">検索インデックス (Search Index)</span> で JSONB / JSON 列とそのサブパスへの <code>=</code> や <code>IN</code> などの等価比較を高速化できます。
+      </p>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before: アップデート前の課題</h3>
+          <ul>
+            <li><code>GROUP BY</code> / <code>ORDER BY</code> には <code>JSON_VALUE</code> や <code>LAX_INT64</code> などで一度別のデータ型 (STRING、INT64 など) に抽出・変換する必要があった</li>
+            <li>JSON 値と非 JSON 値 (数値・文字列リテラルなど) の比較には明示的な型変換の記述が必要だった</li>
+            <li>JSON ドキュメントの等価条件フィルタリングを効率的に高速化する手段が限られていた</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After: アップデート後の改善</h3>
+          <ul>
+            <li>JSON / JSONB 値を型変換なしでそのまま等価・順序比較、<code>GROUP BY</code> / <code>ORDER BY</code> に使用可能</li>
+            <li><code>CAST(expression AS JSON)</code> と暗黙的型強制により <code>json_col = 2</code> や <code>json_col BETWEEN 1 AND 10</code> のような直接比較が可能</li>
+            <li><code>TOKENIZE_JSON</code> / <code>TOKENIZE_JSONB</code> と検索インデックスで等価比較・包含判定・キー存在判定を高速化</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Before["Before: 手動の型変換が必要"]
+        Q1["📝 クエリ作成者"] --> C1["🔧 JSON_VALUE / LAX_INT64 等で<br>別のデータ型へ抽出・変換"]
+        C1 --> S1["🗄️ Spanner<br>変換後の値で比較・ソート"]
+    end
+    subgraph After["After: JSON のまま直接比較・ソート"]
+        Q2["📝 クエリ作成者"] --> S2["🗄️ Spanner"]
+        S2 --> F1["⚖️ 等価・順序比較<br>GROUP BY / ORDER BY を直接実行"]
+        S2 --> F2["🔄 暗黙的型強制<br>json_col = 2 など非 JSON 値と直接比較"]
+        S2 --> IDX["⚡ 検索インデックス<br>TOKENIZE_JSON / TOKENIZE_JSONB で<br>= や IN の等価比較を高速化"]
+    end
+    Before -.アップデート.-> After
+        </pre>
+      </div>
+      <p>
+        従来は JSON 値を関数で別のデータ型へ変換してから比較・ソートする必要がありましたが、本アップデートにより JSON / JSONB のまま直接比較・集計・ソートでき、検索インデックスで等価比較を高速化できます。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⭐ 主要機能</h2>
+
+      <div class="card">
+        <h3>1️⃣ JSON / JSONB 値の等価・順序比較と GROUP BY / ORDER BY サポート</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span>JSON / JSONB 値同士を等価・順序で比較でき、<code>GROUP BY</code> / <code>ORDER BY</code> 句に直接使用可能</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>異なる JSON 型間の順序は以下のように定義される</span></div>
+        <div class="order-chain">
+          <div class="order-item">Null (JSON null)</div>
+          <span class="order-lt">&lt;</span>
+          <div class="order-item">String</div>
+          <span class="order-lt">&lt;</span>
+          <div class="order-item">Number</div>
+          <span class="order-lt">&lt;</span>
+          <div class="order-item">Boolean</div>
+          <span class="order-lt">&lt;</span>
+          <div class="order-item">Array</div>
+          <span class="order-lt">&lt;</span>
+          <div class="order-item">Object</div>
+        </div>
+        <div class="check-item"><span class="check-icon">✓</span><span>同一型内では、数値は数学的比較、文字列は辞書順比較、Boolean は <code>true &gt; false</code>、配列・オブジェクトは要素 / キー・値ペアごとの比較ルールに従う</span></div>
+      </div>
+
+      <div class="card">
+        <h3>2️⃣ CAST AS JSON と非 JSON 値との比較における暗黙的型強制 (GoogleSQL)</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span><code>CAST(expression AS JSON)</code> で <code>INT64</code>、<code>FLOAT32/64</code>、<code>NUMERIC</code>、<code>BOOL</code>、<code>STRING</code>、<code>BYTES</code>、<code>DATE</code>、<code>TIMESTAMP</code>、<code>INTERVAL</code>、<code>ARRAY</code>、<code>STRUCT</code>、<code>PROTO</code>、<code>ENUM</code>、<code>UUID</code>、<code>GRAPH_ELEMENT</code>、<code>GRAPH_PATH</code> を JSON に変換可能</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>等価演算子 (<code>=</code>、<code>!=</code>、リスト形式の <code>IN</code>) では、Boolean、数値型、<code>DATE</code>、<code>TIMESTAMP</code>、<code>UUID</code>、<code>STRING</code>、<code>ENUM</code>、<code>BYTES</code>、および要素型がサポートされる <code>ARRAY</code> の暗黙的型強制をサポート</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>順序演算子 (<code>&lt;</code>、<code>&lt;=</code>、<code>&gt;</code>、<code>&gt;=</code>、<code>BETWEEN</code>) では、Boolean、数値型、<code>DATE</code>、<code>TIMESTAMP</code>、<code>UUID</code>、<code>STRING</code>、<code>ARRAY</code> をサポート (<code>BYTES</code>、<code>RANGE</code>、<code>ENUM</code> は JSON へのキャストで順序が保持されないため非サポート)</span></div>
+      </div>
+
+      <div class="card">
+        <h3>3️⃣ 検索インデックスによる JSON / JSONB 等価比較の高速化</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span>GoogleSQL では <code>TOKENIZE_JSON</code>、PostgreSQL ダイアレクトでは <code>TOKENIZE_JSONB</code> でトークン化した列に <code>CREATE SEARCH INDEX</code> を作成</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>等価比較 (<code>=</code>、<code>!=</code>、<code>&lt;&gt;</code>、<code>IN</code>、<code>NOT IN</code>)、JSON 包含判定 (<code>JSON_CONTAINS</code> / <code>@&gt;</code>、<code>&lt;@</code>)、キー存在判定 (<code>IS NOT NULL</code> / <code>?</code>、<code>?|</code>、<code>?&amp;</code>) をインデックスで高速化</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>JSON 列全体だけでなく、<code>doc.sub.path[0].key = "value"</code> のようなサブパスに対する条件も高速化対象</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span><code>&lt;</code>、<code>&lt;=</code>、<code>&gt;</code>、<code>&gt;=</code> などの範囲比較は検索インデックスによる高速化の対象外</span></div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔬 技術仕様</h2>
+
+      <h3>📐 JSON 型間の比較ルール (GoogleSQL)</h3>
+      <table>
+        <thead>
+          <tr><th>JSON 型</th><th>比較ルール</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>型が異なる場合</td><td><code>NULL (JSON null) &lt; STRING &lt; NUMBER &lt; BOOLEAN &lt; ARRAY &lt; OBJECT</code></td></tr>
+          <tr><td>Object</td><td>キー・値ペアをキー順にペアワイズ比較 (キー → 値の順)。一方がもう一方のプレフィックスの場合、ペア数が多い方が大きい</td></tr>
+          <tr><td>Array</td><td>先頭から要素ごとに比較。一方がもう一方のプレフィックスの場合、長い方が大きい</td></tr>
+          <tr><td>Boolean</td><td><code>true</code> &gt; <code>false</code></td></tr>
+          <tr><td>Number</td><td>数学的な数値比較</td></tr>
+          <tr><td>String</td><td>辞書順の文字列比較</td></tr>
+          <tr><td>Null</td><td>JSON null 同士はすべて等しく、非 null の JSON 値より小さい</td></tr>
+        </tbody>
+      </table>
+
+      <div class="note-box">
+        <strong>💡 JSONB (PostgreSQL ダイアレクト) の注意点:</strong> <code>Null &lt; String &lt; Number &lt; Boolean &lt; Array &lt; Object</code> の順序が適用され、オブジェクトはペア数が多い方が大きいなど一部ルールが異なります。また、トップレベルの空配列 <code>[]</code> は JSONB null より小さいというエッジケースがあります (<code>'[]'::jsonb &lt; 'null'::jsonb</code> は true)。
+      </div>
+
+      <h3>🔄 CAST AS JSON の挙動 (TO_JSON との差分)</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>挙動</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>SQL <code>NULL</code> のキャスト</td><td>JSON null ではなく SQL <code>NULL</code> を返す (<code>STRUCT</code> / <code>ARRAY</code> 内にネストされた <code>NULL</code> は JSON null に変換)</td></tr>
+          <tr><td><code>+/-inf</code>、<code>NaN</code> のキャスト</td><td>エラーを返す</td></tr>
+          <tr><td><code>stringify_wide_numbers</code> パラメータ</td><td>非サポート (常に無効として動作)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>⚙️ 設定方法</h2>
+
+      <h3>📋 前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>Spanner データベース (GoogleSQL または PostgreSQL ダイアレクト) に JSON / JSONB 列が存在すること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>検索インデックスを使用する場合は、<span class="highlight">Spanner Enterprise エディションまたは Enterprise Plus エディション</span>であること</span></div>
+
+      <h3>ステップ 1: JSON 値を直接比較・ソートするクエリを記述する (GoogleSQL)</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">JSON 値の直接比較・GROUP BY / ORDER BY</span>
+        </div>
+        <pre><code class="language-sql">-- JSON 値を非 JSON 値と直接比較 (暗黙的型強制)
+SELECT a.AlbumId
+FROM Albums a
+WHERE a.Metadata.MultiDiscCount = 2;
+
+-- JSON 値を ORDER BY / GROUP BY に直接使用
+SELECT a.Metadata.Genre AS genre, COUNT(*) AS cnt
+FROM Albums a
+GROUP BY genre
+ORDER BY genre;</code></pre>
+      </div>
+      <p>型変換関数を使わずに、JSON のサブパスをそのままフィルタ・集計・ソートに使用できます。</p>
+
+      <h3>ステップ 2: 検索インデックスを作成して等価比較を高速化する</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">TOKENIZE_JSON + CREATE SEARCH INDEX</span>
+        </div>
+        <pre><code class="language-sql">-- TOKENIZE_JSON で JSON 列をトークン化し、検索インデックスを作成
+CREATE TABLE Albums (
+  SingerId INT64 NOT NULL,
+  AlbumId INT64 NOT NULL,
+  Metadata JSON,
+  MetadataTokens TOKENLIST AS (TOKENIZE_JSON(Metadata)) HIDDEN
+) PRIMARY KEY (SingerId, AlbumId);
+
+CREATE SEARCH INDEX AlbumsIndex ON Albums(MetadataTokens);</code></pre>
+      </div>
+      <p>作成後、クエリオプティマイザが <code>=</code>、<code>IN</code>、<code>JSON_CONTAINS</code>、キー存在条件などをインデックスで高速化します。クエリ実行プランに <code>Search index scan</code> ノードが表示されるかでインデックス使用を確認できます。</p>
+    </div>
+
+    <!-- メリット / デメリット -->
+    <div class="section">
+      <h2>⚖️ メリットと制約事項</h2>
+
+      <div class="pros-cons">
+        <div>
+          <div class="success-box">
+            <strong>💼 ビジネス面のメリット</strong>
+            <ul>
+              <li><strong>開発生産性の向上</strong>: JSON データの集計・ソートに型変換の定型コードが不要になり、クエリがシンプルかつ保守しやすくなる</li>
+              <li><strong>スキーマレスデータ活用の促進</strong>: 属性が可変な半構造化データ (商品カタログ、イベント属性など) をリレーショナルデータと同じ感覚で分析・集計できる</li>
+            </ul>
+          </div>
+          <div class="success-box">
+            <strong>🔧 技術面のメリット</strong>
+            <ul>
+              <li><strong>クエリ性能の向上</strong>: 検索インデックスにより JSON / JSONB 列とサブパスへの等価比較・包含判定・キー存在判定がインデックススキャンで高速化</li>
+              <li><strong>一貫した比較セマンティクス</strong>: JSON 型間・型内の比較ルールが明確に定義され、<code>GROUP BY</code> / <code>ORDER BY</code> / <code>DISTINCT</code> の挙動が予測可能</li>
+              <li><strong>Spanner Graph との相乗効果</strong>: 動的プロパティは JSON 型として扱われるため、プロパティフィルタや <code>GROUP BY</code> / <code>ORDER BY</code> / <code>RETURN DISTINCT</code> で本機能の比較セマンティクスをそのまま活用可能</li>
+            </ul>
+          </div>
+        </div>
+        <div>
+          <div class="error-box">
+            <strong>🚧 制限事項</strong>
+            <ul>
+              <li>JSON 型の列はプライマリキーやセカンダリインデックスのキーには使用不可</li>
+              <li>検索インデックスは読み取り専用トランザクションでのみ使用される (読み書きトランザクションで強制使用するとエラー)</li>
+              <li>検索インデックスで高速化されるのは等価比較・包含判定・キー存在判定のみ。範囲比較 (<code>&lt;</code>, <code>&gt;</code> など) や PostgreSQL の <code>-&gt;&gt;</code> によるテキスト抽出述語は対象外</li>
+              <li>検索インデックスに格納する JSON ドキュメントのトークン出力サイズは 10 MB 未満であること (超過時は too many search token bytes エラー)</li>
+              <li>検索インデックスは Enterprise / Enterprise Plus エディションで利用可能</li>
+            </ul>
+          </div>
+          <div class="warning-box">
+            <strong>⚠️ 考慮すべき点</strong>
+            <ul>
+              <li>順序比較の暗黙的型強制では <code>BYTES</code>、<code>RANGE</code>、<code>ENUM</code> が非サポート (JSON へのキャストで順序が保持されないため)</li>
+              <li><code>IN</code> 演算子の暗黙的型強制はリスト形式のみ対応し、最初のオペランドは JSON 式である必要がある</li>
+              <li>大きなドキュメント全体の検索が不要な場合は、生成列でサブセットを抽出してインデックス化するのが推奨</li>
+              <li>JSONB のトップレベル空配列 <code>[]</code> が JSONB null より小さいなど、エッジケースの順序に注意</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>🛒 ユースケース 1: 可変属性を持つ商品カタログの集計・ソート</h3>
+        <p><strong>シナリオ</strong>: EC サイトで商品ごとに属性 (ブランド、カラー、評価など) が異なるため JSON 列で管理している。属性ごとの集計や評価順のソートを行いたい。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">JSON サブパスで直接ソート・集計</span>
+          </div>
+          <pre><code class="language-sql">-- 評価 (JSON サブパス) で直接ソート
+SELECT p.ProductId, p.Attributes.brand, p.Attributes.rating
+FROM Products p
+ORDER BY p.Attributes.rating DESC
+LIMIT 10;
+
+-- ブランドごとに集計
+SELECT p.Attributes.brand AS brand, COUNT(*) AS cnt
+FROM Products p
+GROUP BY brand;</code></pre>
+        </div>
+        <p><strong>効果</strong>: <code>JSON_VALUE</code> などによる型変換が不要になり、クエリが簡潔になる。属性スキーマの変更にもテーブル定義の変更なしで対応できる。</p>
+      </div>
+
+      <div class="usecase">
+        <h3>⚡ ユースケース 2: 検索インデックスによる JSON フィルタリングの高速化</h3>
+        <p><strong>シナリオ</strong>: 大量のイベントログを JSON 列で保持しており、<code>status = "active"</code> のような等価条件や特定キーの存在チェックで頻繁にフィルタリングする。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">検索インデックスで高速化されるクエリ</span>
+          </div>
+          <pre><code class="language-sql">-- サブパスへの等価比較 (検索インデックスで高速化)
+SELECT e.EventId
+FROM Events e
+WHERE e.Payload.status IN ("active", "pending");
+
+-- キー存在判定 (検索インデックスで高速化)
+SELECT e.EventId
+FROM Events e
+WHERE e.Payload.error_code IS NOT NULL;</code></pre>
+        </div>
+        <p><strong>効果</strong>: フルスキャンを避け、検索インデックスのスキャンにより読み取り専用トランザクションでのフィルタリングを高速化できる。</p>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>
+        この機能自体に<span class="highlight">追加料金はなく</span>、Spanner の通常の料金体系 (コンピュート容量、ストレージ、ネットワーク) が適用されます。
+      </p>
+      <div class="warning-box">
+        <strong>⚠️ 注意:</strong> 検索インデックスは <strong>Enterprise エディションおよび Enterprise Plus エディション</strong>で利用可能な機能であり、検索インデックスの保持には追加のストレージが消費されます。
+      </div>
+      <p>詳細は <a href="https://cloud.google.com/spanner/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Spanner の料金ページ</a> を参照してください。</p>
+    </div>
+
+    <!-- 関連サービス -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Spanner 全文検索 (Full-Text Search)</strong>: JSON 検索インデックスは全文検索の検索インデックス基盤を利用しており、テキスト検索と JSON 条件を単一のインデックススキャンに組み合わせられる</span></div>
+      </div>
+      <div class="card">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Spanner Graph</strong>: 動的プロパティが JSON 型として扱われるため、本アップデートの比較・ソートセマンティクスがグラフクエリのフィルタ・集計・ソートにも適用される</span></div>
+      </div>
+      <div class="card">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>BigQuery</strong>: 同じ GoogleSQL 系の JSON 型を持つ分析基盤。Spanner でのトランザクショナルな JSON 処理と組み合わせた分析パイプラインを構成できる</span></div>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="success-box">
+        <p style="margin: 0;">
+          Spanner の JSON / JSONB 値が<strong>型変換なしで比較・集計・ソート</strong>できるようになり、半構造化データを扱うクエリの記述性と性能が大きく向上しました。JSON 列を多用しているワークロードでは、既存クエリの<strong>型変換処理の簡素化</strong>と、頻出する等価フィルタ条件への<strong>検索インデックス適用 (Enterprise エディション以上)</strong> を検討することを推奨します。
+        </p>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p>📎 出典・参考リンク:</p>
+      <ul>
+        <li>📰 <a href="https://docs.cloud.google.com/release-notes#October_30_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026-10-30)</a></li>
+        <li>📖 <a href="https://docs.cloud.google.com/spanner/docs/reference/standard-sql/data-types#comparison_and_sorting" target="_blank" rel="noopener noreferrer" class="gc-link">JSON comparison and sorting</a></li>
+        <li>📖 <a href="https://docs.cloud.google.com/spanner/docs/reference/standard-sql/conversion_rules#json_comparison_coercion" target="_blank" rel="noopener noreferrer" class="gc-link">JSON comparison coercion</a></li>
+        <li>📖 <a href="https://docs.cloud.google.com/spanner/docs/reference/standard-sql/conversion_functions#cast_as_json" target="_blank" rel="noopener noreferrer" class="gc-link">CAST AS JSON</a></li>
+        <li>📖 <a href="https://docs.cloud.google.com/spanner/docs/full-text-search/json-indexes" target="_blank" rel="noopener noreferrer" class="gc-link">JSON search indexes</a></li>
+        <li>📖 <a href="https://docs.cloud.google.com/spanner/docs/working-with-jsonb" target="_blank" rel="noopener noreferrer" class="gc-link">Working with JSONB</a></li>
+        <li>📖 <a href="https://docs.cloud.google.com/spanner/docs/working-with-json" target="_blank" rel="noopener noreferrer" class="gc-link">Working with JSON</a></li>
+        <li>💰 <a href="https://cloud.google.com/spanner/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Spanner 料金ページ</a></li>
+      </ul>
+      <p>🏷️ タグ: Spanner, JSON, JSONB, GoogleSQL, PostgreSQL, 検索インデックス, 全文検索, データベース</p>
+      <p>このインフォグラフィックは Google Cloud News レポート (2026-10-30) をもとに生成されました。</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>
