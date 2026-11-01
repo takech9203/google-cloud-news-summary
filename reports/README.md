@@ -5,6 +5,7 @@
 
 ## 2026 年
 
+- [2026-10-31 - Google SecOps: Basic Mode search (SIEM 検索の実行モード選択)](2026/2026-10-31-google-secops-basic-mode-search.md)
 - [2026-10-30 - BigQuery: Apache Arrow 形式でのクエリ結果取得 (Preview)](2026/2026-10-30-bigquery-apache-arrow-query-results.md)
 - [2026-10-30 - Gemini Enterprise: Gemini Notebook Enterprise ビジュアルリフレッシュ (UI 刷新と新機能群が GA)](2026/2026-10-30-gemini-notebook-enterprise-visual-refresh.md)
 - [2026-10-30 - Gemini Enterprise: S&P Global - Adaptive Retrieval データストア (Public Preview)](2026/2026-10-30-gemini-enterprise-sp-global-adaptive-retrieval.md)
