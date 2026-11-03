@@ -5,7 +5,21 @@
 
 ## 2026 年
 
+- [2026-11-02 - Cloud Load Balancing: Application Load Balancer の Cloud Trace による分散トレーシング (Preview)](2026/2026-11-02-cloud-load-balancing-distributed-tracing-preview.md)
+- [2026-11-02 - App Engine / Cloud Run / Cloud Run functions: Python 3.15 ランタイムが Preview で利用可能に](2026/2026-11-02-serverless-python-3-15-runtime-preview.md)
+- [2026-11-02 - Cloud Load Balancing: フロントエンド mTLS 検証緩和 (Validation Relaxations) が GA](2026/2026-11-02-cloud-load-balancing-mtls-validation-relaxations-ga.md)
+- [2026-11-02 - Datastream: africa-south1 (ヨハネスブルグ) と asia-southeast3 (バンコク) リージョンで利用可能に](2026/2026-11-02-datastream-africa-south1-asia-southeast3.md)
+- [2026-11-02 - Model Armor: ストリーミングサニタイズにおけるテンプレート単位の除外ルールサポート (Preview)](2026/2026-11-02-model-armor-streaming-exclusion-rules-preview.md)
+- [2026-11-02 - Backup and DR: 自動保護ポリシーによる Compute Engine リソース保護の自動化が GA](2026/2026-11-02-backup-and-dr-auto-protection-ga.md)
+- [2026-11-02 - BigQuery: Data Engineering Agent が AI・ML・オブジェクト関数の生成に対応 (GA)](2026/2026-11-02-bigquery-data-engineering-agent-ai-ml-object-functions.md)
+- [2026-11-02 - Knowledge Catalog: Knowledge Studio (Preview)](2026/2026-11-02-knowledge-catalog-knowledge-studio-preview.md)
+- [2026-11-02 - Oracle Database@Google Cloud: ODB Network 向けカスタム DNS ドメインが GA](2026/2026-11-02-oracle-database-custom-dns-domains-ga.md)
+- [2026-11-02 - Apigee X: EKM ヘルスモニタリング](2026/2026-11-02-apigee-x-ekm-health-monitoring.md)
+- [2026-11-02 - Cloud NGFW: Advanced malware sandbox (WildFire) が GA に](2026/2026-11-02-cloud-ngfw-advanced-malware-sandbox-ga.md)
+- [2026-11-02 - BigQuery: データエージェントの可観測性 (Google Cloud Observability 統合) が GA](2026/2026-11-02-bigquery-data-agent-observability-ga.md)
+- [2026-11-01 - Google SecOps SOAR: Release 6.3.105 第 1 フェーズリージョンへのロールアウト開始](2026/2026-11-01-google-secops-soar-6-3-105-rollout.md)
 - [2026-10-31 - Google SecOps: Basic Mode search (SIEM 検索の実行モード選択)](2026/2026-10-31-google-secops-basic-mode-search.md)
+- [2026-10-31 - Google SecOps SOAR: Release 6.3.104 が全リージョンで利用可能に](2026/2026-10-31-google-secops-soar-6-3-104-all-regions.md)
 - [2026-10-30 - BigQuery: Apache Arrow 形式でのクエリ結果取得 (Preview)](2026/2026-10-30-bigquery-apache-arrow-query-results.md)
 - [2026-10-30 - Gemini Enterprise: Gemini Notebook Enterprise ビジュアルリフレッシュ (UI 刷新と新機能群が GA)](2026/2026-10-30-gemini-notebook-enterprise-visual-refresh.md)
 - [2026-10-30 - Gemini Enterprise: S&P Global - Adaptive Retrieval データストア (Public Preview)](2026/2026-10-30-gemini-enterprise-sp-global-adaptive-retrieval.md)
