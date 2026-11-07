@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Load Balancing: Traffic Duration 設定と In-Flight バランシングモードが GA</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-teal {
+      border-left-color: var(--gc-teal);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card-teal {
+      background: linear-gradient(135deg, var(--gc-teal), #00838F);
+    }
+
+    .stat-card-green {
+      background: linear-gradient(135deg, var(--gc-green), #1B5E20);
+    }
+
+    .stat-card-orange {
+      background: linear-gradient(135deg, var(--gc-orange), #E65100);
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-box h3 {
+      color: var(--gc-red);
+      margin-top: 0;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-box h3 {
+      color: var(--gc-green);
+      margin-top: 0;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h3 {
+      color: var(--gc-blue-800);
+      margin-top: 0;
+    }
+
+    .compatibility-supported {
+      color: var(--gc-green);
+      font-weight: 600;
+    }
+
+    .compatibility-unsupported {
+      color: var(--gc-red);
+      font-weight: 600;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>&#9878;&#65039; Traffic Duration 設定と<br>In-Flight バランシングモードが GA</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Cloud Load Balancing</span>
+          <span class="badge">Application Load Balancer</span>
+          <span class="badge badge-ga">GA</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-05-22</div>
+    </div>
+
+    <!-- 概要セクション -->
+    <div class="section">
+      <h2>&#128203; 概要</h2>
+      <p>Application Load Balancer において、バックエンドサービスにバックエンドを追加する際に <span class="highlight">Traffic Duration (トラフィック持続時間) 設定</span> を構成できるようになりました。<code>SHORT</code> または <code>LONG</code> の値を指定でき、バックエンドが HTTP リクエストを完了するために必要な応答時間に基づいて選択します。</p>
+      <p>さらに、<span class="highlight">In-Flight バランシングモード</span> が利用可能になり、リクエストの完了に 1 秒以上かかる場合に、ロードバランサーのトラフィック分散をより適切に制御できるようになりました。</p>
+
+      <div class="note-box">
+        <strong>&#128161; 対象ユーザー:</strong> AI/ML 推論、大規模データ処理、ストリーミングレスポンスなど長時間処理を行うバックエンドを持つアプリケーションを運用しているすべてのユーザー
+      </div>
+    </div>
+
+    <!-- Before/After 比較 -->
+    <div class="section">
+      <h2>&#128260; Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h3>&#10060; Before (アップデート前)</h3>
+          <div class="check-item"><span class="cross-icon">&#10007;</span><span>RATE / UTILIZATION ベースのみで長時間リクエストのトラフィック分散が不均等</span></div>
+          <div class="check-item"><span class="cross-icon">&#10007;</span><span>1 秒以上かかるリクエストで新規リクエスト割り当てを正確に制御できない</span></div>
+          <div class="check-item"><span class="cross-icon">&#10007;</span><span>バックエンドの応答時間特性に応じた最適なバランシング戦略を選択する手段がない</span></div>
+          <div class="check-item"><span class="cross-icon">&#10007;</span><span>AI 推論リクエストが特定バックエンドに集中</span></div>
+        </div>
+        <div class="after-box">
+          <h3>&#9989; After (アップデート後)</h3>
+          <div class="check-item"><span class="check-icon">&#10003;</span><span><code>--traffic-duration</code> フラグで応答時間特性を明示的に宣言</span></div>
+          <div class="check-item"><span class="check-icon">&#10003;</span><span>IN_FLIGHT モードで処理中リクエスト数に基づく精密な負荷分散</span></div>
+          <div class="check-item"><span class="check-icon">&#10003;</span><span>長時間リクエストでも各バックエンドに均等に処理が分散</span></div>
+          <div class="check-item"><span class="check-icon">&#10003;</span><span>GA リリースで SLA 保証付き本番運用が可能</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 統計カード -->
+    <div class="section">
+      <h2>&#128200; 数字で見るアップデート</h2>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value">1 秒</div>
+          <div class="stat-label">SHORT / LONG の閾値</div>
+        </div>
+        <div class="stat-card stat-card-teal">
+          <div class="stat-value">$0</div>
+          <div class="stat-label">追加料金なし</div>
+        </div>
+        <div class="stat-card stat-card-green">
+          <div class="stat-value">4 タイプ</div>
+          <div class="stat-label">対応 Application Load Balancer</div>
+        </div>
+        <div class="stat-card stat-card-orange">
+          <div class="stat-value">3 粒度</div>
+          <div class="stat-label">ゾーン / インスタンス / エンドポイント</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>&#127959;&#65039; アーキテクチャ図</h2>
+      <p>Traffic Duration 設定により、バックエンドの応答時間特性に応じてバランシング戦略が最適化されます。SHORT 設定ではリクエストレートベース、LONG 設定では処理中リクエスト数ベースのトラフィック分散が適用されます。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    Client["クライアント"]
+    ALB["Application Load Balancer"]
+
+    subgraph SHORT_BACKENDS["SHORT トラフィック 1秒未満"]
+        direction LR
+        S1["Backend A<br/>RATE モード<br/>max-rate: 1000 RPS"]
+        S2["Backend B<br/>RATE モード<br/>max-rate: 1000 RPS"]
+    end
+
+    subgraph LONG_BACKENDS["LONG トラフィック 1秒以上"]
+        direction LR
+        L1["Backend C<br/>IN_FLIGHT モード<br/>max-in-flight: 50"]
+        L2["Backend D<br/>IN_FLIGHT モード<br/>max-in-flight: 50"]
+    end
+
+    Client --> ALB
+    ALB -->|"traffic-duration=SHORT<br/>リクエストレートで分散"| SHORT_BACKENDS
+    ALB -->|"traffic-duration=LONG<br/>処理中リクエスト数で分散"| LONG_BACKENDS
+        </pre>
+      </div>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>&#9881;&#65039; 主要機能</h2>
+
+      <div class="card card-teal">
+        <h3>1. Traffic Duration 設定</h3>
+        <div class="icon-text"><span class="arrow">&#8594;</span><span>バックエンドサービスにバックエンドを追加する際に <code>SHORT</code> または <code>LONG</code> を指定</span></div>
+        <div class="icon-text"><span class="arrow">&#8594;</span><span><code>SHORT</code>: バックエンドが 1 秒未満で HTTP レスポンスを返すことを想定 (デフォルト動作)</span></div>
+        <div class="icon-text"><span class="arrow">&#8594;</span><span><code>LONG</code>: バックエンドが 1 秒以上かけて HTTP レスポンスを生成するケースを想定</span></div>
+        <div class="icon-text"><span class="arrow">&#8594;</span><span>バックエンドとバックエンドサービス間のマッピングごとに個別設定が可能</span></div>
+      </div>
+
+      <div class="card card-green">
+        <h3>2. In-Flight バランシングモード (IN_FLIGHT)</h3>
+        <div class="icon-text"><span class="arrow">&#8594;</span><span>処理中 (in-progress) の HTTP リクエスト数に基づいてトラフィックを分散</span></div>
+        <div class="icon-text"><span class="arrow">&#8594;</span><span>RATE モードの代替として、リクエスト完了に 1 秒以上かかる場合に使用</span></div>
+        <div class="icon-text"><span class="arrow">&#8594;</span><span><code>traffic-duration=LONG</code> との組み合わせが必須</span></div>
+        <div class="icon-text"><span class="arrow">&#8594;</span><span>ゾーン単位、インスタンス単位、エンドポイント単位でターゲット容量を設定可能</span></div>
+      </div>
+
+      <div class="card card-purple">
+        <h3>3. ターゲット容量パラメータ</h3>
+        <div class="icon-text"><span class="arrow">&#8594;</span><span><code>max-in-flight-requests</code>: ゾーンあたりの処理中リクエスト数の上限</span></div>
+        <div class="icon-text"><span class="arrow">&#8594;</span><span><code>max-in-flight-requests-per-instance</code>: VM インスタンスあたりの処理中リクエスト数の上限</span></div>
+        <div class="icon-text"><span class="arrow">&#8594;</span><span><code>max-in-flight-requests-per-endpoint</code>: NEG エンドポイントあたりの処理中リクエスト数の上限</span></div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>&#128208; 技術仕様</h2>
+
+      <h3>Traffic Duration 設定値</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>設定値</th>
+            <th>推奨ユースケース</th>
+            <th>利用可能なバランシングモード</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>SHORT</code> (デフォルト)</td>
+            <td>1 秒未満でレスポンスを返すバックエンド</td>
+            <td>RATE, UTILIZATION, CONNECTION, CUSTOM_METRICS</td>
+          </tr>
+          <tr>
+            <td><code>LONG</code></td>
+            <td>1 秒以上かかるバックエンド</td>
+            <td>IN_FLIGHT, UTILIZATION, CONNECTION, CUSTOM_METRICS</td>
+          </tr>
+          <tr>
+            <td>未指定</td>
+            <td>SHORT と同じ動作</td>
+            <td>SHORT と同じ</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>対応するロードバランサー</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>ロードバランサー</th>
+            <th>サポート状況</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>グローバル外部 Application Load Balancer</td>
+            <td class="compatibility-supported">&#10003; 対応</td>
+          </tr>
+          <tr>
+            <td>リージョナル外部 Application Load Balancer</td>
+            <td class="compatibility-supported">&#10003; 対応</td>
+          </tr>
+          <tr>
+            <td>リージョナル内部 Application Load Balancer</td>
+            <td class="compatibility-supported">&#10003; 対応</td>
+          </tr>
+          <tr>
+            <td>クロスリージョン内部 Application Load Balancer</td>
+            <td class="compatibility-supported">&#10003; 対応</td>
+          </tr>
+          <tr>
+            <td>クラシック Application Load Balancer</td>
+            <td class="compatibility-unsupported">&#10007; 非対応</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>対応するバックエンドタイプ</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>バックエンドタイプ</th>
+            <th>サポート状況</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ゾーナルインスタンスグループ (マネージド/アンマネージド)</td>
+            <td class="compatibility-supported">&#10003; 対応</td>
+          </tr>
+          <tr>
+            <td>リージョナルマネージドインスタンスグループ</td>
+            <td class="compatibility-supported">&#10003; 対応 (per-instance のみ)</td>
+          </tr>
+          <tr>
+            <td>ゾーナル NEG (GCE_VM_IP_PORT)</td>
+            <td class="compatibility-supported">&#10003; 対応</td>
+          </tr>
+          <tr>
+            <td>ゾーナルハイブリッド接続 NEG</td>
+            <td class="compatibility-supported">&#10003; 対応</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>In-Flight リクエスト数の計算</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>パラメータ</th>
+            <th>計算方法</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>max-in-flight-requests=X</code></td>
+            <td>ゾーン容量 = X、インスタンスあたり = X / h (h = ヘルシーインスタンス数)</td>
+          </tr>
+          <tr>
+            <td><code>max-in-flight-requests-per-instance=Y</code></td>
+            <td>ゾーン容量 = Y * h (h = ヘルシーインスタンス数)</td>
+          </tr>
+          <tr>
+            <td><code>max-in-flight-requests-per-endpoint=Z</code></td>
+            <td>ゾーン容量 = Z * h (h = ヘルシーエンドポイント数)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>&#128295; 設定方法</h2>
+
+      <div class="note-box">
+        <strong>&#128221; 前提条件:</strong>
+        <div class="check-item"><span class="check-icon">&#10003;</span><span>Application Load Balancer (クラシック以外) が構成済み</span></div>
+        <div class="check-item"><span class="check-icon">&#10003;</span><span>バックエンドサービスが作成済み</span></div>
+        <div class="check-item"><span class="check-icon">&#10003;</span><span><code>gcloud</code> CLI が最新バージョン</span></div>
+      </div>
+
+      <h3>ステップ 1: Traffic Duration を LONG に設定してバックエンドを追加</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud compute backend-services add-backend BACKEND_SERVICE_NAME \
+    --instance-group=INSTANCE_GROUP_NAME \
+    --instance-group-zone=ZONE \
+    --balancing-mode=IN_FLIGHT \
+    --traffic-duration=LONG \
+    --max-in-flight-requests-per-instance=100 \
+    --global</code></pre>
+
+      <h3>ステップ 2: 既存バックエンドの Traffic Duration を更新</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud compute backend-services update-backend BACKEND_SERVICE_NAME \
+    --instance-group=INSTANCE_GROUP_NAME \
+    --instance-group-zone=ZONE \
+    --traffic-duration=LONG \
+    --balancing-mode=IN_FLIGHT \
+    --max-in-flight-requests=500 \
+    --global</code></pre>
+
+      <h3>ステップ 3: SHORT 設定での RATE モード構成 (比較用)</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud compute backend-services add-backend BACKEND_SERVICE_NAME \
+    --instance-group=INSTANCE_GROUP_NAME \
+    --instance-group-zone=ZONE \
+    --balancing-mode=RATE \
+    --traffic-duration=SHORT \
+    --max-rate-per-instance=1000 \
+    --global</code></pre>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>&#9989; メリット</h2>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div>
+          <h3>&#128188; ビジネス面</h3>
+          <div class="card card-green">
+            <div class="check-item"><span class="check-icon">&#10003;</span><span><strong>AI/ML ワークロードの安定運用</strong>: 推論リクエストなど長時間処理のトラフィック分散が最適化され、ユーザー体験が向上</span></div>
+            <div class="check-item"><span class="check-icon">&#10003;</span><span><strong>SLA 保証付き本番利用</strong>: GA リリースにより、エンタープライズ環境でのミッションクリティカルなワークロードへの適用が可能</span></div>
+            <div class="check-item"><span class="check-icon">&#10003;</span><span><strong>運用コスト削減</strong>: バックエンドの過負荷を防止し、不要なスケールアウトを抑制</span></div>
+          </div>
+        </div>
+        <div>
+          <h3>&#128300; 技術面</h3>
+          <div class="card card-teal">
+            <div class="check-item"><span class="check-icon">&#10003;</span><span><strong>処理中リクエスト数ベースの精密な負荷分散</strong>: 長時間リクエストでも各バックエンドに均等に処理が分散</span></div>
+            <div class="check-item"><span class="check-icon">&#10003;</span><span><strong>ゾーン間の負荷平準化</strong>: ターゲット容量に達したゾーンから別ゾーンへ自動的にトラフィックをリダイレクト</span></div>
+            <div class="check-item"><span class="check-icon">&#10003;</span><span><strong>柔軟な容量パラメータ</strong>: ゾーン単位、インスタンス単位、エンドポイント単位で粒度を選択可能</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>&#9888;&#65039; デメリット・制約事項</h2>
+
+      <div class="warning-box">
+        <strong>制限事項:</strong>
+        <div class="check-item"><span class="cross-icon">&#10007;</span><span>クラシック Application Load Balancer では利用不可</span></div>
+        <div class="check-item"><span class="cross-icon">&#10007;</span><span>IN_FLIGHT バランシングモードは <code>traffic-duration=LONG</code> との組み合わせが必須</span></div>
+        <div class="check-item"><span class="cross-icon">&#10007;</span><span>リージョナルマネージドインスタンスグループでは <code>max-in-flight-requests</code> (ゾーン単位) パラメータは非対応</span></div>
+        <div class="check-item"><span class="cross-icon">&#10007;</span><span>UTILIZATION + セッションアフィニティ使用時は IN_FLIGHT への切り替え検討が必要</span></div>
+      </div>
+
+      <div class="error-box">
+        <strong>考慮すべき点:</strong>
+        <div class="check-item"><span class="cross-icon">!</span><span>同一バックエンドサービス内で異なる Traffic Duration 設定のバックエンドを混在させる場合は設計を慎重に</span></div>
+        <div class="check-item"><span class="cross-icon">!</span><span>ターゲット容量はサーキットブレーカーではない: 全ゾーンが容量に達した場合は比例的にオーバーフィルされる</span></div>
+        <div class="check-item"><span class="cross-icon">!</span><span>既存環境での設定変更時は、トラフィックパターンの変化に注意が必要</span></div>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>&#128161; ユースケース</h2>
+
+      <div class="usecase-card">
+        <h3>&#129302; ユースケース 1: AI/ML 推論サービスのロードバランシング</h3>
+        <p><strong>シナリオ:</strong> Vertex AI や自前の推論サーバーに対するリクエストが 2-30 秒かかるケースで、バックエンド間の負荷を均等化したい。</p>
+        <span class="code-label">Bash</span>
+        <pre><code class="language-bash"># AI 推論バックエンドに IN_FLIGHT モードを設定
+gcloud compute backend-services add-backend ml-inference-backend \
+    --instance-group=inference-gpu-ig \
+    --instance-group-zone=us-central1-a \
+    --balancing-mode=IN_FLIGHT \
+    --traffic-duration=LONG \
+    --max-in-flight-requests-per-instance=10 \
+    --global</code></pre>
+        <p><strong>効果:</strong> GPU インスタンスごとに同時処理リクエスト数が制御され、特定のインスタンスへの過集中を防止。推論レイテンシの安定化とリソース利用効率の向上を実現。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>&#128196; ユースケース 2: 大規模レポート生成 API</h3>
+        <p><strong>シナリオ:</strong> ユーザーリクエストに応じて大規模な PDF レポートやデータエクスポートを生成する API で、処理に 5-60 秒かかる。</p>
+        <span class="code-label">Bash</span>
+        <pre><code class="language-bash"># レポート生成バックエンドの設定
+gcloud compute backend-services add-backend report-gen-backend \
+    --network-endpoint-group=report-gen-neg \
+    --network-endpoint-group-zone=asia-northeast1-a \
+    --balancing-mode=IN_FLIGHT \
+    --traffic-duration=LONG \
+    --max-in-flight-requests-per-endpoint=5 \
+    --region=asia-northeast1</code></pre>
+        <p><strong>効果:</strong> 各エンドポイントの同時処理数を制限し、メモリ・CPU リソースの枯渇を防止。安定したレスポンスタイムを維持しながらスループットを最大化。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>&#128225; ユースケース 3: ストリーミングレスポンス (SSE/WebSocket)</h3>
+        <p><strong>シナリオ:</strong> Server-Sent Events や長時間のストリーミングレスポンスを返すバックエンドで、接続時間が数十秒から数分に及ぶ。</p>
+        <p><strong>効果:</strong> 処理中の接続数に基づいてバランシングされるため、新しいストリーミング接続が既に多くの接続を処理中のバックエンドに集中することを防止。</p>
+      </div>
+    </div>
+
+    <!-- 料金情報 -->
+    <div class="section">
+      <h2>&#128178; 料金情報</h2>
+      <div class="success-box">
+        <strong>Traffic Duration 設定や IN_FLIGHT バランシングモードの利用に追加料金は発生しません。</strong> 従来の Cloud Load Balancing の料金体系に準拠します。
+      </div>
+      <p>主な料金構成要素:</p>
+      <div class="check-item"><span class="arrow">&#8594;</span><span>フォワーディングルール料金</span></div>
+      <div class="check-item"><span class="arrow">&#8594;</span><span>データ処理料金 (インバウンド/アウトバウンド)</span></div>
+    </div>
+
+    <!-- 利用可能リージョン -->
+    <div class="section">
+      <h2>&#127758; 利用可能リージョン</h2>
+      <p>グローバル外部 Application Load Balancer およびクロスリージョン内部 Application Load Balancer は<span class="highlight">グローバルに利用可能</span>です。リージョナル Application Load Balancer は Google Cloud の<span class="highlight">全リージョン</span>で利用できます。</p>
+    </div>
+
+    <!-- 関連サービス -->
+    <div class="section">
+      <h2>&#128279; 関連サービス・機能</h2>
+      <div class="card card-teal">
+        <div class="icon-text"><span class="arrow">&#8594;</span><span><strong>Cloud Service Mesh</strong>: 同様に Traffic Duration 設定と IN_FLIGHT バランシングモードをサポート</span></div>
+      </div>
+      <div class="card card-green">
+        <div class="icon-text"><span class="arrow">&#8594;</span><span><strong>Cloud Monitoring</strong>: ロードバランサーのメトリクス (処理中リクエスト数、レイテンシ分布) をモニタリング</span></div>
+      </div>
+      <div class="card card-orange">
+        <div class="icon-text"><span class="arrow">&#8594;</span><span><strong>Cloud Armor</strong>: Application Load Balancer と統合し、セキュリティポリシーを適用可能</span></div>
+      </div>
+      <div class="card card-purple">
+        <div class="icon-text"><span class="arrow">&#8594;</span><span><strong>Managed Instance Group (MIG)</strong>: オートスケーラーと組み合わせて IN_FLIGHT リクエスト数に応じた動的スケーリングを実現</span></div>
+      </div>
+      <div class="card">
+        <div class="icon-text"><span class="arrow">&#8594;</span><span><strong>Custom Metrics バランシングモード</strong>: Traffic Duration 設定と組み合わせてアプリケーション固有のメトリクスに基づくトラフィック分散も可能</span></div>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>&#128221; まとめ</h2>
+      <p>Cloud Load Balancing の Traffic Duration 設定と In-Flight バランシングモードの GA リリースは、AI/ML 推論やデータ処理など長時間リクエストを処理するアプリケーションのトラフィック管理に大きな改善をもたらします。</p>
+      <div class="flow-diagram">
+        <div class="flow-step">&#128336; 長時間<br>リクエスト</div>
+        <span class="flow-arrow">&#8594;</span>
+        <div class="flow-step">&#9878;&#65039; traffic-duration<br>=LONG</div>
+        <span class="flow-arrow">&#8594;</span>
+        <div class="flow-step">&#9881;&#65039; IN_FLIGHT<br>モード</div>
+        <span class="flow-arrow">&#8594;</span>
+        <div class="flow-step">&#9989; 均等な<br>負荷分散</div>
+      </div>
+      <div class="success-box">
+        <strong>推奨:</strong> 長時間処理を持つバックエンドを運用している場合は、<code>--traffic-duration=LONG</code> と <code>--balancing-mode=IN_FLIGHT</code> の組み合わせの導入を検討してください。
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p><strong>&#128206; 出典:</strong></p>
+      <ul style="list-style: none; padding: 0; margin: 8px 0;">
+        <li style="margin: 4px 0;">- <a href="https://cloud.google.com/release-notes#May_22_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li style="margin: 4px 0;">- <a href="https://cloud.google.com/load-balancing/docs/backend-service#applb-csm-traffic-duration" target="_blank" rel="noopener noreferrer">Traffic Duration 設定ドキュメント</a></li>
+        <li style="margin: 4px 0;">- <a href="https://cloud.google.com/load-balancing/docs/backend-service#bmtc-inflight" target="_blank" rel="noopener noreferrer">In-Flight バランシングモード</a></li>
+        <li style="margin: 4px 0;">- <a href="https://cloud.google.com/sdk/gcloud/reference/compute/backend-services/add-backend" target="_blank" rel="noopener noreferrer">gcloud compute backend-services add-backend リファレンス</a></li>
+        <li style="margin: 4px 0;">- <a href="https://cloud.google.com/vpc/network-pricing#lb" target="_blank" rel="noopener noreferrer">料金ページ</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline);">Generated: 2026-05-22 | Tags: #CloudLoadBalancing #ApplicationLoadBalancer #TrafficDuration #InFlightBalancing #GA</p>
+    </footer>
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+    hljs.highlightAll();
+  </script>
+</body>
+</html>

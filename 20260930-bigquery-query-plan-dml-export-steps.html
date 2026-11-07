@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BigQuery: クエリプランで UPDATE / DELETE / MERGE / EXPORT 実行ステップの表示に対応</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .badge-deprecated {
+      background: var(--gc-red);
+      color: #FFFFFF;
+    }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 720px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .before-box h3 {
+      color: var(--gc-red);
+      margin-top: 0;
+    }
+
+    .after-box h3 {
+      color: var(--gc-green);
+      margin-top: 0;
+    }
+
+    .before-box ul, .after-box ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    /* ステップカテゴリチップ */
+    .step-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      margin: 16px 0;
+    }
+
+    .step-chip {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-outline-variant);
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-family: 'Roboto Mono', 'Source Code Pro', monospace;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .step-chip.new {
+      border-color: var(--gc-green);
+      background: var(--gc-green-tint);
+      color: var(--gc-green);
+    }
+
+    /* チェックリストスタイル */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+    }
+
+    /* コードブロック (pre:not(.mermaid) で Mermaid 図を除外) */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block {
+      overflow: hidden;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブルスタイル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border: 1px solid var(--gc-blue-200);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-800);
+    }
+
+    /* メリットのグリッド */
+    .benefit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 720px) {
+      .benefit-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .benefit-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      border-top: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .benefit-card h3 {
+      margin-top: 0;
+    }
+
+    .benefit-card ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .benefit-card li {
+      margin: 8px 0;
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .diagram-caption {
+      font-size: 14px;
+      color: var(--gc-outline);
+      text-align: center;
+      margin-top: 8px;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer ul {
+      padding-left: 20px;
+      margin: 8px 0;
+    }
+
+    footer li {
+      margin: 4px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- タイトルエリア -->
+    <div class="header">
+      <div>
+        <div style="margin-bottom: 8px;">
+          <span class="badge">BigQuery</span>
+          <span class="badge badge-ga">Feature</span>
+        </div>
+        <h1>📊 BigQuery: クエリプランで UPDATE / DELETE / MERGE / EXPORT 実行ステップの表示に対応</h1>
+      </div>
+      <div class="subtitle">リリース日: 2026-09-30</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📝 概要</h2>
+      <p>
+        BigQuery のクエリプラン (query plan) で、<span class="highlight">UPDATE、DELETE、MERGE、EXPORT の実行ステップを表示できる</span>ようになりました。
+        データ操作言語 (DML) ステートメントや、結果を宛先テーブルへマテリアライズするクエリについても、どのステージでどのような操作が実行されたのかを<strong>ステップレベル</strong>で確認できます。
+      </p>
+      <p>
+        BigQuery はクエリ実行時に SQL を「ステージ (stage)」で構成される実行グラフに変換し、各ステージは「ステップ (step)」と呼ばれる基本操作で構成されます。
+        今回のアップデートで、DML の実行を表す UPDATE / DELETE / MERGE ステップと、宛先テーブルへの出力を表す EXPORT ステップが加わり、DML 中心のワークロードでも実行の内訳を詳細に分析できます。
+        クエリプランは <code>jobs.get</code> などの API レスポンスや、コンソールの「実行の詳細 (Execution Details)」/ 実行グラフから確認できます。
+      </p>
+
+      <div class="step-chips">
+        <div class="step-chip">READ</div>
+        <div class="step-chip">WRITE</div>
+        <div class="step-chip">COMPUTE</div>
+        <div class="step-chip">FILTER</div>
+        <div class="step-chip">SORT</div>
+        <div class="step-chip">AGGREGATE</div>
+        <div class="step-chip">JOIN</div>
+        <div class="step-chip new">🆕 UPDATE</div>
+        <div class="step-chip new">🆕 DELETE</div>
+        <div class="step-chip new">🆕 MERGE</div>
+        <div class="step-chip new">🆕 EXPORT</div>
+      </div>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before: アップデート前の課題</h3>
+          <ul>
+            <li>ステップカテゴリには READ、WRITE、COMPUTE、FILTER、SORT、AGGREGATE、LIMIT、JOIN、ANALYTIC_FUNCTION、USER_DEFINED_FUNCTION などが表示されていたが、<strong>UPDATE、DELETE、MERGE、EXPORT の各実行ステップは表示できなかった</strong></li>
+            <li>UPDATE / DELETE / MERGE などの DML ステートメントについて、ターゲットテーブルへの変更操作がどのステージで実行されたかを<strong>ステップレベルで追跡しにくかった</strong></li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After: アップデート後の改善</h3>
+          <ul>
+            <li>クエリプラン上で <strong>UPDATE、DELETE、MERGE の各ステップを表示</strong>でき、変更対象の列やターゲットテーブルを確認できるようになった</li>
+            <li><strong>EXPORT ステップ</strong>により、DML や宛先テーブルへの結果出力において、出力列と宛先テーブルを確認できるようになった</li>
+            <li>実行グラフと組み合わせて、DML を含むクエリの<strong>ボトルネック分析・最適化</strong>がステップレベルで行えるようになった</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    U([👤 ユーザー / データエンジニア]) -->|DML / クエリ実行| BQ[🔷 BigQuery クエリエンジン]
+    BQ -->|SQL を変換| EG[📊 実行グラフ<br/>ステージ + ステップ]
+    EG --> S1[READ ステップ<br/>入力テーブル / シャッフルの読み取り]
+    S1 --> S2[COMPUTE / JOIN / FILTER<br/>など既存ステップ]
+    S2 --> S3[🆕 UPDATE / DELETE / MERGE ステップ<br/>変更列とターゲットテーブルを表示]
+    S3 --> S4[🆕 EXPORT ステップ<br/>出力列と宛先テーブルを表示]
+    S4 --> T[(🗄️ ターゲット / 宛先テーブル)]
+    EG -.->|jobs.get API /<br/>コンソールの実行の詳細| U
+        </pre>
+      </div>
+      <p class="diagram-caption">
+        DML ステートメントの実行グラフにおいて、新たに UPDATE / DELETE / MERGE / EXPORT のステップが表示され、API やコンソールからステップレベルで実行内容を確認できる流れ
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚙️ 主要機能</h2>
+
+      <div class="card">
+        <h3>1️⃣ UPDATE / DELETE / MERGE ステップの表示</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>ターゲットテーブルに対して DML ステートメントを実行するステージに表示される</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Columns</strong>: ターゲットテーブルから読み取られた列、または書き込まれた列</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Target table</strong>: ステートメントによって変更されるターゲットテーブル (UPDATE / DELETE ステップでは <code>FROM</code>、MERGE ステップでは <code>INTO</code> で表記)</span></div>
+      </div>
+
+      <div class="card">
+        <h3>2️⃣ EXPORT ステップの表示</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>出力データを宛先テーブルに書き込むステップ。INSERT、UPDATE、DELETE、MERGE などの DML の最終ステージや、結果を宛先テーブルにマテリアライズするクエリで一般的に表示される</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Output columns</strong>: 宛先テーブルに書き込まれる変数のリスト</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Destination table</strong>: エクスポートされた行を受け取る宛先テーブル (<code>TO</code> で表記)</span></div>
+      </div>
+
+      <div class="card">
+        <h3>3️⃣ 既存のクエリプラン分析機能との統合</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>コンソールの「実行グラフ (Execution graph)」タブで、ステージをノード、ステージ間で交換されるシャッフルメモリをエッジとして可視化</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>ステージをクリックすると、統計情報とステップ詳細 (擬似コード形式のサブステップ) を確認可能</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>jobs.get</code> などの API レスポンスからも診断用のクエリプラン・タイミング情報を取得可能</span></div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔬 技術仕様</h2>
+
+      <h3>📋 クエリプランのステップカテゴリ (DML / 出力関連)</h3>
+      <table>
+        <thead>
+          <tr><th>ステップカテゴリ</th><th>説明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>UPDATE</strong></td><td>UPDATE ステートメントによりターゲットテーブルの既存行を変更。変更された列とターゲットテーブルを含む</td></tr>
+          <tr><td><strong>DELETE</strong></td><td>DELETE ステートメントによりターゲットテーブルから行を削除。参照された列とターゲットテーブルを含む</td></tr>
+          <tr><td><strong>MERGE</strong></td><td>MERGE ステートメントによりターゲットテーブルの行を変更。変更された列とターゲットテーブルを含む</td></tr>
+          <tr><td><strong>EXPORT</strong></td><td>DML ステートメントまたはクエリ結果のエクスポートで、出力列を宛先テーブルに書き込む</td></tr>
+        </tbody>
+      </table>
+
+      <h3>🔍 クエリプラン情報の取得</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>取得方法 (API)</td><td><code>jobs.get</code> などの API レスポンスに診断用のクエリプラン・タイミング情報が含まれる</td></tr>
+          <tr><td>取得方法 (コンソール)</td><td>完了したクエリの「実行の詳細 (Execution Details)」ボタン、または「実行グラフ (Execution graph)」タブ</td></tr>
+          <tr><td>統計の更新</td><td>長時間実行クエリでは統計が定期的に更新される (通常 30 秒間隔より高頻度にはならない)</td></tr>
+          <tr><td>対象外のジョブ</td><td>ドライラン、キャッシュ結果から返されるクエリなど、実行リソースを使用しないジョブには診断情報は含まれない</td></tr>
+          <tr><td>サブステップの表記</td><td>擬似コード形式。変数は <code>$</code> + 一意の番号で表記され、変数番号はステージ間で共有されない</td></tr>
+          <tr><td>制限</td><td>実行グラフが複雑な場合、ペイロードサイズの問題を避けるためにサブステップが切り詰められることがある</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>✅ 前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>BigQuery でクエリジョブを実行していること (ドライランやキャッシュ結果のみのジョブは対象外)</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>クエリプランを確認するためのジョブ情報へのアクセス権があること</span></div>
+
+      <h3>ステップ 1: DML ステートメントを実行する</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">MERGE ステートメントの実行例</span>
+        </div>
+        <pre><code class="language-sql">-- 例: MERGE ステートメントの実行
+MERGE dataset.target_table T
+USING dataset.source_table S
+ON T.id = S.id
+WHEN MATCHED THEN
+  UPDATE SET T.value = S.value
+WHEN NOT MATCHED THEN
+  INSERT (id, value) VALUES (S.id, S.value);</code></pre>
+      </div>
+      <p>UPDATE / DELETE / MERGE などの DML ステートメントを実行します。</p>
+
+      <h3>ステップ 2: コンソールまたは API でクエリプランを確認する</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">API でジョブの詳細 (クエリプランを含む) を取得</span>
+        </div>
+        <pre><code class="language-bash"># API でジョブの詳細 (クエリプランを含む) を取得
+bq show --format=prettyjson -j &lt;JOB_ID&gt;</code></pre>
+      </div>
+      <p>
+        Google Cloud コンソールでは、完了したクエリの「実行の詳細」から「実行グラフ」タブを開き、ステージをクリックすると UPDATE / DELETE / MERGE / EXPORT を含むステップ詳細を確認できます。
+      </p>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>💡 メリット</h2>
+      <div class="benefit-grid">
+        <div class="benefit-card">
+          <h3>💼 ビジネス面</h3>
+          <ul>
+            <li><strong>運用の透明性向上</strong>: DML 中心の ELT / データメンテナンス処理についても実行内容をステップレベルで把握でき、トラブルシューティングの時間を短縮できる</li>
+            <li><strong>コスト・パフォーマンス管理の強化</strong>: クエリプランによるボトルネック分析の対象が DML ステートメントにも広がり、スロット消費の多いステージの特定に役立つ</li>
+          </ul>
+        </div>
+        <div class="benefit-card">
+          <h3>🔧 技術面</h3>
+          <ul>
+            <li><strong>DML 実行の可視化</strong>: どのステージでターゲットテーブルの変更 (UPDATE / DELETE / MERGE) が行われたか、どの列が読み書きされたかを確認できる</li>
+            <li><strong>出力先の明確化</strong>: EXPORT ステップにより、出力列と宛先テーブル (<code>TO</code>) が明示され、結果のマテリアライズ処理を追跡しやすい</li>
+            <li><strong>既存ワークフローとの親和性</strong>: 既存の実行グラフ・<code>jobs.get</code> API による分析フローにそのまま組み込まれるため、追加の設定は不要</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <div class="warning-box">
+        <strong>⚠️ 制限事項</strong>
+        <ul style="margin: 8px 0 0; padding-left: 20px;">
+          <li>ドライランリクエストやキャッシュ結果から返されるクエリジョブなど、<strong>実行リソースを使用しないジョブには診断用のクエリプラン情報が含まれない</strong></li>
+          <li>実行グラフが複雑な場合、ペイロードサイズの問題を避けるために<strong>サブステップが切り詰められる</strong>ことがある</li>
+        </ul>
+      </div>
+
+      <div class="note-box">
+        <strong>💡 考慮すべき点</strong>
+        <ul style="margin: 8px 0 0; padding-left: 20px;">
+          <li>ステップ詳細に表示されるサブステップは「通常含まれる」内容であり、クエリの内容によって表示される情報は異なる</li>
+          <li>長時間実行クエリの統計更新は通常 30 秒間隔より高頻度にはならない</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>📈 ユースケース 1: MERGE を使った大規模な差分更新処理のボトルネック分析</h3>
+        <p><strong>シナリオ</strong>: 日次バッチで MERGE ステートメントを使ってターゲットテーブルへ差分更新を行っているが、処理時間が長くなっており原因を特定したい。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">日次差分更新の MERGE 例</span>
+          </div>
+          <pre><code class="language-sql">MERGE analytics.daily_summary T
+USING staging.daily_updates S
+ON T.date = S.date AND T.key = S.key
+WHEN MATCHED THEN UPDATE SET T.metric = S.metric
+WHEN NOT MATCHED THEN INSERT ROW;</code></pre>
+        </div>
+        <p>
+          実行後、コンソールの実行グラフで MERGE ステップ (変更列・<code>INTO</code> のターゲットテーブル) と EXPORT ステップ (出力列・<code>TO</code> の宛先テーブル) を確認し、スロット時間の大きいステージ (グラフ上で濃い赤のノード) を特定します。
+        </p>
+        <p>
+          <strong>✅ 効果</strong>: MERGE 処理のどのステージに時間がかかっているかをステップレベルで把握し、パーティショニングやクラスタリングなどの最適化判断に役立てられる。
+        </p>
+      </div>
+
+      <div class="usecase">
+        <h3>🔎 ユースケース 2: DELETE / UPDATE ステートメントの実行内容監査</h3>
+        <p><strong>シナリオ</strong>: データ保持ポリシーに基づく定期的な DELETE や UPDATE 処理について、どの列が参照され、どのテーブルが変更されたかを事後的に確認したい。</p>
+        <p>
+          <strong>✅ 効果</strong>: <code>jobs.get</code> API やコンソールのステップ詳細から、DELETE / UPDATE ステップの参照列とターゲットテーブル (<code>FROM</code>) を確認でき、処理内容の検証やトラブルシューティングが容易になる。
+        </p>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>
+        クエリプランと実行グラフの情報は、クエリジョブに埋め込まれた<strong>診断情報として提供</strong>されます。BigQuery のクエリ料金の詳細は、以下の料金ページを参照してください。
+      </p>
+      <div class="icon-text">
+        <span class="arrow">→</span>
+        <a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">BigQuery の料金</a>
+      </div>
+    </div>
+
+    <!-- 関連サービス・機能 -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <h3>📊 BigQuery 実行グラフ (Execution graph)</h3>
+        <p style="margin: 0; font-size: 14px;">Google Cloud コンソールでクエリプランを視覚的に分析する機能。今回追加されたステップもここで確認できる</p>
+      </div>
+      <div class="card">
+        <h3>🔌 BigQuery jobs API (<code>jobs.get</code>)</h3>
+        <p style="margin: 0; font-size: 14px;">クエリプランとタイミング情報を API 経由で取得する手段</p>
+      </div>
+      <div class="card">
+        <h3>🗂️ BigQuery ジョブエクスプローラ</h3>
+        <p style="margin: 0; font-size: 14px;">同日 (2026-09-30) にレイアウトとフィルタリングの改善が GA となっており、ジョブの特定からクエリプラン分析までの流れを補完する</p>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📌 まとめ</h2>
+      <div class="success-box">
+        <p style="margin: 0;">
+          BigQuery のクエリプランに <strong>UPDATE / DELETE / MERGE / EXPORT のステップが追加</strong>され、DML ステートメントや宛先テーブルへの出力を含むクエリの実行内容を<strong>ステップレベルで可視化</strong>できるようになりました。
+          DML 中心のバッチ処理やデータメンテナンス処理を運用している場合は、実行グラフやジョブ API でこれらのステップを確認し、<strong>ボトルネック分析や処理内容の検証</strong>に活用することを推奨します。
+        </p>
+      </div>
+      <p style="font-size: 13px; color: var(--gc-outline); margin-bottom: 0;">
+        🏷️ タグ: BigQuery / クエリプラン / DML / UPDATE / DELETE / MERGE / EXPORT / パフォーマンス分析 / 実行グラフ
+      </p>
+    </div>
+
+    <!-- フッター (出典) -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul>
+        <li><a href="https://docs.cloud.google.com/release-notes#September_30_2026" target="_blank" rel="noopener noreferrer" class="gc-link">Google Cloud 公式リリースノート (September 30, 2026)</a></li>
+        <li><a href="https://docs.cloud.google.com/bigquery/docs/query-plan-explanation" target="_blank" rel="noopener noreferrer" class="gc-link">クエリプランとタイムラインの説明 (公式ドキュメント)</a></li>
+        <li><a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">BigQuery の料金</a></li>
+      </ul>
+      <p>本インフォグラフィックは Google Cloud News レポート (2026-09-30) をもとに生成されています。</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

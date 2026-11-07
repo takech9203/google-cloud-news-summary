@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Storage: HNS バケットでライフサイクル Delete が空フォルダを削除する動作変更</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left {
+      flex: 1;
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-red {
+      border-left-color: var(--gc-red);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-yellow {
+      border-left-color: var(--gc-yellow);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-breaking {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-red);
+    }
+
+    .badge-date {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-orange);
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 20px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.red {
+      background: linear-gradient(135deg, var(--gc-red), #C62828);
+    }
+
+    .stat-card.orange {
+      background: linear-gradient(135deg, var(--gc-orange), #E65100);
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-card h3 {
+      color: var(--gc-red);
+      margin: 0 0 12px 0;
+      font-size: 16px;
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-card h3 {
+      color: var(--gc-green);
+      margin: 0 0 12px 0;
+      font-size: 16px;
+    }
+
+    .before-card ul, .after-card ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-card li, .after-card li {
+      margin: 6px 0;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h3 {
+      color: var(--gc-blue-900);
+      margin: 0 0 8px 0;
+      font-size: 18px;
+    }
+
+    .usecase-card p {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .related-services {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .service-chip {
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 20px;
+      padding: 8px 16px;
+      font-size: 13px;
+      color: var(--gc-on-surface);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .timeline-item {
+      display: flex;
+      gap: 16px;
+      margin: 16px 0;
+      align-items: flex-start;
+    }
+
+    .timeline-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--gc-blue-600);
+      margin-top: 6px;
+      flex-shrink: 0;
+    }
+
+    .timeline-dot.red {
+      background: var(--gc-red);
+    }
+
+    .timeline-content {
+      flex: 1;
+    }
+
+    .timeline-date {
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      font-size: 14px;
+    }
+
+    .timeline-desc {
+      color: var(--gc-on-surface-variant);
+      font-size: 14px;
+      margin-top: 4px;
+    }
+
+    footer {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stat-cards { grid-template-columns: 1fr; }
+      .header { flex-direction: column; }
+      .feature-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>🪣 Cloud Storage: HNS バケットでライフサイクル Delete が空フォルダを自動削除</h1>
+        <div style="margin-top: 12px;">
+          <span class="badge">Cloud Storage</span>
+          <span class="badge">Hierarchical Namespace</span>
+          <span class="badge-breaking">Breaking Change</span>
+          <span class="badge-date">2026/8/26 施行</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-05-28</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        <strong>2026年8月26日以降</strong>、階層型名前空間 (HNS) が有効な Cloud Storage バケットにおいて、
+        Object Lifecycle Management の <span class="highlight">Delete アクション</span>が、
+        ライフサイクルルールの全条件を満たす<span class="highlight">空フォルダを自動的に削除</span>するようになります。
+      </p>
+      <p>
+        従来、HNS バケットではフォルダは明示的に DeleteFolder 操作を行わない限り削除されませんでした。
+        ライフサイクル管理の Delete アクションはオブジェクトのみを対象としており、空になったフォルダはそのまま残存していました。
+        今回の変更により、ライフサイクルルールの条件 (<code>age</code>, <code>matchesPrefix</code>, <code>matchesSuffix</code> 等) を満たす空フォルダも Delete アクションの対象となります。
+      </p>
+
+      <div class="error-box">
+        <strong>&#9888;&#65039; Breaking Change:</strong> この変更は既存の動作を変更します。HNS バケットを使用している全てのユーザーに影響する可能性があります。施行日 (2026年8月26日) までに既存のライフサイクルルールを精査してください。
+      </div>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>&#128260; Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-card">
+          <h3>&#10060; Before (現在の動作)</h3>
+          <ul>
+            <li>Delete アクションは<strong>オブジェクトのみ</strong>を削除</li>
+            <li>空フォルダは残存し続ける</li>
+            <li>空フォルダの蓄積でリスト操作が劣化</li>
+            <li>削除には別途スクリプトや手動操作が必要</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h3>&#9989; After (2026/8/26 以降)</h3>
+          <ul>
+            <li>Delete アクションが<strong>オブジェクト + 空フォルダ</strong>を削除</li>
+            <li>条件を満たす空フォルダは自動削除</li>
+            <li>リスト操作のパフォーマンスが維持</li>
+            <li>追加スクリプトや手動運用が不要</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stat-cards">
+      <div class="stat-card red">
+        <div class="stat-value">&#9888;&#65039;</div>
+        <div class="stat-label">Breaking Change<br>既存動作の変更</div>
+      </div>
+      <div class="stat-card orange">
+        <div class="stat-value">~90 日</div>
+        <div class="stat-label">施行までの猶予期間<br>(2026/8/26 施行)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">HNS</div>
+        <div class="stat-label">対象バケット<br>階層型名前空間のみ</div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>&#128736;&#65039; アーキテクチャ図: ライフサイクル管理の動作フロー</h2>
+      <p>2026年8月26日以降の HNS バケットにおけるライフサイクル管理の動作フローです。Delete アクションの評価対象にオブジェクトだけでなく空フォルダも含まれるようになります。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    A[Object Lifecycle Management] --> B{ルール条件を評価}
+    B -->|オブジェクトが条件を満たす| C[オブジェクトを削除]
+    C --> D{フォルダが空になったか?}
+    D -->|はい| E{空フォルダがルール条件を満たすか?}
+    E -->|はい| F[空フォルダを自動削除]
+    E -->|いいえ| G[空フォルダは残存]
+    D -->|いいえ| H[フォルダは残存]
+    B -->|空フォルダが条件を満たす| F
+
+    style F fill:#ff6b6b,stroke:#c92a2a,color:#fff
+    style A fill:#4dabf7,stroke:#1971c2,color:#fff
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>&#9889; 主要機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h3 style="margin: 0 0 8px 0; color: var(--gc-on-surface); font-size: 16px;">&#128465;&#65039; 空フォルダの自動ライフサイクル削除</h3>
+          <ul style="margin: 0; padding-left: 20px; font-size: 14px;">
+            <li>ライフサイクルルールの全条件を満たす空フォルダが Delete アクションの対象に</li>
+            <li>既存のライフサイクルルールがそのまま空フォルダにも適用</li>
+            <li>オブジェクトと同様に条件評価は非同期で実行</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3 style="margin: 0 0 8px 0; color: var(--gc-on-surface); font-size: 16px;">&#128270; 条件ベースの評価</h3>
+          <ul style="margin: 0; padding-left: 20px; font-size: 14px;">
+            <li><code>age</code> (作成からの経過日数) で評価</li>
+            <li><code>matchesPrefix</code> / <code>matchesSuffix</code> でフィルタ</li>
+            <li>全ての条件を満たした場合にのみ削除実行</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3 style="margin: 0 0 8px 0; color: var(--gc-on-surface); font-size: 16px;">&#128640; パフォーマンス最適化</h3>
+          <ul style="margin: 0; padding-left: 20px; font-size: 14px;">
+            <li>空フォルダの蓄積を自動防止</li>
+            <li>リスト操作のパフォーマンスを維持</li>
+            <li>大規模データパイプラインでの管理負荷を軽減</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specs -->
+    <div class="section">
+      <h2>&#128203; 技術仕様</h2>
+      <h3 style="color: var(--gc-on-surface); font-size: 18px; margin-bottom: 12px;">ライフサイクルルールの動作変更</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>変更前 (現在)</th>
+            <th>変更後 (2026/8/26 以降)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Delete アクションの対象</td>
+            <td>オブジェクトのみ</td>
+            <td><strong>オブジェクト + 空フォルダ</strong></td>
+          </tr>
+          <tr>
+            <td>空フォルダの削除</td>
+            <td>手動 / スクリプト必要</td>
+            <td>ライフサイクルルールで自動削除可能</td>
+          </tr>
+          <tr>
+            <td>対象バケット</td>
+            <td>-</td>
+            <td>HNS 有効バケットのみ</td>
+          </tr>
+          <tr>
+            <td>フラットネームスペースバケット</td>
+            <td>変更なし</td>
+            <td>変更なし (影響なし)</td>
+          </tr>
+          <tr>
+            <td>施行日</td>
+            <td>-</td>
+            <td>2026年8月26日</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 style="color: var(--gc-on-surface); font-size: 18px; margin-top: 24px; margin-bottom: 12px;">ライフサイクル条件の適用例</h3>
+      <p>以下の例では、2026年8月26日以降、<code>temp/</code> プレフィックスに一致し作成から30日以上経過した空フォルダも削除対象となります。</p>
+      <span class="code-label">JSON</span>
+      <pre><code class="language-json">{
+  "lifecycle": {
+    "rule": [
+      {
+        "action": {
+          "type": "Delete"
+        },
+        "condition": {
+          "age": 30,
+          "matchesPrefix": ["temp/"]
+        }
+      }
+    ]
+  }
+}</code></pre>
+    </div>
+
+    <!-- Setup Guide -->
+    <div class="section">
+      <h2>&#128295; 設定方法: 影響確認と対策手順</h2>
+
+      <div class="flow-diagram">
+        <div class="flow-step">&#128269; HNS バケット<br>確認</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">&#128203; ライフサイクル<br>ルール確認</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">&#128736;&#65039; ルール修正<br>(必要に応じて)</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">&#9989; 検証</div>
+      </div>
+
+      <h3 style="color: var(--gc-on-surface); font-size: 16px; margin-top: 20px;">Step 1: 影響を受けるバケットの確認</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># HNS が有効なバケットを一覧表示
+gcloud storage buckets list \
+  --format="table(name,hierarchicalNamespace.enabled)" | grep True</code></pre>
+
+      <h3 style="color: var(--gc-on-surface); font-size: 16px; margin-top: 20px;">Step 2: 現在のライフサイクルルールの確認</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># バケットのライフサイクル設定を確認
+gcloud storage buckets describe gs://BUCKET_NAME \
+  --format="json(lifecycle)"</code></pre>
+
+      <h3 style="color: var(--gc-on-surface); font-size: 16px; margin-top: 20px;">Step 3: 必要に応じてルールの修正</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># ライフサイクル設定ファイルを更新して適用
+gcloud storage buckets update gs://BUCKET_NAME \
+  --lifecycle-file=lifecycle.json</code></pre>
+
+      <div class="note-box">
+        <strong>&#128161; ヒント:</strong> 空フォルダを保持する必要がある場合は、<code>matchesPrefix</code> や <code>matchesSuffix</code> を活用して削除対象を限定するか、該当フォルダにダミーオブジェクト (プレースホルダーファイル) を配置することを検討してください。
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>&#9989; メリット</h2>
+      <div class="feature-grid">
+        <div class="card card-green">
+          <h3 style="margin: 0 0 8px 0; color: var(--gc-on-surface); font-size: 16px;">&#128176; ビジネス面</h3>
+          <div class="check-item">
+            <span class="check-icon">&#10003;</span>
+            <span><strong>運用コスト削減</strong>: カスタムスクリプトや定期実行ジョブが不要に</span>
+          </div>
+          <div class="check-item">
+            <span class="check-icon">&#10003;</span>
+            <span><strong>管理の簡素化</strong>: フォルダクリーンアップが自動化</span>
+          </div>
+        </div>
+        <div class="card card-green">
+          <h3 style="margin: 0 0 8px 0; color: var(--gc-on-surface); font-size: 16px;">&#9881;&#65039; 技術面</h3>
+          <div class="check-item">
+            <span class="check-icon">&#10003;</span>
+            <span><strong>パフォーマンス維持</strong>: 空フォルダ蓄積による劣化を自動防止</span>
+          </div>
+          <div class="check-item">
+            <span class="check-icon">&#10003;</span>
+            <span><strong>一貫性のある動作</strong>: オブジェクトとフォルダに統一的に動作</span>
+          </div>
+          <div class="check-item">
+            <span class="check-icon">&#10003;</span>
+            <span><strong>大規模環境の効率化</strong>: AI/ML パイプラインの一時フォルダ自動クリーンアップ</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations & Considerations -->
+    <div class="section">
+      <h2>&#9888;&#65039; デメリット・制約事項</h2>
+      <h3 style="color: var(--gc-on-surface); font-size: 16px; margin-bottom: 12px;">制限事項</h3>
+      <div class="check-item">
+        <span class="cross-icon">&#10007;</span>
+        <span>HNS バケットのみが対象 (フラットネームスペースのバケットは影響なし)</span>
+      </div>
+      <div class="check-item">
+        <span class="cross-icon">&#10007;</span>
+        <span>フォルダ内にオブジェクトが1つでも存在する場合、そのフォルダは削除されない (空フォルダのみ対象)</span>
+      </div>
+      <div class="check-item">
+        <span class="cross-icon">&#10007;</span>
+        <span>非同期動作のため、条件を満たしてから実際の削除まで遅延が発生する可能性あり</span>
+      </div>
+
+      <h3 style="color: var(--gc-on-surface); font-size: 16px; margin-top: 20px; margin-bottom: 12px;">考慮すべき点</h3>
+      <div class="warning-box">
+        <strong>&#9888;&#65039; フォルダ構造に依存したシステムへの影響:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px; font-size: 14px;">
+          <li>パーティション管理、メタデータ的なフォルダ利用がある場合は注意</li>
+          <li>マネージドフォルダが関連付けられている場合、フォルダ削除時に IAM ポリシーも削除される</li>
+          <li>一度削除されたフォルダは復元できない (ロールバック不可)</li>
+          <li>2026年8月26日までに開発環境での動作検証を強く推奨</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>&#128161; ユースケース</h2>
+      <div class="usecase-card">
+        <h3>&#128640; データパイプラインの一時フォルダ管理</h3>
+        <p><strong>シナリオ:</strong> ETL パイプラインが日次で <code>staging/YYYY-MM-DD/</code> フォルダを作成し、処理完了後にオブジェクトを削除するが、空フォルダが残存し続ける</p>
+        <span class="code-label">JSON</span>
+        <pre><code class="language-json">{
+  "lifecycle": {
+    "rule": [
+      {
+        "action": { "type": "Delete" },
+        "condition": {
+          "age": 7,
+          "matchesPrefix": ["staging/"]
+        }
+      }
+    ]
+  }
+}</code></pre>
+        <p><strong>&#10024; 効果:</strong> 7日以上経過した <code>staging/</code> 配下の空フォルダが自動クリーンアップされ、リスト操作のパフォーマンスが維持される</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>&#129302; フォルダ構造を保持する必要があるケース (AI/ML ワークロード)</h3>
+        <p><strong>シナリオ:</strong> モデルのバージョン管理用にフォルダ構造 (<code>models/v1/</code>, <code>models/v2/</code>) を維持する必要があるが、古いモデルファイルは削除したい</p>
+        <p><strong>&#128736;&#65039; 対策:</strong> <code>matchesPrefix</code> を活用してモデルフォルダ以外にのみ Delete ルールを適用するか、各フォルダにプレースホルダーファイルを配置して空フォルダにならないよう対策する</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>&#128176; 料金情報</h2>
+      <p>本動作変更自体に<strong>追加料金は発生しません</strong>。ライフサイクル管理は Cloud Storage の標準機能として無料で利用できます。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>影響</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ライフサイクル管理</td>
+            <td>無料 (追加料金なし)</td>
+          </tr>
+          <tr>
+            <td>フォルダ削除操作</td>
+            <td>Class A 操作として課金される可能性あり</td>
+          </tr>
+          <tr>
+            <td>ストレージ料金</td>
+            <td>空フォルダ削除によりメタデータ分の微小なコスト削減</td>
+          </tr>
+          <tr>
+            <td>Pub/Sub 通知</td>
+            <td>ライフサイクルイベント通知を有効にしている場合、通知数が増加する可能性</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Regions -->
+    <div class="section">
+      <h2>&#127758; 利用可能リージョン</h2>
+      <p>この動作変更は、HNS が利用可能な<strong>全リージョン</strong>の Cloud Storage バケットに適用されます。リージョン固有の制限はありません。</p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#128279; 関連サービス</h2>
+      <div class="related-services">
+        <div class="service-chip">&#9729;&#65039; Cloud Storage HNS</div>
+        <div class="service-chip">&#9881;&#65039; Object Lifecycle Management</div>
+        <div class="service-chip">&#128193; Cloud Storage FUSE</div>
+        <div class="service-chip">&#128640; Cloud Storage Connector (Dataproc)</div>
+        <div class="service-chip">&#128274; Managed Folders</div>
+      </div>
+      <div class="note-box">
+        <strong>&#128161; 注意:</strong> マネージドフォルダが関連付けられた空フォルダが削除されると、マネージドフォルダとその IAM ポリシーも削除されます。Cloud Storage FUSE でマウントしている場合、フォルダ削除はマウントビューにも即座に反映されます。
+      </div>
+    </div>
+
+    <!-- Timeline -->
+    <div class="section">
+      <h2>&#128197; タイムライン</h2>
+      <div class="timeline-item">
+        <div class="timeline-dot"></div>
+        <div class="timeline-content">
+          <div class="timeline-date">2026年5月28日</div>
+          <div class="timeline-desc">リリースノート発表 - 動作変更の事前告知</div>
+        </div>
+      </div>
+      <div class="timeline-item">
+        <div class="timeline-dot"></div>
+        <div class="timeline-content">
+          <div class="timeline-date">2026年5月28日 ~ 8月25日</div>
+          <div class="timeline-desc">猶予期間 - 既存ルールの確認と対策を実施</div>
+        </div>
+      </div>
+      <div class="timeline-item">
+        <div class="timeline-dot red"></div>
+        <div class="timeline-content">
+          <div class="timeline-date">2026年8月26日</div>
+          <div class="timeline-desc"><strong>施行日</strong> - 空フォルダの自動削除が有効化</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>&#128221; まとめ</h2>
+      <div class="card card-yellow">
+        <p style="margin: 0; font-size: 15px;">
+          本アップデートは <strong>Breaking Change</strong> であり、HNS バケットを使用している全てのユーザーが事前に影響を確認する必要があります。
+          空フォルダの自動削除はパフォーマンス面で有益ですが、フォルダ構造に依存したワークフローがある場合は、ライフサイクルルールの条件を精査し、
+          必要に応じて <code>matchesPrefix</code> / <code>matchesSuffix</code> による除外設定やプレースホルダーファイルの配置を検討してください。
+          <strong>施行日までの約3ヶ月間を活用し、開発環境での動作検証を強く推奨します。</strong>
+        </p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>&#128206; 出典:</p>
+      <ul style="margin: 4px 0; padding-left: 20px;">
+        <li><a href="https://docs.cloud.google.com/release-notes#May_28_2026" target="_blank" rel="noopener noreferrer">Google Cloud Release Notes (May 28, 2026)</a></li>
+        <li><a href="https://docs.cloud.google.com/storage/docs/hns-overview" target="_blank" rel="noopener noreferrer">Cloud Storage - Hierarchical Namespace 概要</a></li>
+        <li><a href="https://docs.cloud.google.com/storage/docs/lifecycle" target="_blank" rel="noopener noreferrer">Object Lifecycle Management ドキュメント</a></li>
+        <li><a href="https://docs.cloud.google.com/storage/docs/hns-buckets-best-practices" target="_blank" rel="noopener noreferrer">HNS バケットのベストプラクティス</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline);">Generated on 2026-05-29</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

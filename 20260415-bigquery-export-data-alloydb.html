@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BigQuery: EXPORT DATA to AlloyDB (Preview) &amp; マテリアライズドビューのセキュリティ修正</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; }
+
+    h1, .title {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 12px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .card-red {
+      border-left-color: var(--gc-red);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .card-teal {
+      border-left-color: var(--gc-teal);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .badge-fix {
+      background: var(--gc-red);
+      color: #FFFFFF;
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .code-block .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      margin: -16px -16px 12px -16px;
+      border-radius: 8px 8px 0 0;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 20px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card-green {
+      background: linear-gradient(135deg, var(--gc-green), #1B8A3B);
+    }
+
+    .stat-card-orange {
+      background: linear-gradient(135deg, var(--gc-orange), #E65100);
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-card h4 {
+      color: var(--gc-red);
+      margin: 0 0 12px 0;
+      font-size: 18px;
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-card h4 {
+      color: var(--gc-green);
+      margin: 0 0 12px 0;
+      font-size: 18px;
+    }
+
+    .before-card ul, .after-card ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .before-card li, .after-card li {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-800);
+      margin: 0 0 8px 0;
+      font-size: 18px;
+    }
+
+    .usecase-card p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .pricing-table {
+      margin: 16px 0;
+    }
+
+    .links-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .link-card {
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 8px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      color: var(--gc-on-surface-variant);
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .link-card:hover {
+      background: var(--gc-blue-50);
+      border-color: var(--gc-blue-300);
+    }
+
+    .link-card .link-icon {
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .link-card .link-text {
+      font-size: 14px;
+      color: var(--gc-blue-600);
+      word-break: break-all;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 28px; }
+      h2 { font-size: 20px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stat-cards { grid-template-columns: 1fr; }
+      .feature-grid { grid-template-columns: 1fr; }
+      .links-grid { grid-template-columns: 1fr; }
+      .flow-diagram { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>📊 BigQuery: EXPORT DATA to AlloyDB &amp; マテリアライズドビューのセキュリティ修正</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">BigQuery</span>
+          <span class="badge" style="background: var(--gc-green);">AlloyDB</span>
+          <span class="badge-preview">Preview</span>
+          <span class="badge-fix">Security Fix</span>
+        </div>
+      </div>
+      <div class="subtitle" style="text-align: right; white-space: nowrap; margin-left: 16px;">
+        <div>2026-04-15</div>
+        <div>Google Cloud Update</div>
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>☁️ 概要</h2>
+      <p>
+        BigQuery に関する 2 つの重要なアップデートが発表されました。<code>EXPORT DATA</code> ステートメントを使用して BigQuery のデータを
+        <span class="highlight">AlloyDB に直接エクスポート</span>するリバース ETL 機能が Preview として利用可能になりました。
+        また、マテリアライズドビューのリフレッシュ時にきめ細かいアクセス制御 (Fine-Grained Access Control) ポリシーで保護されたデータがエラーメッセージに露出する可能性があった問題が修正されました。
+      </p>
+
+      <div class="stat-cards">
+        <div class="stat-card">
+          <div class="stat-value">6</div>
+          <div class="stat-label">EXPORT DATA 対応先 (AlloyDB 含む)</div>
+        </div>
+        <div class="stat-card stat-card-green">
+          <div class="stat-value">SQL のみ</div>
+          <div class="stat-label">リバース ETL パイプライン構築</div>
+        </div>
+        <div class="stat-card stat-card-orange">
+          <div class="stat-value">0</div>
+          <div class="stat-label">セキュリティ修正に必要なユーザー対応</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-card">
+          <h4>❌ Before</h4>
+          <ul>
+            <li>BigQuery の分析結果を AlloyDB に反映するには Dataflow、Cloud Functions、カスタムスクリプトなどの中間パイプラインが必要</li>
+            <li>PostgreSQL 互換 DB へのリバース ETL には外部ツールやサードパーティサービスが必要で、運用が複雑化</li>
+            <li>マテリアライズドビューのリフレッシュ時にアクセス制御で保護されたデータがエラーメッセージに露出するリスク</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>✅ After</h4>
+          <ul>
+            <li><code>EXPORT DATA</code> ステートメント一つで BigQuery から AlloyDB への直接エクスポートが可能</li>
+            <li>BigQuery の SQL だけでリバース ETL パイプラインが完結、中間パイプラインの構築・管理が不要</li>
+            <li>マテリアライズドビューのデータ露出問題が解消され、きめ細かいアクセス制御の信頼性が向上</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>BigQuery が Enterprise 以上のスロットリザベーションを使用してデータを抽出・変換し、EXPORT DATA ステートメントを通じて AlloyDB のテーブルに直接データを書き込みます。AlloyDB に格納されたデータは、PostgreSQL 互換インターフェースを通じてアプリケーションから低レイテンシで読み取ることができます。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    subgraph BQ["BigQuery"]
+        A["データウェアハウス\n(分析用テーブル)"] --> B["EXPORT DATA\nステートメント"]
+        B --> C["スロット\n(Enterprise / Enterprise Plus)"]
+    end
+
+    subgraph AlloyDB["AlloyDB for PostgreSQL"]
+        D["AlloyDB クラスタ\n(プライマリインスタンス)"] --> E["宛先テーブル\n(PostgreSQL)"]
+    end
+
+    subgraph App["アプリケーション層"]
+        F["Web / モバイル\nアプリケーション"]
+    end
+
+    C -- "リバース ETL" --> D
+    E -- "低レイテンシ読み取り" --> F
+
+    style BQ fill:#4285F4,color:#fff
+    style AlloyDB fill:#34A853,color:#fff
+    style App fill:#FBBC04,color:#000
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+
+      <div class="card">
+        <h3>🔄 1. EXPORT DATA to AlloyDB (Preview)</h3>
+        <div class="icon-text"><span class="arrow">→</span><span><code>EXPORT DATA</code> ステートメントを使用して、BigQuery のクエリ結果を AlloyDB のテーブルに直接エクスポートできる新機能</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>BigQuery のリバース ETL 対応先として、Cloud Storage、Spanner、Bigtable、Pub/Sub に続き AlloyDB が追加</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>Preview ステータスであり、本番環境での使用は制約がある可能性がある</span></div>
+      </div>
+
+      <div class="card card-green">
+        <h3>🔗 2. リバース ETL ワークフローの実現</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>BigQuery の分析結果をアプリケーションのサービング層 (AlloyDB) に直接フィードバックし、分析と運用のギャップを解消</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>AlloyDB の PostgreSQL 互換性により、既存の PostgreSQL ベースのアプリケーションとシームレスに統合</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>AlloyDB のカラムナエンジンやインデックスアドバイザーなど高性能機能と組み合わせ可能</span></div>
+      </div>
+
+      <div class="card card-red">
+        <h3>🔒 3. マテリアライズドビューのセキュリティ修正</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>マテリアライズドビューのリフレッシュ時に、きめ細かいアクセス制御ポリシーで保護されたマスク済みまたはフィルタ済みデータがエラーメッセージに露出する問題を修正</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>ユーザー側での追加アクションは不要 (自動修正済み)</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>データマスキングやカラムレベルのアクセス制御を使用している全ユーザーに影響する修正</span></div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3>EXPORT DATA to AlloyDB の要件</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>BigQuery エディション</td><td><strong>Enterprise</strong> または <strong>Enterprise Plus</strong> が必要</td></tr>
+          <tr><td>オンデマンド / Standard エディション</td><td>対応なし</td></tr>
+          <tr><td>ステータス</td><td><span class="badge-preview" style="display: inline; padding: 2px 8px; font-size: 12px;">Preview</span></td></tr>
+          <tr><td>エクスポート方式</td><td><code>EXPORT DATA</code> ステートメント (SQL)</td></tr>
+          <tr><td>宛先</td><td>AlloyDB for PostgreSQL テーブル</td></tr>
+        </tbody>
+      </table>
+
+      <h3>BigQuery EXPORT DATA 対応先一覧</h3>
+      <table>
+        <thead>
+          <tr><th>エクスポート先</th><th>ステータス</th><th>フォーマット</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Cloud Storage</td><td><span class="badge-ga" style="display: inline; padding: 2px 8px; font-size: 12px;">GA</span></td><td>Avro, CSV, JSON, Parquet</td></tr>
+          <tr><td>Amazon S3 / Azure Blob Storage</td><td><span class="badge-ga" style="display: inline; padding: 2px 8px; font-size: 12px;">GA</span></td><td>Avro, CSV, JSON, Parquet</td></tr>
+          <tr><td>Cloud Spanner</td><td><span class="badge-ga" style="display: inline; padding: 2px 8px; font-size: 12px;">GA</span></td><td>CLOUD_SPANNER</td></tr>
+          <tr><td>Cloud Bigtable</td><td><span class="badge-ga" style="display: inline; padding: 2px 8px; font-size: 12px;">GA</span></td><td>CLOUD_BIGTABLE</td></tr>
+          <tr><td>Pub/Sub</td><td><span class="badge-preview" style="display: inline; padding: 2px 8px; font-size: 12px;">Preview</span></td><td>CLOUD_PUBSUB</td></tr>
+          <tr><td><strong>AlloyDB</strong></td><td><span class="badge-preview" style="display: inline; padding: 2px 8px; font-size: 12px;">Preview (新規)</span></td><td>未公開</td></tr>
+        </tbody>
+      </table>
+
+      <h3>マテリアライズドビューのセキュリティ修正</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>問題の種類</td><td>セキュリティ (データ露出)</td></tr>
+          <tr><td>影響範囲</td><td>きめ細かいアクセス制御ポリシー使用時のマテリアライズドビューリフレッシュ</td></tr>
+          <tr><td>露出経路</td><td>エラーメッセージ内にマスク済み / フィルタ済みデータが含まれる</td></tr>
+          <tr><td>必要なアクション</td><td><strong>なし</strong> (自動修正済み)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup Guide -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>前提条件</h3>
+      <div class="card">
+        <div class="check-item"><span class="check-icon">✓</span><span>BigQuery Enterprise または Enterprise Plus エディションのスロットリザベーションが必要</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>AlloyDB クラスタおよびデータ受信用テーブルが事前に作成されていること</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>適切な IAM ロールの付与 (BigQuery Data Viewer、BigQuery User、AlloyDB への書き込み権限)</span></div>
+      </div>
+
+      <h3>Step 1: AlloyDB クラスタとテーブルの準備</h3>
+      <p>AlloyDB にエクスポート先のテーブルを作成します。AlloyDB は PostgreSQL 互換のため、標準的な DDL を使用できます。</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">AlloyDB 上でテーブルを作成</span>
+        </div>
+        <pre><code class="language-sql">-- AlloyDB 上でテーブルを作成
+CREATE TABLE analytics_results (
+    user_id BIGINT PRIMARY KEY,
+    segment VARCHAR(255),
+    lifetime_value NUMERIC,
+    last_updated TIMESTAMP
+);</code></pre>
+      </div>
+
+      <h3>Step 2: BigQuery から AlloyDB へのデータエクスポート</h3>
+      <p><code>EXPORT DATA</code> ステートメントを使用して BigQuery のクエリ結果を AlloyDB にエクスポートします。</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">BigQuery から AlloyDB へのエクスポート</span>
+        </div>
+        <pre><code class="language-sql">-- BigQuery から AlloyDB へのエクスポート
+EXPORT DATA
+OPTIONS (
+  uri='alloydb://PROJECT_ID/REGION/CLUSTER_ID/DATABASE_ID',
+  format='ALLOYDB',
+  alloydb_options="""{ "table": "analytics_results" }"""
+)
+AS
+SELECT
+  user_id,
+  segment,
+  lifetime_value,
+  CURRENT_TIMESTAMP() AS last_updated
+FROM `my_project.my_dataset.user_analytics`;</code></pre>
+      </div>
+
+      <div class="warning-box">
+        <strong>&#x26A0;&#xFE0F; 注意:</strong> 上記の構文は Spanner への EXPORT DATA の構文を参考にした推定です。実際の AlloyDB 向け構文は Preview の公式ドキュメントで確認してください。
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+
+      <div class="feature-grid">
+        <div class="card card-green">
+          <h3>💼 ビジネス面</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>分析結果の迅速なアプリケーション反映</strong>: BigQuery のインサイトを AlloyDB 経由でアプリに即座に反映し、意思決定のスピード向上</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>運用コストの削減</strong>: Dataflow / Cloud Functions などの中間パイプライン構築・運用が不要に</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>PostgreSQL エコシステム活用</strong>: AlloyDB の PostgreSQL 互換性により、既存ツール・ライブラリをそのまま使用可能</span></div>
+        </div>
+
+        <div class="card card-teal">
+          <h3>🔬 技術面</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>SQL のみでリバース ETL</strong>: EXPORT DATA ステートメントだけでパイプライン完結、追加コード不要</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>AlloyDB の高性能な読み取り</strong>: カラムナエンジンやリードプールインスタンスで高スループット・低レイテンシ</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>セキュリティ強化</strong>: マテリアライズドビューの修正できめ細かいアクセス制御の信頼性向上</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>&#x26A0;&#xFE0F; デメリット・制約事項</h2>
+
+      <h3>制限事項</h3>
+      <div class="card card-orange">
+        <div class="icon-text"><span class="cross-icon">&#x2717;</span><span>Preview ステータスのため、本番ワークロードでの使用には注意が必要。SLA の対象外となる可能性あり</span></div>
+        <div class="icon-text"><span class="cross-icon">&#x2717;</span><span>BigQuery <strong>Enterprise</strong> または <strong>Enterprise Plus</strong> エディションが必要 (Standard / オンデマンドでは利用不可)</span></div>
+        <div class="icon-text"><span class="cross-icon">&#x2717;</span><span>AlloyDB 側にエクスポート先テーブルを事前に作成しておく必要がある</span></div>
+      </div>
+
+      <h3>考慮すべき点</h3>
+      <div class="card card-orange">
+        <div class="icon-text"><span style="color: var(--gc-yellow); font-size: 18px; flex-shrink: 0;">&#x26A0;</span><span>Preview から GA に移行する際に、構文やオプションが変更される可能性がある</span></div>
+        <div class="icon-text"><span style="color: var(--gc-yellow); font-size: 18px; flex-shrink: 0;">&#x26A0;</span><span>BigQuery と AlloyDB のリージョンを一致させてデータ転送料金を抑えることを推奨</span></div>
+        <div class="icon-text"><span style="color: var(--gc-yellow); font-size: 18px; flex-shrink: 0;">&#x26A0;</span><span>大規模データのエクスポート時には BigQuery のジョブ実行時間上限 (6 時間) に注意</span></div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>🤖 UC1: ML モデルの予測結果をアプリケーションに反映</h4>
+        <p><strong>シナリオ:</strong> BigQuery ML でトレーニングしたモデルの予測結果 (ユーザーセグメント、レコメンデーションスコアなど) を、AlloyDB 経由で Web アプリケーションのパーソナライゼーション機能に反映する。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">ML 予測結果のエクスポート例</span>
+          </div>
+          <pre><code class="language-sql">EXPORT DATA
+OPTIONS (...)
+AS
+SELECT
+  user_id,
+  ML.PREDICT(MODEL `my_project.my_dataset.churn_model`,
+    STRUCT(feature1, feature2, feature3)) AS churn_probability,
+  CURRENT_TIMESTAMP() AS prediction_time
+FROM `my_project.my_dataset.user_features`;</code></pre>
+        </div>
+        <p><strong>効果:</strong> 分析環境と本番アプリケーション間のデータ伝搬が自動化され、最新の ML 予測結果を低レイテンシでユーザーに提供可能。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>📊 UC2: BI ダッシュボード用のサマリーテーブル生成</h4>
+        <p><strong>シナリオ:</strong> BigQuery で集計した大規模データのサマリーを AlloyDB にエクスポートし、Grafana や Metabase などの BI ツールから PostgreSQL 互換接続で参照する。</p>
+        <p><strong>効果:</strong> BigQuery のクォータや同時実行制限を回避しつつ、多数のダッシュボードユーザーに対して高速なクエリレスポンスを提供可能。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>⚡ UC3: リアルタイムフィーチャーストア</h4>
+        <p><strong>シナリオ:</strong> BigQuery で計算した特徴量を AlloyDB にエクスポートし、オンラインの推論パイプラインからリアルタイムにフィーチャーを参照する。</p>
+        <p><strong>効果:</strong> BigQuery のバッチ処理能力と AlloyDB の低レイテンシ読み取りを組み合わせた、コスト効率の高いフィーチャーストアアーキテクチャを実現。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>EXPORT DATA を使用したデータエクスポートでは、BigQuery のキャパシティコンピュート料金が発生します。</p>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>BigQuery コンピュート</td><td>Enterprise / Enterprise Plus のスロットリザベーション料金 (スロット時間ベース)</td></tr>
+          <tr><td>AlloyDB ストレージ</td><td>エクスポートされたデータの AlloyDB 側のストレージ料金</td></tr>
+          <tr><td>ネットワーク</td><td>リージョン間のデータ転送が発生する場合、BigQuery のデータ抽出料金が適用</td></tr>
+        </tbody>
+      </table>
+
+      <div class="note-box">
+        <strong>💡 コスト最適化のヒント:</strong> BigQuery のスロットリザベーションでベースラインを 0 に設定しオートスケーリングを有効にすることで、一回限りのエクスポートにおけるコンピュートコストを最小化できます。
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="links-grid">
+        <a href="https://docs.cloud.google.com/alloydb/docs/overview" target="_blank" rel="noopener noreferrer" class="link-card">
+          <span class="link-icon">🗄️</span>
+          <span class="link-text">AlloyDB for PostgreSQL - PostgreSQL 互換フルマネージド DB</span>
+        </a>
+        <a href="https://docs.cloud.google.com/bigquery/docs/export-to-spanner" target="_blank" rel="noopener noreferrer" class="link-card">
+          <span class="link-icon">🔄</span>
+          <span class="link-text">BigQuery EXPORT DATA to Spanner (GA)</span>
+        </a>
+        <a href="https://docs.cloud.google.com/bigquery/docs/export-to-bigtable" target="_blank" rel="noopener noreferrer" class="link-card">
+          <span class="link-icon">🔄</span>
+          <span class="link-text">BigQuery EXPORT DATA to Bigtable (GA)</span>
+        </a>
+        <a href="https://docs.cloud.google.com/bigquery/docs/column-level-security-intro" target="_blank" rel="noopener noreferrer" class="link-card">
+          <span class="link-icon">🔒</span>
+          <span class="link-text">BigQuery カラムレベルアクセス制御</span>
+        </a>
+        <a href="https://docs.cloud.google.com/bigquery/docs/column-data-masking-intro" target="_blank" rel="noopener noreferrer" class="link-card">
+          <span class="link-icon">🛡️</span>
+          <span class="link-text">BigQuery データマスキング</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Reference Links -->
+    <div class="section">
+      <h2>📎 参考リンク</h2>
+      <div class="links-grid">
+        <a href="https://docs.cloud.google.com/release-notes#April_15_2026" target="_blank" rel="noopener noreferrer" class="link-card">
+          <span class="link-icon">📄</span>
+          <span class="link-text">公式リリースノート</span>
+        </a>
+        <a href="https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/export-statements" target="_blank" rel="noopener noreferrer" class="link-card">
+          <span class="link-icon">📖</span>
+          <span class="link-text">BigQuery EXPORT DATA ドキュメント</span>
+        </a>
+        <a href="https://docs.cloud.google.com/bigquery/docs/export-to-alloydb" target="_blank" rel="noopener noreferrer" class="link-card">
+          <span class="link-icon">📖</span>
+          <span class="link-text">AlloyDB にエクスポートする (ドキュメント)</span>
+        </a>
+        <a href="https://docs.cloud.google.com/alloydb/docs/overview" target="_blank" rel="noopener noreferrer" class="link-card">
+          <span class="link-icon">📖</span>
+          <span class="link-text">AlloyDB for PostgreSQL 概要</span>
+        </a>
+        <a href="https://docs.cloud.google.com/bigquery/docs/editions-intro" target="_blank" rel="noopener noreferrer" class="link-card">
+          <span class="link-icon">📖</span>
+          <span class="link-text">BigQuery エディション</span>
+        </a>
+        <a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer" class="link-card">
+          <span class="link-icon">💰</span>
+          <span class="link-text">BigQuery 料金</span>
+        </a>
+        <a href="https://cloud.google.com/alloydb/pricing" target="_blank" rel="noopener noreferrer" class="link-card">
+          <span class="link-icon">💰</span>
+          <span class="link-text">AlloyDB 料金</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="margin: 4px 0; padding-left: 20px;">
+        <li><a href="https://docs.cloud.google.com/release-notes#April_15_2026" target="_blank" rel="noopener noreferrer">Google Cloud Release Notes (April 15, 2026)</a></li>
+        <li><a href="https://docs.cloud.google.com/bigquery/docs/export-to-alloydb" target="_blank" rel="noopener noreferrer">BigQuery - AlloyDB にエクスポートする</a></li>
+        <li><a href="https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/export-statements" target="_blank" rel="noopener noreferrer">BigQuery EXPORT DATA ステートメント</a></li>
+      </ul>
+      <p style="margin-top: 12px;">タグ: #BigQuery #AlloyDB #ReverseETL #EXPORT_DATA #Preview</p>
+    </footer>
+
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

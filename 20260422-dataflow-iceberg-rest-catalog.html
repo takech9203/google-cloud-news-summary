@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dataflow: Job Builder が外部 Iceberg REST Catalog をソースとしてサポート</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; min-width: 280px; }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .header-badges {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 8px;
+    }
+
+    .card p {
+      margin: 4px 0;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* Badges */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); color: #FFFFFF; }
+    .badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+
+    /* Before/After */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h4 {
+      color: var(--gc-red);
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box h4 {
+      color: var(--gc-green);
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .before-box ul, .after-box ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .before-box li, .after-box li {
+      margin: 6px 0;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .before-box li::before { content: "✗ "; color: var(--gc-red); font-weight: 700; }
+    .after-box li::before { content: "✓ "; color: var(--gc-green); font-weight: 700; }
+
+    /* Flow Diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Mermaid */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Stat Cards */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Use Case Cards */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-blue-900);
+      margin-bottom: 8px;
+    }
+
+    .usecase-card p {
+      font-size: 14px;
+      margin: 4px 0;
+    }
+
+    .usecase-card .scenario {
+      margin-bottom: 8px;
+    }
+
+    .usecase-card .effect {
+      color: var(--gc-green);
+      font-weight: 500;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* Note/Warning Boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Code Blocks */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-block {
+      overflow: hidden;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      border-radius: 0;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    /* Inline Code */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Steps */
+    .steps {
+      counter-reset: step-counter;
+      margin: 16px 0;
+    }
+
+    .step {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 16px;
+      align-items: flex-start;
+    }
+
+    .step-number {
+      counter-increment: step-counter;
+      background: var(--gc-blue-600);
+      color: #FFFFFF;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .step-content {
+      flex: 1;
+    }
+
+    .step-content h4 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 4px;
+    }
+
+    .step-content p {
+      font-size: 14px;
+    }
+
+    /* Feature Grid */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    /* Pricing Table */
+    .pricing-note {
+      font-size: 14px;
+      color: var(--gc-outline);
+      margin-top: 8px;
+    }
+
+    /* Links Section */
+    .links-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .links-list li {
+      margin: 8px 0;
+      font-size: 14px;
+    }
+
+    .links-list li::before {
+      content: "-> ";
+      color: var(--gc-blue-600);
+      font-weight: 700;
+    }
+
+    /* Footer */
+    footer {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stat-grid { grid-template-columns: 1fr; }
+      .flow-diagram { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); }
+      body { padding: 12px; }
+      .section { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>&#9889; Dataflow: Job Builder が外部 Iceberg REST Catalog をソースとしてサポート</h1>
+        <div class="subtitle">2026-04-22</div>
+        <div class="header-badges">
+          <span class="badge badge-ga">GA</span>
+          <span class="badge">Dataflow</span>
+          <span class="badge">Apache Iceberg</span>
+          <span class="badge">Job Builder</span>
+          <span class="badge">NoCode</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>&#128203; 概要</h2>
+      <p>
+        Dataflow の <span class="highlight">Job Builder</span> (ジョブビルダー) に、外部 Apache Iceberg REST Catalog (IRC) をソースとして利用する機能が <span class="highlight">GA (一般提供)</span> として追加されました。この機能により、外部の Iceberg REST カタログからデータを取得し、Google Cloud Lakehouse テーブルへ直接取り込むデータパイプラインを、<span class="highlight">コードを記述することなく</span> Job Builder UI 上で構築・実行できるようになりました。
+      </p>
+      <p style="margin-top: 12px;">
+        Dataflow の Job Builder は、Google Cloud コンソール上でビジュアルにデータパイプラインを構築・実行するためのノーコード UI です。従来は Pub/Sub、BigQuery、Cloud Storage、PostgreSQL、MySQL 等のデータソースをサポートしていましたが、今回のアップデートにより<strong>外部 Iceberg REST Catalog</strong> が新たにソースとして追加されました。Apache Iceberg は大規模な分析データセットのためのオープンテーブルフォーマットであり、REST Catalog はそのメタデータ管理のための標準的なインターフェースを提供します。
+      </p>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>&#128260; Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h4>&#10060; Before (アップデート前)</h4>
+          <ul>
+            <li>外部 Iceberg REST Catalog からデータを取り込むには Apache Beam SDK (Java/Python) でカスタムパイプラインの開発が必要</li>
+            <li>Managed I/O コネクタの REST カタログ設定 (URI、認証ヘッダー、warehouse 設定等) を手動でコード内に記述する必要あり</li>
+            <li>ノーコードの Job Builder UI では Iceberg ソースがサポートされておらず、プログラミングスキルが必須</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h4>&#9989; After (アップデート後)</h4>
+          <ul>
+            <li>Job Builder UI 上で外部 Iceberg REST Catalog をソースとして選択し、ノーコードでパイプラインを構築可能</li>
+            <li>コードなしで外部 Iceberg カタログから Google Cloud Lakehouse テーブルへデータインジェスト可能</li>
+            <li>Iceberg REST Catalog の接続設定を UI 上で視覚的に行えるため、パイプライン構築の敷居が大幅に低下</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid from report) -->
+    <div class="section">
+      <h2>&#128736; アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    subgraph External["外部環境"]
+        IRC["Apache Iceberg\nREST Catalog\n(外部)"]
+        Data["Iceberg データファイル\n(Parquet)"]
+    end
+
+    subgraph GCP["Google Cloud"]
+        subgraph DF["Dataflow"]
+            JB["Job Builder UI\n(ノーコード)"]
+            Pipeline["Dataflow パイプライン\n(Managed I/O)"]
+        end
+
+        subgraph Lakehouse["Google Cloud Lakehouse"]
+            BLM["BigLake Metastore\n(REST Catalog)"]
+            GCS["Cloud Storage\n(Iceberg テーブル)"]
+        end
+    end
+
+    JB -->|"1. パイプライン定義\n(GUI 操作)"| Pipeline
+    IRC -->|"2. メタデータ取得\n(REST API)"| Pipeline
+    Data -->|"3. データ読み取り"| Pipeline
+    Pipeline -->|"4. データ書き込み"| GCS
+    Pipeline -->|"4. メタデータ登録"| BLM
+        </pre>
+      </div>
+      <p style="margin-top: 8px; font-size: 14px; color: var(--gc-outline);">
+        Job Builder UI でパイプラインを定義すると、Dataflow が外部 Iceberg REST Catalog からメタデータとデータを読み取り、Google Cloud Lakehouse テーブル (BigLake Metastore + Cloud Storage) に取り込む。
+      </p>
+    </div>
+
+    <!-- Key Stats -->
+    <div class="section">
+      <h2>&#128200; 数字で見るアップデート</h2>
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">0</div>
+          <div class="stat-label">行のコード記述が必要<br>(ノーコード)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">GA</div>
+          <div class="stat-label">一般提供ステータス<br>(本番利用可能)</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-green), #2E7D32);">
+          <div class="stat-value">v2</div>
+          <div class="stat-label">Dataflow Runner<br>(最新ランナー)</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-teal), #00838F);">
+          <div class="stat-value">REST</div>
+          <div class="stat-label">Catalog 標準規格<br>(Apache Iceberg)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>&#128273; 主要機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h3>&#127760; 外部 Iceberg REST Catalog ソースの追加</h3>
+          <div class="icon-text"><span class="arrow">-></span><span>Job Builder のソース選択肢に外部 Iceberg REST Catalog が追加</span></div>
+          <div class="icon-text"><span class="arrow">-></span><span>カタログ URI、認証情報、warehouse パスなどの接続パラメータを UI 上で設定可能</span></div>
+          <div class="icon-text"><span class="arrow">-></span><span>Apache Iceberg REST Catalog 仕様に準拠した任意の外部カタログに接続可能</span></div>
+        </div>
+        <div class="card" style="border-left-color: var(--gc-green);">
+          <h3>&#128421; ノーコードでのデータインジェスト</h3>
+          <div class="icon-text"><span class="arrow">-></span><span>プログラミングなしで外部 Iceberg データを Google Cloud Lakehouse テーブルに取り込み可能</span></div>
+          <div class="icon-text"><span class="arrow">-></span><span>Job Builder の既存のトランスフォーム機能 (フィルタ、マッピング、SQL、結合など) と組み合わせて利用可能</span></div>
+          <div class="icon-text"><span class="arrow">-></span><span>パイプラインを Apache Beam YAML ファイルとして保存・再利用することも可能</span></div>
+        </div>
+        <div class="card" style="border-left-color: var(--gc-purple);">
+          <h3>&#128279; Google Cloud Lakehouse との統合</h3>
+          <div class="icon-text"><span class="arrow">-></span><span>取り込み先として Google Cloud Lakehouse テーブルをサポート</span></div>
+          <div class="icon-text"><span class="arrow">-></span><span>BigLake Metastore を通じた Iceberg テーブルメタデータの管理</span></div>
+          <div class="icon-text"><span class="arrow">-></span><span>取り込んだデータは BigQuery や Apache Spark などのクエリエンジンからアクセス可能</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specs -->
+    <div class="section">
+      <h2>&#128295; 技術仕様</h2>
+      <h3 style="font-size: 18px; font-weight: 600; color: var(--gc-on-surface); margin-bottom: 12px;">サポートされる構成</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>ソースカタログ</td><td>Apache Iceberg REST Catalog (外部)</td></tr>
+          <tr><td>サポートカタログタイプ</td><td>REST ベースカタログ</td></tr>
+          <tr><td>データファイル形式</td><td>Parquet</td></tr>
+          <tr><td>取り込み先</td><td>Google Cloud Lakehouse テーブル</td></tr>
+          <tr><td>ベース技術</td><td>Managed I/O (Apache Iceberg コネクタ)</td></tr>
+          <tr><td>必要な Beam SDK</td><td>Java 2.58.0 以降 / Python 2.61.0 以降 (Job Builder が内部で使用)</td></tr>
+          <tr><td>Runner</td><td>Dataflow Runner v2</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="font-size: 18px; font-weight: 600; color: var(--gc-on-surface); margin: 24px 0 12px 0;">Managed I/O 構成パラメータ (参考: SDK 使用時)</h3>
+      <p style="margin-bottom: 12px; font-size: 14px;">Job Builder が内部で使用する Managed I/O の主要な設定パラメータ:</p>
+      <table>
+        <thead>
+          <tr>
+            <th>パラメータ</th>
+            <th>型</th>
+            <th>説明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>table</code></td><td>str</td><td>Iceberg テーブルの識別子</td></tr>
+          <tr><td><code>catalog_name</code></td><td>str</td><td>カタログの名前</td></tr>
+          <tr><td><code>catalog_properties</code></td><td>map[str, str]</td><td>カタログのセットアップに使用するプロパティ (type, uri, warehouse 等)</td></tr>
+          <tr><td><code>config_properties</code></td><td>map[str, str]</td><td>Hadoop Configuration に渡すプロパティ</td></tr>
+          <tr><td><code>filter</code></td><td>str</td><td>スキャン時にデータをフィルタリングする SQL ライクな述語</td></tr>
+          <tr><td><code>keep</code> / <code>drop</code></td><td>list[str]</td><td>読み取る/除外するカラム名のリスト</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup Steps -->
+    <div class="section">
+      <h2>&#128736; 設定方法</h2>
+
+      <div class="note-box" style="margin-bottom: 20px;">
+        <strong>&#128218; 前提条件:</strong>
+        <ul style="list-style: none; padding: 0; margin-top: 8px;">
+          <li style="margin: 4px 0; font-size: 14px;">&#10004; Google Cloud プロジェクトで Dataflow API が有効化されていること</li>
+          <li style="margin: 4px 0; font-size: 14px;">&#10004; 外部 Iceberg REST Catalog のエンドポイント URL と認証情報が準備されていること</li>
+          <li style="margin: 4px 0; font-size: 14px;">&#10004; 取り込み先の Google Cloud Lakehouse テーブルが作成済みであること</li>
+          <li style="margin: 4px 0; font-size: 14px;">&#10004; 必要な IAM ロール (Dataflow 管理者、BigLake 編集者、Storage オブジェクトユーザーなど) が付与されていること</li>
+        </ul>
+      </div>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-number">1</div>
+          <div class="step-content">
+            <h4>Job Builder を開く</h4>
+            <p>Google Cloud コンソールで Dataflow の「ジョブ」ページに移動し、「テンプレートからジョブを作成」をクリック後、「Job Builder」を選択する。</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-number">2</div>
+          <div class="step-content">
+            <h4>ソースの設定</h4>
+            <p>Job Builder UI で新しいソースを追加し、外部 Iceberg REST Catalog を選択する。以下の情報を入力:</p>
+            <ul style="margin-top: 8px; padding-left: 20px; font-size: 14px;">
+              <li><strong>Catalog URI:</strong> 外部 Iceberg REST Catalog のエンドポイント URL</li>
+              <li><strong>認証情報:</strong> カタログへのアクセスに必要な認証トークンまたはクレデンシャル</li>
+              <li><strong>テーブル識別子:</strong> 読み取り対象の Iceberg テーブル名</li>
+              <li><strong>Warehouse パス:</strong> Iceberg のウェアハウスロケーション</li>
+            </ul>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-number">3</div>
+          <div class="step-content">
+            <h4>シンク (出力先) の設定</h4>
+            <p>出力先として Google Cloud Lakehouse テーブルを選択し、テーブルの設定を行う。</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-number">4</div>
+          <div class="step-content">
+            <h4>パイプラインの実行</h4>
+            <p>設定を確認し「ジョブを実行」をクリックすると、Dataflow ジョブが作成・実行される。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>&#128640; メリット</h2>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div>
+          <h3 style="font-size: 18px; font-weight: 600; color: var(--gc-on-surface); margin-bottom: 12px;">&#128188; ビジネス面</h3>
+          <div class="success-box" style="margin: 8px 0;">
+            <strong>データ統合の民主化</strong>
+            <p style="font-size: 14px; margin-top: 4px;">プログラミングスキルがなくても、外部 Iceberg カタログからのデータ取り込みが可能。データアナリストやビジネスユーザーが自らデータ統合を実行。</p>
+          </div>
+          <div class="success-box" style="margin: 8px 0;">
+            <strong>移行コストの削減</strong>
+            <p style="font-size: 14px; margin-top: 4px;">外部環境 (オンプレミスや他クラウド) から Google Cloud Lakehouse への移行で、カスタムコードの開発・保守コストを削減。</p>
+          </div>
+          <div class="success-box" style="margin: 8px 0;">
+            <strong>Time-to-Value の短縮</strong>
+            <p style="font-size: 14px; margin-top: 4px;">コード開発・テスト・デプロイのサイクルが不要になり、データ取り込みパイプラインの構築時間を大幅に短縮。</p>
+          </div>
+        </div>
+        <div>
+          <h3 style="font-size: 18px; font-weight: 600; color: var(--gc-on-surface); margin-bottom: 12px;">&#9881; 技術面</h3>
+          <div class="note-box" style="margin: 8px 0;">
+            <strong>Managed I/O による自動管理</strong>
+            <p style="font-size: 14px; margin-top: 4px;">Dataflow の Managed I/O 基盤上で動作するため、コネクタの自動アップグレード、セキュリティ修正、パフォーマンス改善の恩恵を自動的に受けられる。</p>
+          </div>
+          <div class="note-box" style="margin: 8px 0;">
+            <strong>YAML エクスポートによる再利用性</strong>
+            <p style="font-size: 14px; margin-top: 4px;">Job Builder で構築したパイプラインを Apache Beam YAML としてエクスポートし、gcloud CLI やソース管理リポジトリで管理可能。</p>
+          </div>
+          <div class="note-box" style="margin: 8px 0;">
+            <strong>既存トランスフォームとの組み合わせ</strong>
+            <p style="font-size: 14px; margin-top: 4px;">Job Builder のフィルタ、マッピング、SQL、結合などのトランスフォーム機能を活用して、取り込み時にデータの変換・加工が可能。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>&#9888; デメリット・制約事項</h2>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div>
+          <h3 style="font-size: 16px; font-weight: 600; color: var(--gc-red); margin-bottom: 12px;">制限事項</h3>
+          <div class="warning-box" style="margin: 8px 0;">
+            <ul style="list-style: none; padding: 0; font-size: 14px;">
+              <li style="margin: 6px 0;">&#10060; Job Builder がサポートするトランスフォームのサブセットに限定される (Apache Beam SDK のフル機能は利用不可)</li>
+              <li style="margin: 6px 0;">&#10060; Iceberg REST Catalog は Parquet データファイルのみをサポート (ORC、Avro 等は非対応の可能性)</li>
+              <li style="margin: 6px 0;">&#10060; BigLake は Apache Iceberg V3 テーブルをサポートしていない</li>
+            </ul>
+          </div>
+        </div>
+        <div>
+          <h3 style="font-size: 16px; font-weight: 600; color: var(--gc-orange); margin-bottom: 12px;">考慮すべき点</h3>
+          <div class="warning-box" style="margin: 8px 0;">
+            <ul style="list-style: none; padding: 0; font-size: 14px;">
+              <li style="margin: 6px 0;">&#9888; 大規模データセットの初回取り込みではワーカーリソース (CPU、メモリ、ディスク) のサイジングが重要</li>
+              <li style="margin: 6px 0;">&#9888; 外部カタログへのネットワーク接続性 (VPN、相互接続、パブリック IP) の事前確認が必要</li>
+              <li style="margin: 6px 0;">&#9888; 認証トークンの有効期限管理に注意 (BigLake REST Catalog 使用時、OAuth トークンは 1 時間で期限切れになる場合あり)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>&#127919; ユースケース</h2>
+      <div class="usecase-card">
+        <h3>&#9729; ユースケース 1: マルチクラウド環境からのデータ統合</h3>
+        <p class="scenario"><strong>シナリオ:</strong> AWS や Azure 上で Apache Iceberg ベースのデータレイクを運用している企業が、Google Cloud の BigQuery や Lakehouse でデータ分析を行いたい場合。外部環境の Iceberg REST Catalog に接続し、必要なテーブルを Google Cloud Lakehouse に取り込む。</p>
+        <p class="effect">&#10004; <strong>効果:</strong> コードを書くことなく、マルチクラウド間のデータ統合パイプラインを構築でき、Google Cloud のアナリティクスサービスでの分析が迅速に開始できる。</p>
+      </div>
+      <div class="usecase-card">
+        <h3>&#127970; ユースケース 2: オンプレミスからのデータマイグレーション</h3>
+        <p class="scenario"><strong>シナリオ:</strong> オンプレミスの Hadoop/Spark 環境で Iceberg テーブルを管理している組織が、段階的に Google Cloud Lakehouse へ移行する場合。Job Builder を使って定期的にデータを取り込み、並行運用期間中のデータ同期を実現する。</p>
+        <p class="effect">&#10004; <strong>効果:</strong> データエンジニアがカスタムパイプラインを開発・保守する必要がなくなり、移行プロジェクトのオーバーヘッドが削減される。</p>
+      </div>
+      <div class="usecase-card">
+        <h3>&#128202; ユースケース 3: データメッシュアーキテクチャでのデータ共有</h3>
+        <p class="scenario"><strong>シナリオ:</strong> 各事業部門が独自の Iceberg REST Catalog でデータを公開するデータメッシュアーキテクチャにおいて、中央のデータプラットフォームチームが各部門のデータを Lakehouse に集約する場合。</p>
+        <p class="effect">&#10004; <strong>効果:</strong> ドメインごとの Iceberg カタログから、ノーコードで横断的なデータ統合が可能になり、組織全体のデータ活用が促進される。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>&#128176; 料金</h2>
+      <p style="margin-bottom: 12px;">Dataflow の料金は、パイプラインの実行に使用されるリソースに基づいて課金されます。<span class="highlight">Job Builder 自体の追加料金は発生しません</span>。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>リソース</th>
+            <th>課金単位</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Worker vCPU</td><td>vCPU 時間あたり</td></tr>
+          <tr><td>Worker メモリ</td><td>GB 時間あたり</td></tr>
+          <tr><td>Dataflow Shuffle / Streaming Engine</td><td>処理データ量あたり</td></tr>
+          <tr><td>Persistent Disk (HDD/SSD)</td><td>GB 時間あたり</td></tr>
+        </tbody>
+      </table>
+      <div class="note-box" style="margin-top: 16px;">
+        <strong>&#128161; コスト最適化のヒント:</strong> ストリーミングジョブの場合、<a href="https://cloud.google.com/dataflow/docs/cuds" target="_blank" class="gc-link">確約利用割引 (CUD)</a> や<a href="https://cloud.google.com/dataflow/docs/streaming-engine#compute-unit-pricing" target="_blank" class="gc-link">リソースベースの課金</a>を活用することで、コストの最適化が可能です。
+      </div>
+    </div>
+
+    <!-- Region Availability -->
+    <div class="section">
+      <h2>&#127758; 利用可能リージョン</h2>
+      <p>Dataflow が利用可能な<span class="highlight">すべてのリージョン</span>で利用可能です。詳細は <a href="https://cloud.google.com/dataflow/docs/resources/locations" target="_blank" class="gc-link">Dataflow のロケーションページ</a> を参照してください。</p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#128279; 関連サービス・機能</h2>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div class="card">
+          <h3>&#127754; Google Cloud Lakehouse</h3>
+          <p style="font-size: 14px;">取り込み先の統合データレイクハウスプラットフォーム。BigLake Metastore を通じた Iceberg テーブルの管理を提供。</p>
+        </div>
+        <div class="card" style="border-left-color: var(--gc-green);">
+          <h3>&#128451; BigLake Metastore</h3>
+          <p style="font-size: 14px;">Google Cloud の Iceberg REST Catalog エンドポイント。Lakehouse テーブルのメタデータ管理に使用。</p>
+        </div>
+        <div class="card" style="border-left-color: var(--gc-purple);">
+          <h3>&#9881; Managed I/O</h3>
+          <p style="font-size: 14px;">Dataflow の I/O コネクタ管理フレームワーク。Apache Iceberg を含む複数のソース・シンクに対応し、自動アップグレードを提供。</p>
+        </div>
+        <div class="card" style="border-left-color: var(--gc-orange);">
+          <h3>&#128202; BigQuery</h3>
+          <p style="font-size: 14px;">Lakehouse テーブルに取り込まれたデータに対する SQL ベースの分析が可能。</p>
+        </div>
+        <div class="card" style="border-left-color: var(--gc-teal);">
+          <h3>&#128296; BigQuery Migration Service</h3>
+          <p style="font-size: 14px;">外部 Iceberg カタログからのメタデータマイグレーション機能を提供 (Dataflow によるデータ取り込みと相補的)。</p>
+        </div>
+        <div class="card" style="border-left-color: var(--gc-yellow);">
+          <h3>&#128187; Apache Beam SDK</h3>
+          <p style="font-size: 14px;">Job Builder では対応できない高度なパイプライン要件に対して、フルプログラマティックなパイプライン開発が可能。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reference Links -->
+    <div class="section">
+      <h2>&#128214; 参考リンク</h2>
+      <ul class="links-list">
+        <li><a href="https://cloud.google.com/release-notes#April_22_2026" target="_blank" class="gc-link">公式リリースノート</a></li>
+        <li><a href="https://cloud.google.com/dataflow/docs/guides/job-builder" target="_blank" class="gc-link">Dataflow Job Builder UI 概要</a></li>
+        <li><a href="https://cloud.google.com/dataflow/docs/guides/managed-io-iceberg" target="_blank" class="gc-link">Managed I/O: Apache Iceberg</a></li>
+        <li><a href="https://cloud.google.com/dataflow/docs/guides/read-from-iceberg" target="_blank" class="gc-link">Apache Iceberg からの読み取り</a></li>
+        <li><a href="https://cloud.google.com/dataflow/docs/guides/streaming-write-to-iceberg-biglake" target="_blank" class="gc-link">BigLake REST Catalog を使用した Iceberg ストリーミング書き込み</a></li>
+        <li><a href="https://cloud.google.com/bigquery/docs/import-export-lakehouse-iceberg-rest-catalog-data" target="_blank" class="gc-link">Lakehouse Iceberg テーブルへのデータインポート</a></li>
+        <li><a href="https://cloud.google.com/dataflow/pricing" target="_blank" class="gc-link">Dataflow 料金</a></li>
+      </ul>
+    </div>
+
+    <!-- Summary -->
+    <div class="section" style="background: var(--gc-blue-tint); border: 2px solid var(--gc-blue-200);">
+      <h2>&#128221; まとめ</h2>
+      <p>
+        Dataflow Job Builder に外部 Iceberg REST Catalog ソースが <span class="highlight">GA</span> として追加されたことで、外部環境の Iceberg データを Google Cloud Lakehouse に取り込むためのデータパイプラインを<strong>ノーコードで構築</strong>できるようになりました。
+      </p>
+      <p style="margin-top: 12px;">
+        マルチクラウド環境やオンプレミスからの Iceberg データ統合を検討している組織は、まず Job Builder UI で小規模なデータ取り込みを試し、接続性とパフォーマンスを検証することを推奨します。
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>&#128206; 出典: <a href="https://cloud.google.com/release-notes#April_22_2026" target="_blank" rel="noopener noreferrer">https://cloud.google.com/release-notes#April_22_2026</a></p>
+      <p style="margin-top: 4px;">&#128206; Dataflow Job Builder: <a href="https://cloud.google.com/dataflow/docs/guides/job-builder" target="_blank" rel="noopener noreferrer">https://cloud.google.com/dataflow/docs/guides/job-builder</a></p>
+      <p style="margin-top: 8px; color: var(--gc-outline);">Generated on 2026-04-22 | Google Cloud News Infographic</p>
+    </footer>
+
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+    hljs.highlightAll();
+  </script>
+</body>
+</html>

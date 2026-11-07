@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IAM Recommender x PAM: グループの過剰権限修正</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left {
+      flex: 1;
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2, .section-title {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-red {
+      border-left-color: var(--gc-red);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-preview {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-orange);
+    }
+
+    .badge-security {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-red);
+    }
+
+    /* Before/After */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .before-box h4 {
+      color: var(--gc-red);
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .after-box h4 {
+      color: var(--gc-green);
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .before-box ul, .after-box ul {
+      margin: 0;
+      padding-left: 18px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 6px 0;
+    }
+
+    /* Flow diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Feature cards grid */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .feature-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .feature-card .feature-icon {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+
+    .feature-card .feature-title {
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 6px;
+      font-size: 15px;
+    }
+
+    .feature-card .feature-desc {
+      font-size: 14px;
+      color: var(--gc-on-surface-variant);
+    }
+
+    /* Use case cards */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-900);
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .usecase-card p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    .usecase-card .scenario {
+      color: var(--gc-on-surface-variant);
+    }
+
+    .usecase-card .effect {
+      color: var(--gc-green);
+      font-weight: 500;
+      margin-top: 8px;
+    }
+
+    /* Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    /* Note/Warning boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Mermaid container */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Code block */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Stats row */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    /* Merit/Demerit */
+    .merit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .merit-section h4 {
+      font-size: 15px;
+      font-weight: 600;
+      margin: 0 0 10px 0;
+    }
+
+    .merit-section ul {
+      margin: 0;
+      padding-left: 18px;
+      font-size: 14px;
+    }
+
+    .merit-section li {
+      margin: 6px 0;
+    }
+
+    /* Related services */
+    .related-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .related-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--gc-surface);
+      padding: 12px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    .related-item .rel-icon {
+      font-size: 20px;
+    }
+
+    .related-item .rel-name {
+      font-weight: 600;
+      color: var(--gc-on-surface);
+    }
+
+    .related-item .rel-desc {
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    /* Footer */
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer ul {
+      list-style: none;
+      padding: 0;
+      margin: 8px 0;
+    }
+
+    footer li {
+      margin: 6px 0;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .before-after { grid-template-columns: 1fr; }
+      .feature-grid { grid-template-columns: 1fr; }
+      .stats-row { grid-template-columns: 1fr; }
+      .merit-grid { grid-template-columns: 1fr; }
+      .related-grid { grid-template-columns: 1fr; }
+      .flow-diagram { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>🔐 IAM Recommender x PAM: グループの過剰権限修正</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge-security">Security</span>
+          <span class="badge">IAM</span>
+          <span class="badge-preview">Preview</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-05-08</div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        IAM Recommender が Google グループの<span class="highlight">過剰な権限</span>を検出した際に、永続的なロールバインディングを削除し、
+        <span class="highlight">Privileged Access Manager (PAM)</span> のオンデマンドエンタイトルメントに移行して修正できるようになりました。
+        永続アクセスを <span class="highlight">Just-in-Time (JIT) アクセス</span>モデルに安全に移行することで、最小権限の原則を実現します。
+      </p>
+
+      <!-- Before/After -->
+      <div class="before-after">
+        <div class="before-box">
+          <h4>Before</h4>
+          <ul>
+            <li>過剰権限の修正手段はロールの削除または縮小のみ</li>
+            <li>永続的なロール削除は緊急時のタスク実行を阻害するリスク</li>
+            <li>最小権限と緊急時アクセス確保の両立が困難</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h4>After</h4>
+          <ul>
+            <li>IAM Recommender から直接 PAM エンタイトルメントを作成可能</li>
+            <li>永続ロールを一時的なオンデマンドアクセスに移行</li>
+            <li>Security Insights / IAM ページから数クリックで修正適用</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>IAM Recommender による検出から PAM エンタイトルメントの作成、一時的アクセスの付与までの全体フローです。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    A[IAM Recommender] -->|過剰権限を検出| B[Security Insights / IAM ページ]
+    B -->|推奨事項を表示| C{管理者の判断}
+    C -->|ロール削除してオンデマンドアクセスを付与| D[PAM エンタイトルメント作成]
+    D -->|自動処理| E[永続ロールバインディング削除]
+    D -->|エンタイトルメント有効化| F[PAM エンタイトルメント]
+    F -->|グループメンバーがアクセス要求| G[Grant リクエスト]
+    G -->|承認フロー| H{承認者による審査}
+    H -->|承認| I[一時的なロール付与]
+    H -->|拒否| J[アクセス拒否]
+    I -->|期間終了| K[ロール自動削除]
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Stats -->
+    <div class="section">
+      <h2>📊 ポイント</h2>
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-value">8h</div>
+          <div class="stat-label">デフォルトアクセス期間</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">1-2 min</div>
+          <div class="stat-label">アクセス変更の反映時間</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-green), #1B5E20);">
+          <div class="stat-value">JIT</div>
+          <div class="stat-label">Just-in-Time アクセスモデル</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-icon">🔗</div>
+          <div class="feature-title">IAM Recommender と PAM の統合ワークフロー</div>
+          <div class="feature-desc">過剰権限検出時に「ロールを削除してオンデマンドアクセスを付与する」オプションを表示。ロールとリソースが自動入力された PAM エンタイトルメント作成フォームを提供。</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🛡️</div>
+          <div class="feature-title">Security Insights ページからの修正</div>
+          <div class="feature-desc">「Top groups with excess permissions」ウィジェットから過剰権限を特定し、推奨事項から直接 PAM エンタイトルメントを作成。</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">👥</div>
+          <div class="feature-title">IAM ページからの修正</div>
+          <div class="feature-desc">IAM ページのプリンシパル一覧から Security insights 列を確認し、推奨事項から直接エンタイトルメントを作成。1-2 分でアクセス変更反映。</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">↩️</div>
+          <div class="feature-title">推奨事項の取り消し (Revert)</div>
+          <div class="feature-desc">適用した推奨事項の取り消しが可能。元の IAM バインディングが復元され、作成された PAM エンタイトルメントが削除される。</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Setup Steps -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+      <div class="note-box">
+        <strong>前提条件:</strong> Privileged Access Manager が対象リソース (プロジェクト、フォルダ、または組織) でオンボーディングおよび有効化されていること。
+      </div>
+
+      <div class="flow-diagram">
+        <div class="flow-step">1️⃣ PAM<br/>セットアップ</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">2️⃣ Security Insights<br/>で対象確認</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">3️⃣ 推奨事項を<br/>確認</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">4️⃣ エンタイトルメント<br/>作成・適用</div>
+      </div>
+
+      <h3>Security Insights ページからの修正手順</h3>
+      <div class="card">
+        <div class="icon-text"><span>1.</span> <span>IAM & Admin > Security Insights ページに移動</span></div>
+        <div class="icon-text"><span>2.</span> <span>「Top groups with excess permissions」ウィジェットで対象グループを確認</span></div>
+        <div class="icon-text"><span>3.</span> <span>Insights 列のリンクをクリック</span></div>
+        <div class="icon-text"><span>4.</span> <span>「View recommendation」をクリック</span></div>
+        <div class="icon-text"><span>5.</span> <span>「Remove role and grant on-demand access to the role」を選択</span></div>
+        <div class="icon-text"><span>6.</span> <span>エンタイトルメントの詳細を入力し「Apply」をクリック</span></div>
+      </div>
+    </div>
+
+    <!-- Required Roles & Permissions -->
+    <div class="section">
+      <h2>🔑 必要なロールと権限</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>操作</th>
+            <th>必要なロール</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ロール推奨事項の表示</td>
+            <td><code>roles/recommender.iamAdmin</code> または <code>roles/recommender.iamViewer</code></td>
+          </tr>
+          <tr>
+            <td>PAM エンタイトルメントの作成</td>
+            <td><code>roles/privilegedaccessmanager.admin</code></td>
+          </tr>
+          <tr>
+            <td>リソースの IAM ポリシー変更</td>
+            <td><code>roles/resourcemanager.projectIamAdmin</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>必要な権限の詳細</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>権限</th>
+            <th>用途</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>recommender.iamPolicyInsights.list</code></td>
+            <td>ポリシーインサイトの一覧表示</td>
+          </tr>
+          <tr>
+            <td><code>recommender.iamPolicyRecommendations.list</code></td>
+            <td>ロール推奨事項の一覧表示</td>
+          </tr>
+          <tr>
+            <td><code>privilegedaccessmanager.entitlements.create</code></td>
+            <td>PAM エンタイトルメントの作成</td>
+          </tr>
+          <tr>
+            <td><code>privilegedaccessmanager.entitlements.list</code></td>
+            <td>PAM エンタイトルメントの一覧表示</td>
+          </tr>
+          <tr>
+            <td><code>resourcemanager.projects.setIamPolicy</code></td>
+            <td>IAM ポリシーの変更 (永続ロール削除)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Merits & Demerits -->
+    <div class="section">
+      <h2>⚖️ メリットと制約事項</h2>
+      <div class="merit-grid">
+        <div class="merit-section">
+          <h4 style="color: var(--gc-green);">✅ メリット</h4>
+          <div class="card card-green" style="margin-top: 8px;">
+            <strong>ビジネス面</strong>
+            <ul>
+              <li>最小権限の原則を維持しつつ必要時のアクセスを確保</li>
+              <li>永続ロール削除のリスクなく権限最適化</li>
+              <li>完全な監査ログによる監査対応の強化</li>
+            </ul>
+          </div>
+          <div class="card card-green" style="margin-top: 8px;">
+            <strong>技術面</strong>
+            <ul>
+              <li>IAM Recommender から PAM まで一貫したコンソール操作</li>
+              <li>ロールとリソースの自動入力で設定ミスを低減</li>
+              <li>問題発生時に推奨事項の適用を取り消し可能</li>
+            </ul>
+          </div>
+        </div>
+        <div class="merit-section">
+          <h4 style="color: var(--gc-red);">⚠️ 制約事項・考慮点</h4>
+          <div class="card card-red" style="margin-top: 8px;">
+            <strong>制限事項</strong>
+            <ul>
+              <li>Preview 機能のため限定的なサポート</li>
+              <li>Google グループのプリンシパルのみが対象</li>
+              <li>PAM が事前にオンボーディングされている必要あり</li>
+              <li>アクセス変更の反映に 1-2 分を要する</li>
+            </ul>
+          </div>
+          <div class="card card-orange" style="margin-top: 8px;">
+            <strong>考慮すべき点</strong>
+            <ul>
+              <li>オンデマンドアクセス要求への運用フロー変更が必要</li>
+              <li>承認者設定を適切に行わないと業務遅延の可能性</li>
+              <li>PAM 管理のロールバインディングを手動変更しないこと</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+      <div class="usecase-card">
+        <h4>🖥️ ユースケース 1: 開発チームの本番環境アクセス制御</h4>
+        <p class="scenario"><strong>シナリオ:</strong> 開発者グループに本番環境の Editor ロールが永続的に付与されているが、実際にアクセスが必要なのはデプロイ時やトラブルシューティング時のみ。IAM Recommender が過剰権限として検出。</p>
+        <p class="effect">→ Editor ロールを PAM エンタイトルメントに移行し、デプロイ時にのみ一時的なアクセスを要求させることで、常時の攻撃面を縮小しつつ必要な業務を妨げない。</p>
+      </div>
+      <div class="usecase-card">
+        <h4>📋 ユースケース 2: セキュリティ監査対応</h4>
+        <p class="scenario"><strong>シナリオ:</strong> セキュリティ監査で複数の Google グループに過剰な権限が付与されていることが指摘。しかし、永続的にロールを削除すると四半期ごとの重要な運用タスクが実行できなくなるリスクがある。</p>
+        <p class="effect">→ PAM への移行により、監査要件である最小権限を満たしつつ、四半期ごとのタスク実行時にオンデマンドでアクセスを取得。承認ログにより監査証跡も確保。</p>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス</h2>
+      <div class="related-grid">
+        <div class="related-item">
+          <span class="rel-icon">🔍</span>
+          <div>
+            <div class="rel-name">IAM Recommender (Policy Intelligence)</div>
+            <div class="rel-desc">過剰権限の検出と推奨事項の生成</div>
+          </div>
+        </div>
+        <div class="related-item">
+          <span class="rel-icon">🔐</span>
+          <div>
+            <div class="rel-name">Privileged Access Manager (PAM)</div>
+            <div class="rel-desc">一時的な特権アクセスの管理基盤</div>
+          </div>
+        </div>
+        <div class="related-item">
+          <span class="rel-icon">🛡️</span>
+          <div>
+            <div class="rel-name">Security Command Center</div>
+            <div class="rel-desc">Enterprise/Premium ティアで高度な PAM 機能</div>
+          </div>
+        </div>
+        <div class="related-item">
+          <span class="rel-icon">📝</span>
+          <div>
+            <div class="rel-name">Cloud Audit Logs</div>
+            <div class="rel-desc">PAM 操作の監査ログを記録</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section" style="background: var(--gc-blue-tint); border-color: var(--gc-blue-200);">
+      <h2>📝 まとめ</h2>
+      <p>
+        IAM Recommender と Privileged Access Manager の統合により、Google グループの過剰権限を安全に修正する新しいワークフローが <strong>Preview</strong> として利用可能になりました。
+        永続的なロール削除のリスクを回避しながら最小権限の原則を実現できます。
+      </p>
+      <div class="warning-box">
+        <strong>推奨アクション:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 18px;">
+          <li>Privileged Access Manager のオンボーディングを完了する</li>
+          <li>Security Insights ページから過剰権限のあるグループを確認する</li>
+          <li>重要度の高いグループから段階的に PAM への移行を実施する</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>出典:</strong></p>
+      <ul>
+        <li><a href="https://docs.cloud.google.com/release-notes#May_08_2026" target="_blank" rel="noopener noreferrer" class="gc-link">Google Cloud Release Notes (May 8, 2026)</a></li>
+        <li><a href="https://docs.cloud.google.com/iam/docs/pam-remediate-iam-recommendations" target="_blank" rel="noopener noreferrer" class="gc-link">Remediate excessive permissions with Privileged Access Manager</a></li>
+        <li><a href="https://docs.cloud.google.com/iam/docs/pam-overview" target="_blank" rel="noopener noreferrer" class="gc-link">Privileged Access Manager Overview</a></li>
+        <li><a href="https://docs.cloud.google.com/iam/docs/pam-permissions-and-setup" target="_blank" rel="noopener noreferrer" class="gc-link">PAM Permissions and Setup</a></li>
+        <li><a href="https://docs.cloud.google.com/iam/docs/pam-create-entitlements" target="_blank" rel="noopener noreferrer" class="gc-link">Create Entitlements</a></li>
+        <li><a href="https://docs.cloud.google.com/policy-intelligence/docs/role-recommendations-overview" target="_blank" rel="noopener noreferrer" class="gc-link">Role Recommendations Overview</a></li>
+      </ul>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+</body>
+</html>

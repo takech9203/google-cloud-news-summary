@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Compute Engine: MIG Autoscaler Stabilization Period</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1 {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-yellow {
+      border-left-color: var(--gc-yellow);
+    }
+
+    .card-red {
+      border-left-color: var(--gc-red);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-feature {
+      background: var(--gc-blue-600);
+      color: #FFFFFF;
+    }
+
+    .badge-service {
+      background: var(--gc-blue-500);
+      color: #FFFFFF;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h4, .after-box h4 {
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .before-box ul, .after-box ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-900);
+      margin: 0 0 8px 0;
+    }
+
+    .usecase-card p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid) {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .related-services {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .related-service-item {
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 14px;
+    }
+
+    .related-service-item strong {
+      color: var(--gc-on-surface);
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stat-grid { grid-template-columns: 1fr; }
+      .flow-diagram { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>&#9881;&#65039; MIG Autoscaler Stabilization Period</h1>
+        <p style="margin: 8px 0 0 0; color: var(--gc-on-surface-variant);">安定化期間の構成機能</p>
+      </div>
+      <div class="subtitle">
+        <span class="badge badge-service">Compute Engine</span>
+        <span class="badge badge-feature">Feature</span>
+        <br>
+        <span style="margin-top: 8px; display: inline-block;">2026-06-11</span>
+      </div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>&#128203; 概要</h2>
+      <p>
+        マネージド インスタンス グループ (MIG) のオートスケーラーにおいて、<span class="highlight">安定化期間 (Stabilization Period)</span> を明示的に構成できる機能がリリースされました。
+        負荷が減少した後にオートスケーラーがインスタンスを削除するまでの待機時間を、ワークロードの特性に合わせてカスタマイズできます。
+      </p>
+      <p>
+        安定化期間中に観測された<strong>ピーク負荷</strong>に基づいてグループの推奨サイズを計算し、急激なインスタンスの増減を防ぎます。これにより、コスト最適化と可用性のバランスを取ることが可能になります。
+      </p>
+    </div>
+
+    <!-- Stats -->
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-value">0 - 3600秒</div>
+        <div class="stat-label">設定可能な範囲</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">600秒</div>
+        <div class="stat-label">デフォルト値 (10分)</div>
+      </div>
+      <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-green), #1B5E20);">
+        <div class="stat-value">~70%</div>
+        <div class="stat-label">コスト最適化の高速化</div>
+      </div>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>&#128260; Before / After</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h4>&#10060; Before (アップデート前)</h4>
+          <ul>
+            <li>安定化期間はデフォルト 600秒に固定</li>
+            <li>ワークロード特性に合わせた調整が困難</li>
+            <li>負荷変動が激しい場合に頻繁なインスタンス増減</li>
+            <li>不要なインスタンスが10分間維持されコスト発生</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h4>&#9989; After (アップデート後)</h4>
+          <ul>
+            <li>0秒 ~ 3600秒の範囲で自由に設定可能</li>
+            <li>コスト最適化と安定性のトレードオフを制御</li>
+            <li>Console / gcloud CLI / REST API 全てから構成可能</li>
+            <li>ワークロード特性に最適化したスケーリング動作</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>&#128736;&#65039; アーキテクチャ図</h2>
+      <p>MIG オートスケーラーがスケールイン判断を行う際の安定化期間の役割を示しています。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    A[負荷の変動を検知] --> B{スケールアウト?<br/>スケールイン?}
+    B -->|スケールアウト| C[即座にインスタンス追加]
+    B -->|スケールイン| D[安定化期間の監視開始]
+    D --> E[安定化期間中の<br/>ピーク負荷を記録]
+    E --> F{ピーク負荷に対して<br/>余剰キャパシティあり?}
+    F -->|はい| G[インスタンス削除<br/>スケールイン実行]
+    F -->|いいえ| H[現在のインスタンス数を維持]
+    H --> D
+
+    subgraph 構成可能な安定化期間
+        D
+        E
+        F
+    end
+
+    style A fill:#4285F4,color:#fff
+    style C fill:#34A853,color:#fff
+    style G fill:#FBBC04,color:#000
+    style H fill:#EA4335,color:#fff
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>&#11088; 主要機能</h2>
+
+      <div class="card">
+        <h3>&#9201;&#65039; 安定化期間のカスタム設定</h3>
+        <ul>
+          <li>0秒から 3600秒 (1時間) の範囲で設定可能</li>
+          <li>デフォルト値は 600秒 (10分)</li>
+          <li>新規オートスケーラー作成時および既存オートスケーラー更新時の両方で設定可能</li>
+        </ul>
+      </div>
+
+      <div class="card card-green">
+        <h3>&#128200; ピーク負荷ベースの判断ロジック</h3>
+        <ul>
+          <li>安定化期間中に観測されたピーク負荷を基準にスケールイン判断を実施</li>
+          <li>負荷シグナルの安定化により、不要なインスタンスの増減を防止</li>
+          <li>新しく追加されたインスタンスは安定化期間が経過するまで削除対象にならない</li>
+        </ul>
+      </div>
+
+      <div class="card card-purple">
+        <h3>&#128279; スケールイン制御との併用</h3>
+        <ul>
+          <li>安定化期間とスケールイン制御 (Scale-in Controls) は独立した機能として併用可能</li>
+          <li>安定化期間: ピーク負荷に基づく判断</li>
+          <li>スケールイン制御: インスタンス削減率の制限</li>
+          <li>それぞれ異なる観点からスケールインの安全性を担保</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>&#128295; 技術仕様</h2>
+
+      <h3>パラメータ仕様</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>パラメータ名 (gcloud)</td>
+            <td><code>--stabilization-period</code></td>
+          </tr>
+          <tr>
+            <td>パラメータ名 (REST API)</td>
+            <td><code>stabilizationPeriodSec</code></td>
+          </tr>
+          <tr>
+            <td>最小値</td>
+            <td>0 秒</td>
+          </tr>
+          <tr>
+            <td>最大値</td>
+            <td>3600 秒 (1時間)</td>
+          </tr>
+          <tr>
+            <td>デフォルト値</td>
+            <td>600 秒 (10分)</td>
+          </tr>
+          <tr>
+            <td>適用対象</td>
+            <td>スケールイン判断のみ (スケールアウトには影響しない)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>必要な IAM 権限</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>権限</th>
+            <th>用途</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>compute.autoscalers.create</code></td>
+            <td>オートスケーラーの新規作成</td>
+          </tr>
+          <tr>
+            <td><code>compute.autoscalers.update</code></td>
+            <td>既存オートスケーラーの更新</td>
+          </tr>
+          <tr>
+            <td><code>compute.instanceGroupManagers.use</code></td>
+            <td>インスタンスグループの使用</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Configuration Examples -->
+    <div class="section">
+      <h2>&#128421;&#65039; 設定方法</h2>
+
+      <h3>gcloud CLI でオートスケーラーを作成</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud compute instance-groups managed set-autoscaling INSTANCE_GROUP_NAME \
+    --max-num-replicas 20 \
+    --target-cpu-utilization 0.60 \
+    --cool-down-period 90 \
+    --stabilization-period 240</code></pre>
+
+      <h3>既存のオートスケーラーを更新</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud compute instance-groups managed update-autoscaling INSTANCE_GROUP_NAME \
+    --stabilization-period 300</code></pre>
+
+      <h3>REST API で設定</h3>
+      <span class="code-label">JSON</span>
+      <pre><code class="language-json">{
+  "name": "my-autoscaler",
+  "target": "https://www.googleapis.com/compute/v1/projects/PROJECT_ID/regions/REGION/instanceGroupManagers/my-mig",
+  "autoscalingPolicy": {
+    "minNumReplicas": 1,
+    "maxNumReplicas": 5,
+    "coolDownPeriodSec": 60,
+    "cpuUtilization": {
+      "utilizationTarget": 0.8
+    },
+    "stabilizationPeriodSec": 240
+  }
+}</code></pre>
+
+      <h3>Console から設定</h3>
+      <div class="flow-diagram">
+        <div class="flow-step">&#128193; インスタンス<br/>グループ選択</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">&#9999;&#65039; 編集</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">&#9881;&#65039; オートスケーリング<br/>セクション展開</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">&#128337; 安定化期間<br/>を入力</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">&#128190; 保存</div>
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>&#128077; メリット</h2>
+
+      <h3>&#128188; ビジネス面</h3>
+      <div class="card card-green">
+        <div class="icon-text"><strong>&#128176; コスト最適化</strong></div>
+        <p style="margin: 4px 0;">安定化期間を短縮することで、不要なインスタンスをより早く削除し、コンピューティングコストを削減</p>
+      </div>
+      <div class="card card-green">
+        <div class="icon-text"><strong>&#128737;&#65039; SLA 維持</strong></div>
+        <p style="margin: 4px 0;">安定化期間を延長することで、急激な負荷変動に対する余裕を確保し、サービスの安定性を維持</p>
+      </div>
+
+      <h3>&#128187; 技術面</h3>
+      <div class="card">
+        <div class="icon-text"><strong>&#9889; ワークロード最適化</strong></div>
+        <p style="margin: 4px 0;">アプリケーションの特性に合わせたスケーリング動作のチューニングが可能</p>
+      </div>
+      <div class="card">
+        <div class="icon-text"><strong>&#128260; 運用オーバーヘッド削減</strong></div>
+        <p style="margin: 4px 0;">適切な安定化期間を設定することで、不要なインスタンスの作成・削除の繰り返しを防止</p>
+      </div>
+      <div class="card">
+        <div class="icon-text"><strong>&#128279; 他の制御機能との連携</strong></div>
+        <p style="margin: 4px 0;">スケールイン制御や予測オートスケーリングと組み合わせて、より精密なスケーリング戦略を構築可能</p>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>&#9888;&#65039; 制約事項・注意点</h2>
+
+      <div class="warning-box">
+        <strong>&#9888;&#65039; 制限事項:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>安定化期間はスケールインにのみ適用 (スケールアウトには影響しない)</li>
+          <li>設定可能な範囲は 0秒 ~ 3600秒 (1時間) に限定</li>
+          <li>コネクションドレイン有効時は最大60秒の追加遅延が発生する可能性あり</li>
+        </ul>
+      </div>
+
+      <div class="note-box">
+        <strong>&#128161; 考慮すべき点:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>0秒に設定すると、負荷変動時にインスタンスの頻繁な作成・削除が発生する可能性</li>
+          <li>安定化期間は初期化期間 (Cool-down Period) よりも長く設定することを推奨</li>
+          <li>変更は即座に反映されるため、本番環境では段階的に調整することが望ましい</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>&#128161; ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>&#9889; ユースケース 1: 高速スケーリング Web サービス</h4>
+        <p><strong>シナリオ:</strong> 初期化が数秒で完了する軽量な Web サービスで、コスト削減を積極的に行いたい場合</p>
+        <span class="code-label">Bash</span>
+        <pre><code class="language-bash">gcloud compute instance-groups managed set-autoscaling web-service-mig \
+    --max-num-replicas 50 \
+    --target-cpu-utilization 0.60 \
+    --cool-down-period 30 \
+    --stabilization-period 180</code></pre>
+        <p><strong>効果:</strong> デフォルト 600秒 → 180秒に短縮し、コスト最適化を約70%早く実現</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>&#128274; ユースケース 2: セッションアフィニティが必要なアプリケーション</h4>
+        <p><strong>シナリオ:</strong> ユーザーセッションが特定の VM に紐付いており、負荷減少後もリクエスト処理を継続する必要がある場合</p>
+        <span class="code-label">Bash</span>
+        <pre><code class="language-bash">gcloud compute instance-groups managed set-autoscaling session-app-mig \
+    --max-num-replicas 20 \
+    --target-cpu-utilization 0.70 \
+    --cool-down-period 120 \
+    --stabilization-period 1800</code></pre>
+        <p><strong>効果:</strong> 安定化期間を30分に設定し、アクティブセッションの中断リスクを低減</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>&#128640; ユースケース 3: 変動の激しいバッチ処理ワークロード</h4>
+        <p><strong>シナリオ:</strong> 日中に断続的なバッチジョブが実行され、負荷が急激に上下するワークロード</p>
+        <span class="code-label">Bash</span>
+        <pre><code class="language-bash">gcloud compute instance-groups managed set-autoscaling batch-mig \
+    --max-num-replicas 100 \
+    --target-cpu-utilization 0.80 \
+    --cool-down-period 60 \
+    --stabilization-period 600</code></pre>
+        <p><strong>効果:</strong> デフォルト 600秒を維持し、断続的な負荷スパイクに対応する余裕を確保</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>&#128176; 料金</h2>
+      <div class="note-box">
+        <p style="margin: 0;"><strong>安定化期間の設定自体に追加料金は発生しません。</strong></p>
+        <p style="margin: 8px 0 0 0;">ただし、安定化期間の設定値はインスタンスの稼働時間に直接影響します。</p>
+      </div>
+      <div class="card">
+        <ul style="margin: 0; padding-left: 20px;">
+          <li><strong>安定化期間を短く:</strong> インスタンスがより早く削除 → Compute Engine 使用料金が削減</li>
+          <li><strong>安定化期間を長く:</strong> インスタンスがより長く維持 → その分の使用料金が発生</li>
+          <li>インスタンスの料金は通常の Compute Engine VM の料金体系に従う</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#128279; 関連サービス・機能</h2>
+      <div class="related-services">
+        <div class="related-service-item">
+          <strong>&#128737;&#65039; スケールイン制御</strong><br>
+          <span style="font-size: 13px; color: var(--gc-outline);">一度に削除されるインスタンス数の上限を設定</span>
+        </div>
+        <div class="related-service-item">
+          <strong>&#128302; 予測オートスケーリング</strong><br>
+          <span style="font-size: 13px; color: var(--gc-outline);">過去データに基づいて将来の負荷を予測し事前にスケールアウト</span>
+        </div>
+        <div class="related-service-item">
+          <strong>&#9201;&#65039; 初期化期間 (Cool-down)</strong><br>
+          <span style="font-size: 13px; color: var(--gc-outline);">新しいインスタンスのアプリケーション初期化時間を指定</span>
+        </div>
+        <div class="related-service-item">
+          <strong>&#9878;&#65039; Cloud Load Balancing</strong><br>
+          <span style="font-size: 13px; color: var(--gc-outline);">MIG と連携してトラフィックを分散</span>
+        </div>
+        <div class="related-service-item">
+          <strong>&#128202; Cloud Monitoring</strong><br>
+          <span style="font-size: 13px; color: var(--gc-outline);">オートスケーラーの判断に使用されるメトリクスを提供</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section" style="background: var(--gc-blue-tint); border-color: var(--gc-blue-300);">
+      <h2>&#128203; まとめ</h2>
+      <p>
+        MIG Autoscaler の安定化期間構成機能により、ワークロードの特性に合わせてスケールイン動作を精密に制御できるようになりました。
+      </p>
+      <ul>
+        <li><strong>コスト最適化重視:</strong> 期間を短縮して不要なインスタンスを早期削除</li>
+        <li><strong>安定性重視:</strong> 期間を延長して負荷変動への余裕を確保</li>
+        <li><strong>推奨アクション:</strong> 既存 MIG を運用中の場合、ワークロード特性に応じた安定化期間の見直しを検討</li>
+      </ul>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>&#128206; 出典:</p>
+      <ul style="list-style: none; padding: 0; margin: 4px 0;">
+        <li><a href="https://cloud.google.com/release-notes#June_11_2026" target="_blank" rel="noopener noreferrer">Google Cloud Release Notes (June 11, 2026)</a></li>
+        <li><a href="https://cloud.google.com/compute/docs/autoscaler/managing-autoscalers#configure_stabilization_period" target="_blank" rel="noopener noreferrer">安定化期間の構成ドキュメント</a></li>
+        <li><a href="https://cloud.google.com/compute/docs/autoscaler/understanding-autoscaler-decisions" target="_blank" rel="noopener noreferrer">オートスケーラーの判断について</a></li>
+        <li><a href="https://cloud.google.com/sdk/gcloud/reference/compute/instance-groups/managed/set-autoscaling" target="_blank" rel="noopener noreferrer">gcloud set-autoscaling リファレンス</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline);">#ComputeEngine #MIG #Autoscaler #StabilizationPeriod #ScaleIn</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BigQuery: Organization Policy カスタム制約によるデータ共有リソース制御</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.3;
+    }
+
+    h2, .section-title {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .card-teal {
+      border-left-color: var(--gc-teal);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 20px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.green {
+      background: linear-gradient(135deg, var(--gc-green), #1B5E20);
+    }
+
+    .stat-card.purple {
+      background: linear-gradient(135deg, var(--gc-purple), #6A1B9A);
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-red);
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-green);
+    }
+
+    .before-card h4, .after-card h4 {
+      margin: 0 0 12px 0;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .before-card h4 {
+      color: var(--gc-red);
+    }
+
+    .after-card h4 {
+      color: var(--gc-green);
+    }
+
+    .before-card ul, .after-card ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .before-card li, .after-card li {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-800);
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .usecase-card p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .limitation-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      font-size: 14px;
+    }
+
+    .limitation-icon {
+      color: var(--gc-orange);
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    footer {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    footer li {
+      margin: 4px 0;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stat-cards { grid-template-columns: 1fr; }
+      .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>📊 BigQuery: Organization Policy カスタム制約によるデータ共有リソース制御</h1>
+      <div>
+        <span class="badge">BigQuery</span>
+        <span class="badge badge-ga">GA</span>
+        <div class="subtitle" style="margin-top: 8px;">2026-06-08</div>
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>☁️ 概要</h2>
+      <p>BigQuery Analytics Hub のデータ共有リソース (<strong>Data Exchange</strong> および <strong>Listing</strong>) に対して、<span class="highlight">Organization Policy Service のカスタム制約</span>が GA (一般提供) となりました。</p>
+      <p>CEL (Common Expression Language) を用いた柔軟な条件定義により、組織のデータガバナンスポリシーをプログラマティックに適用できます。</p>
+
+      <div class="note-box">
+        <strong>💡 対象ユーザー:</strong> BigQuery Analytics Hub を利用してデータ共有を行う企業のセキュリティ管理者、ガバナンス担当者、組織ポリシー管理者
+      </div>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-card">
+          <h4>❌ Before (アップデート前)</h4>
+          <ul>
+            <li>Data Exchange や Listing の作成・更新に対して組織レベルでの細かな制御ができなかった</li>
+            <li>公開範囲やエクスポートポリシーを個別に手動で確認する必要があった</li>
+            <li>組織全体で一貫したデータ共有ポリシーを強制する仕組みが限定的だった</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>✅ After (アップデート後)</h4>
+          <ul>
+            <li>Data Exchange と Listing の特定フィールドに対してカスタム制約を定義し組織ポリシーとして強制可能</li>
+            <li>CEL 条件でデータ共有の公開範囲・エクスポート制限・データセットの場所を組織レベルで制御可能</li>
+            <li>ドライランモードによる事前検証が可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>Organization Policy Service のカスタム制約が、リソース階層に沿って継承され、BigQuery Analytics Hub の Data Exchange および Listing の CREATE/UPDATE 操作時にポリシー検証が実行される構成を示しています。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph OrgPolicy["Organization Policy Service"]
+        CC[カスタム制約定義<br/>CEL 条件式]
+        OP[組織ポリシー<br/>enforce: true]
+    end
+
+    subgraph Hierarchy["リソース階層"]
+        ORG[組織]
+        FOLDER[フォルダ]
+        PROJECT[プロジェクト]
+    end
+
+    subgraph AnalyticsHub["BigQuery Analytics Hub"]
+        DE[Data Exchange<br/>analyticshub.googleapis.com/DataExchange]
+        LI[Listing<br/>analyticshub.googleapis.com/Listing]
+    end
+
+    subgraph Operations["リソース操作"]
+        CREATE[CREATE]
+        UPDATE[UPDATE]
+    end
+
+    CC --> OP
+    OP --> ORG
+    ORG --> FOLDER
+    FOLDER --> PROJECT
+    PROJECT --> DE
+    PROJECT --> LI
+    CREATE --> DE
+    CREATE --> LI
+    UPDATE --> DE
+    UPDATE --> LI
+
+    OP -.->|検証| CREATE
+    OP -.->|検証| UPDATE
+        </pre>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="section">
+      <h2>📈 数字で見るアップデート</h2>
+      <div class="stat-cards">
+        <div class="stat-card">
+          <div class="stat-value">2</div>
+          <div class="stat-label">対象リソースタイプ<br/>(Data Exchange / Listing)</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-value">20+</div>
+          <div class="stat-label">Listing の<br/>制御可能フィールド数</div>
+        </div>
+        <div class="stat-card purple">
+          <div class="stat-value">無料</div>
+          <div class="stat-label">Organization Policy Service<br/>の利用料金</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚙️ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h3>🔐 Data Exchange のカスタム制約</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span>公開範囲 (discoveryType) の制御 - パブリックな Data Exchange の作成を禁止可能</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>Data Clean Room (DCR) 限定の Data Exchange 作成を強制可能</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>サブスクライバーのメールログ記録を必須化可能</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>説明文、連絡先、アイコンなどのメタデータフィールドの制御</span></div>
+        </div>
+        <div class="card card-green">
+          <h3>📋 Listing のカスタム制約</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span>公開範囲の制御 - Listing を非公開に限定可能</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>BigQuery データセットの制約 - 特定のデータセットへの参照を強制可能</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>エクスポートポリシーの制御 - restrictedExportPolicy の有効化を強制可能</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>レプリカロケーションの制御 - データの地理的配置を制限可能</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>Pub/Sub トピックのデータアフィニティリージョンの制御</span></div>
+        </div>
+        <div class="card card-purple">
+          <h3>🧪 ポリシーの適用と検証</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span>ドライランモードによる事前検証</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>ポリシー継承による階層的な制御</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>違反時のエラーメッセージによる明確なフィードバック</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specs -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+      <h3>対象リソースとサポートフィールド</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>リソースタイプ</th>
+            <th>主なサポートフィールド</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>analyticshub.googleapis.com/DataExchange</code></td>
+            <td><code>resource.description</code>, <code>resource.discoveryType</code>, <code>resource.displayName</code>, <code>resource.documentation</code>, <code>resource.icon</code>, <code>resource.logLinkedDatasetQueryUserEmail</code>, <code>resource.primaryContact</code></td>
+          </tr>
+          <tr>
+            <td><code>analyticshub.googleapis.com/Listing</code></td>
+            <td><code>resource.allowOnlyMetadataSharing</code>, <code>resource.bigqueryDataset.dataset</code>, <code>resource.bigqueryDataset.replicaLocations</code>, <code>resource.bigqueryDataset.restrictedExportPolicy.*</code>, <code>resource.discoveryType</code>, <code>resource.pubsubTopic.*</code> ほか 20+ フィールド</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>必要な IAM ロール</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>ロール</th>
+            <th>用途</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>roles/orgpolicy.policyAdmin</code></td>
+            <td>組織ポリシーの作成・管理</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>カスタム制約の YAML 定義形式</h3>
+      <span class="code-label">YAML</span>
+      <pre><code class="language-yaml">name: organizations/ORGANIZATION_ID/customConstraints/CONSTRAINT_NAME
+resourceTypes:
+  - analyticshub.googleapis.com/DataExchange
+methodTypes:
+  - CREATE
+  - UPDATE
+condition: "resource.discoveryType == 'DISCOVERY_TYPE_PUBLIC'"
+actionType: DENY
+displayName: Reject public DataExchanges.
+description: All DataExchange resources must be private.</code></pre>
+    </div>
+
+    <!-- Setup Guide -->
+    <div class="section">
+      <h2>🚀 設定方法</h2>
+      <p><strong>前提条件:</strong> Google Cloud 組織が構成済み、組織 ID を把握、<code>roles/orgpolicy.policyAdmin</code> IAM ロールが付与済み</p>
+
+      <div class="flow-diagram">
+        <div class="flow-step">📝 YAML<br/>作成</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">📤 制約<br/>登録</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">✅ 登録<br/>確認</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">⚡ ポリシー<br/>適用</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🧪 ドライラン<br/>(任意)</div>
+      </div>
+
+      <h3>Step 1: カスタム制約の YAML ファイルを作成</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># 例: Data Exchange をプライベートに限定する制約
+cat > constraint-enforce-dataExchangeDiscovery.yaml << 'EOF'
+name: organizations/ORGANIZATION_ID/customConstraints/custom.enforceDataExchangeDiscovery
+resourceTypes:
+  - analyticshub.googleapis.com/DataExchange
+methodTypes:
+  - CREATE
+  - UPDATE
+condition: "resource.discoveryType == 'DISCOVERY_TYPE_PUBLIC'"
+actionType: DENY
+displayName: Reject public DataExchanges.
+description: All DataExchange resources must be private.
+EOF</code></pre>
+
+      <h3>Step 2: カスタム制約を組織に登録</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud org-policies set-custom-constraint constraint-enforce-dataExchangeDiscovery.yaml</code></pre>
+
+      <h3>Step 3: 制約が登録されたことを確認</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud org-policies list-custom-constraints --organization=ORGANIZATION_ID</code></pre>
+
+      <h3>Step 4: 組織ポリシーを作成して適用</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># ポリシー YAML を作成
+cat > policy-enforce-dataExchangeDiscovery.yaml << 'EOF'
+name: projects/PROJECT_ID/policies/custom.enforceDataExchangeDiscovery
+spec:
+  rules:
+    - enforce: true
+EOF
+
+# ポリシーを適用
+gcloud org-policies set-policy policy-enforce-dataExchangeDiscovery.yaml</code></pre>
+
+      <div class="warning-box">
+        <strong>⚠️ 注意:</strong> ポリシーが有効になるまで最大 15 分かかります。
+      </div>
+
+      <h3>Step 5 (任意): ドライランモードで事前検証</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud org-policies set-policy policy-enforce-dataExchangeDiscovery.yaml \
+  --update-mask=dryRunSpec</code></pre>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+      <div class="usecase-card">
+        <h4>🏦 ユースケース 1: パブリック Data Exchange の禁止</h4>
+        <p><strong>シナリオ:</strong> 金融機関が社内データを Analytics Hub で共有する際に、誤ってパブリックに公開されることを防止したい。</p>
+        <p><strong>効果:</strong> 組織内のすべてのプロジェクトで、パブリックな Data Exchange の作成が自動的にブロックされる。</p>
+        <span class="code-label">YAML</span>
+        <pre><code class="language-yaml">name: organizations/123456789/customConstraints/custom.enforceDataExchangeDiscovery
+resourceTypes:
+  - analyticshub.googleapis.com/DataExchange
+methodTypes:
+  - CREATE
+  - UPDATE
+condition: "resource.discoveryType == 'DISCOVERY_TYPE_PUBLIC'"
+actionType: DENY
+displayName: Reject public DataExchanges.
+description: All DataExchange resources must be private.</code></pre>
+      </div>
+
+      <div class="usecase-card">
+        <h4>🔒 ユースケース 2: データエクスポート制限の強制</h4>
+        <p><strong>シナリオ:</strong> 共有される Listing に対して、データのエクスポート制限ポリシーを常に有効にすることを強制したい。</p>
+        <p><strong>効果:</strong> エクスポート制限が有効でない Listing の作成・更新が防止され、データ流出リスクを低減。</p>
+        <span class="code-label">YAML</span>
+        <pre><code class="language-yaml">name: organizations/123456789/customConstraints/custom.listingWithRestrictedExportPolicy
+resourceTypes:
+  - analyticshub.googleapis.com/Listing
+methodTypes:
+  - CREATE
+  - UPDATE
+condition: "has(resource.bigqueryDataset) && has(resource.bigqueryDataset.restrictedExportPolicy) && resource.bigqueryDataset.restrictedExportPolicy.enabled == true"
+actionType: ALLOW
+displayName: The Listing must have restricted export policy.
+description: The Listing resource must have restrictedExportPolicy enabled.</code></pre>
+      </div>
+
+      <div class="usecase-card">
+        <h4>🛡️ ユースケース 3: Data Clean Room 限定のデータ交換</h4>
+        <p><strong>シナリオ:</strong> 組織間でのデータ共有を Data Clean Room 経由のみに限定し、分析環境のセキュリティを確保したい。</p>
+        <p><strong>効果:</strong> Data Clean Room 外での Data Exchange 作成が防止され、セキュアな分析環境が保証される。</p>
+        <span class="code-label">YAML</span>
+        <pre><code class="language-yaml">name: organizations/123456789/customConstraints/custom.analyticsHubAllowDCRDataExchange
+resourceTypes:
+  - analyticshub.googleapis.com/DataExchange
+methodTypes:
+  - CREATE
+condition: "has(resource.sharingEnvironmentConfig.dcrExchangeConfig)"
+actionType: ALLOW
+displayName: Allow a DataExchange in a DCR.
+description: Only allow the creation of a DataExchange resource in a DCR.</code></pre>
+      </div>
+    </div>
+
+    <!-- Merits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div>
+          <h3>ビジネス面</h3>
+          <div class="card card-green">
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>コンプライアンスの自動化</strong>: データ共有に関する規制要件を組織ポリシーとして自動的に適用でき、手動レビューの負荷を軽減</span></div>
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>ガバナンスの一元管理</strong>: 組織全体で一貫したデータ共有ポリシーをトップダウンで適用可能</span></div>
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>リスク軽減</strong>: 意図しないパブリックなデータ共有やポリシー違反を事前に防止</span></div>
+          </div>
+        </div>
+        <div>
+          <h3>技術面</h3>
+          <div class="card card-teal">
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>CEL による柔軟な条件定義</strong>: 複雑な条件式をプログラマティックに記述可能</span></div>
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>階層的なポリシー継承</strong>: 組織・フォルダ・プロジェクトの階層構造に沿った制御</span></div>
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>ドライランモード</strong>: 本番適用前に影響範囲を安全に確認可能</span></div>
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>Infrastructure as Code 対応</strong>: YAML ベースの定義によりポリシーのバージョン管理が可能</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ 制限事項・注意点</h2>
+      <div class="card card-orange">
+        <div class="limitation-item"><span class="limitation-icon">⚡</span><span>CREATE または UPDATE メソッドに対してのみ適用可能 (DELETE には適用不可)</span></div>
+        <div class="limitation-item"><span class="limitation-icon">⚡</span><span>新しいカスタム制約は既存のリソースには自動適用されない (既存リソースの更新が必要)</span></div>
+        <div class="limitation-item"><span class="limitation-icon">⚡</span><span>各リソースタイプにつき最大 20 個のカスタム制約まで</span></div>
+        <div class="limitation-item"><span class="limitation-icon">⚡</span><span>Data Clean Room に公開された既存 Listing はドライランでの既存リソースチェック対象外</span></div>
+        <div class="limitation-item"><span class="limitation-icon">⚡</span><span>既存リソースに対する制約のシミュレーションは非対応</span></div>
+        <div class="limitation-item"><span class="limitation-icon">⚡</span><span><code>resource.bigqueryDataset.replicaLocations</code> フィールドの値は小文字で指定する必要がある</span></div>
+        <div class="limitation-item"><span class="limitation-icon">⚡</span><span>ポリシーの適用まで最大 15 分かかる場合がある</span></div>
+        <div class="limitation-item"><span class="limitation-icon">⚡</span><span>過度に制限的なポリシーは、正当なデータ共有ワークフローを阻害する可能性がある</span></div>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <div class="success-box">
+        <strong>✅ 無料:</strong> Organization Policy Service (カスタム制約を含む) は無料で提供されています。追加料金は発生しません。
+      </div>
+      <p>BigQuery Analytics Hub 自体の利用料金は、通常の BigQuery 料金体系に従います。</p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px;">
+        <div class="card">
+          <strong>📊 BigQuery Analytics Hub</strong>
+          <p style="font-size: 14px; margin: 8px 0 0 0;">データ共有のプラットフォーム。Data Exchange と Listing を管理するサービス</p>
+        </div>
+        <div class="card card-green">
+          <strong>🏛️ Organization Policy Service</strong>
+          <p style="font-size: 14px; margin: 8px 0 0 0;">組織全体のリソースに対するポリシー管理サービス。カスタム制約の基盤</p>
+        </div>
+        <div class="card card-purple">
+          <strong>🛡️ BigQuery Data Clean Rooms</strong>
+          <p style="font-size: 14px; margin: 8px 0 0 0;">セキュアなデータ共有・分析環境。本機能で DCR 限定の Data Exchange を強制可能</p>
+        </div>
+        <div class="card card-teal">
+          <strong>🔑 IAM</strong>
+          <p style="font-size: 14px; margin: 8px 0 0 0;">アクセス制御。Organization Policy は IAM と補完的に機能</p>
+        </div>
+        <div class="card card-orange">
+          <strong>📂 Resource Manager</strong>
+          <p style="font-size: 14px; margin: 8px 0 0 0;">リソース階層の管理。ポリシー継承の基盤</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <p>BigQuery Analytics Hub のデータ共有リソースに対する Organization Policy カスタム制約の GA リリースにより、組織のデータガバナンスを<span class="highlight">プログラマティックかつ階層的</span>に適用できるようになりました。</p>
+      <p>データ共有の公開範囲制御、エクスポート制限の強制、Data Clean Room の利用強制など、企業のコンプライアンス要件に合わせた柔軟なポリシー設計が可能です。Organization Policy Service は<span class="highlight">無料</span>で利用できるため、BigQuery Analytics Hub を活用する組織は、セキュリティ・ガバナンス強化のためにカスタム制約の導入を検討することを推奨します。</p>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>📎 出典:</strong></p>
+      <ul>
+        <li><a href="https://docs.cloud.google.com/release-notes#June_08_2026" target="_blank" rel="noopener noreferrer">Google Cloud Release Notes (June 08, 2026)</a></li>
+        <li><a href="https://docs.cloud.google.com/bigquery/docs/analytics-hub-custom-constraints" target="_blank" rel="noopener noreferrer">Manage Sharing data exchanges and listings using custom constraints</a></li>
+        <li><a href="https://docs.cloud.google.com/organization-policy/overview" target="_blank" rel="noopener noreferrer">Organization Policy Service 概要</a></li>
+        <li><a href="https://docs.cloud.google.com/resource-manager/docs/organization-policy/creating-managing-custom-constraints" target="_blank" rel="noopener noreferrer">カスタム制約の作成と管理</a></li>
+      </ul>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AlloyDB for PostgreSQL: 4 レベルツリー ScaNN インデックスほかベクトル検索機能群が GA</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+:root {
+  --gc-blue: #4285F4;
+  --gc-red: #EA4335;
+  --gc-yellow: #FBBC04;
+  --gc-green: #34A853;
+  --gc-blue-900: #174EA6;
+  --gc-blue-800: #185ABC;
+  --gc-blue-700: #1967D2;
+  --gc-blue-600: #1A73E8;
+  --gc-blue-500: #4285F4;
+  --gc-blue-300: #669DF6;
+  --gc-blue-200: #8AB4F8;
+  --gc-blue-100: #AECBFA;
+  --gc-blue-50: #E8F0FE;
+  --gc-on-surface: #202124;
+  --gc-on-surface-variant: #5F6368;
+  --gc-outline: #80868B;
+  --gc-surface: #FFFFFF;
+  --gc-surface-container-lowest: #F8F9FA;
+  --gc-surface-container-low: #F1F3F4;
+  --gc-surface-container: #E8EAED;
+  --gc-outline-variant: #DADCE0;
+  --gc-blue-tint: #E8F0FE;
+  --gc-green-tint: #E6F4EA;
+  --gc-red-tint: #FCE8E6;
+  --gc-yellow-tint: #FEF7E0;
+  --gc-purple-tint: #F3E8FD;
+  --gc-teal-tint: #E0F7FA;
+  --gc-purple: #A142F4;
+  --gc-teal: #00BCD4;
+  --gc-orange: #FF6D00;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background-color: var(--gc-surface);
+  font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+  color: var(--gc-on-surface-variant);
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 20px;
+  margin: 0;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.header {
+  margin-bottom: 32px;
+  padding-bottom: 16px;
+  border-bottom: 3px solid var(--gc-blue-600);
+}
+
+.header-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+h1, .title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--gc-on-surface);
+  margin: 8px 0 0 0;
+  line-height: 1.4;
+}
+
+h2, .section-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 16px 0 8px 0;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: var(--gc-outline);
+}
+
+.section {
+  background: var(--gc-surface-container-low);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid var(--gc-outline-variant);
+}
+
+.highlight {
+  background-color: var(--gc-blue-50);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--gc-blue-800);
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+.card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin: 12px 0;
+  border-left: 4px solid var(--gc-blue-600);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+}
+
+.card-title {
+  font-weight: 700;
+  color: var(--gc-on-surface);
+  margin-bottom: 6px;
+  font-size: 16px;
+}
+
+.gc-link {
+  color: var(--gc-blue-600);
+  text-decoration: none;
+}
+
+.gc-link:hover {
+  color: var(--gc-blue-800);
+  text-decoration: underline;
+}
+
+.badge,
+.badge-ga,
+.badge-preview,
+.badge-deprecated {
+  display: inline-block;
+  color: #FFFFFF;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+  margin: 4px 8px 4px 0;
+}
+
+.badge { background: var(--gc-blue-600); }
+.badge-ga { background: var(--gc-green); color: #FFFFFF; }
+.badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+.badge-deprecated { background: var(--gc-red); color: #FFFFFF; }
+
+/* 統計カード */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.stat-card {
+  background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+  color: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  line-height: 1.2;
+}
+
+.stat-label {
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+/* Before/After 比較 */
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+@media (max-width: 760px) {
+  .before-after { grid-template-columns: 1fr; }
+}
+
+.before-col, .after-col {
+  border-radius: 12px;
+  padding: 16px 20px;
+}
+
+.before-col {
+  background: var(--gc-red-tint);
+  border: 1px solid rgba(234, 67, 53, 0.3);
+}
+
+.after-col {
+  background: var(--gc-green-tint);
+  border: 1px solid rgba(52, 168, 83, 0.3);
+}
+
+.before-col h3, .after-col h3 {
+  margin-top: 0;
+  font-size: 16px;
+}
+
+.before-col h3 { color: #C5221F; }
+.after-col h3 { color: #188038; }
+
+.before-col ul, .after-col ul {
+  margin: 8px 0 0 0;
+  padding-left: 20px;
+  font-size: 14px;
+}
+
+.before-col li, .after-col li { margin: 6px 0; }
+
+/* Mermaid */
+.mermaid-container {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 20px 0;
+  border: 2px solid rgba(66, 133, 244, 0.3);
+  overflow-x: auto;
+}
+
+.mermaid {
+  display: flex;
+  justify-content: center;
+}
+
+/* コードブロック */
+.code-block {
+  background: #1E1E1E;
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 16px 0;
+}
+
+.code-header {
+  background: #2D2D2D;
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.code-lang { color: #9CDCFE; font-weight: bold; }
+.code-title { color: #AAAAAA; }
+
+.code-block pre {
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+}
+
+pre:not(.mermaid) {
+  background: #1E1E1E;
+  border-radius: 8px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: #E8E8E8;
+  margin: 16px 0;
+}
+
+.code-block code {
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 16px !important;
+  display: block;
+}
+
+code:not(pre code) {
+  background: var(--gc-surface-container-low);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 0.88em;
+  color: var(--gc-blue-900);
+}
+
+.section code:not(pre code) {
+  background: var(--gc-surface);
+}
+
+/* テーブル */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--gc-outline-variant);
+  background: var(--gc-surface);
+}
+
+th {
+  background: var(--gc-blue-50);
+  color: var(--gc-blue-900);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 2px solid var(--gc-blue-200);
+}
+
+td {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--gc-outline-variant);
+  font-size: 14px;
+}
+
+tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+tr:hover { background: var(--gc-blue-50); }
+
+/* ボックス */
+.note-box {
+  background: var(--gc-blue-tint);
+  border-left: 4px solid var(--gc-blue-600);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.warning-box {
+  background: var(--gc-yellow-tint);
+  border-left: 4px solid var(--gc-yellow);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.success-box {
+  background: var(--gc-green-tint);
+  border-left: 4px solid var(--gc-green);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.ai-box {
+  background: var(--gc-purple-tint);
+  border-left: 4px solid var(--gc-purple);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+/* チェックリスト */
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.check-icon { color: var(--gc-green); font-size: 16px; flex-shrink: 0; margin-top: 3px; }
+.cross-icon { color: var(--gc-red); font-size: 16px; flex-shrink: 0; margin-top: 3px; }
+
+/* ユースケース */
+.usecase {
+  background: var(--gc-blue-tint);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin: 12px 0;
+  border: 1px solid var(--gc-blue-100);
+}
+
+.usecase-title {
+  font-weight: 700;
+  color: var(--gc-blue-900);
+  margin-bottom: 6px;
+}
+
+/* 機能カードのカラー種別 */
+.card.green { border-left-color: var(--gc-green); }
+.card.purple { border-left-color: var(--gc-purple); }
+.card.teal { border-left-color: var(--gc-teal); }
+.card.orange { border-left-color: var(--gc-orange); }
+.card.yellow { border-left-color: var(--gc-yellow); }
+.card.red { border-left-color: var(--gc-red); }
+
+/* リンクリスト */
+.link-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0;
+}
+
+.link-list li {
+  margin: 6px 0;
+  font-size: 14px;
+  word-break: break-all;
+}
+
+ul { padding-left: 24px; }
+li { margin: 4px 0; }
+
+footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gc-outline-variant);
+  font-size: 12px;
+  color: var(--gc-outline);
+}
+
+footer a { word-break: break-all; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ヘッダー -->
+  <div class="header">
+    <div class="header-meta">
+      <div>
+        <span class="badge">🗄️ AlloyDB for PostgreSQL</span>
+        <span class="badge-ga">GA</span>
+        <span class="badge-preview">一部 Preview</span>
+      </div>
+      <div class="subtitle">📅 リリース日: 2026-10-28</div>
+    </div>
+    <h1>🚀 AlloyDB AI / ベクトル検索機能群が GA<br>4 レベルツリー (4LT) ScaNN インデックスで最大 100 億ベクトル行に対応</h1>
+  </div>
+
+  <!-- 数字で見るアップデート -->
+  <div class="section">
+    <h2>📊 数字で見るアップデート</h2>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value">100 億行</div>
+        <div class="stat-label">4LT ScaNN が対応する最大ベクトル行数 (GA)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">約 3.5 倍</div>
+        <div class="stat-label">num_leaves 上限拡大<br>30,000,000 → 104,857,600 (PG17+)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">7 機能</div>
+        <div class="stat-label">同時 GA (4LT / 自動保守 / ストリーミング / Vector assist ほか)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">3 種統合</div>
+        <div class="stat-label">ベクトル検索 + 全文検索 + 外部検索を単一 SQL で</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 概要 -->
+  <div class="section">
+    <h2>📝 概要</h2>
+    <p>
+      AlloyDB for PostgreSQL において、AlloyDB AI およびベクトル検索に関する複数の機能が
+      <span class="highlight">一般提供 (GA)</span> になりました。中核は <code>alloydb_scann</code> 拡張が
+      PostgreSQL 17 以降でサポートする <span class="highlight">4 レベルツリー (4LT) ScaNN ベクトルインデックス</span>で、
+      <strong>最大 100 億 (10B) 行のベクトルデータ</strong>を持つテーブルに対するベクトル検索が可能になります。
+      4LT インデックスは自動インデックスメンテナンスにも対応しました。
+    </p>
+    <p>
+      あわせて、<code>scann.satisfy_limit = relaxed_order</code> によるストリーミング検索 (フィルタ付き検索のリコール改善)、
+      宣言的 SQL フレームワーク <strong>Vector assist</strong>、<code>num_leaves</code> 上限の引き上げ、
+      Elasticsearch / Solr / OpenSearch へのフェデレーション検索を実現する <strong>external_search_fdw 拡張</strong>、
+      高性能全文検索の <strong>rum 拡張</strong>が同時に GA。さらに 4LT インデックス構築時のメモリ見積もり改善
+      (OOM 防止) が Preview で提供されます。大規模 RAG やセマンティック検索基盤を運用する組織に重要なアップデートです。
+    </p>
+
+    <div class="before-after">
+      <div class="before-col">
+        <h3>❌ Before (アップデート前の課題)</h3>
+        <ul>
+          <li>4LT ScaNN は Preview 段階で、10 億〜100 億行規模を GA 品質で利用できなかった</li>
+          <li><code>num_leaves</code> 上限は 30,000,000 で、超大規模データのパーティション分割に上限</li>
+          <li>フィルタ付き検索で LIMIT 句を満たせずリコールが低下することがあった</li>
+          <li>埋め込み生成・インデックスパラメータ・クエリチューニングを手動設計する必要</li>
+          <li>外部検索クラスタのデータ検索にはデータコピーやアプリ側統合が必要</li>
+          <li>メモリ見積もりが不正確だと OOM でインデックス構築が失敗</li>
+        </ul>
+      </div>
+      <div class="after-col">
+        <h3>✅ After (アップデート後の改善)</h3>
+        <ul>
+          <li>PG17+ で 4LT ScaNN が GA。最大 100 億ベクトル行 + 自動インデックスメンテナンス対応</li>
+          <li><code>num_leaves</code> 上限が 104,857,600 に拡大 (PG17+)</li>
+          <li>ストリーミング機能で LIMIT を満たすまでリーフパーティションを追加探索し、リコール向上</li>
+          <li>Vector assist が本番品質のベクトル検索セットアップを宣言的に構築</li>
+          <li><code>external_search_fdw</code> で Elasticsearch / Solr / OpenSearch に直接クエリ</li>
+          <li>rum 拡張で高速なフレーズ検索・関連度ランキング。メモリ見積もり改善で構築が安定 (Preview)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- アーキテクチャ図 -->
+  <div class="section">
+    <h2>🏗️ アーキテクチャ図</h2>
+    <div class="mermaid-container">
+      <pre class="mermaid">
+flowchart TD
+    subgraph APP["アプリケーション"]
+        U([👤 ユーザー / RAG アプリ])
+    end
+
+    subgraph ADB["🗄️ AlloyDB for PostgreSQL (PostgreSQL 17+)"]
+        VA["🤖 Vector assist (GA)<br/>宣言的 SQL でベクトル<br/>ワークロードを自動構成"]
+        SCANN["📇 4LT ScaNN インデックス (GA)<br/>最大 100 億ベクトル行<br/>num_leaves 上限 104,857,600"]
+        STREAM["🔁 ストリーミング検索 (GA)<br/>scann.satisfy_limit = relaxed_order<br/>フィルタ検索のリコール向上"]
+        AUTOM["🔧 自動インデックスメンテナンス (GA)<br/>セントロイド更新・パーティション分割"]
+        RUM["📚 rum 拡張 (GA)<br/>高性能全文検索"]
+        FDW["🔌 external_search_fdw (GA)"]
+    end
+
+    subgraph EXT["外部検索クラスタ"]
+        ES[("🔍 Elasticsearch / Solr / OpenSearch")]
+    end
+
+    U -->|SQL クエリ| ADB
+    VA -->|推奨 SQL を生成| SCANN
+    SCANN --> STREAM
+    AUTOM -->|自動保守| SCANN
+    FDW -->|フェデレーション検索| ES
+      </pre>
+    </div>
+    <p>
+      AlloyDB 内でベクトル検索 (4LT ScaNN)・全文検索 (rum)・外部検索クラスタへのフェデレーション検索
+      (external_search_fdw) を統合的に実行できる構成です。Vector assist はベクトルワークロードの構成を
+      推奨 SQL として生成し、自動インデックスメンテナンスがインデックスの品質を維持します。
+    </p>
+  </div>
+
+  <!-- 主要機能 -->
+  <div class="section">
+    <h2>⚡ 主要機能</h2>
+
+    <div class="card">
+      <div class="card-title">1️⃣ 4 レベルツリー (4LT) ScaNN ベクトルインデックス <span class="badge-ga">GA</span></div>
+      <p style="margin: 0; font-size: 14px;">
+        <code>alloydb_scann</code> 拡張が PostgreSQL 17 以降で 4 レベルツリーの ScaNN ベクトルインデックスをサポート。
+        最大 100 億 (10B) ベクトル行のテーブルに対応し、10 億〜100 億行のテーブルには 4 レベルインデックスが推奨。
+        作成時に <code>max_num_levels = 3</code> (セントロイド 3 レベル + リーフレベル) を指定。
+      </p>
+    </div>
+
+    <div class="card green">
+      <div class="card-title">2️⃣ 自動インデックスメンテナンス <span class="badge-ga">GA</span></div>
+      <p style="margin: 0; font-size: 14px;">
+        4LT ScaNN インデックスで <code>auto_maintenance</code> オプションが利用可能。データセットの増加に応じて
+        AlloyDB がセントロイドを分析・更新し、大きな外れ値パーティションを分割。QPS と検索結果品質を自動的に改善。
+      </p>
+    </div>
+
+    <div class="card teal">
+      <div class="card-title">3️⃣ ストリーミング機能 (scann.satisfy_limit = relaxed_order) <span class="badge-ga">GA</span></div>
+      <p style="margin: 0; font-size: 14px;">
+        有効化すると、LIMIT 句を満たす十分な結果が見つかるまでベクトルスキャンが追加のリーフパーティションを探索し続け、
+        フィルタ条件付き検索のリコールが向上。<code>scann.enable_parallel_satisfy_limit</code> フラグを
+        <code>on</code> にすると並列プロセススキャンにも適用可能。
+      </p>
+    </div>
+
+    <div class="card purple">
+      <div class="card-title">4️⃣ Vector assist <span class="badge-ga">GA</span></div>
+      <p style="margin: 0; font-size: 14px;">
+        ベクトル検索ワークロードのデプロイと管理のための宣言的 SQL フレームワーク。対象テーブル・テキストカラム・
+        目標リコールなどの要件 (vector spec) を <code>vector_assist.define_spec</code> で宣言すると、
+        自動チューニングアルゴリズムが最適化された SQL 推奨 (説明付き) を生成。埋め込み生成、クエリ最適化、
+        HNSW などのインデックス作成を含む本番品質のセットアップを支援。
+      </p>
+    </div>
+
+    <div class="card yellow">
+      <div class="card-title">5️⃣ num_leaves 上限の引き上げ</div>
+      <p style="margin: 0; font-size: 14px;">
+        PostgreSQL 17 以降の AlloyDB インスタンスで、ScaNN インデックス構築時の <code>num_leaves</code>
+        最大サポート値が <strong>30,000,000 → 104,857,600</strong> に増加 (約 3.5 倍)。
+      </p>
+    </div>
+
+    <div class="card teal">
+      <div class="card-title">6️⃣ external_search_fdw 拡張 <span class="badge-ga">GA</span></div>
+      <p style="margin: 0; font-size: 14px;">
+        外部検索クラスタに接続し、データベースから直接そのデータをクエリ可能。
+        対応する検索ソース: <strong>Elasticsearch / Solr / OpenSearch</strong>。
+      </p>
+    </div>
+
+    <div class="card green">
+      <div class="card-title">7️⃣ rum 拡張 <span class="badge-ga">GA</span></div>
+      <p style="margin: 0; font-size: 14px;">
+        PostgreSQL 17 以前で高性能な全文検索操作をサポート。標準の GIN インデックスを拡張し、
+        位置情報をインデックスに直接保存することで、テーブルデータにアクセスせずに高速な
+        フレーズ検索と関連度ランキングを実行可能。
+      </p>
+    </div>
+
+    <div class="card orange">
+      <div class="card-title">8️⃣ 4LT インデックス構築時のメモリ見積もり改善 <span class="badge-preview">Preview</span></div>
+      <p style="margin: 0; font-size: 14px;">
+        ScaNN 4 レベルツリーインデックス構築時のメモリ使用量見積もりがより正確になり、OOM エラーを防止。
+        メモリ制限の適用と制約条件下でのメモリ見積もり改善により、インデックス構築の安定性が向上。
+      </p>
+    </div>
+  </div>
+
+  <!-- 技術仕様 -->
+  <div class="section">
+    <h2>🔬 技術仕様</h2>
+
+    <h3>📐 ScaNN インデックスのツリーレベル選択指針</h3>
+    <table>
+      <thead>
+        <tr><th>テーブルのベクトル行数</th><th>推奨ツリーレベル数</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>0〜1,000 万行</td><td>2 レベル</td></tr>
+        <tr><td>1,000 万〜1 億行</td><td>リコール優先: 2 レベル / 構築時間優先: 3 レベル</td></tr>
+        <tr><td>1 億〜10 億行</td><td>リコール優先: 3 レベル / 構築時間優先: 4 レベル</td></tr>
+        <tr><td>10 億〜100 億行</td><td><strong>4 レベル</strong></td></tr>
+      </tbody>
+    </table>
+
+    <h3>⚙️ 主要パラメータ</h3>
+    <table>
+      <thead>
+        <tr><th>項目</th><th>詳細</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>max_num_levels</code></td><td>K-means クラスタリングツリーのセントロイドレベル最大数。<code>3</code> で 4 レベルインデックス</td></tr>
+        <tr><td><code>num_leaves</code></td><td>パーティション数。PG17+ は最大 104,857,600、PG16 以前は最大 30,000,000</td></tr>
+        <tr><td><code>quantizer</code></td><td><code>SQ8</code> (デフォルト、リコール損失は通常 1〜2% 未満) / <code>AH</code> (Preview、SQ8 比最大 4 倍圧縮) / <code>FLAT</code> (リコール 99% 以上)</td></tr>
+        <tr><td><code>auto_maintenance</code></td><td>自動メンテナンスの有効化。<code>ON</code> / <code>OFF</code> (デフォルト)</td></tr>
+        <tr><td><code>scann.satisfy_limit</code></td><td><code>relaxed_order</code> でストリーミング機能を有効化し、フィルタ検索のリコールを改善</td></tr>
+        <tr><td><code>scann.enable_parallel_satisfy_limit</code></td><td><code>on</code> で並列プロセススキャンにもストリーミングを適用</td></tr>
+        <tr><td><code>scann.num_leaves_to_search</code></td><td>検索するパーティションの絶対数。デフォルトは <code>num_leaves</code> の 1%</td></tr>
+        <tr><td><code>scann.pre_reordering_num_neighbors</code></td><td>再順序付け段階で考慮する候補近傍数</td></tr>
+      </tbody>
+    </table>
+
+    <div class="warning-box">
+      <strong>⚠️ Vector assist の制限事項:</strong>
+      <ul style="margin: 8px 0 0 0;">
+        <li>PostgreSQL 17 以降のみサポート</li>
+        <li>インデックスタイプは HNSW と IVFFlat のみサポート (ScaNN インデックスタイプは非サポート)</li>
+        <li>埋め込み自動生成はテキスト埋め込みモデルのみサポート (マルチモーダル埋め込みが必要な場合は <code>google_ml_integration</code> 拡張などで事前に生成)</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 設定方法 -->
+  <div class="section">
+    <h2>🛠️ 設定方法</h2>
+
+    <div class="note-box">
+      <strong>💡 前提条件:</strong>
+      <ul style="margin: 8px 0 0 0;">
+        <li>PostgreSQL 17 以降の AlloyDB インスタンス (4LT ScaNN / Vector assist / <code>num_leaves</code> 上限拡大の場合)</li>
+        <li>OOM 回避のため <code>maintenance_work_mem</code> と <code>shared_buffers</code> をマシンメモリ合計より小さい値に設定</li>
+        <li>rum 拡張の作成には <code>alloydbsuperuser</code> データベースロールが必要</li>
+      </ul>
+    </div>
+
+    <h3>ステップ 1: 4 レベルツリー ScaNN インデックスの作成</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">SQL</span>
+        <span class="code-title">4LT ScaNN インデックス作成</span>
+      </div>
+      <pre><code class="language-sql">CREATE EXTENSION IF NOT EXISTS alloydb_scann;
+
+CREATE INDEX my_scann_index ON my_table
+USING scann (embedding_column cosine)
+WITH (
+  mode = 'MANUAL',
+  num_leaves = NUM_LEAVES_VALUE,  -- 例: power(行数, 3/4) を起点に調整
+  quantizer = 'SQ8',
+  auto_maintenance = ON,           -- 自動インデックスメンテナンスを有効化
+  max_num_levels = 3               -- 4 レベルツリー
+);</code></pre>
+    </div>
+    <p style="font-size: 14px;"><code>max_num_levels = 3</code> により 4 レベルツリーインデックスが作成されます。<code>auto_maintenance = ON</code> で自動メンテナンスが有効になります。</p>
+
+    <h3>ステップ 2: ストリーミング機能の有効化</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">SQL</span>
+        <span class="code-title">ストリーミング検索の有効化</span>
+      </div>
+      <pre><code class="language-sql">-- セッション単位でストリーミング機能を有効化
+SET scann.satisfy_limit = relaxed_order;
+
+-- 並列プロセススキャンにも適用する場合はデータベースフラグを設定
+-- scann.enable_parallel_satisfy_limit = on</code></pre>
+    </div>
+    <p style="font-size: 14px;">フィルタ条件付きベクトル検索で、LIMIT 句を満たすまで追加のリーフパーティションを探索するようになります。</p>
+
+    <h3>ステップ 3: rum 拡張による全文検索インデックスの作成 (任意)</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">SQL</span>
+        <span class="code-title">rum インデックス作成</span>
+      </div>
+      <pre><code class="language-sql">CREATE EXTENSION IF NOT EXISTS rum;
+
+ALTER TABLE documents ADD COLUMN search_vector tsvector
+  GENERATED ALWAYS AS (to_tsvector('english', content)) STORED;
+
+CREATE INDEX idx_docs_rum ON documents
+USING rum (search_vector rum_tsvector_ops);</code></pre>
+    </div>
+    <p style="font-size: 14px;">位置情報がインデックスに保存されるため、テーブルアクセスなしで高速なフレーズ検索・関連度ランキングが可能です。</p>
+  </div>
+
+  <!-- メリット -->
+  <div class="section">
+    <h2>✨ メリット</h2>
+    <h3>💼 ビジネス面</h3>
+    <div class="check-item"><span class="check-icon">✅</span><span><strong>超大規模 RAG / セマンティック検索の実現</strong>: 最大 100 億ベクトル行まで GA 品質でサポートされ、エンタープライズ規模のナレッジベースや商品カタログの検索基盤を PostgreSQL 互換データベース上に統合できる</span></div>
+    <div class="check-item"><span class="check-icon">✅</span><span><strong>運用コストの削減</strong>: 自動インデックスメンテナンスと Vector assist により、ベクトル検索基盤のチューニング・保守にかかる専門的な作業が削減される</span></div>
+    <div class="check-item"><span class="check-icon">✅</span><span><strong>既存検索基盤の活用</strong>: external_search_fdw により、既存の Elasticsearch / Solr / OpenSearch 資産をデータ移行なしに AlloyDB から直接活用できる</span></div>
+
+    <h3>🔧 技術面</h3>
+    <div class="check-item"><span class="check-icon">✅</span><span><strong>リコールの改善</strong>: <code>relaxed_order</code> ストリーミングにより、フィルタ付き検索でも LIMIT を満たすまで探索が継続され、検索品質が向上</span></div>
+    <div class="check-item"><span class="check-icon">✅</span><span><strong>スケーラビリティの向上</strong>: <code>num_leaves</code> 上限が約 3.5 倍 (30,000,000 → 104,857,600) に拡大し、超大規模データセットでより細かいパーティション分割が可能</span></div>
+    <div class="check-item"><span class="check-icon">✅</span><span><strong>インデックス構築の安定化</strong>: メモリ見積もり精度の向上とメモリ制限の適用により、4LT インデックス構築時の OOM エラーを防止 (Preview)</span></div>
+    <div class="check-item"><span class="check-icon">✅</span><span><strong>検索機能の統合</strong>: ベクトル検索 (ScaNN)、全文検索 (rum)、外部検索 (FDW) を単一データベースの SQL で統合的に扱える</span></div>
+  </div>
+
+  <!-- デメリット・制約事項 -->
+  <div class="section">
+    <h2>⚠️ デメリット・制約事項</h2>
+    <h3>🚧 制限事項</h3>
+    <div class="check-item"><span class="cross-icon">❌</span><span>4LT ScaNN インデックス、Vector assist、<code>num_leaves</code> 上限拡大 (104,857,600) は PostgreSQL 17 以降が必要 (PG16 以前の上限は 30,000,000)</span></div>
+    <div class="check-item"><span class="cross-icon">❌</span><span>Vector assist は HNSW / IVFFlat インデックスのみ対応し、ScaNN インデックスタイプは非サポート</span></div>
+    <div class="check-item"><span class="cross-icon">❌</span><span>Vector assist の埋め込み自動生成はテキスト埋め込みモデルのみ対応</span></div>
+    <div class="check-item"><span class="cross-icon">❌</span><span>rum 拡張は PostgreSQL 17 以前でのサポートと Release Notes に記載</span></div>
+    <div class="check-item"><span class="cross-icon">❌</span><span>4LT インデックス構築時のメモリ見積もり改善は Preview であり、Pre-GA 利用規約が適用される</span></div>
+
+    <h3>🤔 考慮すべき点</h3>
+    <div class="warning-box">
+      <ul style="margin: 0;">
+        <li>ScaNN インデックスの <code>auto_maintenance</code> はデフォルト <code>OFF</code>。自動メンテナンスを利用する場合は明示的な有効化が必要</li>
+        <li><code>scann.satisfy_limit = relaxed_order</code> は追加のリーフパーティションを探索するため、リコールと引き換えに探索コストが増加する可能性がある。チューニングのベストプラクティスを確認のうえ設定すること</li>
+        <li>インデックス構築前に <code>maintenance_work_mem</code> / <code>shared_buffers</code> の適切な設定が引き続き推奨される</li>
+        <li>行数に応じたツリーレベルと <code>num_leaves</code> の選択 (4 レベルの場合は <code>power(行数, 3/4)</code> が起点) がリコールと構築時間のバランスに影響する</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ユースケース -->
+  <div class="section">
+    <h2>🎯 ユースケース</h2>
+
+    <div class="usecase">
+      <div class="usecase-title">💡 ユースケース 1: 100 億ベクトル規模のエンタープライズ RAG 基盤</div>
+      <p style="margin: 0 0 8px 0; font-size: 14px;">
+        <strong>シナリオ</strong>: 全社のドキュメント・ナレッジを埋め込みベクトル化して保存し、生成 AI アプリケーションから
+        低レイテンシで類似検索したい。データ量は数十億〜100 億ベクトル行に達する。
+      </p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">実装例</span>
+        </div>
+        <pre><code class="language-sql">CREATE INDEX kb_scann_idx ON knowledge_base
+USING scann (embedding cosine)
+WITH (mode='MANUAL', num_leaves = 5623413, -- power(1e10, 3/4) 起点で調整
+      quantizer='SQ8', auto_maintenance=ON, max_num_levels=3);
+
+SET scann.satisfy_limit = relaxed_order;
+SELECT doc_id, title FROM knowledge_base
+WHERE category = 'engineering'
+ORDER BY embedding &lt;=&gt; $1 LIMIT 10;</code></pre>
+      </div>
+      <p style="margin: 8px 0 0 0; font-size: 14px;">
+        <strong>効果</strong>: 100 億行規模でも GA 品質のベクトル検索が可能になり、フィルタ条件付きでもストリーミング機能により
+        LIMIT を満たす結果を取得できる。自動メンテナンスによりデータ増加後も検索品質が維持される。
+      </p>
+    </div>
+
+    <div class="usecase">
+      <div class="usecase-title">🔌 ユースケース 2: 既存 Elasticsearch 資産とのフェデレーション検索</div>
+      <p style="margin: 0 0 8px 0; font-size: 14px;">
+        <strong>シナリオ</strong>: ログ・商品カタログを Elasticsearch で運用しているが、トランザクションデータは AlloyDB にある。
+        両者を結合した検索をデータコピーなしで実行したい。
+      </p>
+      <p style="margin: 0; font-size: 14px;">
+        <strong>効果</strong>: <code>external_search_fdw</code> により Elasticsearch のインデックスを外部テーブルとして
+        SQL から直接クエリでき、AlloyDB のリレーショナルデータと組み合わせた検索がデータ移動なしに実現できる。
+      </p>
+    </div>
+
+    <div class="usecase">
+      <div class="usecase-title">🤖 ユースケース 3: Vector assist による検索アプリの迅速なプロトタイピング</div>
+      <p style="margin: 0 0 8px 0; font-size: 14px;">
+        <strong>シナリオ</strong>: セマンティック検索機能を新規アプリに追加したいが、埋め込みモデル選定や
+        インデックスチューニングの知見が少ない。
+      </p>
+      <p style="margin: 0; font-size: 14px;">
+        <strong>効果</strong>: vector spec (対象テーブル、テキストカラム、目標リコールなど) を SQL で宣言するだけで、
+        埋め込み生成・インデックス作成・クエリ最適化の推奨 SQL が説明付きで生成され、レビュー・修正しながら
+        本番品質のセットアップを短期間で構築できる。
+      </p>
+    </div>
+  </div>
+
+  <!-- 料金・リージョン -->
+  <div class="section">
+    <h2>💰 料金・利用可能リージョン</h2>
+    <div class="note-box">
+      <strong>💳 料金:</strong> 今回 GA となった機能は AlloyDB の拡張機能・データベースフラグとして提供されます。
+      AlloyDB for PostgreSQL の料金は vCPU・メモリ・ストレージ・ネットワークの使用量に基づきます。
+      詳細は <a href="https://cloud.google.com/alloydb/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">料金ページ</a> を参照してください。
+    </div>
+    <div class="note-box">
+      <strong>🌏 利用可能リージョン:</strong> Release Notes にリージョン固有の記載はありません。
+      AlloyDB for PostgreSQL が利用可能なリージョンについては
+      <a href="https://cloud.google.com/alloydb/docs/locations" target="_blank" rel="noopener noreferrer" class="gc-link">公式ドキュメント</a> を参照してください。
+    </div>
+  </div>
+
+  <!-- 関連サービス -->
+  <div class="section">
+    <h2>🔗 関連サービス・機能</h2>
+    <div class="card purple">
+      <div class="card-title">🤖 Vertex AI</div>
+      <p style="margin: 0; font-size: 14px;"><code>google_ml_integration</code> 拡張経由で埋め込み生成モデル (例: text-embedding-005) を呼び出し、AlloyDB 内で埋め込みを生成できる</p>
+    </div>
+    <div class="card">
+      <div class="card-title">⚡ AlloyDB columnar engine</div>
+      <p style="margin: 0; font-size: 14px;">ScaNN インデックスをカラム型エンジンにロードしてベクトル検索をさらに高速化できる</p>
+    </div>
+    <div class="card red">
+      <div class="card-title">🔒 Secret Manager</div>
+      <p style="margin: 0; font-size: 14px;">external_search_fdw で外部検索クラスタの認証情報を安全に管理する際に使用 (AlloyDB Omni ドキュメントに記載)</p>
+    </div>
+    <div class="card teal">
+      <div class="card-title">🗄️ AlloyDB Omni</div>
+      <p style="margin: 0; font-size: 14px;">Vector assist や external_search_fdw は AlloyDB Omni でも提供されている</p>
+    </div>
+    <div class="card green">
+      <div class="card-title">📚 BM25 インデックス</div>
+      <p style="margin: 0; font-size: 14px;">rum 拡張と並ぶ全文検索の選択肢として、PostgreSQL 17 以降で BM25 関連度ランキングが利用可能</p>
+    </div>
+  </div>
+
+  <!-- まとめ -->
+  <div class="section">
+    <h2>📌 まとめ</h2>
+    <div class="success-box">
+      <p style="margin: 0 0 8px 0;">
+        AlloyDB のベクトル検索が 4 レベルツリー ScaNN インデックスの GA により
+        <strong>最大 100 億ベクトル行</strong>までスケールし、自動メンテナンス・ストリーミング検索・Vector assist・
+        外部検索連携・rum 全文検索を含む<strong>包括的な検索プラットフォーム</strong>としての完成度が大きく向上しました。
+      </p>
+      <p style="margin: 0;">
+        👉 大規模な RAG やセマンティック検索基盤を検討している場合は、PostgreSQL 17 以降のインスタンスで
+        4LT ScaNN インデックスと <code>scann.satisfy_limit = relaxed_order</code> の評価を開始し、
+        行数に応じたツリーレベルと <code>num_leaves</code> の設計指針を確認することを推奨します。
+      </p>
+    </div>
+    <p style="font-size: 13px; color: var(--gc-outline);">
+      🏷️ タグ: #AlloyDB #PostgreSQL #ScaNN #VectorSearch #AlloyDBAI #RAG #GA #FullTextSearch #Elasticsearch #OpenSearch
+    </p>
+  </div>
+
+  <!-- 参考リンク -->
+  <div class="section">
+    <h2>📚 参考リンク</h2>
+    <ul class="link-list">
+      <li>📄 <a href="https://cloud.google.com/alloydb/docs/release-notes" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート</a></li>
+      <li>📇 <a href="https://docs.cloud.google.com/alloydb/docs/ai/create-scann-index" target="_blank" rel="noopener noreferrer" class="gc-link">ScaNN インデックスの作成</a></li>
+      <li>🎛️ <a href="https://docs.cloud.google.com/alloydb/docs/ai/tune-indexes" target="_blank" rel="noopener noreferrer" class="gc-link">ベクトルインデックスのチューニング</a></li>
+      <li>📖 <a href="https://docs.cloud.google.com/alloydb/docs/reference/ai/scann-index-reference" target="_blank" rel="noopener noreferrer" class="gc-link">ScaNN インデックスリファレンス</a></li>
+      <li>🔧 <a href="https://docs.cloud.google.com/alloydb/docs/ai/maintain-vector-indexes" target="_blank" rel="noopener noreferrer" class="gc-link">ベクトルインデックスの自動メンテナンス</a></li>
+      <li>🤖 <a href="https://docs.cloud.google.com/alloydb/docs/ai/vector-assist-overview" target="_blank" rel="noopener noreferrer" class="gc-link">Vector assist 概要</a></li>
+      <li>📚 <a href="https://docs.cloud.google.com/alloydb/docs/ai/create-rum-index" target="_blank" rel="noopener noreferrer" class="gc-link">RUM インデックスの作成と管理</a></li>
+      <li>🔍 <a href="https://docs.cloud.google.com/alloydb/docs/ai/full-text-search-overview" target="_blank" rel="noopener noreferrer" class="gc-link">全文検索の概要</a></li>
+      <li>💰 <a href="https://cloud.google.com/alloydb/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">料金ページ</a></li>
+    </ul>
+  </div>
+
+  <!-- フッター -->
+  <footer>
+    <p>📎 出典:</p>
+    <ul class="link-list" style="margin-top: 4px;">
+      <li><a href="https://cloud.google.com/alloydb/docs/release-notes" target="_blank" rel="noopener noreferrer" class="gc-link">https://cloud.google.com/alloydb/docs/release-notes</a> (AlloyDB for PostgreSQL Release Notes, 2026-10-28)</li>
+      <li>Google Cloud News レポート: reports/2026/2026-10-28-alloydb-scann-4lt-vector-search-ga.md</li>
+    </ul>
+    <p style="margin-top: 8px;">このインフォグラフィックは Google Cloud の公開情報をもとに自動生成されています。</p>
+  </footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#4285F4',
+      primaryTextColor: '#202124',
+      primaryBorderColor: '#4285F4',
+      lineColor: '#4285F4',
+      secondaryColor: '#F1F3F4',
+      tertiaryColor: '#FAFAFA',
+      background: '#FFFFFF',
+      mainBkg: '#E8F0FE',
+      nodeBorder: '#4285F4',
+      clusterBkg: '#E8F0FE',
+      clusterBorder: '#4285F4',
+      edgeLabelBackground: '#FFFFFF',
+      textColor: '#202124'
+    }
+  });
+</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

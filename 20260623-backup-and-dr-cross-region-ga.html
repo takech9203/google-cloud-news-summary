@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Backup and DR Service: クロスリージョンバックアップ GA</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--gc-outline);
+      text-align: right;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge-ga {
+      display: inline-block;
+      background: var(--gc-green);
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge-service {
+      display: inline-block;
+      background: var(--gc-blue-600);
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h4 {
+      color: var(--gc-red);
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box h4 {
+      color: var(--gc-green);
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .before-box ul, .after-box ul {
+      margin: 0;
+      padding-left: 16px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 4px 0;
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-900);
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .usecase-card p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid) {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .feature-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .feature-card.green {
+      border-left-color: var(--gc-green);
+    }
+
+    .feature-card.teal {
+      border-left-color: var(--gc-teal);
+    }
+
+    .feature-card h4 {
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .feature-card p, .feature-card ul {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    .feature-card ul {
+      padding-left: 20px;
+    }
+
+    .feature-card li {
+      margin: 4px 0;
+    }
+
+    .region-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .region-card {
+      background: var(--gc-surface);
+      border-radius: 8px;
+      padding: 16px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .region-card h4 {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      color: var(--gc-blue-800);
+    }
+
+    .region-card p {
+      margin: 0;
+      font-size: 13px;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .subtitle {
+        text-align: left;
+      }
+      h1 {
+        font-size: 24px;
+      }
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+      .stat-grid {
+        grid-template-columns: 1fr;
+      }
+      .region-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>🛡️ Backup and DR Service: クロスリージョンバックアップ GA</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge-service">Backup and DR Service</span>
+          <span class="badge-ga">GA</span>
+        </div>
+      </div>
+      <div class="subtitle">
+        リリース日: 2026-06-23<br>
+        Cross-region backups GA /<br>Application-consistent backups via Console
+      </div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>Google Cloud Backup and DR Service に 2 つの重要なアップデートが発表された。<span class="highlight">クロスリージョンバックアップが GA</span> となり、リージョン障害に対する保護が本番ワークロードで SLA の下で利用可能に。また、<span class="highlight">アプリケーション整合性バックアップを Console から設定可能</span>になり、運用管理者の設定負荷が大幅に軽減された。</p>
+
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">30+</div>
+          <div class="stat-label">対応リージョン数</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">99年</div>
+          <div class="stat-label">最大強制保持期間</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-green), #2E7D32);">
+          <div class="stat-value">GA</div>
+          <div class="stat-label">SLA 対象・本番利用可</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h4>❌ Before (アップデート前)</h4>
+          <ul>
+            <li>クロスリージョンバックアップは Preview 段階 (SLA なし)</li>
+            <li>アプリ整合性の設定に gcloud CLI / Terraform / API が必要</li>
+            <li>バックアップ先リージョンの明示的指定が不可 (マルチリージョン Vault のみ)</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h4>✅ After (アップデート後)</h4>
+          <ul>
+            <li>クロスリージョンバックアップが GA (SLA 適用)</li>
+            <li>Console の Backup Plans 画面からチェックボックスで設定可能</li>
+            <li>セカンダリリージョンを明示的に選択可能 (データレジデンシー対応)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>クロスリージョンバックアップでは、ソースリージョンのワークロードからバックアップを作成し、明示的に指定したセカンダリリージョンの Backup Vault に保存する。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph SourceRegion["ソースリージョン (例: asia-northeast1)"]
+        VM["Compute Engine VM"]
+        Disk["Persistent Disk"]
+        FS["Filestore Instance"]
+        BP["Backup Plan\n+ App Consistency 有効"]
+    end
+
+    subgraph SecondaryRegion["セカンダリリージョン (例: asia-northeast2)"]
+        BV2["Cross-Region\nBackup Vault"]
+        Backup2["Immutable &\nIndelible Backups"]
+    end
+
+    subgraph LocalRegion["ローカルリージョン"]
+        BV1["Regional\nBackup Vault"]
+        Backup1["Primary Backups"]
+    end
+
+    VM -->|"Guest Flush / VSS"| BP
+    Disk --> BP
+    FS --> BP
+    BP -->|"バックアップ作成"| BV1
+    BV1 --> Backup1
+    BP -->|"クロスリージョン転送"| BV2
+    BV2 --> Backup2
+
+    style BV2 fill:#e8f5e9,stroke:#2e7d32
+    style Backup2 fill:#e8f5e9,stroke:#2e7d32
+    style BP fill:#e3f2fd,stroke:#1565c0
+        </pre>
+      </div>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <h4>🌍 1. クロスリージョンバックアップ (GA)</h4>
+          <ul>
+            <li>Compute Engine インスタンス、ディスク、Filestore インスタンスが対象</li>
+            <li>ソースワークロードとは異なるリージョンの Backup Vault にバックアップを保存</li>
+            <li>バックアップ先リージョンを明示的に選択可能</li>
+            <li>リージョン障害時のディザスタリカバリに対応</li>
+            <li>データレジデンシー要件への準拠を支援</li>
+          </ul>
+        </div>
+        <div class="feature-card green">
+          <h4>🔒 2. アプリケーション整合性バックアップの Console 対応</h4>
+          <ul>
+            <li>Cloud Console の Backup Plans 画面から直接設定可能</li>
+            <li>Guest Flush (Linux) または VSS (Windows) オプションを有効化</li>
+            <li>バックアップ取得前にアプリケーションのトランザクションを完了</li>
+            <li>保留中の書き込みをディスクにフラッシュ</li>
+            <li>リカバリ時にアプリケーションデータの整合性を保証</li>
+          </ul>
+        </div>
+        <div class="feature-card teal">
+          <h4>🏦 3. Backup Vault によるイミュータブルストレージ</h4>
+          <ul>
+            <li>バックアップデータの変更不可 (Immutability) と削除不可 (Indelibility) を保証</li>
+            <li>最小強制保持期間 (最大 99 年) の設定が可能</li>
+            <li>ランサムウェア攻撃や誤操作からのデータ保護</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- 技術仕様: 比較表 -->
+    <div class="section">
+      <h2>📊 技術仕様</h2>
+      <h3>クロスリージョン vs マルチリージョンバックアップ</h3>
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>項目</th>
+              <th>クロスリージョン</th>
+              <th>マルチリージョン</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>バックアップ先の選択</strong></td>
+              <td>ユーザーが明示的にリージョンを指定</td>
+              <td>Google が大陸内の 2 リージョンに自動配置</td>
+            </tr>
+            <tr>
+              <td><strong>ユースケース</strong></td>
+              <td>コンプライアンス、データレジデンシー法、特定 DR サイト</td>
+              <td>高可用性、運用のシンプルさ</td>
+            </tr>
+            <tr>
+              <td><strong>管理オーバーヘッド</strong></td>
+              <td>中程度 (ターゲットペアリング設定が必要)</td>
+              <td>低 (単一 Vault で自動バランシング)</td>
+            </tr>
+            <tr>
+              <td><strong>対象ワークロード</strong></td>
+              <td>Compute Engine インスタンス、ディスク、Filestore</td>
+              <td>Compute Engine インスタンス、ディスク、Cloud SQL</td>
+            </tr>
+            <tr>
+              <td><strong>CMEK</strong></td>
+              <td>Backup Vault と同じリージョンの鍵を使用</td>
+              <td>Backup Vault と同じリージョンの鍵を使用</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>ワークロード別サポート状況</h3>
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>ワークロード</th>
+              <th>リージョン</th>
+              <th>マルチリージョン</th>
+              <th>クロスリージョン</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Compute Engine インスタンス</td>
+              <td>✅</td>
+              <td>✅</td>
+              <td>✅</td>
+            </tr>
+            <tr>
+              <td>Compute Engine ディスク</td>
+              <td>✅</td>
+              <td>✅</td>
+              <td>✅</td>
+            </tr>
+            <tr>
+              <td>Filestore インスタンス</td>
+              <td>✅</td>
+              <td>❌</td>
+              <td>✅</td>
+            </tr>
+            <tr>
+              <td>Cloud SQL インスタンス</td>
+              <td>✅</td>
+              <td>✅</td>
+              <td>❌</td>
+            </tr>
+            <tr>
+              <td>AlloyDB クラスタ</td>
+              <td>✅</td>
+              <td>❌</td>
+              <td>❌</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🔧 設定方法</h2>
+      <h3>前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>Backup and DR Service API が有効化されていること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>Backup Vault がセカンダリリージョンに作成済みであること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>Linux 環境の場合: 事前・事後スクリプトが作成済み</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>適切な IAM 権限が付与されていること</span></div>
+
+      <h3>設定フロー</h3>
+      <div class="flow-diagram">
+        <div class="flow-step">🏗️ Backup Vault<br>作成<br><small>(セカンダリリージョン)</small></div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">📋 Backup Plan<br>作成<br><small>(App Consistency有効)</small></div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🔗 ワークロード<br>関連付け<br><small>(VM に適用)</small></div>
+      </div>
+
+      <h3>Console からの設定手順</h3>
+      <div class="note-box">
+        <strong>💡 Console 操作手順:</strong>
+        <ol style="margin: 8px 0; padding-left: 20px; font-size: 14px;">
+          <li>Cloud Console で Backup and DR Service > Backup Plans に移動</li>
+          <li>「Create Backup Plan」をクリック</li>
+          <li>Resource type: 「Compute Engine VMs」を選択</li>
+          <li>Backup vault location: セカンダリリージョンの Backup Vault を選択</li>
+          <li>Backup rule を設定 (頻度、保持期間など)</li>
+          <li><strong>「Enable application consistent snapshot」チェックボックスを有効化</strong></li>
+          <li>「Create」をクリック</li>
+        </ol>
+      </div>
+
+      <h3>gcloud CLI でのバックアッププラン作成例</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># gcloud CLI でのバックアッププラン作成例 (Guest Flush 有効)
+gcloud backup-dr backup-plans create my-app-consistent-plan \
+  --compute-instance-properties=guest-flush=true \
+  --resource-type=compute.googleapis.com/Instance \
+  --location=asia-northeast1 \
+  --project=my-project \
+  --backup-vault=my-backup-vault \
+  --backup-rule=rule-id=daily-rule,recurrence=DAILY,\
+time-zone=Asia/Tokyo,backup-window-start=2,backup-window-end=6,\
+retention-days=30 \
+  --max-custom-on-demand-retention-days=90</code></pre>
+    </div>
+
+    <!-- メリット・デメリット -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div>
+          <h3>ビジネス面</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>DR 強化</strong>: リージョン障害時もセカンダリからリカバリ可能</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>コンプライアンス</strong>: バックアップ保存先を明示的に制御</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>コスト最適化</strong>: 必要なリージョンのみにバックアップ保存</span></div>
+        </div>
+        <div>
+          <h3>技術面</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>データ整合性</strong>: Guest Flush/VSS でアプリ一貫性確保</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>柔軟なリージョン選択</strong>: 任意のサポートリージョン間で転送可能</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>Console 設定</strong>: CLI 不要で運用者の負荷軽減</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>⚠️ 制限事項・注意点</h2>
+      <div class="warning-box">
+        <strong>制限事項:</strong>
+        <ul style="margin: 8px 0; padding-left: 20px; font-size: 14px;">
+          <li>Hyperdisk ではアプリケーション整合性スナップショットは非サポート</li>
+          <li>クロスリージョンバックアップは Cloud SQL / AlloyDB では利用不可</li>
+          <li>Backup Plan はソースワークロードと同じリージョンに作成が必要</li>
+          <li>クロスリージョン転送にはリージョン間データ転送料金が発生</li>
+        </ul>
+      </div>
+      <div style="margin-top: 12px;">
+        <h3>考慮すべき点</h3>
+        <div class="check-item"><span class="cross-icon">!</span><span>ターゲットペアリング設定の管理オーバーヘッド</span></div>
+        <div class="check-item"><span class="cross-icon">!</span><span>CMEK 使用時は Backup Vault と同じリージョンに鍵配置が必要</span></div>
+        <div class="check-item"><span class="cross-icon">!</span><span>Linux 環境のアプリ整合性には事前・事後スクリプトの準備が必要</span></div>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+      <div class="usecase-card">
+        <h4>🏢 ユースケース 1: リージョン障害からの DR</h4>
+        <p><strong>シナリオ:</strong> 東京リージョン (asia-northeast1) で稼働するミッションクリティカルな Compute Engine VM を、大阪リージョン (asia-northeast2) にバックアップ。</p>
+        <p><strong>効果:</strong> 東京リージョン全体が利用不能になった場合でも、大阪リージョンの Backup Vault からリカバリが可能。RPO はバックアップ頻度に応じて制御される。</p>
+      </div>
+      <div class="usecase-card">
+        <h4>🇪🇺 ユースケース 2: データレジデンシー要件への対応</h4>
+        <p><strong>シナリオ:</strong> EU のデータレジデンシー規制により、バックアップデータを EU 内の特定の国に保管する必要がある場合。ソースリージョン (europe-west3: フランクフルト) からクロスリージョンで europe-west9 (パリ) にバックアップを保存。</p>
+        <p><strong>効果:</strong> マルチリージョンでは Google が自動的にリージョンを選択するが、クロスリージョンでは明示的にバックアップ先を指定でき、規制要件を確実に満たせる。</p>
+      </div>
+      <div class="usecase-card">
+        <h4>🗄️ ユースケース 3: データベース VM のアプリケーション整合性バックアップ</h4>
+        <p><strong>シナリオ:</strong> Windows VM 上で動作する SQL Server データベースのバックアップにおいて、VSS を使用してアプリケーション整合性を確保。</p>
+        <p><strong>効果:</strong> Console から「Enable Application Consistency」を有効にするだけで、VSS ベースのアプリケーション整合性バックアップが自動的に実行され、データベースのトランザクション一貫性が保証される。</p>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>Backup and DR Service は使用量に基づく月額課金。クロスリージョンバックアップでは以下のコスト要素が発生:</p>
+      <div class="feature-grid">
+        <div class="card">
+          <div class="check-item"><span>💾</span><span><strong>バックアップストレージ料金</strong>: Backup Vault に保存されたデータ量に基づく</span></div>
+        </div>
+        <div class="card">
+          <div class="check-item"><span>🔧</span><span><strong>管理料金</strong>: バックアップ管理のための料金</span></div>
+        </div>
+        <div class="card">
+          <div class="check-item"><span>🌐</span><span><strong>リージョン間データ転送料金</strong>: ソースリージョンからセカンダリリージョンへのデータ転送に課金</span></div>
+        </div>
+      </div>
+      <div class="note-box">
+        <strong>📎 参考:</strong> 詳細な料金は <a href="https://cloud.google.com/backup-disaster-recovery/pricing" target="_blank" class="gc-link">Backup and DR 料金ページ</a> を参照。
+      </div>
+    </div>
+
+    <!-- 利用可能リージョン -->
+    <div class="section">
+      <h2>🌏 利用可能リージョン</h2>
+      <p>クロスリージョンバックアップ用の Backup Vault は、30 以上のリージョンで作成可能:</p>
+      <div class="region-grid">
+        <div class="region-card">
+          <h4>🇺🇸 北米</h4>
+          <p>us-central1, us-east1, us-east4, us-west1, us-west2, northamerica-northeast1 など</p>
+        </div>
+        <div class="region-card">
+          <h4>🇪🇺 ヨーロッパ</h4>
+          <p>europe-west1, europe-west2, europe-west3, europe-west4, europe-north1 など</p>
+        </div>
+        <div class="region-card">
+          <h4>🌏 アジア太平洋</h4>
+          <p>asia-northeast1 (東京), asia-northeast2 (大阪), asia-northeast3 (ソウル), asia-southeast1, australia-southeast1 など</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 関連サービス -->
+    <div class="section">
+      <h2>🔗 関連サービス</h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
+        <div class="card" style="text-align: center; border-left-color: var(--gc-blue);">
+          <div style="font-size: 24px;">🖥️</div>
+          <strong>Compute Engine</strong>
+          <div style="font-size: 12px; color: var(--gc-outline);">バックアップ対象</div>
+        </div>
+        <div class="card" style="text-align: center; border-left-color: var(--gc-blue-300);">
+          <div style="font-size: 24px;">📁</div>
+          <strong>Filestore</strong>
+          <div style="font-size: 12px; color: var(--gc-outline);">バックアップ対象</div>
+        </div>
+        <div class="card" style="text-align: center; border-left-color: var(--gc-yellow);">
+          <div style="font-size: 24px;">🔑</div>
+          <strong>Cloud KMS</strong>
+          <div style="font-size: 12px; color: var(--gc-outline);">CMEK 暗号化</div>
+        </div>
+        <div class="card" style="text-align: center; border-left-color: var(--gc-green);">
+          <div style="font-size: 24px;">📈</div>
+          <strong>Cloud Monitoring</strong>
+          <div style="font-size: 12px; color: var(--gc-outline);">モニタリング</div>
+        </div>
+        <div class="card" style="text-align: center; border-left-color: var(--gc-red);">
+          <div style="font-size: 24px;">🛡️</div>
+          <strong>Security Command Center</strong>
+          <div style="font-size: 12px; color: var(--gc-outline);">脅威検出</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section" style="background: var(--gc-blue-tint); border: 2px solid var(--gc-blue-200);">
+      <h2>📝 まとめ</h2>
+      <p>今回のアップデートにより、Backup and DR Service は<span class="highlight">リージョン障害に対するエンタープライズグレードの保護機能を GA レベルで提供</span>するとともに、アプリケーション整合性バックアップの設定を大幅に簡素化した。</p>
+      <div class="note-box" style="background: var(--gc-surface);">
+        <strong>推奨アクション:</strong>
+        <ul style="margin: 8px 0; padding-left: 20px; font-size: 14px;">
+          <li>ディザスタリカバリ戦略の強化やコンプライアンス要件への対応を検討している組織は、クロスリージョンバックアップの導入を早期に評価</li>
+          <li>既存のバックアッププランにアプリケーション整合性オプションを有効化</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="list-style: none; padding: 0; margin: 4px 0;">
+        <li><a href="https://docs.cloud.google.com/release-notes#June_23_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li><a href="https://docs.cloud.google.com/backup-disaster-recovery/docs/cloud-console/compute/compute-instance-backup" target="_blank" rel="noopener noreferrer">Back up Compute Engine instances</a></li>
+        <li><a href="https://docs.cloud.google.com/backup-disaster-recovery/docs/concepts/backup-vault#regions" target="_blank" rel="noopener noreferrer">Backup vaults for immutable and indelible backups</a></li>
+        <li><a href="https://cloud.google.com/backup-disaster-recovery/pricing" target="_blank" rel="noopener noreferrer">料金ページ</a></li>
+      </ul>
+      <p style="margin-top: 8px; font-size: 11px; color: var(--gc-outline);">Generated: 2026-06-24 | #BackupAndDR #DisasterRecovery #CrossRegion #ApplicationConsistency #GA</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

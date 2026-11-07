@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GKE: Local SSD 混在構成 (Mixed Local SSD) - エフェメラル + raw ブロック分割</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      margin-bottom: 32px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 8px 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* バッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+    }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 720px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .before-box, .after-box {
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+    }
+
+    .before-box h3 {
+      color: var(--gc-red);
+      margin-top: 0;
+    }
+
+    .after-box h3 {
+      color: var(--gc-green);
+      margin-top: 0;
+    }
+
+    .before-box ul, .after-box ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 8px 0;
+      font-size: 14px;
+    }
+
+    /* チェックリスト */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    /* コードブロック (pre:not(.mermaid) で Mermaid 図を除外) */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      border-radius: 0;
+    }
+
+    .code-block code,
+    pre:not(.mermaid) code {
+      display: block;
+      background: none;
+      border: none;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      color: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.88em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+      background: #FFFFFF;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+      border: 1px solid var(--gc-blue-100);
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-800);
+    }
+
+    /* メリット / デメリット 2 カラム */
+    .pros-cons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 720px) {
+      .pros-cons {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* ステップ */
+    .step {
+      display: flex;
+      gap: 14px;
+      margin: 20px 0;
+      align-items: flex-start;
+    }
+
+    .step-number {
+      background: var(--gc-blue-600);
+      color: #FFFFFF;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .step-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .step-content h3 {
+      margin-top: 2px;
+    }
+
+    ul {
+      padding-left: 22px;
+      margin: 8px 0;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 13px;
+      color: var(--gc-outline);
+    }
+
+    footer ul {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    footer li {
+      margin: 6px 0;
+    }
+
+    .tags {
+      margin-top: 12px;
+    }
+
+    .tag {
+      display: inline-block;
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      color: var(--gc-on-surface-variant);
+      border-radius: 16px;
+      padding: 2px 12px;
+      font-size: 12px;
+      margin: 2px 4px 2px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div class="header-top">
+        <div>
+          <span class="badge">Google Kubernetes Engine</span>
+          <span class="badge badge-ga">Feature (GKE Standard)</span>
+        </div>
+        <div class="subtitle">📅 リリース日: 2026-11-03</div>
+      </div>
+      <h1>💽 GKE: Local SSD の混在構成 (Mixed Local SSD)</h1>
+      <div class="subtitle">1 枚の Local SSD を「エフェメラルストレージ」と「raw ブロックストレージ」に分割して同一ノードで併用</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📌 概要</h2>
+      <p>
+        GKE <span class="highlight">1.37.0-gke.3570000 以降</span>で、ノードに接続された各 Local SSD の容量を
+        <span class="highlight">エフェメラルストレージ</span>と<span class="highlight">raw ブロックストレージ</span>に分割して利用できるようになりました。
+        <code>--ephemeral-storage-local-ssd</code> フラグの <code>capacity</code> プロパティを指定すると、GKE はその容量だけをエフェメラルストレージとしてフォーマットし、残りは未フォーマットの raw ブロックデバイスとしてノードに提供します。
+      </p>
+      <p>
+        エフェメラル部分は各 Local SSD に均等分割されたうえで <strong>RAID-0 アレイ</strong>として結合され、標準の <code>emptyDir</code> ボリュームとして利用可能。
+        raw ブロック部分は、データベースやキャッシュのようにダイレクトディスクアクセスで性能を最大化したいワークロードが <strong>local PersistentVolume</strong> を通じて利用できます。
+      </p>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before: 全量どちらか一方のみ</h3>
+          <ul>
+            <li>Local SSD は「全量エフェメラル」(<code>--ephemeral-storage-local-ssd</code>) か「全量 raw ブロック」(<code>--local-nvme-ssd-block</code>) の二択だった</li>
+            <li>raw ブロックとエフェメラルの両方が必要な場合、ノードやディスクを用途別に分ける必要があり、ハードウェア使用率が低下</li>
+            <li>raw ブロック専用ノードプールの別運用でクラスタ管理オーバーヘッドが増加</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After: 1 枚の SSD を分割して併用</h3>
+          <ul>
+            <li>1 台のノード上で、同じ Local SSD をエフェメラルと raw ブロックに分割して併用可能に</li>
+            <li>DB・キャッシュなどの高性能ワークロードが raw ブロックを使いつつ、同一ノードのサイドカーやログは標準の <code>emptyDir</code> を利用</li>
+            <li>専用ノード・ディスクが不要になり、ハードウェア使用率の最大化と管理負荷の軽減を実現</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Node["🖥️ GKE ノード (1.37.0-gke.3570000+)"]
+        subgraph SSD1[("💽 Local SSD #1")]
+            E1["📁 エフェメラル領域<br/>(フォーマット済み)"]
+            B1["🧱 raw ブロック領域<br/>(未フォーマット)"]
+        end
+        subgraph SSD2[("💽 Local SSD #2")]
+            E2["📁 エフェメラル領域<br/>(フォーマット済み)"]
+            B2["🧱 raw ブロック領域<br/>(未フォーマット)"]
+        end
+        RAID["🔗 RAID-0 アレイ<br/>(エフェメラルストレージ)"]
+        E1 --> RAID
+        E2 --> RAID
+    end
+    Flag["⚙️ --ephemeral-storage-local-ssd<br/>count=N,capacity=XXX GB"] --> Node
+    RAID --> EmptyDir["📦 Pod: emptyDir ボリューム<br/>(ログ / キャッシュ / サイドカー)"]
+    B1 --> PV["🗄️ local PersistentVolume<br/>(StorageClass: WaitForFirstConsumer)"]
+    B2 --> PV
+    PV --> DB["🐘 Pod: データベース / キャッシュ<br/>(ダイレクトディスクアクセス)"]
+        </pre>
+      </div>
+      <div class="note-box">
+        <strong>💡 ポイント:</strong> <code>capacity</code> で指定した容量が各 Local SSD に均等に割り当てられて RAID-0 のエフェメラルストレージとなり、残りの容量は各ディスクごとに未フォーマットの raw ブロックデバイスとして提供されます。
+      </div>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+
+      <div class="card">
+        <h3>1️⃣ <code>capacity</code> プロパティによる容量分割</h3>
+        <ul>
+          <li><code>--ephemeral-storage-local-ssd</code> フラグに <code>capacity</code> サブフィールドを指定し、エフェメラルとしてフォーマットする容量を設定</li>
+          <li>指定値は <strong>0 より大きく、物理 Local SSD 総容量 (ディスク数 × ディスクあたり容量) 未満</strong>である必要あり</li>
+          <li>Local SSD 数が構成可能なマシンタイプでは <code>count</code> も指定。<code>-lssd</code> タイプなど固定数では省略可能 (GKE が VM シェイプから自動計算)</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>2️⃣ エフェメラルストレージ部分 (RAID-0)</h3>
+        <ul>
+          <li>指定容量が各 Local SSD に均等に分割され、RAID-0 アレイとして結合</li>
+          <li>標準の <code>emptyDir</code> ボリュームとして、通常の GKE エフェメラルボリュームと同じ方法でアクセス可能</li>
+          <li>GKE がシステム用に一部を予約するため、割り当て可能容量は <code>capacity</code> 指定値より少なくなる</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>3️⃣ raw ブロックストレージ部分</h3>
+        <ul>
+          <li>各ディスクの残容量が、未フォーマットの個別 raw ブロックデバイスとしてノードに提供される</li>
+          <li>GKE はフォーマットもマウントも行わず、ユーザーが StorageClass + local PersistentVolume + PersistentVolumeClaim で手動構成</li>
+          <li>データベースやキャッシュなど、直接ディスクアクセスによる高性能が必要なワークロードに最適</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>4️⃣ ノードラベルによる識別</h3>
+        <ul>
+          <li>混在構成ノードには <code>cloud.google.com/gke-ephemeral-storage-local-ssd: "true"</code> と <code>cloud.google.com/gke-local-nvme-ssd-partition: "true"</code> の<strong>両方</strong>のラベルが付与される</li>
+          <li><code>gke-local-nvme-ssd-partition</code> ラベルは、全量 raw ブロック構成で使われる <code>gke-local-nvme-ssd=true</code> ラベルとは<strong>別物</strong>である点に注意</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+      <table>
+        <tr><th style="width: 30%;">項目</th><th>詳細</th></tr>
+        <tr><td>必要バージョン</td><td>GKE 1.37.0-gke.3570000 以降 (それ以前は <code>--cluster-version</code> / <code>--node-version</code> 指定、または <code>--release-channel=rapid</code>)</td></tr>
+        <tr><td>対象クラスタ</td><td>GKE Standard クラスタのみ (Autopilot 非対応)</td></tr>
+        <tr><td>設定フラグ</td><td><code>--ephemeral-storage-local-ssd count=N,capacity=XXX</code></td></tr>
+        <tr><td><code>capacity</code> の制約</td><td>0 より大きく、物理総容量 (ディスク数 × ディスクサイズ) 未満。<strong>作成後の変更は不可</strong></td></tr>
+        <tr><td>エフェメラル部分</td><td>各ディスクに均等分割 + RAID-0 結合、<code>emptyDir</code> でアクセス</td></tr>
+        <tr><td>raw ブロック部分</td><td>ディスクごとに未フォーマットのブロックデバイスとして提供</td></tr>
+        <tr><td>対応 OS</td><td>Linux ノードイメージのみ (Container-Optimized OS、Ubuntu)。Windows Server は非対応</td></tr>
+        <tr><td>ノードラベル</td><td><code>cloud.google.com/gke-ephemeral-storage-local-ssd: "true"</code><br><code>cloud.google.com/gke-local-nvme-ssd-partition: "true"</code></td></tr>
+        <tr><td>マシンタイプ</td><td>Local SSD 対応マシンタイプが必要 (共有コアタイプの e2-medium などは不可)</td></tr>
+      </table>
+
+      <h3>📄 raw ブロック用 StorageClass の例</h3>
+      <p>PersistentVolume のバインドを Pod スケジューリングまで遅延させるため、<code>volumeBindingMode: WaitForFirstConsumer</code> の StorageClass 作成が推奨されています。</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">YAML</span>
+          <span class="code-title">local-storage StorageClass</span>
+        </div>
+        <pre><code class="language-yaml">apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: "local-storage"
+provisioner: "kubernetes.io/no-provisioner"
+volumeBindingMode: "WaitForFirstConsumer"</code></pre>
+      </div>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>✅ 前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>GKE Standard クラスタであること (Autopilot は非対応)</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>クラスタ / ノードプールのバージョンが 1.37.0-gke.3570000 以降 (それ未満の場合はバージョンフラグで明示指定)</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>Local SSD をサポートするマシンタイプを使用 (リージョンとマシンタイプにより接続可能なディスク数が異なる)</span></div>
+
+      <div class="step">
+        <div class="step-number">1</div>
+        <div class="step-content">
+          <h3>混在構成のクラスタを作成</h3>
+          <div class="code-block">
+            <div class="code-header">
+              <span class="code-lang">Bash</span>
+              <span class="code-title">クラスタ作成 (混在 Local SSD 構成)</span>
+            </div>
+            <pre><code class="language-bash"># Local SSD 数が構成可能なマシンタイプの場合
+gcloud container clusters create CLUSTER_NAME \
+    --machine-type=MACHINE_TYPE \
+    --ephemeral-storage-local-ssd count=NUMBER_OF_DISKS,capacity=CAPACITY
+
+# Local SSD 数が固定のマシンタイプ (-lssd タイプなど) の場合
+gcloud container clusters create CLUSTER_NAME \
+    --machine-type=MACHINE_TYPE \
+    --ephemeral-storage-local-ssd capacity=CAPACITY</code></pre>
+          </div>
+          <p><code>CAPACITY</code> にはエフェメラルストレージとしてフォーマットする総容量 (例: <code>200GB</code>) を指定。この設定はデフォルトノードプールにのみ適用されます。</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-number">2</div>
+        <div class="step-content">
+          <h3>既存クラスタにノードプールを追加</h3>
+          <div class="code-block">
+            <div class="code-header">
+              <span class="code-lang">Bash</span>
+              <span class="code-title">ノードプール追加</span>
+            </div>
+            <pre><code class="language-bash">gcloud container node-pools create POOL_NAME \
+    --cluster=CLUSTER_NAME \
+    --machine-type=MACHINE_TYPE \
+    --ephemeral-storage-local-ssd count=NUMBER_OF_DISKS,capacity=CAPACITY</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-number">3</div>
+        <div class="step-content">
+          <h3>ノードラベルの確認</h3>
+          <div class="code-block">
+            <div class="code-header">
+              <span class="code-lang">Bash</span>
+              <span class="code-title">ラベル確認</span>
+            </div>
+            <pre><code class="language-bash">kubectl describe node NODE_NAME</code></pre>
+          </div>
+          <p>出力に <code>cloud.google.com/gke-ephemeral-storage-local-ssd: "true"</code> と <code>cloud.google.com/gke-local-nvme-ssd-partition: "true"</code> の両方のラベルが含まれることを確認します。</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-number">4</div>
+        <div class="step-content">
+          <h3>raw ブロック容量の利用</h3>
+          <p><code>WaitForFirstConsumer</code> の StorageClass を作成し、local PersistentVolume をプロビジョニングして PersistentVolumeClaim で要求します。エフェメラル容量は通常の <code>emptyDir</code> ボリュームとしてそのまま利用できます。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- メリット / デメリット -->
+    <div class="section">
+      <h2>⚖️ メリットと制約事項</h2>
+      <div class="pros-cons">
+        <div>
+          <div class="success-box">
+            <strong>💼 ビジネス面のメリット</strong>
+            <ul>
+              <li><strong>ハードウェア使用率の最大化</strong>: raw ブロック用に専用ノードやディスク全体を割り当てる必要がなく、購入済みの Local SSD 容量を無駄なく活用</li>
+              <li><strong>運用コストの削減</strong>: 用途別に分かれていたノードプールを統合でき、クラスタ管理オーバーヘッドが減少</li>
+            </ul>
+          </div>
+          <div class="success-box">
+            <strong>🔬 技術面のメリット</strong>
+            <ul>
+              <li><strong>性能と利便性の両立</strong>: DB・キャッシュは低レイテンシ・高 IOPS を確保しつつ、サイドカーやログは標準のエフェメラルストレージを利用</li>
+              <li><strong>標準 API での利用</strong>: <code>emptyDir</code> と local PersistentVolume という Kubernetes 標準の仕組みで利用でき、Pod スケジューリングとの統合も可能</li>
+            </ul>
+          </div>
+        </div>
+        <div>
+          <div class="error-box">
+            <strong>🚧 制限事項</strong>
+            <ul>
+              <li>GKE Autopilot では利用不可 (Standard のみ)</li>
+              <li>カスタム ComputeClass は混在構成を非サポート</li>
+              <li>Linux ノードイメージ (COS、Ubuntu) のみ。Windows Server 非対応</li>
+              <li><code>capacity</code> は作成後に変更不可</li>
+              <li>システム予約により割り当て可能なエフェメラル容量は指定値より少ない</li>
+              <li>ノードメモリスワップとの併用では dedicated Local SSD プロファイルは非対応 (ブートディスク / エフェメラル Local SSD プロファイルは併用可)</li>
+            </ul>
+          </div>
+          <div class="warning-box">
+            <strong>⚠️ 考慮すべき点</strong>
+            <ul>
+              <li><strong>共有 I/O</strong>: RAID-0 と raw ブロックは同じ物理 SSD を共有するため、一方の高負荷 I/O が他方のスループットに影響する可能性</li>
+              <li><strong>メンテナンスイベント</strong>: ストレージ最適化の Z3 / Z4D VM では、メンテナンス時にデータが保持されない可能性があり、raw ブロック利用は非推奨</li>
+              <li><strong>手動構成が必要</strong>: raw ブロック部分のデバイス構成・容量管理・中断対処はユーザーの責任</li>
+              <li><strong>RAID DaemonSet の禁止</strong>: コミュニティの RAID DaemonSet (<code>gke-daemonset-raid-disks.yaml</code>) を混在構成ノードで実行すると、GKE 管理のエフェメラル容量が破壊される</li>
+              <li>永続性や特殊な性能要件がないワークロードには、従来どおり全量エフェメラル構成を推奨</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>📊 ユースケース 1: 高性能データベースとサイドカーの同居</h3>
+        <p><strong>シナリオ</strong>: 低レイテンシ・高 IOPS が必要なセルフマネージドのデータベース (分散 KVS や検索エンジンなど) を GKE 上で運用し、同じ Pod / ノードでログ収集サイドカーやコンテナキャッシュも動かしたい。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">DB 用ノードプールの作成例</span>
+          </div>
+          <pre><code class="language-bash">gcloud container node-pools create db-pool \
+    --cluster=my-cluster \
+    --machine-type=n2-standard-32 \
+    --ephemeral-storage-local-ssd count=4,capacity=400GB</code></pre>
+        </div>
+        <p>raw ブロック部分 (残容量) を local PersistentVolume としてデータベースに割り当て、エフェメラル部分 (400GB から予約分を除いた容量) をログやキャッシュ用の <code>emptyDir</code> として利用。</p>
+        <p><strong>✨ 効果</strong>: データベースはダイレクトディスクアクセスで最大性能を得ながら、専用ノードを分離せずにサイドカー用ストレージも確保でき、ノード数とコストを削減。</p>
+      </div>
+
+      <div class="usecase">
+        <h3>🚀 ユースケース 2: キャッシュ層のハードウェア使用率最適化</h3>
+        <p><strong>シナリオ</strong>: Local SSD を raw ブロックで使うインメモリキャッシュ (永続化オフロード付き) を運用しているが、ディスク全体をキャッシュに割り当てると容量が余り、エフェメラルストレージ不足で別のディスクが必要になっていた。</p>
+        <p><strong>✨ 効果</strong>: 1 枚の Local SSD をキャッシュ用 raw ブロックとエフェメラルストレージに分割できるため、余剰容量を無駄にせず、ノードあたりのディスク枚数を削減。</p>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>
+        混在構成で Local SSD 容量を分割しても、料金はエフェメラル / raw ブロックの割り当て比率に関係なく、ノードに接続された<span class="highlight">物理 Local SSD の総容量</span>に対して課金されます。
+        Local SSD は GB あたり月額の従量課金で、<strong>Spot VM 向けの割引価格</strong>や、<strong>リソースベースの確約利用割引 (CUD)</strong> も利用できます。
+      </p>
+      <p>最新の単価は公式料金ページを参照してください。</p>
+      <ul>
+        <li><a href="https://cloud.google.com/compute/disks-image-pricing#localssdpricing" target="_blank" rel="noopener noreferrer" class="gc-link">Local SSD の料金</a></li>
+        <li><a href="https://cloud.google.com/products/compute/pricing/storage-optimized" target="_blank" rel="noopener noreferrer" class="gc-link">ストレージ最適化 VM の料金 (Titanium SSD)</a></li>
+      </ul>
+    </div>
+
+    <!-- 利用可能リージョン -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <p>
+        Local SSD を利用できるリージョン / ゾーンおよびマシンタイプごとの接続可能ディスク数に依存します。
+        詳細は <a href="https://docs.cloud.google.com/compute/docs/disks/local-ssd#choose_number_local_ssds" target="_blank" rel="noopener noreferrer" class="gc-link">Local SSD のドキュメント</a> を参照してください。
+      </p>
+    </div>
+
+    <!-- 関連サービス -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <strong>💽 Compute Engine Local SSD</strong>: 本機能の基盤となる物理接続型の高性能一時ストレージ。IOPS とレイテンシの特性、マシンシリーズ対応状況は Compute Engine 側の仕様に準拠
+      </div>
+      <div class="card">
+        <strong>📁 GKE Local SSD エフェメラルストレージ (全量構成)</strong>: 永続性や特殊な性能要件がない場合に推奨される従来構成。<code>emptyDir</code> によるアクセス方法は共通
+      </div>
+      <div class="card">
+        <strong>🧱 GKE Local SSD raw ブロックストレージ (全量構成)</strong>: ディスク全体を raw ブロックとして使う既存機能。混在構成とはノードラベルや RAID DaemonSet の扱いが異なる
+      </div>
+      <div class="card">
+        <strong>💾 GKE ノードメモリスワップ</strong>: ブートディスクプロファイルまたはエフェメラル Local SSD プロファイルで混在構成と併用可能
+      </div>
+      <div class="card">
+        <strong>🗄️ local PersistentVolume / StorageClass</strong>: raw ブロック部分を Pod スケジューリングと統合して利用するための Kubernetes 標準機能
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="note-box">
+        <p style="margin-top: 0;">
+          GKE <strong>1.37.0-gke.3570000 以降</strong>の Standard クラスタで、Local SSD をエフェメラルストレージと raw ブロックストレージに分割して併用できるようになり、
+          高性能データベース・キャッシュと通常のファイルストレージ需要を<strong>同一ノードで両立</strong>できるようになりました。
+        </p>
+        <p style="margin-bottom: 0;">
+          raw ブロック専用のノードプールを分けて運用しているチームは、本機能による<strong>ノード統合とハードウェア使用率改善</strong>を検討する価値があります。
+          導入時は <code>capacity</code> が作成後に変更できない点と、共有 I/O による性能影響を考慮したサイジングを行ってください。
+        </p>
+      </div>
+      <div class="tags">
+        <span class="tag">#GKE</span>
+        <span class="tag">#LocalSSD</span>
+        <span class="tag">#Storage</span>
+        <span class="tag">#Kubernetes</span>
+        <span class="tag">#RawBlock</span>
+        <span class="tag">#EphemeralStorage</span>
+        <span class="tag">#PersistentVolume</span>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p><strong>📎 出典・参考リンク</strong></p>
+      <ul>
+        <li>📰 <a href="https://docs.cloud.google.com/release-notes#November_03_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026-11-03)</a></li>
+        <li>📘 <a href="https://docs.cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/mixed-local-ssd" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: Provision and use mixed Local SSDs for raw block and ephemeral storage</a></li>
+        <li>📘 <a href="https://docs.cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/local-ssd-raw" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: Local SSD-backed raw block storage</a></li>
+        <li>📘 <a href="https://docs.cloud.google.com/compute/docs/disks/local-ssd" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: Compute Engine Local SSD</a></li>
+        <li>💰 <a href="https://cloud.google.com/compute/disks-image-pricing#localssdpricing" target="_blank" rel="noopener noreferrer" class="gc-link">料金ページ: Local SSD</a></li>
+      </ul>
+      <p>ベースレポート: reports/2026/2026-11-03-gke-mixed-local-ssd-ephemeral-raw-block.md | 生成日: 2026-11-05</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

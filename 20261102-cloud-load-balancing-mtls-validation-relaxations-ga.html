@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Load Balancing: フロントエンド mTLS 検証緩和 (Validation Relaxations) が GA</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* バッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box, .after-box {
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid rgba(234, 67, 53, 0.3);
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid rgba(52, 168, 83, 0.3);
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-box h3 { color: #C5221F; }
+    .after-box h3 { color: #188038; }
+
+    .before-box ul, .after-box ul {
+      margin: 8px 0 0 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin-bottom: 8px;
+    }
+
+    @media (max-width: 720px) {
+      .before-after { grid-template-columns: 1fr; }
+    }
+
+    /* フロー図 */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+      font-size: 14px;
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* チェックリスト */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    /* コードブロック (Mermaid の pre を除外) */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block {
+      overflow: hidden;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.88em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブル */
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border: 1px solid var(--gc-blue-100);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* 関連サービスリスト */
+    .related-item {
+      background: var(--gc-surface);
+      border-radius: 8px;
+      border-left: 4px solid var(--gc-teal);
+      padding: 12px 16px;
+      margin: 10px 0;
+      font-size: 14px;
+      box-shadow: 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer ul {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    footer li {
+      margin-bottom: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <div style="margin-bottom: 8px;">
+          <span class="badge">⚖️ Cloud Load Balancing</span>
+          <span class="badge badge-ga">GA (一般提供)</span>
+        </div>
+        <h1>🔐 フロントエンド mTLS「検証緩和」が GA</h1>
+        <div class="subtitle">Application Load Balancer の新クライアント検証モード <strong>ALLOW_VALIDATION_RELAXATIONS</strong></div>
+      </div>
+      <div class="subtitle">📅 リリース日: 2026-11-02</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📝 概要</h2>
+      <p>
+        Application Load Balancer の相互 TLS (mTLS) で、クライアント証明書検証を<span class="highlight">部分的に緩和できる第 3 の検証モード</span>
+        <code>ALLOW_VALIDATION_RELAXATIONS</code> が <strong>GA</strong> になりました。
+        <code>ServerTlsPolicy</code> (Client Authentication) リソースに設定し、標準の X.509 検証ルールに対して
+        <strong>特定の検証例外のみを明示的に許可</strong>できます。
+      </p>
+      <p>
+        従来は「厳格拒否 (<code>REJECT_INVALID</code>)」か「全許可 (<code>ALLOW_INVALID_OR_MISSING_CLIENT_CERT</code>)」の二者択一でしたが、
+        新モードはその中間に位置し、証明書の提示を必須としつつ
+        <span class="highlight">「EKU 拡張の欠如」「SHA-1 署名」「リーフ証明書の期限切れ」</span>の 3 種類の例外だけをピンポイントで許容します。
+        古い IoT デバイスや組み込み機器などレガシーなクライアントを抱える組織が、セキュリティポスチャを維持したまま移行を進められます。
+      </p>
+
+      <div class="flow-diagram">
+        <div class="flow-step">🚫 REJECT_INVALID<br><small>厳格拒否</small></div>
+        <span class="flow-arrow">◀</span>
+        <div class="flow-step" style="border-color: var(--gc-green); background: var(--gc-green-tint);">🛡️ ALLOW_VALIDATION_RELAXATIONS<br><small>指定した例外のみ許容 (新規・GA)</small></div>
+        <span class="flow-arrow">▶</span>
+        <div class="flow-step">⚠️ ALLOW_INVALID_OR_MISSING...<br><small>全許可</small></div>
+      </div>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before: 二者択一のクライアント検証</h3>
+          <ul>
+            <li>検証ルールを 1 つでも満たさない証明書 (EKU なし、SHA-1、期限切れ) は <code>REJECT_INVALID</code> で一律に接続拒否され、レガシークライアントを受け入れられない</li>
+            <li>回避策の「全許可モード」では未提示・完全に無効な証明書までバックエンドに到達し、認証強制が事実上無効化</li>
+            <li>全クライアントの証明書を事前に再発行・再配布するか、セキュリティを犠牲にするかの難しい判断が必要</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After: 必要最小限の緩和を選択的に許可</h3>
+          <ul>
+            <li>証明書の提示と信頼チェーン検証を必須としたまま、特定の検証例外のみを選択的に許可</li>
+            <li>緩和項目 (<code>ALLOW_MISSING_EKU</code> / <code>ALLOW_SHA1_HASHING</code> / <code>ALLOW_EXPIRED_LEAF_CERTIFICATE</code>) を個別指定でき、必要最小限の緩和にとどめられる</li>
+            <li>証明書の一斉更新なしで移行を進め、移行後に段階的に <code>REJECT_INVALID</code> へ厳格化できる</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="note-box">
+        <strong>💡 対応範囲:</strong> Global external、Classic、Regional external、Regional internal、Cross-region internal を含む
+        <strong>すべての Application Load Balancer タイプ</strong>で利用できます。
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    Client([💻 クライアント&lt;br&gt;レガシー証明書]) -->|クライアント証明書を提示| ALB[⚖️ Application Load Balancer&lt;br&gt;ターゲット HTTPS プロキシ]
+    ALB --> Policy[📜 ServerTlsPolicy&lt;br&gt;ALLOW_VALIDATION_RELAXATIONS]
+    Policy --> Key{🔑 秘密鍵の所有証明&lt;br&gt;OK?}
+    Key -->|失敗| Reject[🚫 TLS ハンドシェイク終了&lt;br&gt;※常に必須・緩和不可]
+    Key -->|成功| Chain{🔗 TrustConfig で&lt;br&gt;信頼チェーン検証}
+    Chain -->|検証エラー発生| Relax{🛡️ 緩和対象の例外か?&lt;br&gt;EKU 欠如 / SHA-1 / 期限切れ}
+    Relax -->|指定した緩和に該当| Backend[🖥️ バックエンドへ転送&lt;br&gt;+ カスタム mTLS ヘッダー]
+    Relax -->|該当しない| Reject2[🚫 接続拒否&lt;br&gt;Cloud Logging に記録]
+    Chain -->|検証成功| Backend
+        </pre>
+      </div>
+      <p>
+        <code>ALLOW_VALIDATION_RELAXATIONS</code> モードでは、<strong>秘密鍵の所有証明と信頼チェーン検証は引き続き必須</strong>のまま、
+        管理者が明示的に指定した 3 種類の検証例外のみが許容され、それ以外の検証エラーは従来どおり接続拒否となります。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚙️ 主要機能</h2>
+
+      <div class="card">
+        <h3>1️⃣ 新しいクライアント検証モード <code>ALLOW_VALIDATION_RELAXATIONS</code></h3>
+        <div class="icon-text"><span class="arrow">→</span><span><code>ServerTlsPolicy</code> (Client Authentication) リソースに設定する第 3 のクライアント検証モード</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>クライアント証明書の提示を必須とし、指定した検証緩和のみを適用したうえで信頼チェーン検証を実施</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>REJECT_INVALID</code> (厳格拒否) と <code>ALLOW_INVALID_OR_MISSING_CLIENT_CERT</code> (全許可) の中間に位置する選択肢</span></div>
+      </div>
+
+      <div class="card">
+        <h3>2️⃣ <code>ALLOW_MISSING_EKU</code>: EKU 拡張欠如の許容</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>クライアント証明書に Extended Key Usage (EKU) 拡張が存在しない場合に、EKU 検証をバイパス</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>EKU 拡張が存在する場合は、従来どおり <code>clientAuth</code> キー用途 (OID 1.3.6.1.5.5.7.3.2) の許可が必要</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>標準検証では EKU に <code>clientAuth</code> を含まない証明書は <code>client_cert_chain_invalid_eku</code> エラーで拒否される</span></div>
+      </div>
+
+      <div class="card">
+        <h3>3️⃣ <code>ALLOW_SHA1_HASHING</code>: SHA-1 署名証明書の許容</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>レガシーな SHA-1 メッセージダイジェストで署名されたクライアント証明書チェーンの検証を許可</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>標準の証明書要件では SHA-256 以上のハッシュアルゴリズムが必須 (MD4、MD5、SHA-1 は非サポート)</span></div>
+      </div>
+
+      <div class="card">
+        <h3>4️⃣ <code>ALLOW_EXPIRED_LEAF_CERTIFICATE</code>: 期限切れリーフ証明書の許容</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>期限切れのリーフ証明書を、有効期間終了 (notAfter タイムスタンプ) の 1 秒前の時点とみなして検証</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>対象はリーフ (クライアント) 証明書のみで、期限切れ以外の検証項目は通常どおり評価される</span></div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔬 技術仕様</h2>
+
+      <h3>📋 クライアント検証モードの比較</h3>
+      <div class="table-wrap">
+        <table>
+          <tr>
+            <th>検証モード</th>
+            <th>証明書の提示</th>
+            <th>検証失敗時の動作</th>
+            <th>主な用途</th>
+          </tr>
+          <tr>
+            <td><code>REJECT_INVALID</code></td>
+            <td>必須</td>
+            <td>接続を終了し、エラーを Cloud Logging に記録</td>
+            <td>厳格な mTLS 認証の強制</td>
+          </tr>
+          <tr>
+            <td><code>ALLOW_VALIDATION_RELAXATIONS</code> <span class="badge badge-ga" style="font-size: 11px; padding: 2px 8px;">新規・GA</span></td>
+            <td>必須</td>
+            <td>指定した緩和に該当する例外のみ許容し、それ以外は拒否</td>
+            <td>レガシーワークロードの移行</td>
+          </tr>
+          <tr>
+            <td><code>ALLOW_INVALID_OR_MISSING_CLIENT_CERT</code></td>
+            <td>任意</td>
+            <td>無効・未提示でもバックエンドへ転送 (カスタムヘッダーで失敗理由を通知)</td>
+            <td>ソフト適用・移行初期の観測</td>
+          </tr>
+        </table>
+      </div>
+      <div class="warning-box">
+        <strong>⚠️ 共通ルール:</strong> いずれのモードでも、クライアントが<strong>秘密鍵の所有を証明できない場合は TLS ハンドシェイクが終了</strong>します (緩和不可)。
+      </div>
+
+      <h3>🛡️ 検証緩和パラメータ</h3>
+      <div class="table-wrap">
+        <table>
+          <tr>
+            <th>パラメータ</th>
+            <th>緩和内容</th>
+            <th>標準検証ルール</th>
+          </tr>
+          <tr>
+            <td><code>ALLOW_MISSING_EKU</code></td>
+            <td>EKU 拡張が存在しない場合に EKU 検証をスキップ (存在する場合は <code>clientAuth</code> が必須)</td>
+            <td>EKU 拡張に <code>clientAuth</code> を含むことが必須</td>
+          </tr>
+          <tr>
+            <td><code>ALLOW_SHA1_HASHING</code></td>
+            <td>SHA-1 署名の証明書チェーンを許容</td>
+            <td>SHA-256 以上のハッシュアルゴリズムが必須</td>
+          </tr>
+          <tr>
+            <td><code>ALLOW_EXPIRED_LEAF_CERTIFICATE</code></td>
+            <td>期限切れリーフ証明書を notAfter の 1 秒前として検証</td>
+            <td>証明書が有効期限内であることが必須</td>
+          </tr>
+        </table>
+      </div>
+
+      <h3>⚖️ 対応ロードバランサー</h3>
+      <div class="table-wrap">
+        <table>
+          <tr>
+            <th>ロードバランサータイプ</th>
+            <th>対応</th>
+          </tr>
+          <tr><td>Global external Application Load Balancer</td><td>✅</td></tr>
+          <tr><td>Classic Application Load Balancer</td><td>✅</td></tr>
+          <tr><td>Regional external Application Load Balancer</td><td>✅</td></tr>
+          <tr><td>Regional internal Application Load Balancer</td><td>✅</td></tr>
+          <tr><td>Cross-region internal Application Load Balancer</td><td>✅</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>✅ 前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>mTLS を構成する Application Load Balancer と、信頼アンカー (ルート証明書) を含む Certificate Manager の <code>TrustConfig</code> リソースが作成済みであること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><code>ServerTlsPolicy</code> リソースの作成・更新権限 (Network Security API) を持っていること</span></div>
+
+      <h3>ステップ 1: 検証緩和を指定した ServerTlsPolicy を作成</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">ServerTlsPolicy の作成</span>
+        </div>
+        <pre><code class="language-bash">gcloud network-security server-tls-policies create LEGACY_MTLS_POLICY \
+    --location=global \
+    --client-validation-mode=allow-validation-relaxations \
+    --client-validation-relaxations=allow-missing-eku,allow-sha1-hashing,allow-expired-leaf-certificate \
+    --client-validation-trust-config=projects/PROJECT_ID/locations/global/trustConfigs/TRUST_CONFIG_NAME</code></pre>
+      </div>
+      <p>
+        <code>--client-validation-mode=allow-validation-relaxations</code> を指定し、<code>--client-validation-relaxations</code> に許可する緩和項目を
+        カンマ区切りで列挙します。<span class="highlight">必要最小限の緩和のみを指定することを推奨</span>します。
+      </p>
+
+      <h3>ステップ 2: ServerTlsPolicy をターゲット HTTPS プロキシにアタッチ</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">ターゲット HTTPS プロキシへの適用</span>
+        </div>
+        <pre><code class="language-bash">gcloud compute target-https-proxies update TARGET_HTTPS_PROXY_NAME \
+    --server-tls-policy=projects/PROJECT_ID/locations/global/serverTlsPolicies/LEGACY_MTLS_POLICY</code></pre>
+      </div>
+      <p>ポリシーをロードバランサーのターゲット HTTPS プロキシに関連付けると、以降のクライアント接続に緩和付きの mTLS 検証が適用されます。</p>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>🌟 メリット</h2>
+
+      <h3>💼 ビジネス面</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>レガシーワークロード移行の加速</strong>: 古い証明書を利用するクライアント群の証明書更新・再配布を待たずに、Application Load Balancer への移行プロジェクトを進められる</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>セキュリティとの両立</strong>: 「全許可モード」に切り替えることなく移行期間を乗り切れるため、監査・コンプライアンス上の説明責任を果たしやすい</span></div>
+
+      <h3>🔧 技術面</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>最小権限の原則に沿った緩和</strong>: 3 種類の緩和項目を個別に指定でき、必要な例外だけをピンポイントで許容できる</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>認証の骨格は維持</strong>: 証明書の提示、秘密鍵所有の証明、TrustConfig に対する信頼チェーン検証は引き続き必須で、緩和対象外の検証エラーは従来どおり拒否・ログ記録される</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>段階的な厳格化が容易</strong>: 移行完了後は <code>--client-validation-mode=reject-invalid</code> に変更するだけで標準の厳格検証に戻せる</span></div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>🚧 制限事項</h3>
+      <div class="check-item"><span class="cross-icon">✗</span><span>緩和できるのは「EKU 拡張の欠如」「SHA-1 署名」「期限切れリーフ証明書」の <strong>3 項目のみ</strong>。自己署名証明書や信頼チェーンを構成できない証明書は許容されない (自己署名証明書を受け入れる場合は TrustConfig の <code>allowlistedCertificates</code> を検討)</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span><code>ALLOW_EXPIRED_LEAF_CERTIFICATE</code> が対象とするのは<strong>リーフ証明書のみ</strong>で、期限切れの中間 CA・ルート CA 証明書は緩和対象外</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span><code>ALLOW_MISSING_EKU</code> は EKU 拡張が「存在しない」場合のみ有効で、EKU 拡張が存在して <code>clientAuth</code> を含まない証明書は引き続き拒否される</span></div>
+
+      <h3>🤔 考慮すべき点</h3>
+      <div class="warning-box">
+        <strong>⚠️ 一時的な措置として位置づける:</strong> SHA-1 署名や期限切れ証明書の許容はセキュリティリスクを伴うため、恒久的な設定ではなく移行期間中の一時的な措置とし、最終的には <code>REJECT_INVALID</code> への移行を計画すべきです。
+      </div>
+      <div class="note-box">
+        <strong>💡 モニタリングの併用:</strong> どのクライアントが緩和に依存しているかを把握するため、カスタム mTLS ヘッダーや Cloud Logging による検証結果のモニタリングを併用することが望ましいです。
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>🏭 ユースケース 1: レガシー IoT デバイス群のオンプレミスからの移行</h3>
+        <p>
+          <strong>シナリオ</strong>: 工場内の IoT デバイス数千台が、EKU 拡張を持たない古いクライアント証明書でオンプレミスのリバースプロキシに mTLS 接続している。
+          ゲートウェイを Google Cloud の外部 Application Load Balancer に移行したいが、全デバイスの証明書再発行には長期間を要する。
+        </p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">実装例: EKU 欠如のみを緩和するポリシー</span>
+          </div>
+          <pre><code class="language-bash">gcloud network-security server-tls-policies create iot-migration-policy \
+    --location=global \
+    --client-validation-mode=allow-validation-relaxations \
+    --client-validation-relaxations=allow-missing-eku \
+    --client-validation-trust-config=projects/my-project/locations/global/trustConfigs/iot-trust-config</code></pre>
+        </div>
+        <div class="success-box" style="margin-bottom: 0;">
+          <strong>✅ 効果:</strong> 証明書の一斉更新を待たずにロードバランサーを切り替えられる。信頼チェーン検証は維持されるため、
+          社内 CA が発行した証明書を持つデバイスのみが接続でき、デバイス更新の完了後に <code>reject-invalid</code> へ切り替えて厳格化できる。
+        </div>
+      </div>
+
+      <div class="usecase">
+        <h3>🤝 ユースケース 2: 証明書更新が遅延したパートナーシステムの一時的救済</h3>
+        <p>
+          <strong>シナリオ</strong>: B2B API を mTLS (<code>REJECT_INVALID</code>) で保護しているが、一部パートナーのクライアント証明書が期限切れとなり、
+          更新完了まで数日かかる。業務影響を避けつつ、未認証クライアントの受け入れは避けたい。
+        </p>
+        <div class="success-box" style="margin-bottom: 0;">
+          <strong>✅ 効果:</strong> <code>ALLOW_EXPIRED_LEAF_CERTIFICATE</code> のみを指定した緩和モードに一時的に切り替えることで、
+          信頼チェーンが有効なパートナーの接続は維持しながら、証明書を持たない第三者の接続は引き続き拒否できる。
+          全許可モードへ切り替える場合と比べてリスクを大幅に抑えられる。
+        </div>
+      </div>
+    </div>
+
+    <!-- 料金・リージョン -->
+    <div class="section">
+      <h2>💰 料金・利用可能リージョン</h2>
+      <div class="note-box">
+        <strong>💵 料金:</strong> 本機能 (mTLS 検証緩和) 自体に追加料金は発表されていません。
+        Cloud Load Balancing の標準料金 (フォワーディングルール、処理データ量など) が適用されます。
+        詳細は <a href="https://cloud.google.com/vpc/network-pricing#lb" target="_blank" rel="noopener noreferrer" class="gc-link">料金ページ</a> を参照してください。
+      </div>
+      <div class="note-box">
+        <strong>🌍 利用可能リージョン:</strong> すべての Application Load Balancer タイプ (Global external、Classic、Regional external、Regional internal、Cross-region internal) で利用可能です。
+        リージョンごとの提供状況は公式ドキュメントを参照してください。
+      </div>
+    </div>
+
+    <!-- 関連サービス・機能 -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="related-item">📜 <strong>Certificate Manager (TrustConfig)</strong>: 信頼アンカー (ルート証明書) と中間証明書を保持する TrustConfig リソースを管理し、<code>ServerTlsPolicy</code> から参照してクライアント証明書の信頼チェーン検証に利用</div>
+      <div class="related-item">🏛️ <strong>Certificate Authority Service</strong>: プライベート CA を構築してクライアント証明書を発行し、Application Load Balancer の mTLS と組み合わせて利用可能</div>
+      <div class="related-item">📊 <strong>Cloud Logging</strong>: 検証モードに応じたクライアント証明書検証エラー (<code>client_cert_chain_invalid_eku</code>、<code>client_cert_validation_failed</code> など) が記録され、緩和に依存するクライアントの特定や移行進捗の確認に活用可能</div>
+      <div class="related-item">📨 <strong>カスタム mTLS ヘッダー</strong>: 証明書のフィンガープリントや検証結果をバックエンドにヘッダーで伝達でき、アプリケーション側での追加判定に利用可能</div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>🎉 まとめ</h2>
+      <div class="success-box">
+        <p style="margin-top: 0;">
+          <code>ALLOW_VALIDATION_RELAXATIONS</code> モードの GA により、mTLS のクライアント検証が
+          <span class="highlight">「厳格拒否か全許可か」の二者択一から脱し</span>、
+          レガシー証明書を使うワークロードを安全に Application Load Balancer へ移行する現実的な選択肢が加わりました。
+        </p>
+        <p style="margin-bottom: 0;">
+          レガシークライアントを理由に mTLS の導入や移行を見送っていた場合は、
+          <strong>必要最小限の緩和項目を指定した <code>ServerTlsPolicy</code> の検証</strong>から始め、
+          移行完了後に <code>REJECT_INVALID</code> へ厳格化する計画を立てることを推奨します。
+        </p>
+      </div>
+      <div class="flow-diagram">
+        <div class="flow-step">🔍 緩和依存クライアント<br>の観測・把握</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🛡️ 必要最小限の緩和で<br>ALB へ移行</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">📜 クライアント証明書の<br>段階的更新</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🔒 REJECT_INVALID へ<br>厳格化</div>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p><strong>📎 出典・参考リンク</strong></p>
+      <ul>
+        <li>レポート: <a href="https://github.com/takech9203/google-cloud-news-summary/blob/main/reports/2026/2026-11-02-cloud-load-balancing-mtls-validation-relaxations-ga.md" target="_blank" rel="noopener noreferrer" class="gc-link">reports/2026/2026-11-02-cloud-load-balancing-mtls-validation-relaxations-ga.md</a></li>
+        <li>公式リリースノート: <a href="https://docs.cloud.google.com/release-notes#November_02_2026" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/release-notes#November_02_2026</a></li>
+        <li>相互 TLS の概要 (クライアント検証モード): <a href="https://docs.cloud.google.com/load-balancing/docs/mtls" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/load-balancing/docs/mtls</a></li>
+        <li>gcloud network-security server-tls-policies create リファレンス: <a href="https://docs.cloud.google.com/sdk/gcloud/reference/network-security/server-tls-policies/create" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/sdk/gcloud/reference/network-security/server-tls-policies/create</a></li>
+        <li>ユーザー提供証明書による mTLS の設定: <a href="https://docs.cloud.google.com/load-balancing/docs/https/setting-up-mtls-ccm" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/load-balancing/docs/https/setting-up-mtls-ccm</a></li>
+        <li>プライベート CA による mTLS の設定: <a href="https://docs.cloud.google.com/load-balancing/docs/https/setting-up-mtls-ca-ccm" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/load-balancing/docs/https/setting-up-mtls-ca-ccm</a></li>
+        <li>料金ページ: <a href="https://cloud.google.com/vpc/network-pricing#lb" target="_blank" rel="noopener noreferrer" class="gc-link">https://cloud.google.com/vpc/network-pricing#lb</a></li>
+      </ul>
+      <p>🏷️ タグ: Cloud Load Balancing / mTLS / ServerTlsPolicy / Application Load Balancer / セキュリティ / ネットワーキング / GA</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

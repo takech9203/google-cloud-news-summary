@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BigQuery: レプリケーション モニタリングと Continuous Queries to Spanner GA</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card.green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card.yellow {
+      border-left-color: var(--gc-yellow);
+    }
+
+    .card.teal {
+      border-left-color: var(--gc-teal);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-block {
+      overflow: hidden;
+      padding: 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 20px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.green {
+      background: linear-gradient(135deg, var(--gc-green), #1B8A3D);
+    }
+
+    .stat-card.teal {
+      background: linear-gradient(135deg, var(--gc-teal), #0097A7);
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .after {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .before h3, .after h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before ul, .after ul {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    .before li, .after li {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+    }
+
+    .usecase-card h3 {
+      color: var(--gc-blue-900);
+      margin-top: 0;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .region-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .region-item {
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 8px;
+      padding: 12px 16px;
+      text-align: center;
+      font-size: 14px;
+    }
+
+    .region-item strong {
+      display: block;
+      color: var(--gc-blue-900);
+      margin-bottom: 4px;
+    }
+
+    .links-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .links-list li {
+      margin: 8px 0;
+      padding: 8px 12px;
+      background: var(--gc-surface);
+      border-radius: 8px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .links-list li a {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .links-list li a:hover {
+      text-decoration: underline;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .before-after { grid-template-columns: 1fr; }
+      .feature-grid { grid-template-columns: 1fr; }
+      .stat-cards { grid-template-columns: 1fr; }
+      .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>📊 BigQuery: レプリケーション モニタリング &amp; Continuous Queries to Spanner</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">BigQuery</span>
+          <span class="badge-ga">GA</span>
+          <span class="badge">Cloud Monitoring</span>
+          <span class="badge">Spanner</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-03-04</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>☁️ 概要</h2>
+      <p>BigQuery の <span class="highlight">2 つの機能が GA</span> (一般提供) になりました。クロスリージョン レプリケーションの<strong>運用監視</strong>と Spanner への<strong>リアルタイム データ連携</strong>の両方が本番環境で安心して利用できるようになりました。</p>
+
+      <div class="stat-cards">
+        <div class="stat-card">
+          <div class="stat-value">2</div>
+          <div class="stat-label">GA になった機能数</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-value">60s</div>
+          <div class="stat-label">メトリクス サンプリング間隔</div>
+        </div>
+        <div class="stat-card teal">
+          <div class="stat-value">Near Real-time</div>
+          <div class="stat-label">Spanner へのデータ同期</div>
+        </div>
+      </div>
+
+      <p><strong>対象ユーザー:</strong> クロスリージョン レプリケーションを利用しているデータエンジニア、DR 計画を策定するインフラストラクチャ チーム、BigQuery と Spanner 間のリアルタイム データ同期を必要とするアプリケーション開発者</p>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before">
+          <h3>❌ Before (アップデート前)</h3>
+          <ul>
+            <li>CRR/MDR のレイテンシやエグレス バイトを Cloud Monitoring で直接監視する手段がなかった</li>
+            <li>BigQuery から Spanner へのデータ同期はバッチ ジョブによるスケジュール実行が必要</li>
+            <li>DR 環境のレプリケーション遅延を検知するためのカスタム監視基盤を別途構築する必要があった</li>
+          </ul>
+        </div>
+        <div class="after">
+          <h3>✅ After (アップデート後)</h3>
+          <ul>
+            <li>Cloud Monitoring で <code>staleness</code> と <code>network_egress_bytes_count</code> を直接監視可能</li>
+            <li>Continuous Queries により BigQuery から Spanner にリアルタイム ストリーミング</li>
+            <li>Metrics Explorer やカスタム ダッシュボードでレプリケーション状態を可視化 + アラート設定</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>今回 GA となった 2 つの機能のフローを示します。機能 1 はクロスリージョン レプリケーションの監視フロー、機能 2 は BigQuery から Spanner へのリアルタイム データ ストリーミングです。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph feature1["機能 1: レプリケーション モニタリング"]
+        BQ_Primary["🗄️ BigQuery\nプライマリ リージョン"]
+        BQ_Secondary["🗄️ BigQuery\nセカンダリ リージョン"]
+        CM["📊 Cloud Monitoring"]
+        Alert["🔔 アラート ポリシー"]
+        Dashboard["📈 カスタム ダッシュボード"]
+
+        BQ_Primary -- "非同期レプリケーション" --> BQ_Secondary
+        BQ_Primary -- "staleness メトリクス\negress bytes メトリクス" --> CM
+        CM --> Alert
+        CM --> Dashboard
+    end
+
+    subgraph feature2["機能 2: Continuous Queries to Spanner"]
+        BQ_Source[("🗄️ BigQuery\nソース テーブル")]
+        CQ["⚡ Continuous Query\nAPPENDS 関数"]
+        Export["📤 EXPORT DATA\nCLOUD_SPANNER"]
+        Spanner[("🔷 Spanner\nテーブル")]
+
+        BQ_Source -- "新規行の検出" --> CQ
+        CQ -- "リアルタイム\nストリーミング" --> Export
+        Export -- "書き込み" --> Spanner
+    end
+        </pre>
+      </div>
+    </div>
+
+    <!-- Feature 1: Replication Monitoring -->
+    <div class="section">
+      <h2>📊 機能 1: レプリケーション モニタリング</h2>
+      <p>クロスリージョン レプリケーション (CRR) およびマネージド ディザスタ リカバリ (MDR) で有効なデータセットのレプリケーション状態を <span class="highlight">Cloud Monitoring</span> で監視可能になりました。</p>
+
+      <div class="card">
+        <h3>📈 storage/replication/staleness</h3>
+        <p>セカンダリ リージョンで利用可能なデータの鮮度 (レイテンシ) を測定。60 秒ごとにサンプリングされ、最大 420 秒の遅延で表示されます。</p>
+        <div class="icon-text"><span class="arrow">→</span> <span>型: GAUGE, INT64 / 単位: ms</span></div>
+      </div>
+
+      <div class="card green">
+        <h3>📡 storage/replication/network_egress_bytes_count</h3>
+        <p>レプリケーションによる課金対象のエグレス バイト数を測定。60 秒ごとにサンプリングされ、最大 420 秒の遅延で表示されます。</p>
+        <div class="icon-text"><span class="arrow">→</span> <span>型: DELTA, INT64 / 単位: By</span></div>
+      </div>
+
+      <h3>メトリクスのラベル</h3>
+      <table>
+        <thead>
+          <tr><th>ラベル</th><th>説明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>location</code></td><td>レプリケーション先のロケーション</td></tr>
+          <tr><td><code>replica_id</code></td><td>レプリカ ID</td></tr>
+          <tr><td><code>replication_error</code></td><td>レプリケーション エラー (staleness メトリクスのみ)</td></tr>
+        </tbody>
+      </table>
+
+      <div class="note-box">
+        <strong>💡 ポイント:</strong> Metrics Explorer でのリアルタイム表示、カスタム ダッシュボードの作成、アラート ポリシーの設定が可能です。
+      </div>
+    </div>
+
+    <!-- Feature 2: Continuous Queries to Spanner -->
+    <div class="section">
+      <h2>⚡ 機能 2: Continuous Queries to Spanner</h2>
+      <p>BigQuery の <code>EXPORT DATA</code> ステートメントと <code>APPENDS</code> 関数を組み合わせ、BigQuery テーブルに追加された新規行を自動的に検出して <span class="highlight">Spanner にストリーミング</span>します。</p>
+
+      <div class="card">
+        <h3>🔄 リアルタイム リバース ETL</h3>
+        <div class="check-item"><span class="check-icon">✓</span> <span><code>format = 'CLOUD_SPANNER'</code> オプションで Spanner テーブルへ直接エクスポート</span></div>
+        <div class="check-item"><span class="check-icon">✓</span> <span><code>change_timestamp_column</code> でデータの書き込み順序を制御可能</span></div>
+        <div class="check-item"><span class="check-icon">✓</span> <span>ニアリアルタイムのデータ同期を実現、定期バッチ ジョブが不要に</span></div>
+      </div>
+
+      <div class="card teal">
+        <h3>🎛️ CONTINUOUS ジョブタイプ</h3>
+        <div class="check-item"><span class="check-icon">✓</span> <span><code>CONTINUOUS</code> ジョブタイプのスロット予約割り当てが必要</span></div>
+        <div class="check-item"><span class="check-icon">✓</span> <span>BigQuery Studio UI または BQ CLI (<code>--continuous=true</code>) から実行可能</span></div>
+        <div class="check-item"><span class="check-icon">✓</span> <span>サービス アカウントを使用した長時間実行に対応</span></div>
+      </div>
+
+      <h3>設定パラメータ</h3>
+      <table>
+        <thead>
+          <tr><th>パラメータ</th><th>説明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>format</code></td><td><code>'CLOUD_SPANNER'</code> を指定</td></tr>
+          <tr><td><code>uri</code></td><td>Spanner データベースの URI</td></tr>
+          <tr><td><code>spanner_options.table</code></td><td>書き込み先の Spanner テーブル名</td></tr>
+          <tr><td><code>spanner_options.priority</code></td><td>リクエスト優先度 (<code>HIGH</code>, <code>MEDIUM</code>, <code>LOW</code>)</td></tr>
+          <tr><td><code>spanner_options.change_timestamp_column</code></td><td>タイムスタンプ列の指定 (書き込み順序の制御)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Code Sample -->
+    <div class="section">
+      <h2>💻 設定方法 / コードサンプル</h2>
+
+      <h3>ステップ 1: レプリケーション モニタリングの設定</h3>
+      <p>Google Cloud コンソール &gt; Monitoring &gt; Metrics Explorer でリソースタイプ「BigQuery Dataset」を選択し、レプリケーション関連メトリクスを追加します。アラート ポリシーを作成して閾値を超えた場合に通知を受け取れます。</p>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">Metrics Explorer での確認</span>
+        </div>
+        <pre><code class="language-bash"># Cloud Monitoring の Metrics Explorer で確認
+# Google Cloud コンソール > Monitoring > Metrics Explorer
+# リソースタイプ: BigQuery Dataset
+# メトリクス: storage/replication/staleness
+#          または storage/replication/network_egress_bytes_count</code></pre>
+      </div>
+
+      <h3>ステップ 2: Continuous Query to Spanner の設定</h3>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">Continuous Query の SQL 例</span>
+        </div>
+        <pre><code class="language-sql">EXPORT DATA
+OPTIONS (
+  uri = 'https://spanner.googleapis.com/projects/PROJECT_ID/instances/INSTANCE_ID/databases/DATABASE_ID',
+  format = 'CLOUD_SPANNER',
+  spanner_options = '{"table": "my_table", "priority": "HIGH", "change_timestamp_column": "update_time"}'
+)
+AS
+SELECT
+  id,
+  name,
+  value,
+  _CHANGE_TIMESTAMP AS update_time
+FROM APPENDS(
+  TABLE `project.dataset.source_table`,
+  CURRENT_TIMESTAMP() - INTERVAL 10 MINUTE
+);</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">bq CLI での実行</span>
+        </div>
+        <pre><code class="language-bash"># bq CLI を使用した Continuous Query の実行
+bq query --continuous=true --use_legacy_sql=false '
+EXPORT DATA
+OPTIONS (
+  uri = "https://spanner.googleapis.com/projects/my-project/instances/my-instance/databases/my-db",
+  format = "CLOUD_SPANNER",
+  spanner_options = "{\"table\": \"target_table\", \"priority\": \"HIGH\"}"
+)
+AS
+SELECT * FROM APPENDS(
+  TABLE `my-project.my_dataset.source_table`,
+  CURRENT_TIMESTAMP() - INTERVAL 10 MINUTE
+);
+'</code></pre>
+      </div>
+
+      <div class="note-box">
+        <strong>💡 ヒント:</strong> BigQuery Studio の UI から実行する場合は、クエリ エディタで SQL を入力し、「その他」メニューから「クエリモードの選択」で「Continuous query」を選択します。
+      </div>
+    </div>
+
+    <!-- Prerequisites -->
+    <div class="section">
+      <h2>📋 前提条件</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h3>📊 レプリケーション モニタリング</h3>
+          <div class="check-item"><span class="check-icon">✓</span> <span>BigQuery のクロスリージョン レプリケーション (CRR) またはマネージド ディザスタ リカバリ (MDR) が有効なデータセット</span></div>
+        </div>
+        <div class="card">
+          <h3>⚡ Continuous Queries</h3>
+          <div class="check-item"><span class="check-icon">✓</span> <span>Enterprise エディション以上の予約</span></div>
+          <div class="check-item"><span class="check-icon">✓</span> <span><code>CONTINUOUS</code> ジョブタイプのスロット予約割り当て</span></div>
+          <div class="check-item"><span class="check-icon">✓</span> <span>Spanner データベースおよび書き込み先テーブルが作成済み</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div class="feature-grid">
+        <div>
+          <h3>ビジネス面</h3>
+          <div class="card green">
+            <div class="icon-text"><span>🎯</span> <strong>DR 運用の信頼性向上</strong></div>
+            <p style="margin: 4px 0; font-size: 14px;">RPO (目標復旧時点) の遵守状況をリアルタイムで把握し、DR 計画の実効性を確保</p>
+          </div>
+          <div class="card green">
+            <div class="icon-text"><span>⚡</span> <strong>リアルタイム アプリケーション サービング</strong></div>
+            <p style="margin: 4px 0; font-size: 14px;">BigQuery の分析結果を Spanner 経由で低レイテンシに提供し、ユーザー体験を向上</p>
+          </div>
+          <div class="card green">
+            <div class="icon-text"><span>💰</span> <strong>運用コストの削減</strong></div>
+            <p style="margin: 4px 0; font-size: 14px;">バッチ ジョブのスケジューリングと管理が不要になり、パイプラインの運用負荷が軽減</p>
+          </div>
+        </div>
+        <div>
+          <h3>技術面</h3>
+          <div class="card">
+            <div class="icon-text"><span>📊</span> <strong>統合監視</strong></div>
+            <p style="margin: 4px 0; font-size: 14px;">Cloud Monitoring の既存ダッシュボードやアラート基盤にレプリケーション メトリクスを統合</p>
+          </div>
+          <div class="card">
+            <div class="icon-text"><span>🔄</span> <strong>イベント駆動アーキテクチャ</strong></div>
+            <p style="margin: 4px 0; font-size: 14px;"><code>APPENDS</code> 関数により新規行の追加をイベントとして捕捉し、即座に Spanner に反映</p>
+          </div>
+          <div class="card">
+            <div class="icon-text"><span>📝</span> <strong>SQL ベースのパイプライン定義</strong></div>
+            <p style="margin: 4px 0; font-size: 14px;">標準 SQL で記述でき、専用 ETL ツール不要でリバース ETL を実現</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <div class="warning-box">
+        <strong>制限事項</strong>
+        <ul style="margin: 8px 0; padding-left: 20px;">
+          <li>Continuous Queries to Spanner は <strong>Enterprise エディション以上</strong>が必要 (Standard / オンデマンドは不可)</li>
+          <li><code>APPENDS</code> 関数は <strong>INSERT のみ</strong>を捕捉 (UPDATE / DELETE は検出しない)</li>
+          <li>Spanner の自動生成主キーを持つテーブルへの Continuous Query エクスポートは不可</li>
+          <li>PostgreSQL 方言の Spanner データベースへのエクスポートは不可</li>
+          <li>ユーザー アカウントのアクセス トークン TTL は 2 日間 (長時間実行にはサービス アカウントが必要)</li>
+          <li>レプリケーション モニタリング メトリクスはサンプリング後最大 420 秒の遅延</li>
+        </ul>
+      </div>
+      <div class="error-box">
+        <strong>考慮すべき点</strong>
+        <ul style="margin: 8px 0; padding-left: 20px;">
+          <li>データベース エラー (重複主キー、参照整合性違反など) が発生するとパイプラインがキャンセルされるため、エラー ハンドリングの設計が重要</li>
+          <li>Spanner テーブルの主キーに単調増加する整数を使用するとパフォーマンスの問題が発生する可能性あり</li>
+          <li>レプリケーション モニタリングのメトリクスは CRR/MDR が有効なデータセットでのみ利用可能</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h3>🏦 ユースケース 1: DR レプリケーション SLA 監視</h3>
+        <p><strong>シナリオ:</strong> 金融サービス企業が BigQuery のマネージド ディザスタ リカバリを利用し、東京 (asia-northeast1) から大阪 (asia-northeast2) へのレプリケーションを監視する。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Config</span>
+            <span class="code-title">Cloud Monitoring アラート ポリシー</span>
+          </div>
+          <pre><code class="language-yaml"># Cloud Monitoring アラート ポリシーの設定
+# 条件: storage/replication/staleness > 300000 ms (5 分) が 10 分間継続
+# 通知チャンネル: PagerDuty, Slack</code></pre>
+        </div>
+        <p><strong>効果:</strong> レプリケーション レイテンシが閾値を超えた場合に即座にアラートが発報され、RPO 違反を未然に防止できる。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>🛒 ユースケース 2: リアルタイム リバース ETL パイプライン</h3>
+        <p><strong>シナリオ:</strong> EC サイトが BigQuery で集約したユーザー行動分析データを Spanner に同期し、パーソナライゼーション エンジンからリアルタイムに参照する。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">EC サイト パーソナライゼーション</span>
+          </div>
+          <pre><code class="language-sql">EXPORT DATA
+OPTIONS (
+  format = 'CLOUD_SPANNER',
+  uri = 'https://spanner.googleapis.com/projects/ecommerce-prod/instances/serving/databases/personalization',
+  spanner_options = '{"table": "user_recommendations", "priority": "HIGH", "change_timestamp_column": "updated_at"}'
+)
+AS
+SELECT
+  user_id,
+  recommendation_scores,
+  _CHANGE_TIMESTAMP AS updated_at
+FROM APPENDS(
+  TABLE `ecommerce-prod.analytics.user_recommendations`,
+  CURRENT_TIMESTAMP() - INTERVAL 10 MINUTE
+);</code></pre>
+        </div>
+        <p><strong>効果:</strong> BigQuery での ML 推論結果が数秒以内に Spanner を経由してアプリケーションに反映され、リアルタイムなパーソナライゼーションが可能になる。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h3>📊 レプリケーション モニタリング</h3>
+          <p style="font-size: 14px;">Cloud Monitoring のメトリクス利用に関する<strong>追加費用なし</strong>。カスタム ダッシュボードやアラート設定数が無料枠を超える場合は Cloud Monitoring の料金が適用。</p>
+        </div>
+        <div class="card">
+          <h3>🔄 クロスリージョン レプリケーション</h3>
+          <div class="check-item"><span class="arrow">→</span> <span style="font-size: 14px;"><strong>ストレージ:</strong> セカンダリ リージョンのストレージ バイトが別途課金</span></div>
+          <div class="check-item"><span class="arrow">→</span> <span style="font-size: 14px;"><strong>データ レプリケーション:</strong> データ レプリケーション料金が別途課金 (スロット リソースは消費しない)</span></div>
+        </div>
+        <div class="card">
+          <h3>⚡ Continuous Queries</h3>
+          <div class="check-item"><span class="arrow">→</span> <span style="font-size: 14px;"><strong>スロット予約:</strong> CONTINUOUS ジョブタイプの予約割り当てに基づくスロット消費</span></div>
+          <div class="check-item"><span class="arrow">→</span> <span style="font-size: 14px;"><strong>Enterprise エディション以上</strong>が必須</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Regions -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <h3>レプリケーション モニタリング</h3>
+      <p>CRR/MDR が利用可能なすべてのリージョン ペアで利用可能です。</p>
+      <div class="region-grid">
+        <div class="region-item">
+          <strong>🇺🇸 US</strong>
+          us-central1 / us-east1<br>US マルチリージョン / us-west1
+        </div>
+        <div class="region-item">
+          <strong>🇪🇺 EU</strong>
+          europe-west3 / europe-west10<br>EU マルチリージョン / europe-west1
+        </div>
+        <div class="region-item">
+          <strong>🌏 ASIA</strong>
+          asia-east1 / asia-southeast1
+        </div>
+        <div class="region-item">
+          <strong>🇦🇺 AU</strong>
+          australia-southeast1 / australia-southeast2
+        </div>
+      </div>
+      <h3>Continuous Queries</h3>
+      <p>サポートされるリージョンは <a href="https://cloud.google.com/bigquery/docs/locations#continuous-query-loc" target="_blank" class="gc-link">BigQuery Continuous Query のロケーション</a> を参照してください。</p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <div class="icon-text"><span>📊</span> <strong>Cloud Monitoring</strong></div>
+          <p style="margin: 4px 0; font-size: 14px;">レプリケーション メトリクスの収集・可視化・アラート基盤として直接連携</p>
+        </div>
+        <div class="card">
+          <div class="icon-text"><span>🔷</span> <strong>Cloud Spanner</strong></div>
+          <p style="margin: 4px 0; font-size: 14px;">Continuous Queries のエクスポート先として、低レイテンシのアプリケーション サービングを提供</p>
+        </div>
+        <div class="card">
+          <div class="icon-text"><span>🛡️</span> <strong>BigQuery MDR</strong></div>
+          <p style="margin: 4px 0; font-size: 14px;">Enterprise Plus エディション向けの包括的な DR 機能。ハード/ソフト フェイルオーバーをサポート</p>
+        </div>
+        <div class="card">
+          <div class="icon-text"><span>🔄</span> <strong>BigQuery CRR</strong></div>
+          <p style="margin: 4px 0; font-size: 14px;">データセットのセカンダリ レプリカを別リージョンに作成し、非同期でレプリケーション</p>
+        </div>
+        <div class="card">
+          <div class="icon-text"><span>📨</span> <strong>Pub/Sub / Bigtable</strong></div>
+          <p style="margin: 4px 0; font-size: 14px;">Continuous Queries のエクスポート先として Spanner 以外にも対応</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reference Links -->
+    <div class="section">
+      <h2>📎 参考リンク</h2>
+      <ul class="links-list">
+        <li><a href="https://docs.cloud.google.com/release-notes#March_04_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li><a href="https://cloud.google.com/bigquery/docs/data-replication" target="_blank" rel="noopener noreferrer">BigQuery クロスリージョン レプリケーション ドキュメント</a></li>
+        <li><a href="https://cloud.google.com/bigquery/docs/managed-disaster-recovery" target="_blank" rel="noopener noreferrer">BigQuery マネージド ディザスタ リカバリ ドキュメント</a></li>
+        <li><a href="https://cloud.google.com/bigquery/docs/continuous-queries-introduction" target="_blank" rel="noopener noreferrer">BigQuery Continuous Queries 概要</a></li>
+        <li><a href="https://cloud.google.com/bigquery/docs/export-to-spanner" target="_blank" rel="noopener noreferrer">BigQuery から Spanner へのデータ エクスポート (リバース ETL)</a></li>
+        <li><a href="https://cloud.google.com/monitoring/api/metrics_gcp#gcp-bigquery" target="_blank" rel="noopener noreferrer">Cloud Monitoring メトリクス (BigQuery)</a></li>
+        <li><a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer">BigQuery 料金</a></li>
+      </ul>
+    </div>
+
+    <!-- Summary -->
+    <div class="success-box">
+      <strong>📝 まとめ:</strong> 今回の GA により、BigQuery のクロスリージョン レプリケーションの運用監視と Spanner へのリアルタイム データ連携の両方が本番環境で安心して利用できるようになりました。DR 戦略を運用している組織はレプリケーション モニタリング メトリクスを活用してアラートとダッシュボードを構築し、RPO の遵守状況を可視化することを推奨します。また、BigQuery と Spanner 間のバッチ ETL パイプラインを運用している場合は、Continuous Queries への移行を検討することで、リアルタイム性の向上と運用負荷の軽減が期待できます。
+    </div>
+
+    <footer>
+      <p>📎 出典: <a href="https://docs.cloud.google.com/release-notes#March_04_2026" target="_blank" rel="noopener noreferrer" class="gc-link" style="word-break: break-all;">https://docs.cloud.google.com/release-notes#March_04_2026</a></p>
+      <p>生成日: 2026-03-05 | #BigQuery #CloudMonitoring #Spanner #CrossRegionReplication #DisasterRecovery #ContinuousQueries #ReverseETL #GA</p>
+    </footer>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

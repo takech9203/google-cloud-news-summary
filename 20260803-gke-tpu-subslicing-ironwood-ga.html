@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GKE: TPU Subslicing (Dynamic Subslicing) が Ironwood (TPU7x) で GA</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      margin-top: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 768px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid rgba(234, 67, 53, 0.3);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid rgba(52, 168, 83, 0.3);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-box h3 { color: #C5221F; }
+    .after-box h3 { color: #188038; }
+
+    .before-box ul, .after-box ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 6px 0;
+    }
+
+    /* フロー図スタイル */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+      font-size: 14px;
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* チェックリストスタイル */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    /* コードブロック */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block {
+      overflow: hidden;
+      padding: 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブルスタイル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .ai-box {
+      background: var(--gc-purple-tint);
+      border-left: 4px solid var(--gc-purple);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* 統計カード */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-100);
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      word-break: break-all;
+    }
+
+    ul.link-list {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    ul.link-list li {
+      margin: 4px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <h1>☁️ GKE: TPU Subslicing が Ironwood (TPU7x) で GA</h1>
+        <div style="margin-top: 12px;">
+          <span class="badge">Google Kubernetes Engine</span>
+          <span class="badge" style="background: var(--gc-purple);">Cloud TPU (TPU7x / Ironwood)</span>
+          <span class="badge badge-ga">GA (一般提供)</span>
+        </div>
+      </div>
+      <div class="subtitle">📅 リリース日: 2026-08-03</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📌 概要</h2>
+      <p>
+        GKE の <span class="highlight">TPU Subslicing (Dynamic Subslicing)</span> が、第 7 世代 TPU の
+        <span class="highlight">Ironwood (TPU7x)</span> で一般提供 (GA) となりました。
+        4x4x4 サブブロック (64 チップ) のノードプールをインクリメンタルにプロビジョニングし、
+        より小さな <strong>サブスライス</strong> に分割して、小さなトポロジを必要とするワークロードを実行できます。
+      </p>
+      <p>
+        Dynamic Slicing は TPU の <strong>物理プロビジョニング</strong> と <strong>ワークロードのスライス割り当て</strong> を分離 (デカップリング) し、
+        スケジューリング時に TPU ネットワークインターコネクト (ICI/OCS) を動的に再構成します。
+        TPU 利用効率の最大化を目指す ML エンジニア・プラットフォームエンジニアが主な対象です。
+      </p>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value">最大 5 倍</div>
+          <div class="stat-label">ワークロード起動時間を短縮</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">最大 4.5 倍</div>
+          <div class="stat-label">障害からの復旧時間を短縮</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">9,216 チップ</div>
+          <div class="stat-label">TPU7x 1 Pod あたり最大チップ数</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">2,307 TFLOPs</div>
+          <div class="stat-label">チップあたり性能 (BF16) / 192 GB HBM</div>
+        </div>
+      </div>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before: 静的な TPU トポロジ</h3>
+          <ul>
+            <li>ノードプールが作成時のトポロジに固定され、ワークロードのトポロジと<strong>完全一致</strong>しないとスケジュール不可</li>
+            <li>異なるトポロジのたびに TPU インフラの<strong>再プロビジョニング</strong>が頻繁に必要</li>
+            <li>1 ノードの障害が<strong>ノードプール全体</strong>に影響</li>
+            <li>4x4x4 (64 チップ) 単位でしか使えず、小規模ワークロードで<strong>利用効率が低下</strong></li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After: Dynamic Slicing (GA)</h3>
+          <ul>
+            <li><strong>Sub-slicing</strong>: 1 つの 4x4x4 を 2x2x1 / 2x2x2 / 2x2x4 / 2x4x4 に分割し複数ワークロードを同時実行 (GKE 1.36.0-gke.3712000 以降)</li>
+            <li><strong>Super-slicing</strong>: 複数ノードプールを結合し 4x4x8 など大規模スライスを形成 (GKE 1.35.2-gke.1842000 以降)</li>
+            <li>サブスライス間は<strong>電気的・ネットワーク的に分離</strong>し障害を隔離</li>
+            <li><strong>Partition Health Labels</strong> が形状ごとに更新され、<code>UNSET</code> / <code>INCOMPLETE</code> 状態を追加</li>
+            <li>部分的に不健全なキューブでも<strong>プロビジョニング・利用を継続</strong></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Provision["🏗️ インクリメンタルプロビジョニング (All Capacity mode)"]
+        NP["📦 TPU7x ノードプール<br/>4x4x4 サブブロック (64 チップ / 16 VM)"]
+    end
+
+    subgraph Controller["⚙️ GKE コントロールプレーン"]
+        SC["🎛️ Slice Controller<br/>(Slice カスタムリソースを管理)"]
+        HL["🏷️ Partition Health Labels<br/>gke-tpu-partition-[shape]-state"]
+    end
+
+    subgraph SubSlicing["✂️ Dynamic Sub-slicing (1.36.0-gke.3712000+)"]
+        S1["🧩 2x2x4 サブスライス<br/>ファインチューニング"]
+        S2["🧩 2x2x2 サブスライス<br/>実験"]
+        S3["🧩 2x2x2 サブスライス<br/>オンライン推論"]
+    end
+
+    subgraph SuperSlicing["🔗 Dynamic Super-slicing (1.35.2-gke.1842000+)"]
+        SS["🚀 4x4x8 スーパースライス<br/>大規模トレーニング"]
+    end
+
+    NP --> SC
+    SC --> HL
+    SC -- "サブブロックを分割<br/>(電気的・ネットワーク分離)" --> S1 & S2 & S3
+    SC -- "OCS 再構成で<br/>複数サブブロックを結合" --> SS
+        </pre>
+      </div>
+      <p>
+        事前プロビジョニングした 4x4x4 サブブロックのノードプールを、GKE の Slice Controller がワークロードスケジューリング時に
+        動的に分割 (Sub-slicing) または結合 (Super-slicing) し、要求されたトポロジの TPU スライスを<strong>数秒で形成</strong>します。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+
+      <div class="card">
+        <h3>✂️ 1. Dynamic Sub-slicing (4x4x4 より小さいトポロジ)</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>単一の事前プロビジョニング済み TPU ノードプールを、ワークロードレベルで複数の小さな独立ユニットに分割</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>サポートトポロジ: <code>2x2x1</code> (4 チップ)、<code>2x2x2</code> (8 チップ)、<code>2x2x4</code> (16 チップ)、<code>2x4x4</code> (32 チップ)</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>例: 1 つの 4x4x4 サブブロックを、1 つの 2x2x4 と 2 つの 2x2x2 サブスライスに分割</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>サブスライス間は電気的・ネットワーク的に分離され、障害や性能影響を相互に隔離</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>GKE <strong>1.36.0-gke.3712000 以降</strong> (Rapid チャネル) でサポート</span></div>
+      </div>
+
+      <div class="card" style="border-left-color: var(--gc-purple);">
+        <h3>🔗 2. Dynamic Super-slicing (4x4x4 以上のトポロジ)</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>物理的に分離された複数のノードプールを、スケジューリング時に単一の仮想スライスとして結合</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>Slice Controller が <strong>Optical Circuit Switch (OCS)</strong> の物理再構成をオーケストレーションし、ラック間で <strong>Inter-Chip Interconnect (ICI)</strong> ネットワークを拡張</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>ワークロードからは結合されたサブブロックが単一の <strong>3D トーラスメッシュ</strong> として動作</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>GKE <strong>1.35.2-gke.1842000 以降</strong>でサポート</span></div>
+      </div>
+
+      <div class="card" style="border-left-color: var(--gc-green);">
+        <h3>🏷️ 3. Partition Health Labels の更新</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>ラベルが <code>cloud.google.com/gke-tpu-partition-[shape]-state</code> に更新され、<code>[shape]</code> にサブスライス形状 (2x2x1〜4x4x4) を指定可能に</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>新しい状態 <code>UNSET</code> (初期化失敗) と <code>INCOMPLETE</code> (全ノード未プロビジョニング) が追加</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>DEGRADED</code> 状態は最上位の 4x4x4 トポロジのみに適用</span></div>
+      </div>
+
+      <div class="card" style="border-left-color: var(--gc-orange);">
+        <h3>🧱 4. インクリメンタルプロビジョニング</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>フォールトトレラントなノードプールプロビジョニングモデル</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>全 TPU キャパシティを TPU7x VM の 16 ノードグループからなるノードプールに変換し、部分的に不健全なキューブでもプロビジョニングと利用を継続可能</span></div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔬 技術仕様</h2>
+
+      <h3>🏷️ パーティション状態ラベルの値</h3>
+      <table>
+        <thead>
+          <tr><th>状態</th><th>説明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>HEALTHY</code></td><td>パーティションは健全で完全に機能している</td></tr>
+          <tr><td><code>DEGRADED</code></td><td>インフラが劣化状態 (例: OCS リンク劣化)。スライス形成は可能だが性能低下の可能性あり。4x4x4 トポロジのみに適用</td></tr>
+          <tr><td><code>UNHEALTHY</code></td><td>パーティションは不健全でスライスを形成できない</td></tr>
+          <tr><td><code>UNSET</code> 🆕</td><td>GKE Slice Controller の初期化に失敗し、状態が未定義</td></tr>
+          <tr><td><code>INCOMPLETE</code> 🆕</td><td>パーティション内のすべてのノードがプロビジョニングされていない</td></tr>
+        </tbody>
+      </table>
+
+      <h3>📐 サポートされるトポロジと要件</h3>
+      <table>
+        <thead>
+          <tr><th>構成</th><th>トポロジ</th><th>必要 GKE バージョン</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Dynamic Sub-slicing</td><td>2x2x1、2x2x2、2x2x4、2x4x4</td><td>1.36.0-gke.3712000 以降</td></tr>
+          <tr><td>Dynamic Super-slicing</td><td>4x4x4 以上 (各次元は 4 の倍数、次元の積は 9,216 以下、最大 32 サブブロック)</td><td>1.35.2-gke.1842000 以降</td></tr>
+        </tbody>
+      </table>
+
+      <div class="note-box">
+        <strong>📏 Super-slicing のトポロジルール:</strong>
+        <div class="check-item"><span class="check-icon">✓</span><span>トポロジは <code>AxBxC</code> 形式の 3 次元文字列 (例: <code>4x8x8</code>)</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>次元は非減少順 (A &lt;= B &lt;= C)。例: <code>4x8x4</code> は無効で、<code>4x4x8</code> と指定する</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>各次元は 4 の倍数 (<code>4A x 4B x 4C</code>)</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>次元の積 (A×B×C) は 9,216 以下</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>最大 32 サブブロック (例: 8x16x16 = 32 サブブロック、12x12x12 = 27 サブブロック)</span></div>
+      </div>
+
+      <h3>📝 ワークロードでのスライストポロジ指定例 (Kueue + TAS)</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">YAML</span>
+          <span class="code-title">JobSet で 2x2x4 サブスライスを要求する例</span>
+        </div>
+        <pre><code class="language-yaml">apiVersion: jobset.x-k8s.io/v1alpha2
+kind: JobSet
+metadata:
+  name: sub-slice-workload
+  labels:
+    kueue.x-k8s.io/queue-name: lq
+spec:
+  replicatedJobs:
+    - name: job-jax
+      replicas: 1
+      template:
+        spec:
+          parallelism: 4   # 2x2x4 = 16 チップ / VM あたり 4 チップ = 4 Pod
+          completions: 4
+          template:
+            metadata:
+              annotations:
+                cloud.google.com/gke-tpu-slice-topology: 2x2x4
+            spec:
+              nodeSelector:
+                cloud.google.com/gke-tpu-accelerator: tpu7x
+              tolerations:
+                - key: "google.com/tpu"
+                  operator: "Equal"
+                  value: "present"
+                  effect: "NoSchedule"
+              containers:
+                - name: jax
+                  image: python:latest
+                  resources:
+                    limits:
+                      google.com/tpu: 4
+              restartPolicy: Never</code></pre>
+      </div>
+      <p style="font-size: 14px;">
+        パーティション健全性の指定がない場合、Kueue Slice Controller の webhook が
+        <code>cloud.google.com/gke-tpu-partition-4x4x4-state</code> に <code>HEALTHY</code> / <code>DEGRADED</code>
+        を許可するデフォルトの nodeAffinity を自動注入します。
+      </p>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🔧 設定方法</h2>
+
+      <h3>✅ 前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>Rapid チャネルの Standard クラスタ (Sub-slicing は 1.36.0-gke.3712000 以降、Super-slicing は 1.35.2-gke.1842000 以降)</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>Ironwood (TPU7x) の使用 (マシンタイプ: <code>tpu7x-standard-4t</code>)</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>ノードイメージに Container-Optimized OS を使用</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>インクリメンタルプロビジョニングには All Capacity mode 予約が必要 (TPU Cluster Director により有効化)</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>リージョンに十分な TPU7x クォータ</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>マルチスライスワークロードを実行する場合は JobSet v0.10.1 以降をインストール</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>Sub-slicing 使用時は保留中のホストメンテナンスイベントを確認 (2026 年 9 月 18 日〜30 日に終了時刻を持つ保留イベントがあるノードでは、事前に手動でホストメンテナンスイベントをトリガー)</span></div>
+
+      <h3>🔍 ステップ 1: ノードとパーティションの状態を確認</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">パーティション ID / 状態ラベルの確認</span>
+        </div>
+        <pre><code class="language-bash"># ノードプールのノード一覧を取得
+kubectl get nodes -l cloud.google.com/gke-nodepool=${NODE_POOL_NAME}
+
+# パーティション ID ラベルを確認
+kubectl describe node NODE_NAME | grep -E "cloud.google.com/gke-tpu-partition-.*-id"
+
+# パーティション状態ラベルを確認
+kubectl describe node NODE_NAME | grep -E "cloud.google.com/gke-tpu-partition-.*-state"</code></pre>
+      </div>
+      <p style="font-size: 14px;">
+        各ノードには、利用可能なすべてのトポロジ (2x2x1、2x2x2、2x2x4、2x4x4、4x4x4) のパーティション ID と状態ラベルが付与されます。
+      </p>
+
+      <h3>🗓️ ステップ 2: スケジューラの選択とスライスの形成</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">Kueue + TAS 使用時</span>
+        </div>
+        <pre><code class="language-bash"># Kueue + TAS を使用する場合: JobSet マニフェストを適用
+kubectl apply -f sub-slice-workload.yaml</code></pre>
+      </div>
+      <div class="card">
+        <h3 style="font-size: 16px;">🎛️ スケジューラの選択肢</h3>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Kueue + Topology Aware Scheduling (TAS)</strong>: Slice カスタムリソースを自動作成。Kueue が指定トポロジの動的スライス形成を試み、スライスがアクティブになるとワークロードを admit して Pod をスケジュール</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>カスタムスケジューラ</strong>: Slice カスタムリソースを直接管理。複雑なスケジューリング要件や既存基盤との統合に有用</span></div>
+      </div>
+      <p style="font-size: 14px;">
+        スライス形成の進行状況や健全性は、Slice カスタムリソースの status フィールドで確認できます。
+      </p>
+
+      <div class="flow-diagram">
+        <div class="flow-step">📦 4x4x4 ノードプール<br/>プロビジョニング</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🏷️ パーティション<br/>状態を確認</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">📝 JobSet に<br/>トポロジを指定</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🎛️ Slice Controller が<br/>スライスを形成</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🚀 Pod を<br/>スケジュール</div>
+      </div>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>💡 メリット</h2>
+      <div class="success-box">
+        <strong>💼 ビジネス面</strong>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>TPU 利用効率の最大化</strong>: 64 チップの 4x4x4 キューブを複数の小規模ワークロードで共有でき、高価な TPU キャパシティの遊休を削減</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>予約キャパシティの柔軟な活用</strong>: All Capacity mode により予約全体へのフルアクセスとトポロジ・健全性の完全な可視性を確保し、大規模トレーニングから小規模推論まで同一予約内で柔軟に運用</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>運用コストの削減</strong>: ワークロードごとのノードプール再プロビジョニングが不要になり、インフラ管理の工数を削減</span></div>
+      </div>
+      <div class="success-box">
+        <strong>⚙️ 技術面</strong>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>起動・復旧時間の短縮</strong>: ワークロード起動時間を最大 5 倍、復旧時間を最大 4.5 倍短縮 (公式ドキュメントによる)</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>障害の分離</strong>: サブスライス間の電気的・ネットワーク的分離により、障害や性能影響が他のワークロードに波及しない</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>フォールトトレランス</strong>: 部分的に不健全なキューブでも利用を継続可能。1 ノードの障害がプール全体に影響しない</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>数秒でのトポロジ形成</strong>: OCS/ICI の動的再構成により、要求された多次元トポロジをスケジューリング時に数秒で形成</span></div>
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <div class="warning-box">
+        <strong>🚧 制限事項</strong>
+        <div class="check-item"><span class="cross-icon">✗</span><span>Ironwood (TPU7x) 専用の機能であり、以前の TPU 世代 (v5p、Trillium など) では利用不可</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>Standard クラスタの Rapid チャネル限定 (Autopilot 非対応)</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>Sub-slicing は GKE 1.36.0-gke.3712000 以降、Super-slicing は 1.35.2-gke.1842000 以降が必要</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>All Capacity mode 予約 (TPU Cluster Director) が必須</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>ノードイメージは Container-Optimized OS のみ</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span><code>DEGRADED</code> 状態は 4x4x4 トポロジのみでサポートされ、小さいサブスライストポロジでは検出できない</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>Super-slicing のトポロジは各次元 4 の倍数、次元の積 9,216 以下、最大 32 サブブロックという制約</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>TPU7x では JAX と PyTorch がサポートされ、TensorFlow は非サポート</span></div>
+      </div>
+      <div class="note-box">
+        <strong>🤔 考慮すべき点</strong>
+        <div class="check-item"><span class="arrow">→</span><span>Sub-slicing の利用前に、保留中のホストメンテナンスイベント (2026 年 9 月 18 日〜30 日に終了時刻を持つもの) がある場合は手動でメンテナンスをトリガーする必要がある</span></div>
+        <div class="check-item"><span class="arrow">→</span><span>Kueue + TAS を使わない場合、Slice カスタムリソースのライフサイクル管理を自前のスケジューラで実装する必要がある</span></div>
+        <div class="check-item"><span class="arrow">→</span><span><code>UNSET</code> や <code>INCOMPLETE</code> 状態のパーティションはスライス形成に使用できないため、Cloud Monitoring の <code>kubernetes.io/accelerator/partition/state</code> メトリクスなどによる監視を組み込むことが望ましい</span></div>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>1️⃣ 単一キューブでのファインチューニング・実験・推論の同時実行</h3>
+        <p>
+          <strong>シナリオ</strong>: ML プラットフォームチームが 4x4x4 (64 チップ) の TPU7x キューブを 1 つ予約しているが、
+          個々のワークロード (LLM のファインチューニング、ハイパーパラメータ実験、オンライン推論) はそれぞれ 8〜16 チップで十分なため、
+          キューブ全体を 1 ワークロードで占有すると利用効率が低い。
+        </p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">YAML</span>
+            <span class="code-title">Pod アノテーションでの指定例</span>
+          </div>
+          <pre><code class="language-yaml"># 4x4x4 サブブロックを 1 つの 2x2x4 と 2 つの 2x2x2 サブスライスに分割
+# 各ワークロードの Pod アノテーションで指定
+annotations:
+  cloud.google.com/gke-tpu-slice-topology: 2x2x4  # ファインチューニング用
+# ---
+annotations:
+  cloud.google.com/gke-tpu-slice-topology: 2x2x2  # 実験用 / 推論用</code></pre>
+        </div>
+        <p>
+          <strong>効果</strong>: 1 つの物理キューブ上で複数ワークロードを電気的・ネットワーク的に分離した状態で同時実行でき、
+          TPU 予約キャパシティの利用率を大幅に向上。障害や性能影響もサブスライス間で隔離される。
+        </p>
+      </div>
+
+      <div class="usecase">
+        <h3>2️⃣ 大規模基盤モデルのトレーニング (Super-slicing)</h3>
+        <p>
+          <strong>シナリオ</strong>: 単一の物理ハードウェアブロック (4x4x4) の容量を超える基盤モデルのトレーニングを行いたい。
+          従来は正確なトポロジのノードプールを事前に構築する必要があった。
+        </p>
+        <p>
+          <strong>効果</strong>: 複数の 4x4x4 ノードプールをスケジューリング時に OCS の動的再構成で結合し、
+          4x4x8 や 8x8x8 などの大規模スライスを単一のトーラスメッシュとして形成。
+          ワークロードの要件に応じてスライスを組み替えられるため、再プロビジョニングなしで大規模トレーニングと他のワークロードを切り替えられる。
+        </p>
+      </div>
+
+      <div class="usecase">
+        <h3>3️⃣ 部分的な障害発生時の継続運用</h3>
+        <p>
+          <strong>シナリオ</strong>: 静的ノードプールでは 1 ノードの障害でノードプール全体が影響を受け、トレーニングの復旧に時間がかかっていた。
+        </p>
+        <p>
+          <strong>効果</strong>: インクリメンタルプロビジョニングとパーティション健全性ラベルにより、不健全なパーティションを避けて
+          健全なパーティションのみでスライスを形成。部分的に不健全なキューブでも残りのキャパシティを利用し続けられ、
+          <span class="highlight">復旧時間を最大 4.5 倍短縮</span>。
+        </p>
+      </div>
+    </div>
+
+    <!-- 料金・リージョン -->
+    <div class="section">
+      <h2>💰 料金・利用可能リージョン</h2>
+      <div class="note-box">
+        <strong>💵 料金:</strong> Dynamic Slicing / Subslicing 自体の追加料金に関する記載は Release Notes にはありません。
+        TPU7x (Ironwood) の利用には All Capacity mode 予約が必要であり、料金は Cloud TPU の料金体系に従います。
+      </div>
+      <div class="note-box">
+        <strong>🌏 リージョン:</strong> リージョンごとの TPU7x の提供状況は公式ドキュメントを参照してください。
+        利用にはリージョンの TPU7x クォータと All Capacity mode 予約が必要です。
+      </div>
+      <ul class="link-list">
+        <li>💵 <a href="https://cloud.google.com/tpu/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud TPU の料金</a></li>
+        <li>💵 <a href="https://cloud.google.com/kubernetes-engine/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">GKE の料金</a></li>
+        <li>🌏 <a href="https://docs.cloud.google.com/tpu/docs/regions-zones" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud TPU のリージョンとゾーン</a></li>
+      </ul>
+    </div>
+
+    <!-- 関連サービス -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card" style="border-left-color: var(--gc-purple);">
+        <div class="icon-text"><span>🧠</span><span><strong>Cloud TPU (TPU7x / Ironwood)</strong>: 本機能の対象となる第 7 世代 TPU。チップあたり 192 GB HBM、BF16 で 2,307 TFLOPs、1 Pod あたり最大 9,216 チップ</span></div>
+      </div>
+      <div class="card">
+        <div class="icon-text"><span>🗂️</span><span><strong>TPU Cluster Director / All Capacity mode</strong>: インクリメンタルプロビジョニングの前提となる予約モード。予約キャパシティへのフルアクセスとハードウェアトポロジ・健全性の完全な可視性を提供</span></div>
+      </div>
+      <div class="card" style="border-left-color: var(--gc-green);">
+        <div class="icon-text"><span>🗓️</span><span><strong>Kueue + Topology Aware Scheduling (TAS)</strong>: Slice カスタムリソースを自動作成し、動的スライスのスケジューリングを行う推奨スケジューラ構成</span></div>
+      </div>
+      <div class="card" style="border-left-color: var(--gc-orange);">
+        <div class="icon-text"><span>📦</span><span><strong>JobSet</strong>: マルチスライスワークロードの実行に使用する Kubernetes API (v0.10.1 以降が必要)</span></div>
+      </div>
+      <div class="card" style="border-left-color: var(--gc-teal);">
+        <div class="icon-text"><span>📈</span><span><strong>Cloud Monitoring</strong>: <code>kubernetes.io/accelerator/partition/state</code>、<code>accelerator/slice/formation_durations</code> などのメトリクスでパーティション状態やスライス形成時間を監視可能</span></div>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="success-box">
+        <p style="margin: 0;">
+          TPU Subslicing の GA により、Ironwood (TPU7x) の 4x4x4 キューブを<strong>動的に分割・結合</strong>し、
+          小規模な推論・実験から大規模トレーニングまで<strong>同一の予約キャパシティで柔軟に運用</strong>できるようになりました。
+          TPU の再プロビジョニングが不要になり、起動時間・復旧時間の短縮と障害分離が実現されるため、
+          TPU7x を利用中または導入予定の組織は、<span class="highlight">Rapid チャネルの対応 GKE バージョンへの更新</span>と
+          <span class="highlight">Kueue + TAS によるスケジューリング構成</span>の検討をおすすめします。
+        </p>
+      </div>
+      <div style="margin-top: 16px;">
+        <span class="badge">GKE</span>
+        <span class="badge">Cloud TPU</span>
+        <span class="badge">TPU7x</span>
+        <span class="badge">Ironwood</span>
+        <span class="badge">Dynamic Slicing</span>
+        <span class="badge">Subslicing</span>
+        <span class="badge" style="background: var(--gc-purple);">AI/ML</span>
+        <span class="badge badge-ga">GA</span>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p><strong>📎 出典・参考リンク</strong></p>
+      <ul class="link-list">
+        <li><a href="https://docs.cloud.google.com/release-notes#August_03_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026-08-03)</a></li>
+        <li><a href="https://docs.cloud.google.com/kubernetes-engine/docs/concepts/dynamic-slicing" target="_blank" rel="noopener noreferrer" class="gc-link">About GKE dynamic slicing (公式ドキュメント)</a></li>
+        <li><a href="https://docs.cloud.google.com/kubernetes-engine/docs/how-to/use-gke-dynamic-slicing" target="_blank" rel="noopener noreferrer" class="gc-link">Schedule dynamic slices with Kueue and TAS</a></li>
+        <li><a href="https://docs.cloud.google.com/kubernetes-engine/docs/how-to/create-dynamic-slices" target="_blank" rel="noopener noreferrer" class="gc-link">Use dynamic slicing with a custom scheduler</a></li>
+        <li><a href="https://docs.cloud.google.com/tpu/docs/tpu7x" target="_blank" rel="noopener noreferrer" class="gc-link">TPU7x (Ironwood) ドキュメント</a></li>
+        <li><a href="https://docs.cloud.google.com/tpu/docs/all-capacity-overview" target="_blank" rel="noopener noreferrer" class="gc-link">All Capacity mode overview</a></li>
+        <li><a href="https://cloud.google.com/tpu/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud TPU の料金</a></li>
+      </ul>
+      <p>本インフォグラフィックは Google Cloud News レポート (2026-08-03) を基に生成されています。</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>
