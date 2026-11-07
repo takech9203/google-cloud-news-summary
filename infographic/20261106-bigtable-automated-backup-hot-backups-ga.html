@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bigtable: 自動バックアップポリシーによるホットバックアップの作成が GA</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid rgba(234, 67, 53, 0.3);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid rgba(52, 168, 83, 0.3);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-box h3,
+    .after-box h3 {
+      margin-top: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .before-box h3 { color: var(--gc-red); }
+    .after-box h3 { color: var(--gc-green); }
+
+    .before-box ul,
+    .after-box ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .before-box li,
+    .after-box li {
+      margin: 8px 0;
+      font-size: 14px;
+    }
+
+    @media (max-width: 720px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* チェックリスト */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+    }
+
+    /* 統計カード */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* コードブロック */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block {
+      overflow: hidden;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-100);
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-800);
+    }
+
+    /* ステップリスト */
+    .step-list {
+      counter-reset: step;
+      list-style: none;
+      padding-left: 0;
+      margin: 12px 0;
+    }
+
+    .step-list li {
+      counter-increment: step;
+      position: relative;
+      padding-left: 44px;
+      margin: 12px 0;
+    }
+
+    .step-list li::before {
+      content: counter(step);
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 28px;
+      height: 28px;
+      background: var(--gc-blue-600);
+      color: #FFFFFF;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      word-break: break-all;
+    }
+
+    ul {
+      padding-left: 22px;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <div style="margin-bottom: 8px;">
+          <span class="badge">Bigtable</span>
+          <span class="badge badge-ga">GA (一般提供)</span>
+        </div>
+        <h1>🗄️ Bigtable: 自動バックアップポリシーによる<br>ホットバックアップの作成が GA</h1>
+      </div>
+      <div class="subtitle">📅 リリース日: 2026-11-06</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📝 概要</h2>
+      <p>
+        Bigtable の <span class="highlight">SSD インスタンス</span>で、自動バックアップポリシーを構成して
+        <span class="highlight">毎日のホットバックアップ</span>を作成できる機能が GA になりました。
+        各バックアップがホット状態を維持する期間 (<strong>keep-hot duration</strong>) を指定でき、
+        期間経過後は自動的に標準バックアップへ移行します。
+      </p>
+      <p>
+        ホットバックアップは迅速な復旧に最適化された<strong>本番即応状態</strong>のバックアップで、
+        復元直後から本番レベルの低レイテンシ読み取りに到達するまでの時間を大幅に短縮します。
+        RTO (目標復旧時間) の短い本番ワークロードで、手動運用なしに
+        「最新のバックアップは常にホット、古いバックアップは低コストの標準」という構成を維持できます。
+      </p>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before (アップデート前)</h3>
+          <ul>
+            <li>自動バックアップポリシーが作成するのは<strong>標準バックアップのみ</strong>で、復元後に本番性能へ到達するまで時間が長かった</li>
+            <li>ホットバックアップの継続維持には、オンデマンドの定期作成と移行時刻の個別設定という<strong>手動運用</strong>が必要だった</li>
+            <li>「最新のみホット・古いものは標準」構成を<strong>自前のスケジュール運用</strong>で実現する必要があった</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After (アップデート後)</h3>
+          <ul>
+            <li>ポリシーに <strong>keep-hot duration</strong> を設定するだけで、毎日ホットバックアップが<strong>自動作成</strong></li>
+            <li>keep-hot duration (24 時間〜10 日) 経過後は<strong>自動的に標準バックアップへ移行</strong>し、残りの保持期間は低コストで保管</li>
+            <li>24 時間に設定すれば「常に最新の 1 世代のみホット」という<strong>DR とコストのバランス構成を自動化</strong></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">24h〜10d</div>
+          <div class="stat-label">keep-hot duration の指定範囲</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">毎日 1 回</div>
+          <div class="stat-label">ホットバックアップの自動作成頻度</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">最大 90 日</div>
+          <div class="stat-label">自動バックアップの保持期間</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図 (バックアップのライフサイクル)</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    T[📊 Bigtable テーブル<br>SSD インスタンス] -->|自動バックアップポリシー<br>毎日 1 回| H[🔥 ホットバックアップ<br>本番即応・高速復元]
+    H -->|keep-hot duration 経過<br>24h〜10d| S[🗄️ 標準バックアップ<br>増分・低コスト]
+    S -->|保持期間満了<br>最大 90 日| E[🗑️ 自動削除]
+    H -->|高速リストア| R1([⚡ 新テーブル<br>すぐに本番性能])
+    S -->|通常リストア| R2([🐢 新テーブル<br>性能到達まで時間要])
+        </pre>
+      </div>
+      <p>
+        自動バックアップポリシーが毎日ホットバックアップを作成し、指定した keep-hot duration の経過後に
+        標準バックアップへ自動移行、保持期間満了で削除されるライフサイクルを示しています。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚙️ 主要機能</h2>
+
+      <div class="card">
+        <h3>🔥 1. 自動バックアップポリシーでのホットバックアップ作成 (GA)</h3>
+        <p>
+          SSD インスタンスのテーブルに対し、自動バックアップポリシーでデイリーのホットバックアップを作成可能。
+          テーブル作成時、自動バックアップ有効化時、既存ポリシーの更新時のいずれでも構成できます
+          (Google Cloud コンソールまたは gcloud CLI)。
+        </p>
+      </div>
+
+      <div class="card">
+        <h3>⏱️ 2. keep-hot duration (ホット保持期間) の指定</h3>
+        <p>
+          各デイリーバックアップがホット状態を維持する期間を指定する<strong>必須設定</strong>。
+          24 時間 (1 日) 〜 10 日の範囲で指定し、ポリシーの保持期間 (retention period) を超えることはできません。
+          コンソールのデフォルトは 3 日。期間経過後は残りの保持期間、標準バックアップとして保管されます。
+        </p>
+      </div>
+
+      <div class="card">
+        <h3>🔄 3. 「最新バックアップのみホット」構成の自動化</h3>
+        <p>
+          keep-hot duration を 24 時間に設定すると、翌日の自動バックアップ作成とともに前日分が標準バックアップへ移行。
+          高速な災害復旧とストレージコストのバランスを自動で維持できます。
+        </p>
+      </div>
+
+      <div class="card">
+        <h3>🔀 4. バックアップタイプの切り替え</h3>
+        <p>
+          ポリシーのバックアップタイプを Hot から Standard に戻すことも可能。
+          タイプ変更は作成済みバックアップには影響せず、既存のホットバックアップは移行期間満了までホットのまま維持されます。
+        </p>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔬 技術仕様</h2>
+
+      <h3>ホット自動バックアップの仕様</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>対象インスタンス</strong></td>
+            <td>SSD インスタンスのみ (HDD インスタンスは非対応)</td>
+          </tr>
+          <tr>
+            <td><strong>バックアップ頻度</strong></td>
+            <td>24 時間ごと (デイリー)</td>
+          </tr>
+          <tr>
+            <td><strong>keep-hot duration</strong></td>
+            <td>24 時間 (<code>24h</code>/<code>1d</code>) 〜 10 日 (<code>10d</code>)、保持期間以下であること (必須設定)</td>
+          </tr>
+          <tr>
+            <td><strong>コンソールのデフォルト</strong></td>
+            <td>ホットから標準への移行: 3 日</td>
+          </tr>
+          <tr>
+            <td><strong>保持期間</strong></td>
+            <td>デフォルト 7 日、自動バックアップポリシーでは最大 90 日</td>
+          </tr>
+          <tr>
+            <td><strong>移行後の扱い</strong></td>
+            <td>標準バックアップとして残りの保持期間保管 (保持期間・有効期限は変化しない)</td>
+          </tr>
+          <tr>
+            <td><strong>非対応</strong></td>
+            <td>階層型ストレージ (tiered storage) が有効なテーブル</td>
+          </tr>
+          <tr>
+            <td><strong>大規模クラスタ</strong></td>
+            <td>400 TB 超の SSD ストレージを使用するクラスタで有効化する場合は Cloud カスタマーケアへの連絡が必要</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>その他の制限事項 (ホットバックアップ共通)</h3>
+      <div class="check-item">
+        <span class="cross-icon">✖</span>
+        <span>ホットから標準への変換は可能だが、<strong>標準からホットへの変換は不可</strong></span>
+      </div>
+      <div class="check-item">
+        <span class="cross-icon">✖</span>
+        <span>ホットバックアップのコピーは<strong>常に標準バックアップ</strong>になる (コピーには高速復元特性は引き継がれない)</span>
+      </div>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>前提条件</h3>
+      <div class="check-item">
+        <span class="check-icon">✓</span>
+        <span>テーブルが SSD インスタンス上にあること</span>
+      </div>
+      <div class="check-item">
+        <span class="check-icon">✓</span>
+        <span>テーブルで階層型ストレージが有効になっていないこと</span>
+      </div>
+
+      <h3>ステップ 1: gcloud CLI で keep-hot duration を設定</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">自動バックアップポリシーの更新</span>
+        </div>
+        <pre><code class="language-bash">gcloud bigtable tables update TABLE_ID \
+  --instance=INSTANCE_ID \
+  --automated-backup-retention-period=15d \
+  --automated-backup-keep-hot-duration=24h</code></pre>
+      </div>
+      <p>
+        <code>--automated-backup-keep-hot-duration</code> でホット保持期間 (例: <code>24h</code>、<code>2d</code>) を指定します。
+        変更したいパラメータのフラグのみ指定すればよく、省略したパラメータは既存値が維持されます。
+      </p>
+      <div class="warning-box">
+        <strong>⚠️ 注意:</strong> <code>--enable-automated-backup</code> フラグを既存ポリシーのあるテーブルに再指定すると、
+        保持期間や keep-hot duration が<strong>デフォルト値 (保持期間 7 日、標準バックアップ) にリセット</strong>されます。
+        更新時は個別フラグを使用してください。
+      </div>
+
+      <h3>ステップ 2: コンソールで設定する場合</h3>
+      <ol class="step-list">
+        <li>Bigtable インスタンス一覧から対象の SSD インスタンスを選択</li>
+        <li><strong>Tables</strong> ページで対象テーブルの <strong>Edit</strong> をクリック</li>
+        <li><strong>Configure automated backup</strong> セクションで <strong>Enable automated backup</strong> を選択</li>
+        <li><strong>Backup type</strong> で <strong>Hot</strong> を選択</li>
+        <li><strong>Set hot to standard</strong> に 1〜10 の整数 (日数) を入力 (デフォルト: 3 日、Retention period 以下)</li>
+        <li><strong>Save</strong> をクリック</li>
+      </ol>
+      <div class="note-box">
+        <strong>💡 ヒント:</strong> ポリシーの変更が反映されるまで最大 1 時間かかる場合があります。
+      </div>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>✨ メリット</h2>
+
+      <h3>💼 ビジネス面</h3>
+      <div class="success-box">
+        <strong>⚡ RTO の短縮:</strong> 障害発生時にホットバックアップから高速に復元でき、
+        復元直後から本番レベルの低レイテンシ読み取りが可能なため、サービス停止の影響を最小化できます。
+      </div>
+      <div class="success-box">
+        <strong>💰 運用コストの最適化:</strong> 最新世代のみホットに保ち古い世代を標準に自動移行することで、
+        高速復旧能力と保管コストのバランスを自動で維持できます。
+      </div>
+
+      <h3>🔧 技術面</h3>
+      <div class="success-box">
+        <strong>🤖 運用の自動化:</strong> オンデマンドホットバックアップの定期作成や移行時刻の個別設定といった
+        手動運用・スクリプト運用が不要になります。
+      </div>
+      <div class="success-box">
+        <strong>📋 ポリシーベースの一貫管理:</strong> バックアップタイプ、keep-hot duration、
+        保持期間 (最大 90 日) を単一の自動バックアップポリシーで一元管理できます。
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>制限事項</h3>
+      <div class="check-item">
+        <span class="cross-icon">✖</span>
+        <span>SSD インスタンス限定 (HDD インスタンスでは利用不可)</span>
+      </div>
+      <div class="check-item">
+        <span class="cross-icon">✖</span>
+        <span>階層型ストレージが有効なテーブルでは利用不可</span>
+      </div>
+      <div class="check-item">
+        <span class="cross-icon">✖</span>
+        <span>keep-hot duration は 24 時間以上 10 日以下で、保持期間を超えられない</span>
+      </div>
+      <div class="check-item">
+        <span class="cross-icon">✖</span>
+        <span>400 TB 超の SSD ストレージを使用するクラスタでは有効化にカスタマーケアへの連絡が必要</span>
+      </div>
+
+      <h3>考慮すべき点</h3>
+      <div class="warning-box">
+        <strong>💸 コスト:</strong> ホットバックアップはテーブル全体の論理コピーとして課金されるため、
+        増分共有される標準バックアップよりストレージ単価・課金対象サイズの両面でコストが高くなります。
+        <strong>keep-hot duration を必要最小限にすることが重要</strong>です。
+      </div>
+      <div class="warning-box">
+        <strong>🌐 レプリケーション構成:</strong> 各クラスタにデイリーバックアップが作成されるためコストが増加しえます。
+        Enterprise Plus エディションでは特定ロケーションのみの有効化で軽減可能です。
+      </div>
+      <div class="warning-box">
+        <strong>🚩 フラグの再指定:</strong> <code>--enable-automated-backup</code> フラグの再指定は
+        ポリシーをデフォルトにリセットするため、更新時は個別フラグを使用してください。
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>🚨 ユースケース 1: 低 RTO が求められる本番サービスのディザスタリカバリ</h3>
+        <p>
+          <strong>シナリオ:</strong> ユーザー向けアプリケーションのバックエンドとして Bigtable (SSD) を使用しており、
+          障害時には最新バックアップから短時間で本番性能に復帰する必要がある。
+        </p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">実装例</span>
+          </div>
+          <pre><code class="language-bash">gcloud bigtable tables update prod-user-table \
+  --instance=prod-instance \
+  --automated-backup-retention-period=30d \
+  --automated-backup-keep-hot-duration=24h</code></pre>
+        </div>
+        <p>
+          <strong>効果:</strong> 常に直近 24 時間以内のホットバックアップが存在し、高速復元が可能。
+          前日以前の世代は標準バックアップとして 30 日間低コストで保持されます。
+        </p>
+      </div>
+
+      <div class="usecase">
+        <h3>🔧 ユースケース 2: 週次メンテナンスに備えた数日間のホット保持</h3>
+        <p>
+          <strong>シナリオ:</strong> 大規模なスキーマ変更やデータ移行を行う週は、
+          直近数日分のバックアップから即座にロールバックできる状態を維持したい。
+        </p>
+        <p>
+          <strong>効果:</strong> keep-hot duration を 3〜10 日に設定することで、作業期間中の複数世代をホットのまま保持し、
+          どの時点にも高速に復元できます。作業後はポリシー更新で標準バックアップ運用に戻せます。
+        </p>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>
+        バックアップの作成・コピー・復元などの操作自体は<strong>無料</strong>で、
+        バックアップの<strong>物理サイズに基づくストレージ料金</strong>が発生します。
+        ホットバックアップは即応状態で保管されるため、標準バックアップのような増分課金ではなく、
+        <span class="highlight">テーブル全体の論理コピーに対して課金</span>されます。
+        ホットから標準への移行時に追加料金は発生せず、ホット期間はホット料金、移行後は標準料金が適用されます。
+      </p>
+      <h3>料金例 (最低料金、リージョンにより異なる)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>料金 (概算)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>🔥 ホットバックアップ ストレージ</td>
+            <td><strong>$0.12/GB/月 〜</strong></td>
+          </tr>
+          <tr>
+            <td>🗄️ 標準バックアップ ストレージ</td>
+            <td><strong>$0.026/GB/月 〜</strong></td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        詳細は <a href="https://cloud.google.com/bigtable/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Bigtable 料金ページ</a> を参照してください。
+      </p>
+    </div>
+
+    <!-- 関連サービス・機能 -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <h3>🔥 Bigtable オンデマンドホットバックアップ</h3>
+        <p>任意のタイミングで作成するホットバックアップ。移行時刻の設定は任意で、自動バックアップとの併用も可能です。</p>
+      </div>
+      <div class="card">
+        <h3>🗂️ Bigtable 階層型ストレージ (tiered storage)</h3>
+        <p>有効化したテーブルではホットバックアップが利用できないため、設計時にトレードオフの検討が必要です。</p>
+      </div>
+      <div class="card">
+        <h3>🏢 Bigtable Enterprise Plus エディション</h3>
+        <p>自動バックアップを特定クラスタロケーションのみに限定する構成が可能で、レプリケーション環境のバックアップコストを最適化できます。</p>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>🎉 まとめ</h2>
+      <div class="note-box">
+        <p style="margin: 0;">
+          Bigtable の自動バックアップポリシーで<strong>デイリーホットバックアップと keep-hot duration</strong> を設定できる機能が GA となり、
+          <span class="highlight">高速復旧とコスト最適化を両立するバックアップ運用をポリシーだけで自動化</span>できるようになりました。
+          SSD インスタンスで低 RTO が求められるワークロードを運用している場合は、
+          keep-hot duration を 24 時間に設定した<strong>「最新世代のみホット」構成</strong>から導入を検討することをおすすめします。
+        </p>
+      </div>
+      <p>
+        <span class="badge">#Bigtable</span>
+        <span class="badge">#Backup</span>
+        <span class="badge">#DisasterRecovery</span>
+        <span class="badge badge-ga">#GA</span>
+        <span class="badge">#Storage</span>
+      </p>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p><strong>📎 出典・参考リンク</strong></p>
+      <ul style="padding-left: 20px; margin: 8px 0;">
+        <li>公式リリースノート: <a href="https://docs.cloud.google.com/release-notes#November_06_2026" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/release-notes#November_06_2026</a></li>
+        <li>バックアップの概要 (ホットバックアップ): <a href="https://docs.cloud.google.com/bigtable/docs/backups" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/bigtable/docs/backups</a></li>
+        <li>バックアップの管理 (ホット自動バックアップの構成): <a href="https://docs.cloud.google.com/bigtable/docs/managing-backups#configure-hot-automated-backups" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/bigtable/docs/managing-backups#configure-hot-automated-backups</a></li>
+        <li>料金ページ: <a href="https://cloud.google.com/bigtable/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">https://cloud.google.com/bigtable/pricing</a></li>
+      </ul>
+      <p>このインフォグラフィックは Google Cloud News レポート (2026-11-06) に基づいて作成されました。</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>
