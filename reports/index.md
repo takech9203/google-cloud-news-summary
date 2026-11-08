@@ -5,6 +5,7 @@
 
 ## 2026 年
 
+- [2026-11-08 - Google SecOps SOAR: Release 6.3.106 第 1 フェーズリージョンへのロールアウト開始](2026/2026-11-08-google-secops-soar-6-3-106-rollout.md)
 - [2026-11-06 - BigQuery: モデルに対するカスタム組織ポリシーのサポート (Preview)](2026/2026-11-06-bigquery-models-custom-org-policy-preview.md)
 - [2026-11-06 - Config Controller: 同梱される Config Connector が v1.159.0 に更新](2026/2026-11-06-config-controller-config-connector-v1-159-0.md)
 - [2026-11-06 - Bigtable: 自動バックアップポリシーによるホットバックアップの作成が GA](2026/2026-11-06-bigtable-automated-backup-hot-backups-ga.md)
@@ -19,6 +20,7 @@
 - [2026-11-06 - Cloud Trace: _Trace バケットの再プロビジョニング機能が GA](2026/2026-11-06-cloud-trace-bucket-reprovisioning.md)
 - [2026-11-06 - Google Cloud Contact Center as a Service (CCaaS): バージョン 6.32 リリース (約 30 件の不具合修正)](2026/2026-11-06-ccaas-6-32-release.md)
 - [2026-11-06 - Looker: 26.24 リリース (Filters as tiles の GA と多数の修正)](2026/2026-11-06-looker-26-24-release.md)
+- [2026-11-06 - Cloud Asset Inventory: Cloud KMS KajPolicyConfig リソースタイプの検索 API 対応](2026/2026-11-06-cloud-asset-inventory-kms-kajpolicyconfig.md)
 - [2026-11-06 - Container-Optimized OS: COS 125 / COS 129 LTS Refresh リリース (cos-125-19216-801-14, cos-129-19506-625-14)](2026/2026-11-06-container-optimized-os-lts-refresh.md)
 - [2026-11-06 - Gemini Enterprise: Adobe データストア (Public Preview)](2026/2026-11-06-gemini-enterprise-adobe-data-store-preview.md)
 - [2026-11-06 - Cloud Load Balancing: リージョン / クロスリージョンのロードバランサで IPv6 フロントエンド構成が GA](2026/2026-11-06-cloud-load-balancing-ipv6-frontend-ga.md)
