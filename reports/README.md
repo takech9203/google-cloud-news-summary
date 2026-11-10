@@ -5,7 +5,16 @@
 
 ## 2026 年
 
+- [2026-11-09 - BigQuery: パイプラインのタスク最大同時実行数の指定が GA](2026/2026-11-09-bigquery-pipelines-concurrent-task-limit-ga.md)
+- [2026-11-09 - Anthos Config Management (Config Sync): バージョン 1.25.2 セキュリティ・依存関係アップデート](2026/2026-11-09-anthos-config-management-security-updates.md)
+- [2026-11-09 - Dataform: 同時実行アクション数の制限が一般提供 (GA) に](2026/2026-11-09-dataform-concurrent-actions-limit-ga.md)
+- [2026-11-09 - AI Hypercomputer / GKE: Pathways on Cloud が GKE で一般提供 (GA) 開始](2026/2026-11-09-pathways-on-cloud-gke-ga.md)
+- [2026-11-09 - Bigtable: Google Cloud コンソールでの Avro スキーマバンドル作成・管理 (Preview)](2026/2026-11-09-bigtable-avro-schema-bundles-console-preview.md)
+- [2026-11-09 - Anti Money Laundering AI: 商用向け v004.009 系の新マイナーエンジンバージョン (202610-000) リリース](2026/2026-11-09-anti-money-laundering-ai-v004-009-202610.md)
+- [2026-11-08 - Cloud Asset Inventory: Gemini for Google Cloud の Topic リソースタイプが検索 API で利用可能に](2026/2026-11-08-cloud-asset-inventory-cloudaicompanion-topic.md)
+- [2026-11-08 - Cloud Run: Vulnerability Assessment for Cloud Run (Preview)](2026/2026-11-08-cloud-run-vulnerability-assessment-preview.md)
 - [2026-11-08 - Google SecOps SOAR: Release 6.3.106 第 1 フェーズリージョンへのロールアウト開始](2026/2026-11-08-google-secops-soar-6-3-106-rollout.md)
+- [2026-11-08 - Google SecOps: Emerging Threats Center の Operations 機能が GA](2026/2026-11-08-google-secops-emerging-threats-center-operations-ga.md)
 - [2026-11-06 - BigQuery: モデルに対するカスタム組織ポリシーのサポート (Preview)](2026/2026-11-06-bigquery-models-custom-org-policy-preview.md)
 - [2026-11-06 - Config Controller: 同梱される Config Connector が v1.159.0 に更新](2026/2026-11-06-config-controller-config-connector-v1-159-0.md)
 - [2026-11-06 - Bigtable: 自動バックアップポリシーによるホットバックアップの作成が GA](2026/2026-11-06-bigtable-automated-backup-hot-backups-ga.md)
