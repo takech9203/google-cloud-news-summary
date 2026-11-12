@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API Gateway: バックエンド接続における TLS 1.3 サポート</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); color: #FFFFFF; }
+    .badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+    .badge-deprecated { background: var(--gc-red); color: #FFFFFF; }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 760px) {
+      .before-after { grid-template-columns: 1fr; }
+    }
+
+    .before-box, .after-box {
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid rgba(234, 67, 53, 0.35);
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid rgba(52, 168, 83, 0.35);
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-box h3 { color: #C5221F; }
+    .after-box h3 { color: #188038; }
+
+    .before-box ul, .after-box ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li { margin: 6px 0; }
+
+    /* フロー図 */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+      font-size: 14px;
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 22px;
+      font-weight: bold;
+      text-align: center;
+    }
+
+    .flow-arrow small {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 1.3;
+    }
+
+    /* チェックリスト */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon { color: var(--gc-green); font-size: 18px; }
+    .cross-icon { color: var(--gc-red); font-size: 18px; }
+
+    /* コードブロック (pre:not(.mermaid) で Mermaid を除外) */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block {
+      overflow: hidden;
+      padding: 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+      font-family: 'Roboto Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-title { color: #AAAAAA; }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* 統計カード */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-100);
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+    }
+
+    ul { padding-left: 24px; }
+    li { margin: 6px 0; }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a { word-break: break-all; }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- タイトルエリア -->
+    <div class="header">
+      <div>
+        <div style="margin-bottom: 8px;">
+          <span class="badge">API Gateway</span>
+          <span class="badge badge-ga">Feature (GA)</span>
+          <span class="badge" style="background: var(--gc-teal);">セキュリティ / ネットワーク</span>
+        </div>
+        <h1>🔒 API Gateway: バックエンド接続で TLS 1.3 をサポート</h1>
+        <div class="subtitle" style="margin-top: 8px;">ゲートウェイ → バックエンド間の接続が自動的に最新 TLS プロトコルへ</div>
+      </div>
+      <div class="subtitle">📅 リリース日: 2026-11-10</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📝 概要</h2>
+      <p>
+        Google Cloud は <span class="highlight">API Gateway のゲートウェイからバックエンドサービスへの接続</span>において
+        <span class="highlight">TLS 1.3 (RFC 8446)</span> を有効化しました。
+        バックエンドが TLS 1.3 をサポートしていれば、ゲートウェイは<strong>自動的に TLS 1.3 で接続</strong>します。
+        <strong>ユーザー側の設定変更は不要</strong>で、TLS バージョンのネゴシエーションはゲートウェイとバックエンド間で自動的に行われます。
+      </p>
+      <p>
+        API Gateway は Cloud Run、Cloud Run functions、App Engine などのバックエンドに一貫した REST API で安全にアクセスできる
+        フルマネージドの API 管理サービスです。今回のアップデートで、クライアント → ゲートウェイ区間に加えて
+        ゲートウェイ → バックエンド区間でも最新 TLS が使われ、<strong>エンドツーエンドの通信セキュリティが強化</strong>されます。
+      </p>
+
+      <div class="flow-diagram">
+        <div class="flow-step">📱 API クライアント</div>
+        <span class="flow-arrow">→<small>TLS 1.2+<br>(強制済み)</small></span>
+        <div class="flow-step">🚪 API Gateway</div>
+        <span class="flow-arrow" style="color: var(--gc-green);">→<small>🆕 TLS 1.3<br>(自動選択)</small></span>
+        <div class="flow-step">⚙️ バックエンド<br><small style="font-weight: normal; color: var(--gc-outline);">Cloud Run / functions / App Engine</small></div>
+      </div>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before (アップデート前の課題)</h3>
+          <ul>
+            <li>ゲートウェイ → バックエンド間では TLS 1.3 が使われず、バックエンドが対応していても旧バージョンの TLS で接続</li>
+            <li>フロントエンド側は 2025 年 7 月に TLS 1.2+ が強制されたが、バックエンド側は TLS 1.3 の恩恵 (高速ハンドシェイク、強化暗号スイート) を受けられず</li>
+            <li>セキュリティポリシーで TLS 1.3 が推奨・要求される場合に、ゲートウェイ〜バックエンド区間が未対応</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After (アップデート後の改善)</h3>
+          <ul>
+            <li>バックエンドが TLS 1.3 対応なら、ゲートウェイは自動的に TLS 1.3 で接続</li>
+            <li>設定変更・再デプロイ不要で、既存のゲートウェイにもそのまま適用</li>
+            <li>1-RTT ハンドシェイクで新規接続確立時のレイテンシ削減が期待できる</li>
+            <li>クライアント → ゲートウェイ → バックエンドの全区間でモダンな TLS を実現</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Client["クライアント"]
+        A([📱 API クライアント&lt;br&gt;ブラウザ / モバイルアプリ])
+    end
+
+    subgraph GCP["Google Cloud"]
+        B[🚪 API Gateway&lt;br&gt;ゲートウェイ]
+        C[🔐 Service Control API&lt;br&gt;認証・API キー検証]
+        subgraph Backend["バックエンドサービス"]
+            D[⚙️ Cloud Run]
+            E[⚡ Cloud Run functions]
+            F[🖥️ App Engine]
+        end
+    end
+
+    A -- "HTTPS (TLS 1.2+)" --> B
+    B -. "検証" .-> C
+    B == "🆕 TLS 1.3&lt;br&gt;(バックエンドが対応時に自動選択)" ==> D
+    B == "🆕 TLS 1.3" ==> E
+    B == "🆕 TLS 1.3" ==> F
+
+    style B fill:#4285F4,color:#fff
+    style Backend fill:#E8F0FE
+        </pre>
+      </div>
+      <p>
+        クライアントからの API リクエストは API Gateway で認証・検証された後、バックエンドサービスへ転送されます。
+        今回のアップデートにより、ゲートウェイからバックエンドへの接続 (太線部分) で、
+        バックエンドが TLS 1.3 をサポートしていれば<strong>自動的に TLS 1.3 が使用</strong>されます。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+
+      <div class="card">
+        <h3>🔄 1. バックエンド接続での TLS 1.3 自動ネゴシエーション</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span>ゲートウェイ → バックエンドサービスへの接続で TLS 1.3 が有効化</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>バックエンドが TLS 1.3 対応なら、ゲートウェイは TLS 1.3 を使用</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>未対応のバックエンドには、従来どおりサポートされる TLS バージョンにフォールバック</span></div>
+      </div>
+
+      <div class="card">
+        <h3>🛠️ 2. 設定不要での適用</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span>OpenAPI 仕様 (<code>x-google-backend</code>) や API Config の変更は不要</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>Cloud Run、Cloud Run functions、App Engine など Google マネージドバックエンドは TLS 1.3 対応済みで、自動的に恩恵を受けられる</span></div>
+      </div>
+
+      <div class="card">
+        <h3>🔗 3. フロントエンド側の TLS 強化との組み合わせ</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span>2025 年 7 月のアップデートでクライアント → ゲートウェイ間は TLS 1.2 以上が強制済み</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>今回のバックエンド側 TLS 1.3 対応により、通信経路全体でモダンな TLS 構成が実現</span></div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔬 技術仕様</h2>
+
+      <h3>📊 TLS 1.2 と TLS 1.3 の比較</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>TLS 1.2</th>
+            <th>TLS 1.3</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ハンドシェイク</td>
+            <td>2-RTT</td>
+            <td><strong>1-RTT</strong> (接続確立が高速)</td>
+          </tr>
+          <tr>
+            <td>Forward Secrecy</td>
+            <td>オプション</td>
+            <td><strong>必須</strong> (一時的な鍵交換のみ)</td>
+          </tr>
+          <tr>
+            <td>旧式暗号スイート (RSA 鍵交換、CBC モードなど)</td>
+            <td>利用可能</td>
+            <td><strong>廃止</strong></td>
+          </tr>
+          <tr>
+            <td>ハンドシェイクの暗号化</td>
+            <td>平文部分が多い</td>
+            <td>証明書を含む大部分を暗号化</td>
+          </tr>
+          <tr>
+            <td>規格</td>
+            <td>RFC 5246</td>
+            <td>RFC 8446</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>🔌 API Gateway のエンドポイント構成</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>エンドポイント</th>
+            <th>役割</th>
+            <th>今回の変更</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>API エンドポイント</td>
+            <td>クライアントが API を利用するための公開エンドポイント</td>
+            <td>変更なし (TLS 1.2+ を強制済み)</td>
+          </tr>
+          <tr>
+            <td>バックエンドエンドポイント</td>
+            <td>API がバックエンドサービスに接続するためのエンドポイント</td>
+            <td><strong>🆕 TLS 1.3 が有効化</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>⚙️ 設定方法</h2>
+
+      <h3>📋 前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>API Gateway でゲートウェイがデプロイ済みであること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>バックエンドサービス (Cloud Run、Cloud Run functions、App Engine、または外部 HTTPS サービス) が稼働していること</span></div>
+
+      <div class="success-box">
+        <strong>✅ 設定作業は不要:</strong> このアップデートは自動的に適用されます。バックエンドが TLS 1.3 をサポートしていれば、ゲートウェイは自動的に TLS 1.3 で接続します。
+      </div>
+
+      <h3>🔍 参考: 自前のバックエンドで TLS 1.3 の対応状況を確認する</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">TLS 1.3 対応確認</span>
+        </div>
+        <pre><code class="language-bash"># バックエンドサーバーが TLS 1.3 をサポートしているか確認
+openssl s_client -connect YOUR_BACKEND_HOST:443 -tls1_3 &lt;/dev/null 2&gt;/dev/null \
+  | grep -E "Protocol|Cipher"</code></pre>
+      </div>
+      <p>
+        <code>Protocol  : TLSv1.3</code> が表示されれば、バックエンドは TLS 1.3 に対応しており、ゲートウェイからの接続で TLS 1.3 が使用されます。
+      </p>
+
+      <h3>🔍 参考: 既存のゲートウェイ構成の確認</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">gcloud CLI でのゲートウェイ確認</span>
+        </div>
+        <pre><code class="language-bash"># ゲートウェイの一覧を確認
+gcloud api-gateway gateways list
+
+# API Config の詳細 (バックエンド設定) を確認
+gcloud api-gateway api-configs describe CONFIG_ID --api=API_ID</code></pre>
+      </div>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>💡 メリット</h2>
+
+      <div class="card" style="border-left-color: var(--gc-green);">
+        <h3>💼 ビジネス面</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>コンプライアンス対応の強化</strong>: 最新 TLS プロトコルの利用を求めるセキュリティポリシーや業界規制 (金融、医療など) への準拠が容易に</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>運用負荷ゼロでのセキュリティ向上</strong>: 設定変更やダウンタイムなしで、既存の API 基盤のセキュリティ水準が向上</span></div>
+      </div>
+
+      <div class="card" style="border-left-color: var(--gc-green);">
+        <h3>🔧 技術面</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>接続確立の高速化</strong>: TLS 1.3 の 1-RTT ハンドシェイクにより、ゲートウェイ → バックエンドの新規接続時のレイテンシが削減</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>Forward Secrecy の必須化</strong>: 万一秘密鍵が漏洩しても過去の通信内容は復号できず、長期的なデータ保護を強化</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>脆弱な暗号スイートの排除</strong>: RSA 鍵交換や CBC モードなど既知の攻撃対象となった方式が廃止</span></div>
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>🚧 制限事項</h3>
+      <div class="check-item"><span class="cross-icon">✗</span><span>TLS 1.3 が使用されるのは<strong>バックエンドが TLS 1.3 をサポートしている場合のみ</strong>。未対応のバックエンドへは従来の TLS バージョンで接続</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>TLS バージョンを明示的に固定・指定するユーザー向け設定は提供されない (自動ネゴシエーション)</span></div>
+
+      <h3>🤔 考慮すべき点</h3>
+      <div class="warning-box">
+        <strong>⚠️ 注意:</strong>
+        <ul style="margin: 8px 0 0;">
+          <li>自前で運用する外部バックエンド (オンプレミスや VM 上のサービス) で TLS 1.3 の恩恵を受けるには、バックエンド側のミドルウェア (nginx、Envoy など) が TLS 1.3 に対応している必要がある</li>
+          <li>バックエンド側で TLS バージョンに依存した監視・検査 (ミドルボックスによる TLS インスペクションなど) を行っている場合は、TLS 1.3 への移行による影響を確認する</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>🏦 ユースケース 1: 金融系 API 基盤でのエンドツーエンド TLS 強化</h3>
+        <p><strong>シナリオ:</strong> 金融機関が API Gateway + Cloud Run で外部公開 API を運用しており、社内セキュリティ基準で通信経路全体における TLS 1.3 の利用が推奨されている。</p>
+        <p style="margin-bottom: 0;"><strong>効果:</strong> Cloud Run は TLS 1.3 に対応しているため、<span class="highlight">追加作業なし</span>でゲートウェイ → バックエンド間が TLS 1.3 となり、クライアント → ゲートウェイ間 (TLS 1.2+) と合わせて監査要件を満たしやすくなる。</p>
+      </div>
+
+      <div class="usecase">
+        <h3>📱 ユースケース 2: 低レイテンシが求められるモバイル向け API</h3>
+        <p><strong>シナリオ:</strong> モバイルアプリ向けの API で、トラフィックの増減によりゲートウェイからバックエンドへの新規接続が頻繁に発生する。</p>
+        <p style="margin-bottom: 0;"><strong>効果:</strong> TLS 1.3 の <span class="highlight">1-RTT ハンドシェイク</span>により接続確立のオーバーヘッドが削減され、コールドスタートやスケールアウト時のバックエンド接続レイテンシの改善が期待できる。</p>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <div class="note-box">
+        <strong>💡 追加料金なし:</strong> 今回のアップデートによる追加料金はありません。API Gateway の料金は API 呼び出し数に基づく従量課金です。
+      </div>
+
+      <h3>📈 料金例 (API 呼び出し)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>月間 API 呼び出し数 (課金アカウントごと)</th>
+            <th>100 万回あたりの料金</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>0〜200 万回</td>
+            <td><strong>$0.00 (無料)</strong></td>
+          </tr>
+          <tr>
+            <td>200 万〜10 億回</td>
+            <td>$3.00</td>
+          </tr>
+          <tr>
+            <td>10 億回超</td>
+            <td>$1.50</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>詳細は <a class="gc-link" href="https://cloud.google.com/api-gateway/pricing" target="_blank" rel="noopener noreferrer">API Gateway 料金ページ</a> を参照してください。</p>
+    </div>
+
+    <!-- 関連サービス -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+
+      <div class="card">
+        <h3>⚙️ Cloud Run / Cloud Run functions / App Engine</h3>
+        <p style="margin: 0;">API Gateway の代表的なバックエンド。Google マネージドサービスとして TLS 1.3 に対応しており、本アップデートの恩恵を自動的に受けられる。</p>
+      </div>
+
+      <div class="card">
+        <h3>🔐 Service Control API</h3>
+        <p style="margin: 0;">API キー検証・認証・ロギングなどの API 管理ルールをランタイムで適用するコンポーネント。</p>
+      </div>
+
+      <div class="card">
+        <h3>⚖️ Cloud Load Balancing / GKE Gateway</h3>
+        <p style="margin: 0;">同様にバックエンド TLS (BackendTLSPolicy) による暗号化・検証をサポート。L7 ロードバランサー経由の構成での代替・補完となる。</p>
+      </div>
+
+      <div class="card">
+        <h3>🚀 Apigee</h3>
+        <p style="margin: 0;">より高度な API 管理 (ポリシー、アナリティクス、収益化) が必要な場合の上位サービス。TargetEndpoint 単位で TLS を細かく構成できる。</p>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📌 まとめ</h2>
+      <div class="success-box">
+        <p style="margin: 0 0 8px;">
+          API Gateway のバックエンド接続で <strong>TLS 1.3 が有効化</strong>され、クライアントからバックエンドまでの<strong>通信経路全体でモダンな TLS 構成</strong>が実現しました。
+        </p>
+        <p style="margin: 0;">
+          設定変更は不要で自動的に適用されるため、ユーザー側の対応は基本的に不要です。ただし、自前で運用する外部バックエンドがある場合は TLS 1.3 対応状況を確認し、未対応であればミドルウェア (nginx、Envoy など) の更新を検討することを推奨します。
+        </p>
+      </div>
+      <div style="margin-top: 12px;">
+        <span class="badge">API Gateway</span>
+        <span class="badge">TLS 1.3</span>
+        <span class="badge">セキュリティ</span>
+        <span class="badge">ネットワーク</span>
+        <span class="badge">暗号化</span>
+        <span class="badge">バックエンド</span>
+      </div>
+    </div>
+
+    <!-- フッター (出典) -->
+    <footer>
+      <p>📎 出典 / 参考リンク:</p>
+      <ul style="margin: 4px 0; padding-left: 20px;">
+        <li><a class="gc-link" href="https://docs.cloud.google.com/release-notes#November_10_2026" target="_blank" rel="noopener noreferrer">公式リリースノート (2026-11-10)</a></li>
+        <li><a class="gc-link" href="https://docs.cloud.google.com/api-gateway/docs/architecture-overview" target="_blank" rel="noopener noreferrer">API Gateway アーキテクチャ</a></li>
+        <li><a class="gc-link" href="https://docs.cloud.google.com/api-gateway/docs/about-api-gateway" target="_blank" rel="noopener noreferrer">API Gateway について</a></li>
+        <li><a class="gc-link" href="https://docs.cloud.google.com/api-gateway/docs/release-notes" target="_blank" rel="noopener noreferrer">API Gateway リリースノート</a></li>
+        <li><a class="gc-link" href="https://cloud.google.com/api-gateway/pricing" target="_blank" rel="noopener noreferrer">API Gateway 料金ページ</a></li>
+      </ul>
+      <p>このインフォグラフィックは Google Cloud News レポート (2026-11-10) を基に生成されました。</p>
+    </footer>
+
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>
