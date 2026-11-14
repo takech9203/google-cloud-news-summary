@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Looker: Conversational Analytics System Activity の Token usage 可観測性メトリクス強化</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+:root {
+  --gc-blue: #4285F4;
+  --gc-red: #EA4335;
+  --gc-yellow: #FBBC04;
+  --gc-green: #34A853;
+  --gc-blue-900: #174EA6;
+  --gc-blue-800: #185ABC;
+  --gc-blue-700: #1967D2;
+  --gc-blue-600: #1A73E8;
+  --gc-blue-500: #4285F4;
+  --gc-blue-300: #669DF6;
+  --gc-blue-200: #8AB4F8;
+  --gc-blue-100: #AECBFA;
+  --gc-blue-50: #E8F0FE;
+  --gc-on-surface: #202124;
+  --gc-on-surface-variant: #5F6368;
+  --gc-outline: #80868B;
+  --gc-surface: #FFFFFF;
+  --gc-surface-container-lowest: #F8F9FA;
+  --gc-surface-container-low: #F1F3F4;
+  --gc-surface-container: #E8EAED;
+  --gc-outline-variant: #DADCE0;
+  --gc-blue-tint: #E8F0FE;
+  --gc-green-tint: #E6F4EA;
+  --gc-red-tint: #FCE8E6;
+  --gc-yellow-tint: #FEF7E0;
+  --gc-purple-tint: #F3E8FD;
+  --gc-teal-tint: #E0F7FA;
+  --gc-purple: #A142F4;
+  --gc-teal: #00BCD4;
+  --gc-orange: #FF6D00;
+}
+
+body {
+  background-color: var(--gc-surface);
+  font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+  color: var(--gc-on-surface-variant);
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 20px;
+  margin: 0;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 3px solid var(--gc-blue-600);
+}
+
+h1, .title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--gc-on-surface);
+  margin: 0;
+  line-height: 1.4;
+}
+
+h2, .section-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin-top: 0;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 20px 0 8px;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: var(--gc-outline);
+}
+
+.section {
+  background: var(--gc-surface-container-low);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid var(--gc-outline-variant);
+}
+
+.highlight {
+  background-color: var(--gc-blue-50);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--gc-blue-800);
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+.card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border-left: 4px solid var(--gc-blue-600);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+}
+
+.card h3 {
+  margin-top: 0;
+}
+
+.icon-text {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+  color: var(--gc-on-surface-variant);
+}
+
+.arrow {
+  color: var(--gc-blue-600);
+  font-size: 20px;
+}
+
+.gc-link {
+  color: var(--gc-blue-600);
+  text-decoration: none;
+}
+
+.gc-link:hover {
+  color: var(--gc-blue-800);
+  text-decoration: underline;
+}
+
+.badge,
+.badge-ga,
+.badge-preview,
+.badge-deprecated {
+  display: inline-block;
+  color: #FFFFFF;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+  margin: 4px 8px 4px 0;
+}
+
+.badge {
+  background: var(--gc-blue-600);
+}
+
+.badge-ga {
+  background: var(--gc-green);
+  color: #FFFFFF;
+}
+
+.badge-preview {
+  background: var(--gc-orange);
+  color: #FFFFFF;
+}
+
+/* Before/After 比較 */
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+@media (max-width: 760px) {
+  .before-after {
+    grid-template-columns: 1fr;
+  }
+}
+
+.before-box {
+  background: var(--gc-red-tint);
+  border: 1px solid rgba(234, 67, 53, 0.3);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.after-box {
+  background: var(--gc-green-tint);
+  border: 1px solid rgba(52, 168, 83, 0.3);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.before-box h3, .after-box h3 {
+  margin-top: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.before-box h3 { color: #C5221F; }
+.after-box h3 { color: #188038; }
+
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.check-icon {
+  color: var(--gc-green);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.cross-icon {
+  color: var(--gc-red);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+code:not(pre code) {
+  background: var(--gc-surface);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 0.9em;
+  color: var(--gc-blue-900);
+}
+
+/* テーブル */
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--gc-outline-variant);
+  background: var(--gc-surface);
+}
+
+th {
+  background: var(--gc-blue-50);
+  color: var(--gc-blue-900);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 2px solid var(--gc-blue-200);
+}
+
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--gc-outline-variant);
+  font-size: 14px;
+}
+
+tr:nth-child(even) {
+  background: var(--gc-surface-container-lowest);
+}
+
+tr:hover {
+  background: var(--gc-blue-50);
+}
+
+/* ボックス */
+.note-box {
+  background: var(--gc-blue-tint);
+  border-left: 4px solid var(--gc-blue-600);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.warning-box {
+  background: var(--gc-yellow-tint);
+  border-left: 4px solid var(--gc-yellow);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.ai-box {
+  background: var(--gc-purple-tint);
+  border-left: 4px solid var(--gc-purple);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.success-box {
+  background: var(--gc-green-tint);
+  border-left: 4px solid var(--gc-green);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+/* ユースケース */
+.usecase {
+  background: var(--gc-blue-tint);
+  border: 1px solid var(--gc-blue-100);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 16px 0;
+}
+
+.usecase h3 {
+  margin-top: 0;
+  color: var(--gc-blue-900);
+}
+
+/* Mermaid */
+.mermaid-container {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 20px 0;
+  border: 2px solid rgba(66, 133, 244, 0.3);
+  overflow-x: auto;
+}
+
+.mermaid {
+  display: flex;
+  justify-content: center;
+  background: #FFFFFF;
+}
+
+/* 機能カードグリッド */
+.feature-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 760px) {
+  .feature-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.feature-grid .card {
+  margin: 0;
+}
+
+/* ステップカード */
+.step-card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border-left: 4px solid var(--gc-blue-600);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+}
+
+.step-card h3 {
+  margin-top: 0;
+}
+
+/* フィルタチップ */
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.chip {
+  background: var(--gc-surface);
+  border: 1px solid var(--gc-blue-300);
+  color: var(--gc-blue-800);
+  border-radius: 16px;
+  padding: 4px 14px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+ul {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+
+li {
+  margin: 6px 0;
+}
+
+footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gc-outline-variant);
+  font-size: 13px;
+  color: var(--gc-outline);
+}
+
+footer a {
+  word-break: break-all;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <div>
+      <div style="margin-bottom: 8px;">
+        <span class="badge">📈 Looker</span>
+        <span class="badge badge-ga">GA (Looker (original) 26.16 以降)</span>
+        <span class="badge badge-preview">Preview (Looker (Google Cloud core))</span>
+      </div>
+      <h1>🪙 Looker: Conversational Analytics System Activity の Token usage 可観測性メトリクス強化</h1>
+      <div class="subtitle">トークン使用量の可視化が GA に — Daily Token Utilization と Gemini Enterprise 公開エージェントの観測に対応</div>
+    </div>
+    <div class="subtitle">リリース日: 2026-09-30</div>
+  </div>
+
+  <!-- 概要 -->
+  <div class="section">
+    <h2>📝 概要</h2>
+    <p>
+      Looker の Conversational Analytics System Activity ダッシュボードの <span class="highlight">Token usage タブ</span>で、
+      ユーザーエンゲージメントと推定トークン使用量データを含む可観測性メトリクスが強化され、
+      <span class="highlight">Looker 26.16 以降の Looker (original) インスタンスで一般提供 (GA)</span> となりました。
+      新たに <span class="highlight">Daily Token Utilization (日次トークン使用率) の可視化</span>が追加されたほか、
+      <span class="highlight">Gemini Enterprise に公開された Conversational Analytics データエージェントのトークン使用量の可観測性</span>にも対応しました。
+    </p>
+    <p>
+      Conversational Analytics の使用量は「データトークン」(LLM が処理するテキストとデータの基本単位) で測定されます。
+      質問文、会話履歴、メタデータやエージェント指示などのコンテキストが入力データトークンとして、
+      自然言語の回答、生成された API 呼び出しや SQL クエリ、可視化などが出力データトークンとして計測されます。
+      Looker 管理者は System Activity からインスタンス全体のトークン消費を把握し、コスト管理やガバナンスに活用できます。
+    </p>
+    <div class="warning-box">
+      <strong>⚠️ 注意:</strong> Looker (Google Cloud core) インスタンスでは、「Conversational Analytics Agent Token usage」Preview 機能を有効化した場合に利用でき、
+      トークン使用量の可観測性は<strong>引き続き Preview</strong> です。
+    </div>
+
+    <div class="before-after">
+      <div class="before-box">
+        <h3>😓 Before: アップデート前の課題</h3>
+        <div class="check-item"><span class="cross-icon">❌</span><span>トークン使用量の可観測性は Preview 機能であり、Looker (original) インスタンスでも GA としての利用はできなかった</span></div>
+        <div class="check-item"><span class="cross-icon">❌</span><span>日次のトークン使用率 (Daily Token Utilization) を示す可視化がなく、使用率の推移を直接確認できなかった</span></div>
+        <div class="check-item"><span class="cross-icon">❌</span><span>Gemini Enterprise 上で行われた会話の可観測性がなく、公開したデータエージェントのトークン消費を把握できなかった</span></div>
+      </div>
+      <div class="after-box">
+        <h3>🚀 After: アップデート後の改善</h3>
+        <div class="check-item"><span class="check-icon">✅</span><span>Looker 26.16 以降の Looker (original) インスタンスで、強化された可観測性メトリクスが <strong>GA</strong> に</span></div>
+        <div class="check-item"><span class="check-icon">✅</span><span><strong>Daily Token Utilization</strong> の可視化が追加され、日次の推定トークン使用率の推移を確認可能に</span></div>
+        <div class="check-item"><span class="check-icon">✅</span><span>Gemini Enterprise に公開されたデータエージェントも観測対象となり、Top Agents by Token Usage の Conversation Surface に「Gemini Enterprise」が表示 (Looker (original) のみ)</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- アーキテクチャ図 -->
+  <div class="section">
+    <h2>🏗️ アーキテクチャ図</h2>
+    <div class="mermaid-container">
+      <pre class="mermaid">
+flowchart LR
+    subgraph Surfaces["会話サーフェス"]
+        U([👤 ユーザー]) --> CA["💬 Conversational Analytics<br>(Explore / API / Embed)"]
+        U --> DA["📊 Dashboard Agents<br>(通常 / Embed)"]
+        U --> GE["🤖 Gemini Enterprise<br>(公開済みデータエージェント)"]
+    end
+    CA --> TK["🪙 データトークン計測<br>(入力 / 出力)"]
+    DA --> TK
+    GE --> TK
+    TK -->|同期 (レイテンシ約 6 時間)| SA["📈 System Activity<br>Conversational Analytics ダッシュボード"]
+    SA --> TAB["🗂️ Token usage タブ<br>Daily Token Utilization など"]
+    TAB --> ADM([🛡️ Looker 管理者])
+      </pre>
+    </div>
+    <p>
+      各会話サーフェス (Explore、ダッシュボードエージェント、Gemini Enterprise に公開されたエージェントなど) でのやり取りが
+      データトークンとして計測され、System Activity の Token usage タブで管理者が確認できます。
+    </p>
+  </div>
+
+  <!-- 主要機能 -->
+  <div class="section">
+    <h2>⚡ 主要機能</h2>
+    <div class="card" style="border-left-color: var(--gc-green);">
+      <h3>✅ 1. 強化された可観測性メトリクスの GA (Looker (original))</h3>
+      <div class="icon-text"><span class="arrow">→</span><span>ユーザーエンゲージメントと推定トークン使用量データを含む可観測性メトリクスが、<strong>Looker 26.16 以降の Looker (original) インスタンスで一般提供 (GA)</strong> に</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>Looker (Google Cloud core) インスタンスでは「Conversational Analytics Agent Token usage」Preview 機能を有効化した場合に利用可能で、引き続き <strong>Preview</strong> 扱い</span></div>
+    </div>
+    <div class="card">
+      <h3>📊 2. Daily Token Utilization の可視化を追加</h3>
+      <div class="icon-text"><span class="arrow">→</span><span>日次の<strong>推定トークン使用率</strong>の推移を示す可視化が Token usage タブに追加</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>既存の Daily Estimated Token Usage (日次の入力・出力トークンの推定使用量) と併せて、使用傾向をより詳細に把握可能</span></div>
+    </div>
+    <div class="card" style="border-left-color: var(--gc-purple);">
+      <h3>🤖 3. Gemini Enterprise に公開されたデータエージェントのトークン可観測性</h3>
+      <div class="icon-text"><span class="arrow">→</span><span>Gemini Enterprise に公開された Conversational Analytics データエージェントのトークン使用量が観測対象に</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>Top Agents by Token Usage の Conversation Surface 列に「<strong>Gemini Enterprise</strong>」が表示される (Looker (original) インスタンスのみ)</span></div>
+    </div>
+  </div>
+
+  <!-- Token usage タブで確認できるデータ -->
+  <div class="section">
+    <h2>🗂️ Token usage タブで確認できるデータ</h2>
+    <div class="table-wrap">
+      <table>
+        <tr><th style="width: 35%;">メトリクス</th><th>内容</th></tr>
+        <tr><td><strong>Total Estimated Input Tokens</strong></td><td>Conversational Analytics で使用されたと推定される入力データトークンの合計</td></tr>
+        <tr><td><strong>Total Estimated Output Tokens</strong></td><td>推定される出力データトークンの合計</td></tr>
+        <tr><td><strong>Daily Estimated Token Usage</strong></td><td>日次の入力・出力トークンの推定使用量の推移</td></tr>
+        <tr><td><strong>Daily Token Utilization</strong> <span class="badge badge-ga" style="font-size: 11px; padding: 2px 8px;">今回追加</span></td><td>日次の推定トークン使用率の推移</td></tr>
+        <tr><td><strong>Top Agents by Token Usage</strong></td><td>エージェントごとの入力・出力トークン量。Conversation Surface 列でエージェント種別を表示</td></tr>
+        <tr><td><strong>Top Users by Token Usage</strong></td><td>トークン使用量の多いユーザーの一覧</td></tr>
+        <tr><td><strong>Top Conversations by Token Usage</strong></td><td>トークン使用量の多い会話の一覧</td></tr>
+      </table>
+    </div>
+
+    <h3>💬 Conversation Surface (会話サーフェス) の種類</h3>
+    <div class="table-wrap">
+      <table>
+        <tr><th style="width: 35%;">サーフェス</th><th>説明</th></tr>
+        <tr><td><strong>Conversational Analytics</strong></td><td>1 つ以上の Looker Explore にクエリするデータエージェント</td></tr>
+        <tr><td><strong>Conversational Analytics API</strong></td><td>Looker API の ConversationalAnalytics メソッドで作成されたデータエージェント</td></tr>
+        <tr><td><strong>Conversational Analytics Embed</strong></td><td>埋め込まれた Looker Explore にクエリするデータエージェント</td></tr>
+        <tr><td><strong>Dashboard Agents</strong></td><td>Looker ダッシュボードにクエリするデータエージェント</td></tr>
+        <tr><td><strong>Dashboard Agents Embed</strong></td><td>埋め込まれた Looker ダッシュボードにクエリするデータエージェント</td></tr>
+        <tr><td><strong>Explore Insight Assistant</strong></td><td>Insight Assistant エージェント</td></tr>
+        <tr><td><strong>Gemini Enterprise</strong> <span class="badge badge-ga" style="font-size: 11px; padding: 2px 8px;">今回追加</span></td><td>Gemini Enterprise に公開されたデータエージェント (Looker (original) インスタンスのみ表示)</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- 技術仕様 -->
+  <div class="section">
+    <h2>🔧 技術仕様</h2>
+
+    <h3>🪙 データトークンの計測対象</h3>
+    <div class="table-wrap">
+      <table>
+        <tr><th style="width: 30%;">種別</th><th>含まれる内容</th></tr>
+        <tr><td><strong>📥 入力データトークン</strong></td><td>チャットに入力された質問、セッションの会話履歴、メタデータやエージェント指示などのデータコンテキスト</td></tr>
+        <tr><td><strong>📤 出力データトークン</strong></td><td>質問への自然言語の回答、データ取得のために生成された API 呼び出しや SQL クエリ、モデルが生成したその他のテキスト、モデルが作成した可視化</td></tr>
+      </table>
+    </div>
+
+    <h3>🔍 フィルタリング</h3>
+    <p>Token usage タブでは、以下の属性によるページレベルフィルタが利用できます。</p>
+    <div class="chip-row">
+      <span class="chip">📅 Created Date (作成日)</span>
+      <span class="chip">🤖 Agent ID (エージェント ID)</span>
+      <span class="chip">💬 Conversation Surface (会話サーフェス)</span>
+      <span class="chip">👤 User ID (ユーザー ID)</span>
+      <span class="chip">🗨️ Conversation ID (会話 ID)</span>
+    </div>
+  </div>
+
+  <!-- 設定方法 -->
+  <div class="section">
+    <h2>🛠️ 設定方法</h2>
+
+    <h3>✅ 前提条件</h3>
+    <div class="check-item"><span class="check-icon">✓</span><span><strong>Looker (original) インスタンスの場合</strong>: Looker 26.16 以降であること (GA として利用可能)</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span><strong>Looker (Google Cloud core) インスタンスの場合</strong>: Looker 管理者が Admin パネルの Preview 機能「Conversational Analytics Agent Token usage」を有効化すること (デフォルトでは無効。有効化後も Preview 扱い)</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span>System Activity ダッシュボードへのアクセス権限があること</span></div>
+
+    <div class="step-card">
+      <h3>1️⃣ ステップ 1: (Looker (Google Cloud core) のみ) Preview 機能の有効化</h3>
+      <p style="margin: 0;">
+        Looker 管理者が Admin パネルの Preview Features ページで「<strong>Conversational Analytics Agent Token usage</strong>」を有効にします。
+        有効化すると、Conversational Analytics System Activity ダッシュボードでエンゲージメントとトークン使用量データを含む強化された可観測性メトリクスが利用可能になります。
+      </p>
+    </div>
+
+    <div class="step-card">
+      <h3>2️⃣ ステップ 2: Token usage タブの確認</h3>
+      <p style="margin: 0;">
+        Admin パネルの System Activity セクションから Conversational Analytics ダッシュボードを開き、
+        <strong>Token usage タブ</strong>で推定トークン使用量、Daily Token Utilization、Top Agents / Users / Conversations by Token Usage などを確認します。
+        必要に応じて Created Date、Agent ID、Conversation Surface などのフィルタで絞り込みます。
+      </p>
+    </div>
+
+    <div class="flow-diagram" style="display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; margin: 24px 0;">
+      <div style="background: var(--gc-surface); border: 2px solid var(--gc-blue-600); border-radius: 12px; padding: 12px 20px; text-align: center; color: var(--gc-on-surface); box-shadow: 0 1px 3px rgba(60,64,67,0.12);">🛡️ Admin パネル</div>
+      <span style="color: var(--gc-blue-600); font-size: 24px; font-weight: bold;">→</span>
+      <div style="background: var(--gc-surface); border: 2px solid var(--gc-blue-600); border-radius: 12px; padding: 12px 20px; text-align: center; color: var(--gc-on-surface); box-shadow: 0 1px 3px rgba(60,64,67,0.12);">📈 System Activity</div>
+      <span style="color: var(--gc-blue-600); font-size: 24px; font-weight: bold;">→</span>
+      <div style="background: var(--gc-surface); border: 2px solid var(--gc-blue-600); border-radius: 12px; padding: 12px 20px; text-align: center; color: var(--gc-on-surface); box-shadow: 0 1px 3px rgba(60,64,67,0.12);">💬 Conversational Analytics<br>ダッシュボード</div>
+      <span style="color: var(--gc-blue-600); font-size: 24px; font-weight: bold;">→</span>
+      <div style="background: var(--gc-surface); border: 2px solid var(--gc-blue-600); border-radius: 12px; padding: 12px 20px; text-align: center; color: var(--gc-on-surface); box-shadow: 0 1px 3px rgba(60,64,67,0.12);">🪙 Token usage タブ</div>
+    </div>
+  </div>
+
+  <!-- メリット -->
+  <div class="section">
+    <h2>💎 メリット</h2>
+    <div class="feature-grid">
+      <div class="card" style="border-left-color: var(--gc-green);">
+        <h3>💼 ビジネス面</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>コストの透明性向上</strong>: Conversational Analytics の料金はトークン使用量に基づくため、推定トークン使用量と日次使用率を可視化することで、コストの把握と予測がしやすくなる</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>AI 活用のガバナンス強化</strong>: どのエージェント・ユーザー・会話がトークンを多く消費しているかを特定でき、利用ポリシーの整備や最適化に役立つ</span></div>
+      </div>
+      <div class="card" style="border-left-color: var(--gc-blue-600);">
+        <h3>⚙️ 技術面</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>GA による本番利用の安心感</strong>: Looker (original) インスタンスでは GA となり、本番運用での利用に適したサポートレベルで可観測性メトリクスを活用できる</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>Gemini Enterprise まで含めた一元監視</strong>: Looker 内の会話に加え、Gemini Enterprise に公開したデータエージェントのトークン使用量も同じダッシュボードで観測できる</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>多角的な分析</strong>: Conversation Surface、Agent ID、User ID などのフィルタにより、サーフェス別・エージェント別・ユーザー別の詳細な分析が可能</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- デメリット・制約事項 -->
+  <div class="section">
+    <h2>⚠️ デメリット・制約事項</h2>
+
+    <h3>🚧 制限事項</h3>
+    <div class="warning-box">
+      <ul style="margin: 0;">
+        <li>Looker (Google Cloud core) インスタンスでは、トークン使用量の可観測性は引き続き <strong>Preview</strong> であり、「Conversational Analytics Agent Token usage」Preview 機能の有効化が必要 (デフォルトは無効)</li>
+        <li>GA は <strong>Looker 26.16 以降の Looker (original) インスタンス</strong>が対象</li>
+        <li>トークン使用量データの同期には<strong>約 6 時間のレイテンシ</strong>がある</li>
+        <li>会話サーフェスのタグ付けは Looker 26.14 でタグ付け機能が有効化されて以降の使用分に適用され、過去の使用分には遡及されない (Looker 26.12 や、機能有効化前の 26.14 での使用分にはサーフェスのタグが付かない)</li>
+        <li>会話サーフェスと関連する会話は、実際の会話が完了した後にダッシュボードに表示される</li>
+      </ul>
+    </div>
+
+    <h3>🤔 考慮すべき点</h3>
+    <div class="note-box">
+      <ul style="margin: 0;">
+        <li>表示されるトークン数は「<strong>推定値 (Estimated)</strong>」である</li>
+        <li>Top Users / Top Conversations にはユーザー単位の使用状況が表示されるため、社内での利用目的・運用ルールを整理しておくとよい</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ユースケース -->
+  <div class="section">
+    <h2>🎯 ユースケース</h2>
+
+    <div class="usecase">
+      <h3>💰 ユースケース 1: Conversational Analytics のコスト監視と予算管理</h3>
+      <p><strong>シナリオ</strong>: 全社で Conversational Analytics の利用を拡大しているが、トークンベースの課金のため消費量を継続的に監視したい。</p>
+      <div class="success-box" style="margin-bottom: 0;">
+        <strong>✅ 効果:</strong> Token usage タブの Total Estimated Input/Output Tokens と Daily Token Utilization により、
+        日次のトークン消費傾向を把握し、想定を超える使用の早期検知や予算計画に活用できる。
+      </div>
+    </div>
+
+    <div class="usecase">
+      <h3>🤖 ユースケース 2: Gemini Enterprise 公開エージェントの利用状況把握</h3>
+      <p><strong>シナリオ</strong>: Looker の Explore データエージェントを Gemini Enterprise に公開し、BI ツール外からも自然言語でデータに質問できるようにしている。公開後の利用実態を把握したい。</p>
+      <div class="success-box" style="margin-bottom: 0;">
+        <strong>✅ 効果:</strong> Top Agents by Token Usage の Conversation Surface で「Gemini Enterprise」として区別して表示されるため、
+        Looker 内の会話と Gemini Enterprise 経由の会話のトークン消費を切り分けて分析できる。
+      </div>
+    </div>
+  </div>
+
+  <!-- 料金 -->
+  <div class="section">
+    <h2>💰 料金</h2>
+    <div class="icon-text"><span class="arrow">→</span><span>Conversational Analytics の使用量は<strong>データトークン</strong>で測定され、料金はトークン使用量に基づく</span></div>
+    <div class="icon-text"><span class="arrow">→</span><span>トークン使用量に基づく料金の詳細は、<a class="gc-link" href="https://cloud.google.com/looker/pricing" target="_blank" rel="noopener noreferrer">Looker 料金ページ</a>を参照</span></div>
+  </div>
+
+  <!-- 関連サービス・機能 -->
+  <div class="section">
+    <h2>🔗 関連サービス・機能</h2>
+    <div class="card"><strong>💬 Conversational Analytics (Gemini in Looker)</strong>: 自然言語で Looker Explore やダッシュボードにクエリできる機能。本アップデートの可観測性の対象</div>
+    <div class="card"><strong>🤖 Gemini Enterprise</strong>: Looker のデータエージェントを公開できる基盤。公開されたエージェントのトークン使用量が今回新たに観測対象になった</div>
+    <div class="card"><strong>📈 Looker System Activity</strong>: インスタンスの利用状況を可視化する管理者向けダッシュボード群。Conversational Analytics ダッシュボードもここに含まれる</div>
+    <div class="card"><strong>📝 End User Conversational Analytics (CA) Query Review (Preview)</strong>: ユーザーの同意に基づき Conversational Analytics のクエリと評価を Responses &amp; feedback タブで確認できる別の Preview 機能</div>
+  </div>
+
+  <!-- まとめ -->
+  <div class="section">
+    <h2>📌 まとめ</h2>
+    <div class="success-box">
+      <p style="margin: 0 0 8px;">
+        Looker の Conversational Analytics に対するトークン使用量の可観測性が <strong>Looker (original) インスタンスで GA</strong> となり、
+        <strong>Daily Token Utilization の可視化</strong>や <strong>Gemini Enterprise 公開エージェントの観測</strong>にも対応しました。
+      </p>
+      <p style="margin: 0;">
+        トークンベースの課金を採用する Conversational Analytics のコスト管理・ガバナンスに直結する機能強化であり、
+        <strong>Looker (original) 利用者は 26.16 以降へのアップデート</strong>を、
+        <strong>Looker (Google Cloud core) 利用者は Preview 機能の有効化</strong>を検討するとよいでしょう。
+      </p>
+    </div>
+    <p style="font-size: 13px; color: var(--gc-outline); margin-bottom: 0;">
+      🏷️ タグ: Looker / Conversational Analytics / System Activity / Token Usage / 可観測性 / Gemini Enterprise / GA / Preview / BI / 生成 AI
+    </p>
+  </div>
+
+  <footer>
+    <p><strong>📎 出典:</strong></p>
+    <ul style="padding-left: 20px; margin: 4px 0;">
+      <li><a href="https://docs.cloud.google.com/release-notes#September_30_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026-09-30)</a></li>
+      <li><a href="https://cloud.google.com/looker/docs/system-activity-dashboards#ca-sa-token-usage" target="_blank" rel="noopener noreferrer" class="gc-link">System Activity ダッシュボード: Conversational Analytics token usage</a></li>
+      <li><a href="https://cloud.google.com/looker/docs/admin-panel-general-preview-features#ca-agent-token-usage" target="_blank" rel="noopener noreferrer" class="gc-link">Admin パネル Preview 機能: Conversational Analytics Agent Token usage</a></li>
+      <li><a href="https://cloud.google.com/looker/docs/conversational-analytics-looker-data-agents#publish-data-agents" target="_blank" rel="noopener noreferrer" class="gc-link">データエージェントの Gemini Enterprise への公開</a></li>
+      <li><a href="https://cloud.google.com/looker/docs/conversational-analytics-overview" target="_blank" rel="noopener noreferrer" class="gc-link">Conversational Analytics の概要</a></li>
+      <li><a href="https://cloud.google.com/looker/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Looker 料金ページ</a></li>
+    </ul>
+    <p>本インフォグラフィックは Google Cloud News レポート (2026-09-30) を基に生成されています。</p>
+  </footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+    }
+});
+</script>
+</body>
+</html>

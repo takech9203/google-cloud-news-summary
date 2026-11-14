@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud DNS: CNAME チェイシングと ANY クエリの動作変更 (2027 年 1 月 5 日発効)</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      margin-bottom: 32px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 10px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* バッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated,
+    .badge-announcement {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); }
+    .badge-preview { background: var(--gc-orange); }
+    .badge-deprecated { background: var(--gc-red); }
+    .badge-announcement { background: var(--gc-orange); }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 768px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-card h3 {
+      color: var(--gc-red);
+      margin-top: 0;
+      font-size: 17px;
+    }
+
+    .after-card h3 {
+      color: var(--gc-green);
+      margin-top: 0;
+      font-size: 17px;
+    }
+
+    .before-card ul, .after-card ul {
+      margin: 8px 0 0 0;
+      padding-left: 20px;
+    }
+
+    .before-card li, .after-card li {
+      margin: 8px 0;
+      font-size: 14px;
+    }
+
+    /* 統計カード */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 30px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* フロー図 */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+      font-size: 14px;
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* チェックリスト */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon { color: var(--gc-green); font-size: 18px; }
+    .cross-icon { color: var(--gc-red); font-size: 18px; }
+
+    /* コードブロック (Mermaid の pre を除外) */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block {
+      overflow: hidden;
+      padding: 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+      font-family: 'Roboto Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-title { color: #AAAAAA; }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* テーブル */
+    .table-wrap { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+      background: var(--gc-surface);
+    }
+
+    tr:nth-child(even) td { background: var(--gc-surface-container-lowest); }
+    tr:hover td { background: var(--gc-blue-50); }
+
+    /* ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+      background: #FFFFFF;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+      border: 1px solid var(--gc-blue-100);
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-800);
+    }
+
+    ul { padding-left: 24px; }
+    li { margin: 6px 0; }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div class="header-top">
+        <div>
+          <span class="badge">Cloud DNS</span>
+          <span class="badge-announcement">Announcement</span>
+          <span class="badge-deprecated">動作変更 (2027/1/5 発効)</span>
+        </div>
+        <div class="subtitle">リリース日: 2026-10-27</div>
+      </div>
+      <h1>🌐 Cloud DNS: CNAME チェイシングと ANY クエリの動作変更</h1>
+      <div class="subtitle">CNAME チェーンの後続クエリが VPC の完全な名前解決順序に従うように / パブリック権威ゾーンの ANY クエリは単一レコード応答に — <strong>2027 年 1 月 5 日</strong> 発効の破壊的変更の事前アナウンス</div>
+    </div>
+
+    <!-- キーポイント統計 -->
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-value">2027/1/5</div>
+        <div class="stat-label">変更の発効日</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">2 つ</div>
+        <div class="stat-label">動作変更 (CNAME チェイシング / ANY クエリ)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">約 14 か月</div>
+        <div class="stat-label">影響評価・移行対応の猶予期間</div>
+      </div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        Google Cloud は、Cloud DNS における 2 つの動作変更を事前アナウンスしました。いずれも <span class="highlight">2027 年 1 月 5 日</span> に発効します。
+      </p>
+      <div class="card">
+        <h3>1️⃣ CNAME チェイシングの動作変更</h3>
+        <p style="margin:0;">CNAME チェーンの後続クエリが、パブリックゾーンとプライベートゾーンの境界を越えて <strong>VPC の完全な名前解決順序</strong> に従うようになります。プライベートゾーンやレスポンスポリシーがパブリック CNAME ターゲットと重複するドメイン名を持つ環境では、クエリが意図しない内部 IP アドレスに解決されたり、解決エラーが返されたりする可能性があります。</p>
+      </div>
+      <div class="card">
+        <h3>2️⃣ ANY クエリ (QTYPE=ANY) へのフル応答の無効化</h3>
+        <p style="margin:0;">パブリック権威ゾーンへの DNS タイプ ANY クエリに対し、今後は <strong>一致するレコードセットから選ばれた単一のリソースレコード</strong> のみが返されます。標準的なブラウザ・アプリケーション・API のトラフィックには影響しませんが、ANY クエリに依存するレガシースクリプト・ヘルスチェッカー・監視システムは影響を受けます。</p>
+      </div>
+      <div class="warning-box">
+        <strong>⚠️ 重要:</strong> どちらも新機能の追加ではなく「破壊的変更の予告」です。特にスプリットホライズン DNS 構成や ANY クエリベースの自動化を持つ組織は、<strong>2027 年 1 月 5 日までに影響評価と移行対応を完了</strong>することが推奨されます。
+      </div>
+
+      <h3>🕐 Before: アップデート前の課題 (現在の動作) / ✨ After: 変更後 (2027 年 1 月 5 日以降)</h3>
+      <div class="before-after">
+        <div class="before-card">
+          <h3>🕐 Before (〜2027/1/4)</h3>
+          <ul>
+            <li>CNAME 回答の出所によって後続クエリの検索範囲が分断</li>
+            <li><strong>パブリックゾーン</strong>からの回答 → パブリック DNS と内部 DNS のみ検索 (プライベートゾーン・転送ゾーン・レスポンスポリシーは無視)</li>
+            <li><strong>プライベートゾーン</strong> (ローカルレコード) からの回答 → VPC に認可されたプライベートゾーンのみ検索 (パブリックは無視)</li>
+            <li><strong>レスポンスポリシーゾーン</strong>からの回答 → 後続クエリは一切実行されない</li>
+            <li>プライベート ↔ パブリックをまたぐ CNAME チェーンは解決できず <strong>NXDOMAIN</strong> となるケースがあった</li>
+            <li>ANY クエリはフル応答を返し、ゾーン内容の一括取得手段として (非推奨の形で) 利用され得た</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h3>✨ After (2027/1/5〜)</h3>
+          <ul>
+            <li>CNAME チェイシングの後続クエリは、回答の出所にかかわらず <strong>VPC の完全な名前解決順序</strong> (レスポンスポリシー → プライベートゾーン → 転送/ピアリングゾーン → 内部 DNS → パブリックゾーン) に従う</li>
+            <li>これまで NXDOMAIN になっていたプライベート ↔ パブリック間の CNAME チェーンが解決されるようになる (逆に、意図せず解決されるリスクも)</li>
+            <li>パブリック権威ゾーンへの ANY クエリには、一致するレコードセットから選ばれた <strong>単一のリソースレコード</strong> のみが返される</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図: CNAME チェイシングの変更</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Before["🕐 Before: 現在の CNAME チェイシング (〜2027/1/4)"]
+        Q1([👤 VM からのクエリ]) --> SRC1{CNAME 回答の出所は?}
+        SRC1 -->|パブリックゾーン| P1["🌐 内部 DNS + パブリックのみ検索<br/>(プライベートゾーンは無視)"]
+        SRC1 -->|プライベートゾーン| P2["🔒 認可済みプライベートゾーンのみ検索<br/>(パブリックは無視)"]
+        SRC1 -->|レスポンスポリシー| P3["🚫 後続クエリなし"]
+    end
+
+    subgraph After["✨ After: 新しい CNAME チェイシング (2027/1/5〜)"]
+        Q2([👤 VM からのクエリ]) --> ALL["🔁 すべてのケースで<br/>VPC 名前解決順序に従う"]
+        ALL --> O1["1️⃣ レスポンスポリシー"]
+        O1 --> O2["2️⃣ プライベート / 転送 / ピアリングゾーン"]
+        O2 --> O3["3️⃣ 内部 DNS"]
+        O3 --> O4["4️⃣ パブリックゾーン"]
+    end
+
+    Before -.->|2027 年 1 月 5 日に変更| After
+        </pre>
+      </div>
+      <p>現在は CNAME 回答の出所ごとに後続クエリの検索範囲が分断されていますが、変更後はすべてのケースで VPC の完全な名前解決順序に従って後続クエリが実行されます。</p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>🔧 サービスアップデートの詳細 (変更内容)</h2>
+
+      <div class="card">
+        <h3>🔁 変更 1: CNAME チェイシングの統一</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>CNAME チェイシングとは、最初のクエリに対する CNAME レコード回答で返された DNS 名を、続けてルックアップする動作</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>2027 年 1 月 5 日以降、CNAME 回答がパブリックゾーン・プライベートゾーン・レスポンスポリシーゾーンのいずれから返された場合でも、後続クエリは <strong>VPC の完全な名前解決順序</strong> (レスポンスポリシー → プライベートゾーン → 転送/ピアリングゾーン → 内部 DNS → パブリックゾーン) に従う</span></div>
+        <div class="icon-text"><span class="cross-icon">⚠</span><span>プライベートゾーンやレスポンスポリシーがパブリック CNAME ターゲットと重複するドメイン名を持つ場合、クエリが意図しない内部 IP アドレスに解決される、または解決エラーが返される可能性がある</span></div>
+      </div>
+
+      <div class="card" style="border-left-color: var(--gc-red);">
+        <h3>🚫 変更 2: ANY クエリ (QTYPE=ANY) へのフル応答の無効化</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>2027 年 1 月 5 日以降、パブリック権威ゾーンへの DNS タイプ ANY クエリに対するフル応答が無効化される</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>代わりに、一致するレコードセットの中から選ばれた <strong>単一のリソースレコード</strong> が返される</span></div>
+        <div class="icon-text"><span class="check-icon">✓</span><span>標準的なブラウザ・アプリケーション・API のトラフィックには影響しない</span></div>
+        <div class="icon-text"><span class="cross-icon">✗</span><span><code>dig example.com ANY</code> のようなデバッグコマンド、レガシースクリプト、ヘルスチェッカー、監視システムは最初に利用可能なレコード 1 件のみを受け取る</span></div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>📐 技術仕様</h2>
+
+      <h3>🔁 CNAME チェイシングの現在と変更後の動作比較</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>CNAME 回答の出所</th>
+              <th>現在の動作 (〜2027/1/4)</th>
+              <th>変更後の動作 (2027/1/5〜)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Cloud DNS パブリックゾーン</td>
+              <td>内部 DNS とパブリックゾーンのみ検索。プライベートゾーン (転送・ピアリング・レスポンスポリシー含む) は検索しない</td>
+              <td>VPC の完全な名前解決順序に従う</td>
+            </tr>
+            <tr>
+              <td>Cloud DNS プライベートゾーン (ローカルレコード)</td>
+              <td>VPC ネットワークに認可されたプライベートゾーンのみ検索。パブリックゾーンは検索しない</td>
+              <td>VPC の完全な名前解決順序に従う</td>
+            </tr>
+            <tr>
+              <td>Cloud DNS レスポンスポリシーゾーン</td>
+              <td>後続クエリを実行しない</td>
+              <td>VPC の完全な名前解決順序に従う</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>🚫 ANY クエリの変更</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>項目</th>
+              <th>詳細</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>対象</td>
+              <td>Cloud DNS パブリック権威ゾーン</td>
+            </tr>
+            <tr>
+              <td>現在の動作</td>
+              <td>QTYPE=ANY に対してフル応答を返す</td>
+            </tr>
+            <tr>
+              <td>変更後の動作</td>
+              <td>一致するレコードセットから選ばれた単一のリソースレコードを返す</td>
+            </tr>
+            <tr>
+              <td>影響なし</td>
+              <td>標準的なブラウザ、アプリケーション、API トラフィック</td>
+            </tr>
+            <tr>
+              <td>影響あり</td>
+              <td>ANY クエリを使うレガシースクリプト、ヘルスチェッカー、デバッグコマンド、監視システム</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>⚙️ 設定方法 (推奨される事前対応)</h2>
+
+      <h3>📌 前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>Cloud DNS でパブリックゾーン、プライベートゾーン、レスポンスポリシーのいずれかを運用していること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>影響調査のため、Cloud DNS のクエリログ (Cloud Logging) を有効化しておくことが望ましい</span></div>
+
+      <h3>🔍 ステップ 1: CNAME チェイシング構成の棚卸し (2027 年 1 月 5 日まで)</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">CNAME 構成の確認</span>
+        </div>
+        <pre><code class="language-bash"># dig / nslookup でクエリパスをテストする
+dig app.example.com
+
+# プライベートゾーンと重複するパブリック CNAME ターゲットの有無を確認
+gcloud dns managed-zones list
+gcloud dns record-sets list --zone=ZONE_NAME --filter="type=CNAME"</code></pre>
+      </div>
+      <p>プライベート → パブリック、パブリック → プライベートをまたぐ CNAME チェイシングのシナリオを洗い出します。現在 NXDOMAIN になっているクエリが、変更後は解決されるようになる可能性があります。また、<span class="highlight">CNAME チェーン全体で TTL を一致させる構成</span>が推奨されます。</p>
+
+      <h3>🔄 ステップ 2: ANY クエリの利用箇所の特定と移行</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">ANY クエリからの移行</span>
+        </div>
+        <pre><code class="language-bash"># Cloud Logging で ANY クエリを特定 (Cloud DNS ログを活用)
+# その後、特定のレコードタイプのクエリに移行する
+dig example.com A
+dig example.com MX
+
+# ゾーンの全レコード取得は resourceRecordSets.list API / gcloud を使用する
+gcloud dns record-sets list --zone=ZONE_NAME</code></pre>
+      </div>
+      <p>ANY クエリに依存するレガシースクリプト・監視を特定し、特定のレコードタイプ (A、AAAA、MX、TXT など) のクエリへ移行します。ゾーン全体のレコード取得が必要な場合は、DNS クエリではなく <code>resourceRecordSets.list</code> API、<code>gcloud dns record-sets list</code>、または Google Cloud コンソールを使用します。</p>
+
+      <div class="flow-diagram">
+        <div class="flow-step">🔍 構成の棚卸し<br/>(CNAME / ANY)</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🧪 dig / nslookup<br/>でテスト</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🔄 スクリプト・監視<br/>の移行</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">✅ 2027/1/5<br/>変更発効</div>
+      </div>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <h3>💼 ビジネス面</h3>
+      <div class="card" style="border-left-color: var(--gc-green);">
+        <div class="icon-text"><span class="check-icon">✓</span><span><strong>事前アナウンスによる計画的移行</strong>: 発効日 (2027 年 1 月 5 日) まで約 14 か月の猶予があり、影響評価と修正を計画的に実施できる</span></div>
+        <div class="icon-text"><span class="check-icon">✓</span><span><strong>DNS 運用のセキュリティ向上</strong>: ANY クエリのフル応答無効化は、DNS 業界で広く行われている対応 (増幅攻撃対策・ゾーン内容の露出低減) に沿った変更</span></div>
+      </div>
+      <h3>🔧 技術面</h3>
+      <div class="card" style="border-left-color: var(--gc-green);">
+        <div class="icon-text"><span class="check-icon">✓</span><span><strong>名前解決動作の一貫性</strong>: CNAME チェイシングが常に VPC 名前解決順序に従うため、回答の出所による動作の分断がなくなり、挙動が予測しやすくなる</span></div>
+        <div class="icon-text"><span class="check-icon">✓</span><span><strong>ハイブリッド構成での解決性向上</strong>: これまで NXDOMAIN となっていたプライベート ↔ パブリック間の CNAME チェーンが解決可能になる</span></div>
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <h3>🚧 制限事項</h3>
+      <div class="error-box">
+        <div class="icon-text"><span class="cross-icon">✗</span><span>ANY クエリでは単一レコードしか返されなくなるため、DNS クエリによるゾーン全体の取得はできなくなる (API / gcloud / コンソールでの取得が必要)</span></div>
+        <div class="icon-text"><span class="cross-icon">✗</span><span>CNAME チェイシングの旧動作を維持するオプションは、リリースノート上では案内されていない</span></div>
+      </div>
+      <h3>🤔 考慮すべき点</h3>
+      <div class="warning-box">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>意図しない内部 IP への解決</strong>: プライベートゾーンやレスポンスポリシーがパブリック CNAME ターゲットと重複する名前を持つ場合、変更後はクエリが意図しない内部 IP アドレスに解決されたり、解決エラーになったりする可能性がある</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>NXDOMAIN 前提の挙動変化</strong>: 現在 NXDOMAIN を返しているプライベート ↔ パブリック間 CNAME チェーンが解決されるようになるため、NXDOMAIN を前提としたアプリケーション挙動は見直しが必要</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>ANY クエリ依存システムのリスク</strong>: 対応しない場合、誤った監視アラーム、ゾーン全体のダンプを解析する自動化パイプラインの破損、IT 診断業務の混乱が発生し得る</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>TTL の整合性</strong>: CNAME チェーン全体で TTL を一致させる構成が推奨される</span></div>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>🪞 ユースケース 1: スプリットホライズン DNS を運用している環境の影響確認</h3>
+        <p><strong>シナリオ</strong>: パブリックゾーン <code>example.com</code> と、同名のプライベートゾーンを VPC に認可して運用している (スプリットホライズン構成)。パブリックゾーンの CNAME が <code>internal.example.com</code> を指している。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">変更前後の解決結果の比較用に現在の応答を記録</span>
+          </div>
+          <pre><code class="language-bash"># 変更前後の解決結果を比較するため、現在の応答を記録しておく
+dig app.example.com +trace
+dig internal.example.com</code></pre>
+        </div>
+        <p style="margin-bottom:0;"><strong>効果</strong>: 変更後、パブリックゾーン由来の CNAME 回答の後続クエリがプライベートゾーンも検索するようになるため、意図しない内部 IP への解決を事前に検出し、ゾーン設計やレコードの見直しを行える。</p>
+      </div>
+
+      <div class="usecase">
+        <h3>📡 ユースケース 2: ANY クエリを使う監視・自動化の移行</h3>
+        <p><strong>シナリオ</strong>: レガシーな監視システムが <code>dig example.com ANY</code> でレコードの存在確認を行っており、ゾーンダンプを解析する自動化パイプラインもある。</p>
+        <p style="margin-bottom:0;"><strong>効果</strong>: Cloud Logging の Cloud DNS ログで ANY クエリの発生元を特定し、特定レコードタイプのクエリと <code>gcloud dns record-sets list</code> へ移行することで、2027 年 1 月 5 日以降の誤アラームやパイプライン破損を回避できる。</p>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <div class="note-box">
+        <strong>💡 料金への影響なし:</strong> 今回の変更は動作変更のアナウンスであり、料金体系の変更は含まれません。Cloud DNS の料金は <a href="https://cloud.google.com/dns/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud DNS 料金ページ</a> を参照してください。
+      </div>
+    </div>
+
+    <!-- 関連サービス -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>VPC ネットワーク / 名前解決順序</strong>: 変更後の CNAME チェイシングが従う解決順序 (レスポンスポリシー → プライベート/転送/ピアリングゾーン → 内部 DNS → パブリックゾーン) の基盤</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Cloud Logging</strong>: Cloud DNS のクエリログを記録でき、ANY クエリを発行しているレガシーシステムの特定に活用できる</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Compute Engine 内部 DNS</strong>: メタデータサーバー (169.254.169.254) を経由した名前解決で CNAME チェイシングの対象となる内部 DNS サービス</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>レスポンスポリシー</strong>: ローカルデータルールからの CNAME 回答も、変更後は後続クエリの対象となる</span></div>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="success-box">
+        <p style="margin-top:0;">Cloud DNS の <strong>CNAME チェイシング</strong> と <strong>ANY クエリ応答</strong> という 2 つの基盤的な動作が <span class="highlight">2027 年 1 月 5 日</span> に変更されます。</p>
+        <div class="check-item"><span class="check-icon">✓</span><span>スプリットホライズン構成やパブリック/プライベートをまたぐ CNAME チェーンを持つ環境では、意図しない内部 IP への解決や NXDOMAIN 前提の挙動変化が起こり得るため、<strong>dig/nslookup によるクエリパスのテストと構成の棚卸し</strong>を早めに実施する</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>ANY クエリに依存するスクリプトや監視は、<strong>特定レコードタイプのクエリと <code>resourceRecordSets.list</code> API への移行</strong>を発効日前に完了することを推奨</span></div>
+      </div>
+      <p style="font-size: 13px; color: var(--gc-outline);">タグ: #CloudDNS #DNS #CNAME #BehaviorChange #Networking #VPC #Announcement</p>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="padding-left: 20px; margin: 4px 0;">
+        <li><a href="https://docs.cloud.google.com/release-notes#October_27_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026 年 10 月 27 日)</a></li>
+        <li><a href="https://docs.cloud.google.com/dns/docs/cnamechasing" target="_blank" rel="noopener noreferrer" class="gc-link">CNAME チェイシング (公式ドキュメント)</a></li>
+        <li><a href="https://docs.cloud.google.com/dns/docs/vpc-name-res-order" target="_blank" rel="noopener noreferrer" class="gc-link">VPC の名前解決順序 (公式ドキュメント)</a></li>
+        <li><a href="https://docs.cloud.google.com/dns/docs/reference/rest/v1/resourceRecordSets/list" target="_blank" rel="noopener noreferrer" class="gc-link">resourceRecordSets.list API リファレンス</a></li>
+        <li><a href="https://cloud.google.com/dns/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud DNS 料金ページ</a></li>
+      </ul>
+      <p>ベースレポート: reports/2026/2026-10-27-cloud-dns-cname-chasing-any-query-changes.md (Google Cloud News Summary)</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BigQuery: リザベーションの Project caps と Principal ベースルーティングが GA</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+:root {
+  --gc-blue: #4285F4;
+  --gc-red: #EA4335;
+  --gc-yellow: #FBBC04;
+  --gc-green: #34A853;
+  --gc-blue-900: #174EA6;
+  --gc-blue-800: #185ABC;
+  --gc-blue-700: #1967D2;
+  --gc-blue-600: #1A73E8;
+  --gc-blue-500: #4285F4;
+  --gc-blue-300: #669DF6;
+  --gc-blue-200: #8AB4F8;
+  --gc-blue-100: #AECBFA;
+  --gc-blue-50: #E8F0FE;
+  --gc-on-surface: #202124;
+  --gc-on-surface-variant: #5F6368;
+  --gc-outline: #80868B;
+  --gc-surface: #FFFFFF;
+  --gc-surface-container-lowest: #F8F9FA;
+  --gc-surface-container-low: #F1F3F4;
+  --gc-surface-container: #E8EAED;
+  --gc-outline-variant: #DADCE0;
+  --gc-blue-tint: #E8F0FE;
+  --gc-green-tint: #E6F4EA;
+  --gc-red-tint: #FCE8E6;
+  --gc-yellow-tint: #FEF7E0;
+  --gc-purple-tint: #F3E8FD;
+  --gc-teal-tint: #E0F7FA;
+  --gc-purple: #A142F4;
+  --gc-teal: #00BCD4;
+  --gc-orange: #FF6D00;
+}
+
+body {
+  background-color: var(--gc-surface);
+  font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+  color: var(--gc-on-surface-variant);
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 20px;
+  margin: 0;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 16px;
+  border-bottom: 3px solid var(--gc-blue-600);
+}
+
+h1, .title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--gc-on-surface);
+  margin: 0;
+  line-height: 1.4;
+}
+
+h2, .section-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin-top: 0;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 20px 0 8px;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: var(--gc-outline);
+}
+
+.section {
+  background: var(--gc-surface-container-low);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid var(--gc-outline-variant);
+}
+
+.highlight {
+  background-color: var(--gc-blue-50);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--gc-blue-800);
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+.card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border-left: 4px solid var(--gc-blue-600);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+}
+
+.card h3 {
+  margin-top: 0;
+}
+
+.gc-link {
+  color: var(--gc-blue-600);
+  text-decoration: none;
+}
+
+.gc-link:hover {
+  color: var(--gc-blue-800);
+  text-decoration: underline;
+}
+
+.badge,
+.badge-ga,
+.badge-preview,
+.badge-deprecated {
+  display: inline-block;
+  color: #FFFFFF;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+  margin: 4px 8px 4px 0;
+}
+
+.badge {
+  background: var(--gc-blue-600);
+}
+
+.badge-ga {
+  background: var(--gc-green);
+  color: #FFFFFF;
+}
+
+/* Before/After 比較 */
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+@media (max-width: 720px) {
+  .before-after {
+    grid-template-columns: 1fr;
+  }
+}
+
+.before-box, .after-box {
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.before-box {
+  background: var(--gc-red-tint);
+  border: 1px solid #F5C6C0;
+}
+
+.after-box {
+  background: var(--gc-green-tint);
+  border: 1px solid #BEE3C7;
+}
+
+.before-box h3, .after-box h3 {
+  margin-top: 0;
+  font-size: 16px;
+}
+
+.before-box h3 { color: #C5221F; }
+.after-box h3 { color: #188038; }
+
+.before-box ul, .after-box ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  font-size: 14px;
+}
+
+.before-box li, .after-box li {
+  margin-bottom: 8px;
+}
+
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.check-icon { color: var(--gc-green); font-size: 18px; }
+.cross-icon { color: var(--gc-red); font-size: 18px; }
+
+/* コードブロック */
+.code-block,
+pre:not(.mermaid) {
+  background: #1E1E1E;
+  border-radius: 8px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: #E8E8E8;
+  margin: 16px 0;
+}
+
+.code-block {
+  overflow: hidden;
+}
+
+.code-header {
+  background: #2D2D2D;
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.code-lang {
+  color: #9CDCFE;
+  font-weight: bold;
+  font-family: 'Roboto Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.code-title { color: #AAAAAA; }
+
+.code-block pre {
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+}
+
+.code-block code {
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 16px !important;
+  display: block;
+}
+
+pre code {
+  background: none;
+  border: none;
+  font-size: inherit;
+}
+
+/* インラインコード */
+code:not(pre code) {
+  background: var(--gc-surface-container-low);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 0.85em;
+  color: var(--gc-blue-900);
+}
+
+.section code:not(pre code) {
+  background: var(--gc-surface);
+}
+
+/* テーブル */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--gc-outline-variant);
+  background: var(--gc-surface);
+}
+
+th {
+  background: var(--gc-blue-50);
+  color: var(--gc-blue-900);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 2px solid var(--gc-blue-200);
+}
+
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--gc-outline-variant);
+  font-size: 14px;
+}
+
+tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+tr:hover { background: var(--gc-blue-50); }
+
+/* 注意・情報ボックス */
+.note-box {
+  background: var(--gc-blue-tint);
+  border-left: 4px solid var(--gc-blue-600);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.warning-box {
+  background: var(--gc-yellow-tint);
+  border-left: 4px solid var(--gc-yellow);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.success-box {
+  background: var(--gc-green-tint);
+  border-left: 4px solid var(--gc-green);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+/* 統計カード */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.stat-card {
+  background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+  color: var(--gc-surface);
+  border-radius: 12px;
+  padding: 24px 16px;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+/* ユースケース */
+.usecase {
+  background: var(--gc-blue-tint);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 16px 0;
+  border: 1px solid var(--gc-blue-100);
+}
+
+.usecase h3 {
+  margin-top: 0;
+  color: var(--gc-blue-900);
+}
+
+/* Mermaid */
+.mermaid-container {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 20px 0;
+  border: 2px solid rgba(66, 133, 244, 0.3);
+  overflow-x: auto;
+}
+
+.mermaid {
+  display: flex;
+  justify-content: center;
+  background: #FFFFFF;
+}
+
+/* ステップ */
+.step {
+  display: flex;
+  gap: 16px;
+  margin: 20px 0;
+  align-items: flex-start;
+}
+
+.step-number {
+  background: var(--gc-blue-600);
+  color: #FFFFFF;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.step-content { flex: 1; min-width: 0; }
+
+.step-content h3 { margin-top: 4px; }
+
+ul { padding-left: 24px; }
+li { margin-bottom: 6px; }
+
+footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gc-outline-variant);
+  font-size: 12px;
+  color: var(--gc-outline);
+}
+
+footer a { word-break: break-all; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <div>
+      <div style="margin-bottom: 8px;">
+        <span class="badge">BigQuery</span>
+        <span class="badge badge-ga">GA (一般提供)</span>
+        <span class="badge" style="background: var(--gc-blue-800);">Enterprise / Enterprise Plus 限定</span>
+      </div>
+      <h1>📊 BigQuery リザベーション<br>Project caps と Principal ベースルーティングが GA</h1>
+      <div class="subtitle" style="margin-top: 8px;">プロジェクト単位の上限設定と ID 単位のクエリルーティングで、リザベーションを分割せずにワークロードを制御</div>
+    </div>
+    <div class="subtitle">リリース日: 2026-11-11</div>
+  </div>
+
+  <!-- 概要 -->
+  <div class="section">
+    <h2>📝 概要</h2>
+    <p>BigQuery のワークロード管理 (リザベーション) に関する <span class="highlight">2 つの機能が GA</span> になりました。いずれも <strong>BigQuery Enterprise / Enterprise Plus エディション</strong>でのみ利用できます。</p>
+
+    <div class="card">
+      <h3>🧢 1. Project caps (スケジューリングポリシー)</h3>
+      <p style="margin-bottom: 0;">リザベーション内で<span class="highlight">プロジェクトごとに「最大スロット数」と「最大同時実行クエリ数」の上限</span>を設定。デフォルトのフェアスケジューリングをカスタマイズし、特定プロジェクトによるキャパシティの過剰消費を防止。リザベーションレベルのデフォルトと、アサインメントルール (Project cap) による個別オーバーライドの 2 段階で設定可能。</p>
+    </div>
+
+    <div class="card">
+      <h3>🔀 2. Principal ベースのリザベーションルーティング</h3>
+      <p style="margin-bottom: 0;">アサインメントにオプションの <code>principal</code> プロパティを指定し、<span class="highlight">ユーザー・サービスアカウント・サードパーティ ID 単位</span>でクエリのルーティング先リザベーションを制御。従来のリソース階層 (プロジェクト・フォルダ・組織) 単位より、きめ細かなワークロード分離が可能に。</p>
+    </div>
+
+    <div class="before-after">
+      <div class="before-box">
+        <h3>❌ Before: アップデート前の課題</h3>
+        <ul>
+          <li>フェアスケジューリングではキャパシティを均等に分け合うため、特定プロジェクトのスロット消費や同時実行数に<strong>明示的な上限を設けられなかった</strong></li>
+          <li>特定プロジェクトの暴走的なクエリ実行が他プロジェクトの性能に影響するのを防ぐには、<strong>リザベーションを分割するしかなかった</strong></li>
+          <li>アサインメントはプロジェクト・フォルダ・組織単位のみで、<strong>特定ユーザーや SA のクエリだけ別リザベーションに振り分けられなかった</strong></li>
+          <li>ID ごとのワークロード分離には、<strong>ユーザーやワークロードごとにプロジェクトを分ける</strong>必要があった</li>
+        </ul>
+      </div>
+      <div class="after-box">
+        <h3>✅ After: アップデート後の改善</h3>
+        <ul>
+          <li>プロジェクトごとの<strong>最大スロット数 (最小 100) と最大同時実行数</strong>を設定でき、1 つのリザベーションを複数プロジェクトで安全に共有可能に</li>
+          <li><strong>リザベーションレベルのデフォルト + プロジェクト単位のオーバーライド</strong>の 2 段階で柔軟に制御</li>
+          <li><code>principal</code> 指定で<strong>ユーザー・SA・サードパーティ ID 単位</strong>のルーティング制御が可能に</li>
+          <li>同一階層では principal 一致が汎用アサインメントより優先され、<strong>プロジェクト構成を変えずに ID ベースの分離</strong>を実現</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- アーキテクチャ図 -->
+  <div class="section">
+    <h2>🏗️ アーキテクチャ図</h2>
+    <div class="mermaid-container">
+      <pre class="mermaid">
+flowchart TD
+    UserA([👤 アナリスト<br/>user-a@example.com]) -->|クエリ実行| Project[📁 プロジェクト X]
+    SA([🤖 バッチ用<br/>サービスアカウント]) -->|クエリ実行| Project
+
+    Project --> Router{🔀 アサインメント評価<br/>principal 一致を優先}
+
+    Router -->|principal 一致<br/>ユーザー専用アサインメント| ResA[🎟️ リザベーション A<br/>アドホック分析用]
+    Router -->|principal 未設定<br/>汎用アサインメント| ResB[🎟️ リザベーション B<br/>バッチ / ETL 用]
+
+    subgraph Caps[🧢 Project caps - スケジューリングポリシー]
+        ResA --> CapA[最大スロット: 500<br/>最大同時実行: 10]
+        ResB --> CapB[最大スロット: 1000<br/>最大同時実行: 50]
+    end
+
+    CapA --> Slots[(⚡ スロットプール<br/>Enterprise / Enterprise Plus)]
+    CapB --> Slots
+      </pre>
+    </div>
+    <div class="note-box">
+      <strong>💡 ポイント:</strong> 同一プロジェクトから実行されたクエリでも、実行者の ID (principal) に応じて異なるリザベーションへルーティングされ、各リザベーションではプロジェクトごとの最大スロット数・同時実行数の上限 (Project caps) が適用されます。
+    </div>
+  </div>
+
+  <!-- 主要機能 -->
+  <div class="section">
+    <h2>⚙️ 主要機能</h2>
+
+    <div class="card">
+      <h3>🧢 Project caps による上限設定</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>最大スロット数 (Maximum slots)</strong>: 対象プロジェクトのスロット消費を制限。最小許容値は 100。厳密な制限ではなく近似的な上限として適用</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>最大同時実行数 (Maximum concurrency)</strong>: 同時に許可されるクエリ数を制限。クエリの受付 (admission) 時のみ適用され、実行中のクエリはキャンセルされない。実行中クエリ数より低い値に変更した場合、新規クエリはキューイングされる</span></div>
+    </div>
+
+    <div class="card">
+      <h3>🪜 2 段階の設定レベル (デフォルトとオーバーライド)</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>リザベーションレベルのデフォルト</strong>: 「Project Concurrency」「Project Max Slots」を設定すると、アサインされたすべてのプロジェクトに適用</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>プロジェクト単位のオーバーライド</strong>: アサインメントルール (ルールタイプ「Project cap」) で特定プロジェクトの上限を個別に設定し、デフォルトを上書き</span></div>
+    </div>
+
+    <div class="card">
+      <h3>🔀 Principal ベースのリザベーションルーティング</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>アサインメント作成時に <code>principal</code> プロパティを指定すると、ジョブ実行者の ID でルーティング先を制御</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>対応 ID: Google アカウント (ユーザー) / サービスアカウント / Workforce Identity プールの単一 ID / Workload Identity プールの単一 ID</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>設定方法: コンソール (User フィールド) / SQL (<code>CREATE ASSIGNMENT</code> の <code>principal</code> オプション) / bq CLI (<code>--principal</code> フラグ)</span></div>
+    </div>
+
+    <div class="card">
+      <h3>🧭 アサインメントの評価ロジック</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>リソース階層 (プロジェクト → フォルダ → 組織) の順に評価</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>各階層では、まず principal 一致のアサインメントを確認し、なければ principal 未設定の汎用アサインメントを確認。どちらもなければ次の階層へ</span></div>
+      <div class="check-item"><span class="cross-icon">⚠</span><span><strong>注意</strong>: principal 付きのフォルダレベルアサインメントより、principal なしのプロジェクトレベルアサインメントが優先される。プロジェクトレベルの汎用アサインメントがある環境では、同じプロジェクトレベルにユーザー専用アサインメントを作成すること</span></div>
+    </div>
+  </div>
+
+  <!-- 技術仕様 -->
+  <div class="section">
+    <h2>🔬 技術仕様</h2>
+
+    <h3>🧢 Project caps の仕様と制限</h3>
+    <table>
+      <tr><th>項目</th><th>詳細</th></tr>
+      <tr><td>最大スロット数の最小値</td><td>100 (厳密ではなく近似的な上限)</td></tr>
+      <tr><td>最大同時実行数の適用タイミング</td><td>クエリ受付時のみ (実行中クエリはキャンセルされない)</td></tr>
+      <tr><td>設定変更の反映</td><td>最大 1 分。per-project の最大スロットオーバーライドの変更は新規クエリの開始後に有効化</td></tr>
+      <tr><td>オーバーライドの対象 (assignee)</td><td>Google Cloud プロジェクトのみ (フォルダ・組織は非対応)</td></tr>
+      <tr><td>オーバーライドのジョブタイプ</td><td>未設定または <code>JOB_TYPE_UNSPECIFIED</code> のみ</td></tr>
+      <tr><td>適用外</td><td><code>ML_EXTERNAL</code> ジョブのトレーニングフェーズにはプロジェクトレベルのスロット上限が適用されない</td></tr>
+      <tr><td>対応エディション</td><td>Enterprise / Enterprise Plus</td></tr>
+    </table>
+
+    <h3>🪪 Principal の指定形式 (IAM v2 プリンシパル識別子)</h3>
+    <table>
+      <tr><th>ID 種別</th><th>Principal 形式</th></tr>
+      <tr><td>ユーザー</td><td><code>principal://goog/subject/EMAIL_ADDRESS</code></td></tr>
+      <tr><td>サービスアカウント</td><td><code>principal://iam.googleapis.com/projects/-/serviceAccounts/EMAIL_ADDRESS</code></td></tr>
+      <tr><td>Workforce Identity プール ID</td><td><code>principal://iam.googleapis.com/locations/global/workforcePools/POOL_ID/subject/SUBJECT_ID</code></td></tr>
+      <tr><td>Workload Identity プール ID</td><td><code>principal://iam.googleapis.com/projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/POOL_ID/subject/SUBJECT_ID</code></td></tr>
+    </table>
+    <ul style="font-size: 14px;">
+      <li>ユーザー専用アサインメントのプロジェクトあたりのデフォルト上限は 100 (引き上げは Google へのフィードバック窓口経由で依頼)</li>
+      <li>グループやドメイン全体の指定には対応せず、単一 ID のみ指定可能</li>
+      <li>アサインメントと assignee は同一組織・同一ロケーションである必要がある</li>
+    </ul>
+
+    <h3>🔐 必要な IAM 権限</h3>
+    <table>
+      <tr><th>操作</th><th>必要な権限</th></tr>
+      <tr><td>リザベーション作成</td><td>管理プロジェクトに対する <code>bigquery.reservations.create</code></td></tr>
+      <tr><td>アサインメント作成</td><td>管理プロジェクトと assignee に対する <code>bigquery.reservationAssignments.create</code></td></tr>
+      <tr><td>対応する事前定義ロール</td><td>BigQuery Admin / BigQuery Resource Admin / BigQuery Resource Editor</td></tr>
+    </table>
+  </div>
+
+  <!-- 設定方法 -->
+  <div class="section">
+    <h2>🛠️ 設定方法</h2>
+
+    <div class="note-box">
+      <strong>📋 前提条件:</strong>
+      <ul style="margin: 8px 0 0;">
+        <li>BigQuery Enterprise または Enterprise Plus エディションのリザベーションを使用していること</li>
+        <li>管理プロジェクトに対する <code>bigquery.reservations.create</code> / <code>bigquery.reservationAssignments.create</code> 権限を持っていること</li>
+        <li>アサインメント対象リソースとリザベーションが同一組織・同一ロケーションにあること</li>
+      </ul>
+    </div>
+
+    <div class="step">
+      <div class="step-number">1</div>
+      <div class="step-content">
+        <h3>リザベーションにデフォルトのスケジューリングポリシーを設定</h3>
+        <p>コンソールの <strong>BigQuery &gt; 管理 &gt; Workload management</strong> からリザベーションを作成・編集し、Advanced settings で以下を設定します。これらはアサインされたすべてのプロジェクトに対するデフォルト値として機能します。</p>
+        <ul>
+          <li><strong>Override project concurrency</strong>: プロジェクトごとの同時実行クエリ数の上限</li>
+          <li><strong>Override project max slots</strong>: プロジェクトごとのスロット消費の上限</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-number">2</div>
+      <div class="step-content">
+        <h3>特定プロジェクトに Project cap (オーバーライド) を作成</h3>
+        <p>コンソールの <strong>Workload management &gt; Assignment rules</strong> タブから、ルールタイプ「Project cap」を選択してプロジェクト・リザベーション・Max slots / Max concurrency を指定します。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">bq CLI での例 (プロジェクト単位のオーバーライドはジョブタイプを未設定にする)</span>
+          </div>
+          <pre><code class="language-bash">bq mk \
+  --project_id=ADMIN_PROJECT_ID \
+  --location=LOCATION \
+  --reservation_assignment \
+  --reservation_id=RESERVATION_NAME \
+  --assignee_type=PROJECT \
+  --assignee_id=TARGET_PROJECT_ID</code></pre>
+        </div>
+        <p style="font-size: 14px;">Project cap の assignee はプロジェクトのみで、ジョブタイプは未設定 (<code>JOB_TYPE_UNSPECIFIED</code>) である必要があります。</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-number">3</div>
+      <div class="step-content">
+        <h3>Principal ベースのアサインメントを作成</h3>
+        <p>SQL の <code>CREATE ASSIGNMENT</code> DDL で <code>principal</code> オプションを指定します。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">CREATE ASSIGNMENT での principal 指定</span>
+          </div>
+          <pre><code class="language-sql">CREATE ASSIGNMENT
+  `ADMIN_PROJECT_ID.region-LOCATION.RESERVATION_NAME.ASSIGNMENT_ID`
+OPTIONS (
+  assignee = 'projects/PROJECT_ID',
+  job_type = 'QUERY',
+  principal = 'principal://goog/subject/user-a@example.com');</code></pre>
+        </div>
+        <p>bq CLI の場合は <code>--principal</code> フラグを使用します。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">bq CLI での principal 指定例</span>
+          </div>
+          <pre><code class="language-bash">bq mk \
+  --project_id=ADMIN_PROJECT_ID \
+  --location=LOCATION \
+  --reservation_assignment \
+  --reservation_id=RESERVATION_NAME \
+  --assignee_type=PROJECT \
+  --assignee_id=PROJECT_ID \
+  --job_type=QUERY \
+  --principal='principal://iam.googleapis.com/projects/-/serviceAccounts/batch-sa@example.iam.gserviceaccount.com'</code></pre>
+        </div>
+        <div class="warning-box">
+          <strong>⚠️ 注意:</strong> アサインメント作成後は、少なくとも 5 分待ってからクエリを実行してください。待たない場合、クエリがオンデマンド料金で課金される可能性があります。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- メリット -->
+  <div class="section">
+    <h2>💪 メリット</h2>
+    <div class="before-after">
+      <div class="card" style="margin: 0;">
+        <h3>💼 ビジネス面</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>リザベーション統合によるコスト最適化</strong>: ノイジーネイバー対策のためのリザベーション分割が不要になり、1 つの大きなリザベーションを安全に共有してスロット利用効率を向上</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>部門・チーム単位の公平なキャパシティ配分</strong>: 特定部門のワークロードが他部門の SLA に影響することを防止</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>GA による本番適用</strong>: Preview から GA に昇格し、本番環境のワークロード管理設計に正式に組み込み可能</span></div>
+      </div>
+      <div class="card" style="margin: 0;">
+        <h3>🔧 技術面</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>ID ベースのワークロード分離</strong>: 同一プロジェクト内でも BI ツール用 SA、ETL パイプライン、アドホッククエリを別々のリザベーションへ</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>フェアスケジューリングの柔軟なカスタマイズ</strong>: デフォルトとオーバーライドの 2 段階制御で、きめ細かくかつ低管理負荷の運用</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>実行中クエリへの非破壊性</strong>: 同時実行数の上限は受付時のみ適用され、設定変更が実行中のクエリを中断しない</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>Workforce / Workload Identity 連携に対応</strong>: サードパーティ ID 基盤を利用する環境でも ID 単位のルーティングが可能</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- デメリット・制約事項 -->
+  <div class="section">
+    <h2>⚠️ デメリット・制約事項</h2>
+
+    <h3>🚧 制限事項</h3>
+    <div class="check-item"><span class="cross-icon">✗</span><span>BigQuery Enterprise / Enterprise Plus エディション限定 (Standard エディションおよびオンデマンドでは利用不可)</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span>最大スロット数は厳密な制限ではなく近似的な上限であり、最小値は 100</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span>Project cap (オーバーライド) の assignee はプロジェクトのみで、フォルダ・組織には設定できない</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span><code>ML_EXTERNAL</code> ジョブのトレーニングフェーズにはプロジェクトレベルのスロット上限が適用されない</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span>principal には単一 ID のみ指定可能で、グループは指定できない。ユーザー専用アサインメントはプロジェクトあたりデフォルト 100 件まで</span></div>
+
+    <h3>🤔 考慮すべき点</h3>
+    <div class="warning-box" style="margin-top: 8px;">
+      <ul style="margin: 0;">
+        <li>設定変更の反映に最大 1 分かかり、最大スロットのオーバーライド変更は新規クエリの開始後に有効になる</li>
+        <li>同時実行数の上限を実行中クエリ数より下げると新規クエリはキューイングされるため、レイテンシ要件のあるワークロードでは注意が必要</li>
+        <li>principal なしのプロジェクトレベルアサインメントは、principal 付きのフォルダレベルアサインメントより優先される。プロジェクトレベルの汎用アサインメントが存在する場合、特定ユーザーを確実にルーティングするには同じプロジェクトレベルにユーザー専用アサインメントを追加する必要がある</li>
+        <li>アサインメント作成直後 (5 分以内) のクエリはオンデマンド課金になる可能性がある</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ユースケース -->
+  <div class="section">
+    <h2>🎯 ユースケース</h2>
+
+    <div class="usecase">
+      <h3>📈 ユースケース 1: 全社共有リザベーションのノイジーネイバー対策</h3>
+      <p><strong>シナリオ:</strong> データ分析基盤チームが 5,000 スロットの Enterprise リザベーションを 20 のプロジェクトで共有。月初のレポート処理で特定プロジェクトがスロットを占有し、他プロジェクトのダッシュボード更新が遅延する問題が発生していた。</p>
+      <p><strong>実装例:</strong></p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Plan</span>
+          <span class="code-title">設定方針</span>
+        </div>
+        <pre><code class="language-plaintext">1. リザベーションのデフォルトとして Project Max Slots = 1000、
+   Project Concurrency = 20 を設定
+2. レポート処理プロジェクトには Assignment rule (Project cap) で
+   Max slots = 2000 の個別オーバーライドを設定</code></pre>
+      </div>
+      <div class="success-box" style="margin-bottom: 0;">
+        <strong>✅ 効果:</strong> どのプロジェクトも設定した上限を超えてスロットを消費できなくなり、リザベーションを分割することなくノイジーネイバー問題を解消。スロットの利用効率も維持できる。
+      </div>
+    </div>
+
+    <div class="usecase">
+      <h3>🔀 ユースケース 2: 同一プロジェクト内での BI とバッチのワークロード分離</h3>
+      <p><strong>シナリオ:</strong> 1 つのデータウェアハウスプロジェクトに、Looker などの BI ツールが使うサービスアカウントと、夜間 ETL 用のサービスアカウント、アナリストのアドホッククエリが同居しており、ETL 実行中に BI ダッシュボードの応答が悪化する。</p>
+      <p><strong>実装例:</strong></p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">BI 用サービスアカウントの専用ルーティング</span>
+        </div>
+        <pre><code class="language-sql">-- BI 用サービスアカウントを低レイテンシ重視のリザベーションへ
+CREATE ASSIGNMENT `admin-prj.region-asia-northeast1.bi-reservation.bi-sa-assign`
+OPTIONS (
+  assignee = 'projects/dwh-project',
+  job_type = 'QUERY',
+  principal = 'principal://iam.googleapis.com/projects/-/serviceAccounts/looker-sa@dwh-project.iam.gserviceaccount.com');
+
+-- その他のクエリはプロジェクトレベルの汎用アサインメントで既定のリザベーションへ</code></pre>
+      </div>
+      <div class="success-box" style="margin-bottom: 0;">
+        <strong>✅ 効果:</strong> プロジェクトを分割することなく、ID 単位で BI・ETL・アドホックのワークロードを別々のリザベーションに分離でき、相互干渉を防止できる。
+      </div>
+    </div>
+  </div>
+
+  <!-- 料金 -->
+  <div class="section">
+    <h2>💰 料金</h2>
+    <p>両機能は BigQuery Enterprise / Enterprise Plus エディションのリザベーション機能の一部として提供されます。<span class="highlight">追加料金の記載はありません</span> (Release Notes およびドキュメントに基づく)。</p>
+    <p>BigQuery エディションのコンピュート料金は、スロット時間 (slot-hour) 単位の従量課金です (デフォルトで 1 分の最低課金時間)。</p>
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-value">従量課金</div>
+        <div class="stat-label">スロット時間 (slot-hour) 単位<br>最低課金時間 1 分</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">20% 割引</div>
+        <div class="stat-label">1 年スロットコミットメント<br>(Enterprise / Enterprise Plus)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">40% 割引</div>
+        <div class="stat-label">3 年スロットコミットメント<br>(Enterprise / Enterprise Plus)</div>
+      </div>
+    </div>
+    <p style="font-size: 14px;">リージョンごとの単価は <a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">BigQuery 料金ページ</a> を参照してください。</p>
+  </div>
+
+  <!-- 利用可能リージョン -->
+  <div class="section">
+    <h2>🌏 利用可能リージョン</h2>
+    <p>リージョン固有の制限は Release Notes に記載されていません。BigQuery エディション (Enterprise / Enterprise Plus) が利用可能なロケーションで使用できます。詳細は <a href="https://docs.cloud.google.com/bigquery/docs/locations" target="_blank" rel="noopener noreferrer" class="gc-link">BigQuery のロケーション</a> を参照してください。</p>
+  </div>
+
+  <!-- 関連サービス・機能 -->
+  <div class="section">
+    <h2>🔗 関連サービス・機能</h2>
+    <div class="card">
+      <strong>☁️ BigQuery editions (Enterprise / Enterprise Plus)</strong><br>
+      両機能の利用に必須。アドバンスドワークロード管理 (アイドルスロット共有、ターゲット同時実行数) を提供。
+    </div>
+    <div class="card">
+      <strong>📈 BigQuery slots autoscaling</strong><br>
+      ベースラインスロットとオートスケーリングスロットによるキャパシティ管理。Project caps と組み合わせてリザベーション全体と個別プロジェクトの両面から制御。
+    </div>
+    <div class="card">
+      <strong>🪪 IAM (Workforce / Workload Identity 連携)</strong><br>
+      principal プロパティで指定できる ID の基盤。サードパーティ ID でのルーティングに利用。
+    </div>
+    <div class="card">
+      <strong>🔍 INFORMATION_SCHEMA.JOBS / リザベーションモニタリング</strong><br>
+      プロジェクトごとのスロット消費や同時実行数の実績を確認し、適切な上限値を設計するために活用。
+    </div>
+    <div class="card">
+      <strong>⏳ クエリキュー (Query queues)</strong><br>
+      同時実行数の上限超過時のクエリのキューイング動作に関連。
+    </div>
+  </div>
+
+  <!-- まとめ -->
+  <div class="section">
+    <h2>📌 まとめ</h2>
+    <div class="success-box">
+      <p style="margin: 0 0 8px;">BigQuery のリザベーション管理に <span class="highlight">「プロジェクト単位の上限 (Project caps)」</span> と <span class="highlight">「ID 単位のルーティング (principal)」</span> という 2 つの強力な制御軸が GA として加わり、<strong>リザベーションを分割せずにノイジーネイバー対策とワークロード分離</strong>を実現できるようになりました。</p>
+      <p style="margin: 0;">Enterprise / Enterprise Plus エディションで複数プロジェクト・複数ワークロードがリザベーションを共有している環境では、INFORMATION_SCHEMA やリザベーションモニタリングで現状のスロット消費を把握した上で、デフォルトのスケジューリングポリシーと principal ベースのアサインメントの導入を検討することを推奨します。</p>
+    </div>
+  </div>
+
+  <footer>
+    <p><strong>📎 出典 / 参考リンク</strong></p>
+    <ul style="padding-left: 20px;">
+      <li><a href="https://docs.cloud.google.com/release-notes#November_11_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026-11-11)</a></li>
+      <li><a href="https://docs.cloud.google.com/bigquery/docs/reservations-workload-management" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: ワークロード管理の概要 (Project caps and scheduling policies)</a></li>
+      <li><a href="https://docs.cloud.google.com/bigquery/docs/reservations-assignments" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: ワークロードアサインメントの管理 (principal / Project cap の設定手順)</a></li>
+      <li><a href="https://docs.cloud.google.com/bigquery/docs/reservations-tasks" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: ワークロードリザベーションの管理</a></li>
+      <li><a href="https://docs.cloud.google.com/bigquery/docs/editions-intro" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: BigQuery エディションの概要</a></li>
+      <li><a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">BigQuery 料金ページ</a></li>
+    </ul>
+    <p>本インフォグラフィックは Google Cloud Release Notes (2026-11-11) のレポートを基に生成されています。</p>
+    <p><strong>タグ:</strong> BigQuery / リザベーション / ワークロード管理 / Project caps / スケジューリングポリシー / Principal / Enterprise エディション / GA</p>
+  </footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#4285F4',
+      primaryTextColor: '#202124',
+      primaryBorderColor: '#4285F4',
+      lineColor: '#4285F4',
+      secondaryColor: '#F1F3F4',
+      tertiaryColor: '#FAFAFA',
+      background: '#FFFFFF',
+      mainBkg: '#E8F0FE',
+      nodeBorder: '#4285F4',
+      clusterBkg: '#E8F0FE',
+      clusterBorder: '#4285F4',
+      edgeLabelBackground: '#FFFFFF',
+      textColor: '#202124'
+    }
+  });
+</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

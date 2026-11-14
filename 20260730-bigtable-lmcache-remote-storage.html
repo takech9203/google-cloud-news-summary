@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bigtable: LMCache のリモートストレージバックエンドとして利用可能に (Preview)</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      margin-bottom: 32px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 8px 0 0 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 720px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .before-box, .after-box {
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid rgba(234, 67, 53, 0.3);
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid rgba(52, 168, 83, 0.3);
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-box h3 { color: #C5221F; }
+    .after-box h3 { color: #188038; }
+
+    .before-box ul, .after-box ul {
+      margin: 8px 0 0 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin-bottom: 8px;
+    }
+
+    /* チェックリスト */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon { color: var(--gc-green); font-size: 18px; flex-shrink: 0; }
+    .cross-icon { color: var(--gc-red); font-size: 18px; flex-shrink: 0; }
+
+    /* コードブロック (Mermaid の pre を除外) */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    .table-wrapper {
+      overflow-x: auto;
+    }
+
+    /* 注意・情報ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .ai-box {
+      background: var(--gc-purple-tint);
+      border-left: 4px solid var(--gc-purple);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* 統計カード */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* ユースケース */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-100);
+    }
+
+    .usecase-card h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+    }
+
+    /* ステップ表示 */
+    .step {
+      display: flex;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .step-number {
+      background: var(--gc-blue-600);
+      color: #FFFFFF;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 4px;
+    }
+
+    .step-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .step-content h3 {
+      margin-top: 4px;
+    }
+
+    /* 関連サービス */
+    .related-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+    }
+
+    .related-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 16px;
+      border: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    .related-card strong {
+      color: var(--gc-on-surface);
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    ul {
+      padding-left: 24px;
+    }
+
+    li {
+      margin-bottom: 6px;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div class="header-meta">
+        <div>
+          <span class="badge">🗄️ Bigtable</span>
+          <span class="badge badge-preview">Preview</span>
+        </div>
+        <div class="subtitle">📅 リリース日: 2026-07-30</div>
+      </div>
+      <h1>☁️ Bigtable が LMCache のリモートストレージバックエンドに</h1>
+      <div class="subtitle" style="margin-top: 8px;">LLM の KV キャッシュを Bigtable に外部化し、複数サービングインスタンスで共有 — TTFT を大幅改善</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📌 概要</h2>
+      <p>
+        Bigtable を <span class="highlight">LMCache のリモートストレージバックエンド</span>として利用できるようになりました。
+        LMCache は vLLM などの LLM サービングエンジン向けのオープンソース KV キャッシュレイヤーで、今回の統合により、
+        大規模言語モデル (LLM) の <span class="highlight">Key-Value (KV) キャッシュ (事前計算されたアテンションテンソル)</span> を Bigtable に外部保存できます。
+      </p>
+      <p>
+        KV キャッシュを Bigtable に外部化することで、複数の AI サービングインスタンスが事前計算済みのアテンションテンソルを共有・再利用でき、
+        計算オーバーヘッドが削減され、繰り返し利用されるプロンプトや共有ドキュメントに対する
+        <span class="highlight">Time-to-First-Token (TTFT) が大幅に改善</span>されます。
+      </p>
+
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">PB 規模</div>
+          <div class="stat-label">Bigtable のキャッシュ容量スケール</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">1 桁 ms</div>
+          <div class="stat-label">一貫した低レイテンシ読み取り</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">1/10〜1/20</div>
+          <div class="stat-label">CacheGen 圧縮によるサイズ削減</div>
+        </div>
+      </div>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before: アップデート前の課題</h3>
+          <ul>
+            <li>vLLM の KV キャッシュ (プレフィックスキャッシュ) は各インスタンスの GPU / ホストメモリに閉じており、インスタンス間で事前計算結果を共有できない</li>
+            <li>同じプロンプトプレフィックスや共有ドキュメントでも、別インスタンスに到達するとアテンションテンソルを再計算 → 計算リソースを浪費</li>
+            <li>GPU / ホストメモリの容量上限により、キャッシュできる KV データのサイズが制約される</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After: アップデート後の改善</h3>
+          <ul>
+            <li>LMCache のリモートバックエンドとして Bigtable を指定し、複数の AI サービングインスタンスが KV キャッシュを共有・再利用</li>
+            <li>繰り返しプロンプトや共有ドキュメントに対する再計算が不要になり、TTFT が大幅に改善</li>
+            <li>ペタバイト規模にスケールする Bigtable に KV キャッシュを保存でき、メモリ容量の制約を超えたキャッシュ運用が可能</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="note-box">
+        <strong>🎯 主な対象:</strong> RAG やドキュメント Q&amp;A のように長い共通コンテキストを繰り返し処理する AI サービングワークロードを運用するチーム。
+        Bigtable のマネージドなレプリケーションと IAM アクセス制御を、大規模 LLM サービングの L2 (リモート) キャッシュ層としてそのまま活用できます。
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    U([👤 ユーザー]) --> LB[⚖️ ロードバランサ]
+    LB --> A[🖥️ vLLM サービング&lt;br/&gt;インスタンス A&lt;br/&gt;+ LMCache]
+    LB --> B[🖥️ vLLM サービング&lt;br/&gt;インスタンス B&lt;br/&gt;+ LMCache]
+    A --> LA[⚡ L1: ローカル&lt;br/&gt;CPU キャッシュ]
+    B --> LBC[⚡ L1: ローカル&lt;br/&gt;CPU キャッシュ]
+    LA --> BT[(🗄️ Bigtable&lt;br/&gt;L2: リモート KV キャッシュ&lt;br/&gt;アテンションテンソル共有)]
+    LBC --> BT
+    BT -.->|キャッシュヒット時&lt;br/&gt;再計算不要 → TTFT 改善| A
+    BT -.->|キャッシュヒット時&lt;br/&gt;再計算不要 → TTFT 改善| B
+        </pre>
+      </div>
+      <p>
+        複数の vLLM + LMCache サービングインスタンスが、Bigtable を<span class="highlight">リモート (L2) KV キャッシュ層</span>として共有する構成です。
+        あるインスタンスが計算・保存したアテンションテンソルを別のインスタンスが再利用できるため、繰り返しプロンプトの再計算が不要になります。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚙️ 主要機能</h2>
+
+      <div class="card">
+        <h3>1️⃣ Bigtable リモートストレージバックエンド</h3>
+        <p>
+          LMCache の設定で <code>remote_url: "bigtable://&lt;project-id&gt;/&lt;instance-id&gt;"</code> を指定するだけで、KV キャッシュチャンクを Bigtable に保存可能。
+          ローカル CPU キャッシュ (L1) の背後のリモート (L2) 階層として動作し、複数インスタンス間でキャッシュを共有します。
+        </p>
+      </div>
+
+      <div class="card">
+        <h3>2️⃣ レイヤーグループシャーディング (Layer-Group Sharding)</h3>
+        <p>
+          KV チャンクをモデルレイヤーのグループ単位で複数カラムに分割して保存し、Bigtable のセルサイズ制限内に収めます (<span class="highlight">最大 240 MB の書き込みに対応</span>)。
+          読み取り時は複数カラムを 1 回のネットワークラウンドトリップにバッチ化。<code>bigtable_layer_group_size</code> パラメータで制御 (デフォルト: 10、<code>0</code> で無効化)。
+        </p>
+      </div>
+
+      <div class="card">
+        <h3>3️⃣ CacheGen 圧縮のサポート</h3>
+        <p>
+          <code>remote_serde: "cachegen"</code> を指定すると KV ペイロードを量子化圧縮し、およそ <span class="highlight">10〜20 分の 1 のサイズ</span> (例: 128 MB → 約 8 MB) に削減。
+          大規模モデルでの転送量・保存量の削減に有効です。
+        </p>
+      </div>
+
+      <div class="card">
+        <h3>4️⃣ 多階層キャッシュ構成</h3>
+        <p>
+          <code>remote_storage_plugins: ["redis", "bigtable"]</code> のように Redis を Bigtable の前段に配置する
+          <span class="highlight">3 階層ハイブリッド構成</span>も可能です。
+        </p>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3>📋 主な設定パラメータ (<code>extra_config</code>)</h3>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>パラメータ</th>
+              <th>デフォルト</th>
+              <th>説明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>bigtable_project_id</code> / <code>bigtable_instance_id</code> / <code>bigtable_table_name</code></td>
+              <td>なし</td>
+              <td>Google Cloud プロジェクト・インスタンス・テーブルの識別子</td>
+            </tr>
+            <tr>
+              <td><code>bigtable_family_name</code></td>
+              <td><code>cf</code></td>
+              <td>使用するカラムファミリー名</td>
+            </tr>
+            <tr>
+              <td><code>bigtable_layer_group_size</code></td>
+              <td><code>10</code></td>
+              <td>カラムグループあたりのレイヤー数。<code>0</code> でシャーディング無効</td>
+            </tr>
+            <tr>
+              <td><code>bigtable_max_chunk_size_mb</code></td>
+              <td><code>90.0</code></td>
+              <td>シャーディング無効時の書き込み上限。超過分はスキップ</td>
+            </tr>
+            <tr>
+              <td><code>credentials_path</code></td>
+              <td>なし</td>
+              <td>サービスアカウント JSON キーのパス (未指定時は ADC)</td>
+            </tr>
+            <tr>
+              <td><code>exists_cache_ttl_seconds</code></td>
+              <td><code>10.0</code></td>
+              <td>存在確認ルックアップのキャッシュ TTL</td>
+            </tr>
+            <tr>
+              <td><code>bigtable_write_timeout_ms</code> / <code>bigtable_read_timeout_ms</code></td>
+              <td><code>10000.0</code> / <code>5000.0</code></td>
+              <td>RPC タイムアウト</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>📝 設定例 (lmcache_config.yaml)</h3>
+      <span class="code-label">YAML</span>
+      <pre><code class="language-yaml">chunk_size: 256
+local_cpu: true
+max_local_cpu_size: 10.0
+remote_url: "bigtable://your-gcp-project-id/lmcache-bt-instance"
+remote_serde: "naive"
+extra_config:
+  bigtable_project_id: "your-gcp-project-id"
+  bigtable_instance_id: "lmcache-bt-instance"
+  bigtable_table_name: "lmcache-kv-table"
+  bigtable_family_name: "cf"
+  bigtable_layer_group_size: 10</code></pre>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>✅ 前提条件</h3>
+      <div class="check-item">
+        <span class="check-icon">✓</span>
+        <span>Bigtable API の有効化 (<code>bigtable.googleapis.com</code>、<code>bigtableadmin.googleapis.com</code>)</span>
+      </div>
+      <div class="check-item">
+        <span class="check-icon">✓</span>
+        <span>Bigtable インスタンスとテーブルの作成 (レイテンシ重視の KV キャッシュ用途には SSD ストレージタイプを推奨。カラムファミリー <code>cf</code> を作成)</span>
+      </div>
+      <div class="check-item">
+        <span class="check-icon">✓</span>
+        <span>認証設定 (サービスアカウント JSON キー、または <code>gcloud auth application-default login</code> / GKE Workload Identity Federation による Application Default Credentials)</span>
+      </div>
+
+      <div class="step">
+        <div class="step-number">1</div>
+        <div class="step-content">
+          <h3>Bigtable インスタンスとテーブルの作成</h3>
+          <span class="code-label">Bash</span>
+          <pre><code class="language-bash">gcloud services enable bigtable.googleapis.com bigtableadmin.googleapis.com
+
+gcloud beta bigtable instances create lmcache-bt-instance \
+  --display-name="LMCache Instance" \
+  --cluster-config=id=lmcache-cluster,zone=us-central1-a,nodes=1 \
+  --cluster-storage-type=ssd</code></pre>
+          <p>インスタンス作成後、カラムファミリー <code>cf</code> を持つテーブル (例: <code>lmcache-kv-table</code>) を作成します。</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-number">2</div>
+        <div class="step-content">
+          <h3>LMCache と Bigtable クライアントのインストール</h3>
+          <span class="code-label">Bash</span>
+          <pre><code class="language-bash">export NO_NATIVE_EXT=1
+pip install --no-cache-dir lmcache google-cloud-bigtable cachetools</code></pre>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-number">3</div>
+        <div class="step-content">
+          <h3>設定ファイルを指定して vLLM を起動</h3>
+          <span class="code-label">Bash</span>
+          <pre><code class="language-bash">LMCACHE_CONFIG_FILE=lmcache_config.yaml vllm serve facebook/opt-6.7b</code></pre>
+          <p>YAML 設定ファイルを環境変数で指定して vLLM を起動すると、KV キャッシュが Bigtable にオフロードされます。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>💡 メリット</h2>
+
+      <h3>💼 ビジネス面</h3>
+      <div class="check-item">
+        <span class="check-icon">✓</span>
+        <span><strong>推論コストの削減</strong>: 事前計算済みアテンションテンソルの再利用により GPU の計算オーバーヘッドが削減され、同じサービング能力をより少ないリソースで実現できる</span>
+      </div>
+      <div class="check-item">
+        <span class="check-icon">✓</span>
+        <span><strong>ユーザー体験の向上</strong>: 繰り返しプロンプトや共有ドキュメントに対する TTFT が大幅に改善され、チャットボットや RAG アプリケーションの応答性が向上する</span>
+      </div>
+
+      <h3>⚙️ 技術面</h3>
+      <div class="check-item">
+        <span class="check-icon">✓</span>
+        <span><strong>インスタンス間のキャッシュ共有</strong>: 単一インスタンスのメモリに閉じていた KV キャッシュを、複数のサービングインスタンスで共有・再利用できる</span>
+      </div>
+      <div class="check-item">
+        <span class="check-icon">✓</span>
+        <span><strong>スケーラビリティ</strong>: ペタバイト規模・1 桁ミリ秒レイテンシの Bigtable を活用し、メモリ容量を超える大規模なキャッシュを保持できる</span>
+      </div>
+      <div class="check-item">
+        <span class="check-icon">✓</span>
+        <span><strong>マネージドな運用</strong>: レプリケーション、IAM によるアクセス制御、暗号化など Bigtable のマネージド機能をキャッシュ層でそのまま利用できる</span>
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>🚧 制限事項</h3>
+      <div class="warning-box">
+        <div class="check-item">
+          <span class="cross-icon">•</span>
+          <span>本機能は <strong>Preview</strong> であり、Pre-GA Offerings Terms が適用される</span>
+        </div>
+        <div class="check-item">
+          <span class="cross-icon">•</span>
+          <span>LMCache 側のドキュメントによると、この統合は LMCache の <strong>in-process モード (非推奨化が進んでいるモード)</strong> の上に構築されており、LMCache は MP モードの Secondary KV Storage の利用を推奨している</span>
+        </div>
+        <div class="check-item">
+          <span class="cross-icon">•</span>
+          <span>シャーディング無効時、<code>bigtable_max_chunk_size_mb</code> (デフォルト 90 MB) を超える書き込みはスキップされる</span>
+        </div>
+        <div class="check-item">
+          <span class="cross-icon">•</span>
+          <span>240 MB を超える生チャンクには CacheGen 圧縮 (<code>remote_serde: "cachegen"</code> + <code>bigtable_layer_group_size: 0</code>) が必要</span>
+        </div>
+      </div>
+
+      <h3>🤔 考慮すべき点</h3>
+      <div class="note-box">
+        <div class="check-item">
+          <span class="check-icon">→</span>
+          <span>シャーディング利用時に <code>use_layerwise: true</code> を設定すると 32 回以上の逐次 RPC が発生し性能が劣化するため、<code>use_layerwise: false</code> を設定する</span>
+        </div>
+        <div class="check-item">
+          <span class="check-icon">→</span>
+          <span>CacheGen 圧縮は量子化を伴うため、精度要件に応じてロスレス (<code>naive</code>) との使い分けを検討する</span>
+        </div>
+        <div class="check-item">
+          <span class="check-icon">→</span>
+          <span>Bigtable インスタンスのノード数・ストレージタイプ (SSD/HDD) はキャッシュのレイテンシ要件に合わせてサイジングする必要がある</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h3>📚 ユースケース 1: 共有ドキュメントに対する RAG / ドキュメント Q&amp;A</h3>
+        <p><strong>シナリオ:</strong> 社内ナレッジベースの同一ドキュメント群を長いコンテキストとしてプロンプトに含め、多数のユーザーが複数の vLLM インスタンス越しに質問する。</p>
+        <p><strong>効果:</strong> ドキュメント部分の KV キャッシュを Bigtable 経由で全インスタンスが共有するため、どのインスタンスにリクエストが到達しても再計算が不要になり、<span class="highlight">TTFT が改善</span>される。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>💬 ユースケース 2: システムプロンプト共通のマルチインスタンスチャットサービス</h3>
+        <p><strong>シナリオ:</strong> 長大なシステムプロンプトを持つチャットサービスを、オートスケールする複数のサービングインスタンスで運用する。</p>
+        <p><strong>効果:</strong> 新しくスケールアウトしたインスタンスも Bigtable 上の既存 KV キャッシュを即座に再利用でき、<span class="highlight">ウォームアップなしで低レイテンシの応答</span>を提供できる。</p>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>
+        この統合機能自体は LMCache (オープンソース) の機能であり、Google Cloud 側では利用した Bigtable リソース (ノード、ストレージ、ネットワーク) に対して
+        <span class="highlight">通常の Bigtable 料金</span>が発生します。
+      </p>
+      <div class="note-box">
+        <strong>💡 ストレージタイプの選択:</strong> レイテンシ重視の KV キャッシュには SSD ストレージ、コスト重視のアーカイブ用途には HDD ストレージが選択できます。
+        詳細は <a href="https://cloud.google.com/bigtable/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Bigtable 料金ページ</a> を参照してください。
+      </div>
+    </div>
+
+    <!-- 関連サービス・機能 -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="related-grid">
+        <div class="related-card">
+          <strong>⚡ vLLM</strong>
+          LMCache が統合される LLM サービングエンジン。GKE や Vertex AI Model Garden 上でのサービングで広く利用される。
+        </div>
+        <div class="related-card">
+          <strong>☸️ GKE (Google Kubernetes Engine)</strong>
+          vLLM + LMCache サービングインスタンスの実行基盤。Workload Identity Federation により Bigtable への認証を安全に構成できる。
+        </div>
+        <div class="related-card">
+          <strong>🦜 Bigtable LangChain 統合</strong>
+          Bigtable はベクトルストア / Key-Value ストア / チャット履歴ストアとして LangChain とも統合されており、生成 AI アプリのデータ層として活用できる。
+        </div>
+        <div class="related-card">
+          <strong>🔴 Memorystore (Redis)</strong>
+          LMCache の <code>remote_storage_plugins</code> で Redis を前段に置く 3 階層ハイブリッドキャッシュ構成が可能。
+        </div>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="success-box">
+        <p style="margin: 0;">
+          Bigtable が LMCache のリモートストレージバックエンドとして利用可能になり、複数の AI サービングインスタンス間で LLM の KV キャッシュを共有して
+          <strong>TTFT を大幅に改善</strong>できるようになりました。
+          RAG や長いシステムプロンプトを扱う vLLM ベースのサービング基盤を運用しているチームは、Preview 段階の制約 (LMCache in-process モード依存など) を確認したうえで、
+          <strong>キャッシュヒット率の高いワークロードでの検証</strong>を始めることを推奨します。
+        </p>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p><strong>📎 出典 / 参考リンク:</strong></p>
+      <ul style="padding-left: 20px; margin: 8px 0;">
+        <li>公式リリースノート: <a href="https://docs.cloud.google.com/release-notes#July_30_2026" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/release-notes#July_30_2026</a></li>
+        <li>LMCache: Google Cloud Bigtable Remote Cache ドキュメント: <a href="https://docs.lmcache.ai/kv_cache/storage_backends/bigtable.html" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.lmcache.ai/kv_cache/storage_backends/bigtable.html</a></li>
+        <li>Bigtable ドキュメント: <a href="https://docs.cloud.google.com/bigtable/docs" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/bigtable/docs</a></li>
+        <li>料金ページ: <a href="https://cloud.google.com/bigtable/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">https://cloud.google.com/bigtable/pricing</a></li>
+      </ul>
+      <p>🏷️ タグ: Bigtable, LMCache, vLLM, LLM, KV キャッシュ, AI インフラ, Preview | 📅 リリース日: 2026-07-30 | ステータス: Preview</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

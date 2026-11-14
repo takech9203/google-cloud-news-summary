@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AlloyDB for PostgreSQL: 監査ログパイプラインのモニタリング</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+:root {
+  --gc-blue: #4285F4;
+  --gc-red: #EA4335;
+  --gc-yellow: #FBBC04;
+  --gc-green: #34A853;
+  --gc-blue-900: #174EA6;
+  --gc-blue-800: #185ABC;
+  --gc-blue-700: #1967D2;
+  --gc-blue-600: #1A73E8;
+  --gc-blue-500: #4285F4;
+  --gc-blue-300: #669DF6;
+  --gc-blue-200: #8AB4F8;
+  --gc-blue-100: #AECBFA;
+  --gc-blue-50: #E8F0FE;
+  --gc-on-surface: #202124;
+  --gc-on-surface-variant: #5F6368;
+  --gc-outline: #80868B;
+  --gc-surface: #FFFFFF;
+  --gc-surface-container-lowest: #F8F9FA;
+  --gc-surface-container-low: #F1F3F4;
+  --gc-surface-container: #E8EAED;
+  --gc-outline-variant: #DADCE0;
+  --gc-blue-tint: #E8F0FE;
+  --gc-green-tint: #E6F4EA;
+  --gc-red-tint: #FCE8E6;
+  --gc-yellow-tint: #FEF7E0;
+  --gc-purple-tint: #F3E8FD;
+  --gc-teal-tint: #E0F7FA;
+  --gc-purple: #A142F4;
+  --gc-teal: #00BCD4;
+  --gc-orange: #FF6D00;
+}
+
+body {
+  background-color: var(--gc-surface);
+  font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+  color: var(--gc-on-surface-variant);
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 20px;
+  margin: 0;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 16px;
+  border-bottom: 3px solid var(--gc-blue-600);
+}
+
+h1, .title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--gc-on-surface);
+  margin: 0;
+  line-height: 1.35;
+}
+
+h2, .section-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 20px 0 8px 0;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: var(--gc-outline);
+}
+
+.section {
+  background: var(--gc-surface-container-low);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid var(--gc-outline-variant);
+}
+
+.highlight {
+  background-color: var(--gc-blue-50);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--gc-blue-800);
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+.card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border-left: 4px solid var(--gc-blue-600);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+}
+
+.card h3 { margin-top: 0; }
+
+.icon-text {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+  color: var(--gc-on-surface-variant);
+}
+
+.arrow { color: var(--gc-blue-600); font-size: 20px; }
+
+.gc-link { color: var(--gc-blue-600); text-decoration: none; }
+.gc-link:hover { color: var(--gc-blue-800); text-decoration: underline; }
+
+.badge,
+.badge-ga,
+.badge-preview,
+.badge-deprecated {
+  display: inline-block;
+  color: #FFFFFF;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+  margin: 4px 8px 4px 0;
+}
+.badge { background: var(--gc-blue-600); }
+.badge-ga { background: var(--gc-green); color: #FFFFFF; }
+.badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+.badge-deprecated { background: var(--gc-red); color: #FFFFFF; }
+
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+}
+.check-icon { color: var(--gc-green); font-size: 18px; flex-shrink: 0; }
+.cross-icon { color: var(--gc-red); font-size: 18px; flex-shrink: 0; }
+
+/* Before/After 比較 */
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+.before-panel {
+  background: var(--gc-red-tint);
+  border: 1px solid rgba(234, 67, 53, 0.3);
+  border-radius: 12px;
+  padding: 20px;
+}
+.after-panel {
+  background: var(--gc-green-tint);
+  border: 1px solid rgba(52, 168, 83, 0.3);
+  border-radius: 12px;
+  padding: 20px;
+}
+.before-panel h3, .after-panel h3 { margin-top: 0; }
+.before-panel h3 { color: #C5221F; }
+.after-panel h3 { color: #188038; }
+@media (max-width: 720px) {
+  .before-after { grid-template-columns: 1fr; }
+}
+
+/* コードブロック */
+.code-block,
+pre:not(.mermaid) {
+  background: #1E1E1E;
+  border-radius: 8px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: #E8E8E8;
+  margin: 16px 0;
+}
+.code-block { overflow: hidden; }
+.code-header {
+  background: #2D2D2D;
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+.code-lang { color: #9CDCFE; font-weight: bold; }
+.code-title { color: #AAAAAA; }
+.code-block pre { margin: 0; padding: 0; overflow-x: auto; border-radius: 0; }
+.code-block code {
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 16px !important;
+  display: block;
+}
+pre code { background: none; border: none; font-size: inherit; color: inherit; }
+
+code:not(pre code) {
+  background: var(--gc-surface-container-low);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 0.85em;
+  color: var(--gc-blue-900);
+  word-break: break-all;
+}
+
+/* テーブル */
+.table-wrap { overflow-x: auto; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--gc-outline-variant);
+  background: var(--gc-surface);
+}
+th {
+  background: var(--gc-blue-50);
+  color: var(--gc-blue-900);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 2px solid var(--gc-blue-200);
+}
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--gc-outline-variant);
+  font-size: 14px;
+  vertical-align: top;
+}
+tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+tr:hover { background: var(--gc-blue-50); }
+
+/* ボックス */
+.note-box {
+  background: var(--gc-blue-tint);
+  border-left: 4px solid var(--gc-blue-600);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+.warning-box {
+  background: var(--gc-yellow-tint);
+  border-left: 4px solid var(--gc-yellow);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+.error-box {
+  background: var(--gc-red-tint);
+  border-left: 4px solid var(--gc-red);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+.success-box {
+  background: var(--gc-green-tint);
+  border-left: 4px solid var(--gc-green);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+/* 統計カード */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin: 16px 0;
+}
+.stat-card {
+  background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+  color: var(--gc-surface);
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+}
+.stat-value { font-size: 32px; font-weight: 700; margin-bottom: 4px; }
+.stat-label { font-size: 14px; opacity: 0.9; }
+
+/* Mermaid コンテナ */
+.mermaid-container {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 20px 0;
+  border: 2px solid rgba(66, 133, 244, 0.3);
+  overflow-x: auto;
+}
+.mermaid { display: flex; justify-content: center; }
+
+/* ユースケース */
+.usecase {
+  background: var(--gc-blue-tint);
+  border: 1px solid var(--gc-blue-100);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+}
+.usecase h3 { margin-top: 0; color: var(--gc-blue-900); }
+
+/* メトリクスカード */
+.metric-card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+}
+.metric-card.gauge { border-left: 4px solid var(--gc-yellow); }
+.metric-card.delta { border-left: 4px solid var(--gc-green); }
+.metric-type-badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: 12px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+.metric-type-badge.gauge { background: var(--gc-yellow-tint); color: #B06000; border: 1px solid var(--gc-yellow); }
+.metric-type-badge.delta { background: var(--gc-green-tint); color: #188038; border: 1px solid var(--gc-green); }
+
+ul { padding-left: 24px; margin: 8px 0; }
+li { margin: 6px 0; }
+
+.step-list { counter-reset: step; list-style: none; padding-left: 0; }
+.step-list > li {
+  counter-increment: step;
+  position: relative;
+  padding-left: 44px;
+  margin: 16px 0;
+}
+.step-list > li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 30px;
+  height: 30px;
+  background: var(--gc-blue-600);
+  color: #FFFFFF;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gc-outline-variant);
+  font-size: 12px;
+  color: var(--gc-outline);
+}
+footer a { word-break: break-all; }
+footer li { margin: 4px 0; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ヘッダー -->
+  <div class="header">
+    <div>
+      <div style="margin-bottom: 8px;">
+        <span class="badge">AlloyDB for PostgreSQL</span>
+        <span class="badge badge-ga">GA (一般提供)</span>
+      </div>
+      <h1>🐘 監査ログパイプラインの<br>モニタリングが可能に 📈</h1>
+      <div class="subtitle" style="margin-top: 8px;">pgAudit パイプラインのステータス・スループット・バックログを Cloud Monitoring で可視化</div>
+    </div>
+    <div class="subtitle" style="text-align: right;">
+      リリース日<br><strong style="color: var(--gc-on-surface); font-size: 20px;">2026-09-11</strong>
+    </div>
+  </div>
+
+  <!-- 概要 -->
+  <div class="section">
+    <h2>📌 概要</h2>
+    <p>
+      AlloyDB for PostgreSQL のインスタンス・ノードで、<span class="highlight">監査ログ (pgAudit) パイプライン</span>のステータス、スループット、バックログを Cloud Monitoring でモニタリングできるようになりました。
+      <code>alloydb.googleapis.com/InstanceNode</code> リソースに <strong>3 つの新メトリクス</strong>が追加され、Metrics Explorer から確認できます。
+    </p>
+    <p>
+      AlloyDB は監査ログを<strong>非同期のマネージドパイプライン</strong>で処理し、ノードのローカルストレージに一時バッファリングした後、Cloud Logging へ安全に転送します。高パフォーマンスなロギングを実現する一方、ログ生成レートが取り込み容量を超えると<span class="highlight">バックプレッシャー</span>が発生する可能性があり、今回のアップデートでその健全性を定量的に把握できるようになりました。
+    </p>
+    <div class="note-box">
+      <strong>💡 なぜ重要か:</strong> pgAudit で政府機関・金融・ISO 認証などのコンプライアンス要件を満たしている組織にとって、監査ログの欠落や遅延は重大なリスクです。本機能はそのリスクを<strong>早期に検知するための可観測性</strong>を提供します。
+    </div>
+
+    <div class="before-after">
+      <div class="before-panel">
+        <h3>❌ Before: アップデート前の課題</h3>
+        <div class="check-item"><span class="cross-icon">✗</span><span>非同期処理のため、Cloud Logging への<strong>反映遅延の程度を把握する手段がない</strong></span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>バックプレッシャーの発生を確認できず、<strong>ディスク枯渇による再起動・クラッシュや監査証跡の欠落</strong>を予測困難</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>Cloud Logging への<strong>実効スループットを定量的に確認できない</strong></span></div>
+      </div>
+      <div class="after-panel">
+        <h3>✅ After: アップデート後の改善</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span><code>backlog_bytes_count</code> で処理待ちバックログを監視し、<strong>バックプレッシャーを早期検知</strong></span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><code>processed_bytes_count</code> / <code>processed_entries_count</code> で<strong>転送スループットを定量把握</strong></span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>アラートポリシーと組み合わせて<strong>遅延・ディスク枯渇リスクをプロアクティブに検知</strong></span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- アーキテクチャ図 -->
+  <div class="section">
+    <h2>🏗️ アーキテクチャ図</h2>
+    <div class="mermaid-container">
+      <pre class="mermaid">
+flowchart LR
+    subgraph Node["🖥️ AlloyDB ノード (InstanceNode)"]
+        PG["🐘 PostgreSQL<br/>+ pgAudit 拡張"]
+        BUF[("📦 ローカルバッファ<br/>(一時ディスク領域)")]
+        PIPE["⚙️ 監査ログ<br/>転送パイプライン"]
+        PG -->|"監査レコード生成<br/>(非同期)"| BUF
+        BUF --> PIPE
+    end
+
+    PIPE -->|"安全に転送"| CL["📚 Cloud Logging<br/>(Data Access 監査ログ)"]
+
+    PIPE -.->|"backlog_bytes_count<br/>processed_bytes_count<br/>processed_entries_count"| CM["📈 Cloud Monitoring<br/>(Metrics Explorer)"]
+    CM -->|"バックログ増加を検知"| AL["🔔 アラート通知"]
+    AL --> OPS(["👤 運用担当者"])
+      </pre>
+    </div>
+    <p>
+      pgAudit が生成した監査レコードはノード上のローカルバッファに一時保存され、非同期パイプラインで Cloud Logging に転送されます。今回追加された 3 つのメトリクスにより、このパイプラインの<strong>バックログとスループット</strong>を Cloud Monitoring で監視し、バックプレッシャーをアラートで検知できます。
+    </p>
+  </div>
+
+  <!-- 主要機能 -->
+  <div class="section">
+    <h2>⭐ 主要機能: 3 つの新メトリクス</h2>
+
+    <div class="metric-card gauge">
+      <h3>📦 監査ログバックログサイズの監視<span class="metric-type-badge gauge">GAUGE / Bytes</span></h3>
+      <p style="margin: 8px 0 4px;"><code>backlog_bytes_count</code></p>
+      <div class="icon-text"><span class="arrow">→</span><span>ノード上で処理・Cloud Logging へのアップロード待ちの監査ログバックログサイズ (バイト) を提供</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>値が<strong>持続的に高い・増加し続けている</strong>場合は、パイプラインにバックプレッシャーが発生しているサイン</span></div>
+    </div>
+
+    <div class="metric-card delta">
+      <h3>📤 処理済み監査ログバイト数の監視<span class="metric-type-badge delta">DELTA / Bytes</span></h3>
+      <p style="margin: 8px 0 4px;"><code>processed_bytes_count</code></p>
+      <div class="icon-text"><span class="arrow">→</span><span>Cloud Logging へ正常に処理・転送された監査ログの合計バイト数</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>パイプラインの<strong>実効スループットをバイト単位</strong>で把握できる</span></div>
+    </div>
+
+    <div class="metric-card delta">
+      <h3>🔢 処理済み監査ログエントリ数の監視<span class="metric-type-badge delta">DELTA / Count</span></h3>
+      <p style="margin: 8px 0 4px;"><code>processed_entries_count</code></p>
+      <div class="icon-text"><span class="arrow">→</span><span>Cloud Logging へ正常に処理・転送された監査ログエントリの合計数</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>ワークロードごとの<strong>監査ログ生成量の傾向分析</strong>に活用できる</span></div>
+    </div>
+  </div>
+
+  <!-- 技術仕様 -->
+  <div class="section">
+    <h2>🔧 技術仕様</h2>
+
+    <h3>📋 新規メトリクス一覧</h3>
+    <p>モニタリング対象リソース: <code>alloydb.googleapis.com/InstanceNode</code></p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>メトリクス名 (node/database/logging/audit/ 配下)</th><th>表示名</th><th>種別 / 値型</th><th>単位</th><th>説明</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>backlog_bytes_count</code></td>
+            <td>Audit log backlog size</td>
+            <td>GAUGE / INT64</td>
+            <td>Bytes (By)</td>
+            <td>処理・アップロード待ちの監査ログバックログサイズ。持続的な高値・増加はバックプレッシャーを示す</td>
+          </tr>
+          <tr>
+            <td><code>processed_bytes_count</code></td>
+            <td>Processed audit log bytes</td>
+            <td>DELTA / INT64</td>
+            <td>Bytes (By)</td>
+            <td>Cloud Logging へ正常に転送された監査ログの合計バイト数</td>
+          </tr>
+          <tr>
+            <td><code>processed_entries_count</code></td>
+            <td>Processed audit log entries</td>
+            <td>DELTA / INT64</td>
+            <td>Count (1)</td>
+            <td>Cloud Logging へ正常に転送された監査ログエントリの合計数</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>⚙️ 監査ログパイプラインの制約 (公式ドキュメントより)</h3>
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-value">90 MiB/秒</div>
+        <div class="stat-label">最大ログ取り込みレート</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">1 MB</div>
+        <div class="stat-label">単一監査レコードの最大サイズ</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">非同期</div>
+        <div class="stat-label">処理方式 (ローカルバッファ経由で転送)</div>
+      </div>
+    </div>
+    <div class="warning-box">
+      <strong>⚠️ バックプレッシャー持続時の影響:</strong> Cloud Logging への反映遅延の増大、ローカルディスク枯渇によるインスタンスの再起動・クラッシュ、監査証跡の断続的な欠落が発生する可能性があります。
+    </div>
+  </div>
+
+  <!-- 設定方法 -->
+  <div class="section">
+    <h2>🛠️ 設定方法</h2>
+
+    <h3>✅ 前提条件</h3>
+    <div class="check-item"><span class="check-icon">✓</span><span>AlloyDB インスタンスで <strong>pgAudit 拡張が有効化・構成</strong>されていること</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span>監査ログの閲覧: プロジェクトで Data Access 監査ログが有効 + <code>roles/logging.privateLogViewer</code> ロール</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span>メトリクスの閲覧: Cloud Monitoring へのアクセス権 (例: <code>roles/monitoring.viewer</code>)</span></div>
+
+    <h3>📝 手順</h3>
+    <ol class="step-list">
+      <li>
+        <strong>Metrics Explorer でメトリクスを確認</strong>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Text</span>
+            <span class="code-title">Metrics Explorer での確認</span>
+          </div>
+          <pre><code class="language-text">Google Cloud コンソール → Monitoring → Metrics Explorer
+リソースタイプ: AlloyDB InstanceNode (alloydb.googleapis.com/InstanceNode)
+メトリクス: node/database/logging/audit/backlog_bytes_count など</code></pre>
+        </div>
+        <p>対象リソースとメトリクスを選択し、ノードごとのバックログサイズやスループットを可視化します。</p>
+      </li>
+      <li>
+        <strong>バックログ増加に対するアラートポリシーを作成</strong>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">gcloud によるアラートポリシー作成例</span>
+          </div>
+          <pre><code class="language-bash"># 例: バックログサイズに対するアラートポリシーの作成 (gcloud)
+gcloud alpha monitoring policies create \
+  --display-name="AlloyDB Audit Log Backlog Alert" \
+  --condition-display-name="Audit log backlog sustained high" \
+  --condition-filter='resource.type="alloydb.googleapis.com/InstanceNode" AND metric.type="alloydb.googleapis.com/node/database/logging/audit/backlog_bytes_count"' \
+  --condition-threshold-value=1073741824 \
+  --condition-threshold-comparison=COMPARISON_GT \
+  --condition-threshold-duration=600s \
+  --notification-channels=CHANNEL_ID</code></pre>
+        </div>
+        <p>バックログサイズが一定値 (例: 1 GiB) を <strong>10 分以上超過</strong>した場合に通知するアラートを設定し、バックプレッシャーを早期に検知します。しきい値はワークロードのログ生成量に応じて調整してください。</p>
+      </li>
+    </ol>
+  </div>
+
+  <!-- メリット -->
+  <div class="section">
+    <h2>💪 メリット</h2>
+    <div class="card">
+      <h3>💼 ビジネス面</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>コンプライアンスリスクの低減</strong>: 監査証跡の欠落・遅延の予兆を早期検知でき、政府機関・金融・ISO 認証などの監査要件への準拠を維持しやすい</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>障害の未然防止</strong>: ローカルディスク枯渇によるインスタンスの再起動・クラッシュをバックログ監視で事前に回避</span></div>
+    </div>
+    <div class="card">
+      <h3>⚙️ 技術面</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>可観測性の向上</strong>: ブラックボックスだった監査ログ転送パイプラインの内部状態 (バックログ・スループット) を定量的に把握</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>標準ツールとの統合</strong>: Metrics Explorer、ダッシュボード、アラートポリシーなど既存の運用ツールをそのまま活用可能</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>ノード単位の粒度</strong>: <code>InstanceNode</code> リソースへのメトリクスのため、プライマリ・リードプールなどノード単位で状態を把握できる</span></div>
+    </div>
+  </div>
+
+  <!-- デメリット・制約事項 -->
+  <div class="section">
+    <h2>⚠️ デメリット・制約事項</h2>
+    <div class="error-box">
+      <strong>🚧 制限事項</strong>
+      <ul>
+        <li>監査レコードの作成・処理は引き続き<strong>非同期</strong>であり、Cloud Logging への反映遅延自体がなくなるわけではない (遅延の程度を<strong>可視化</strong>する機能である)</li>
+        <li>最大ログ取り込みレート <strong>90 MiB/秒</strong>、単一監査レコード最大 <strong>1 MB</strong> という制約は変わらない</li>
+      </ul>
+    </div>
+    <div class="warning-box">
+      <strong>🤔 考慮すべき点</strong>
+      <ul>
+        <li>バックプレッシャー検知後の根本対応 (pgAudit の記録対象の絞り込み、ワークロードの見直しなど) は<strong>利用者側で実施</strong>する必要がある</li>
+        <li>pgAudit の設定によっては監査ログ生成量が大きくなり、ローカルディスクの一時領域を消費する点に引き続き注意</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ユースケース -->
+  <div class="section">
+    <h2>🎯 ユースケース</h2>
+
+    <div class="usecase">
+      <h3>🏦 ユースケース 1: 金融システムにおける監査証跡の完全性監視</h3>
+      <p><strong>シナリオ</strong>: 金融機関が AlloyDB 上の勘定系データベースに pgAudit を適用し、すべての READ/WRITE 操作を記録。監査証跡の欠落は規制違反につながるため、パイプラインの健全性を常時監視したい。</p>
+      <p><strong>実装例</strong>:</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Text</span>
+          <span class="code-title">監視フロー</span>
+        </div>
+        <pre><code class="language-text">1. Metrics Explorer で backlog_bytes_count のダッシュボードを作成
+2. バックログが 10 分間しきい値を超えた場合のアラートポリシーを設定
+3. アラート発報時は pgaudit.log の記録対象を確認し、ログ生成レートを調整</code></pre>
+      </div>
+      <div class="success-box" style="margin-bottom: 0;">
+        <strong>✅ 効果:</strong> バックプレッシャーの持続による監査証跡の欠落・インスタンス障害を未然に防ぎ、規制対応の信頼性を高める。
+      </div>
+    </div>
+
+    <div class="usecase">
+      <h3>🔍 ユースケース 2: 監査ログ遅延を考慮したセキュリティ調査</h3>
+      <p><strong>シナリオ</strong>: セキュリティチームが Cloud Logging 上の pgAudit ログを SIEM に連携してリアルタイム分析を実施。非同期パイプラインの遅延により、イベント検知が遅れる可能性がある。</p>
+      <div class="success-box" style="margin-bottom: 0;">
+        <strong>✅ 効果:</strong> <code>backlog_bytes_count</code> の監視により現在の転送遅延の程度を推定でき、SIEM 側の検知ロジックやインシデント調査時のタイムラインの解釈精度が向上する。
+      </div>
+    </div>
+  </div>
+
+  <!-- 料金 -->
+  <div class="section">
+    <h2>💰 料金</h2>
+    <p>
+      今回追加されたメトリクスは Google Cloud の<span class="highlight">システムメトリクス</span> (<code>alloydb.googleapis.com</code>) として提供されます。詳細な課金条件は Cloud Monitoring の料金ページを参照してください。
+    </p>
+    <div class="icon-text"><span class="arrow">→</span><a class="gc-link" href="https://cloud.google.com/stackdriver/pricing" target="_blank" rel="noopener noreferrer">Cloud Monitoring 料金</a></div>
+    <div class="icon-text"><span class="arrow">→</span><a class="gc-link" href="https://cloud.google.com/alloydb/pricing" target="_blank" rel="noopener noreferrer">AlloyDB for PostgreSQL 料金</a></div>
+  </div>
+
+  <!-- 利用可能リージョン -->
+  <div class="section">
+    <h2>🌍 利用可能リージョン</h2>
+    <p>
+      リージョン制限に関する記載は Release Notes およびドキュメントに確認できませんでした。AlloyDB for PostgreSQL が利用可能なリージョンについては
+      <a class="gc-link" href="https://docs.cloud.google.com/alloydb/docs/locations" target="_blank" rel="noopener noreferrer">公式ドキュメント</a> を参照してください。
+    </p>
+  </div>
+
+  <!-- 関連サービス・機能 -->
+  <div class="section">
+    <h2>🔗 関連サービス・機能</h2>
+    <div class="card">
+      <div class="icon-text"><span class="arrow">→</span><span><strong>📈 Cloud Monitoring</strong>: 本アップデートのメトリクスの提供基盤。Metrics Explorer、ダッシュボード、アラートポリシーで監査ログパイプラインを監視</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span><strong>📚 Cloud Logging</strong>: pgAudit の監査ログの転送先。Data Access 監査ログとして Logs Explorer で閲覧可能</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span><strong>🐘 pgAudit 拡張</strong>: AlloyDB におけるデータベース監査の中核機能。SESSION/OBJECT 監査により実行された SQL を選択的に記録</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span><strong>📊 AlloyDB System Insights</strong>: AlloyDB のシステムメトリクスを一元的に確認できる機能。新メトリクスもメトリクスリファレンスに含まれる</span></div>
+    </div>
+  </div>
+
+  <!-- まとめ -->
+  <div class="section">
+    <h2>📝 まとめ</h2>
+    <div class="success-box">
+      <p style="margin: 0 0 8px;">
+        AlloyDB の監査ログパイプラインの内部状態が Cloud Monitoring のメトリクスとして公開され、<strong>バックログ・スループットの可視化とアラート設定</strong>が可能になりました。
+      </p>
+      <p style="margin: 0;">
+        pgAudit をコンプライアンス目的で利用している場合、監査証跡の欠落やディスク枯渇による障害を未然に防ぐため、<code>backlog_bytes_count</code> に対する<strong>アラートポリシーの設定を推奨</strong>します。
+      </p>
+    </div>
+  </div>
+
+  <!-- フッター -->
+  <footer>
+    <p><strong>📎 出典・参考リンク</strong></p>
+    <ul style="list-style: none; padding-left: 0;">
+      <li>📰 <a href="https://docs.cloud.google.com/release-notes#September_11_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026-09-11)</a></li>
+      <li>📖 <a href="https://docs.cloud.google.com/alloydb/docs/pgaudit/view-audit-log#monitor-audit-log-pipeline-status" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: 監査ログパイプラインステータスのモニタリング</a></li>
+      <li>📖 <a href="https://docs.cloud.google.com/alloydb/docs/pgaudit/about" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: pgAudit について (制限事項)</a></li>
+      <li>📖 <a href="https://docs.cloud.google.com/alloydb/docs/reference/system-insights-metrics" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: System insights メトリクスリファレンス</a></li>
+      <li>💰 <a href="https://cloud.google.com/stackdriver/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">料金ページ (Cloud Monitoring)</a></li>
+    </ul>
+    <p>タグ: AlloyDB / PostgreSQL / pgAudit / Cloud Monitoring / Cloud Logging / 監査ログ / 可観測性 / コンプライアンス</p>
+  </footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+    mermaid.initialize({
+        startOnLoad: true,
+        theme: 'base',
+        themeVariables: {
+            primaryColor: '#4285F4',
+            primaryTextColor: '#202124',
+            primaryBorderColor: '#4285F4',
+            lineColor: '#4285F4',
+            secondaryColor: '#F1F3F4',
+            tertiaryColor: '#FAFAFA',
+            background: '#FFFFFF',
+            mainBkg: '#E8F0FE',
+            nodeBorder: '#4285F4',
+            clusterBkg: '#E8F0FE',
+            clusterBorder: '#4285F4',
+            edgeLabelBackground: '#FFFFFF',
+            textColor: '#202124'
+        }
+    });
+</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

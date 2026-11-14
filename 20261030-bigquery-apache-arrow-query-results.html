@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BigQuery: Apache Arrow 形式でのクエリ結果取得 (Preview)</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .badge-deprecated {
+      background: var(--gc-red);
+      color: #FFFFFF;
+    }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 720px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid rgba(234, 67, 53, 0.3);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid rgba(52, 168, 83, 0.3);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-box h3 { color: #C5221F; }
+    .after-box h3 { color: #188038; }
+
+    .before-box ul, .after-box ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+    }
+
+    .before-box li, .after-box li {
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    /* フロー図スタイル */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+      font-size: 14px;
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* チェックリストスタイル */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* コードブロック */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+      padding: 16px;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      border-radius: 0;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブルスタイル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* ユースケースボックス */
+    .usecase-box {
+      background: var(--gc-blue-tint);
+      border: 1px solid var(--gc-blue-200);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+    }
+
+    .usecase-box h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+    }
+
+    /* 2 カラムグリッド */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 720px) {
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    ul {
+      padding-left: 22px;
+      margin: 8px 0;
+    }
+
+    li {
+      margin-bottom: 6px;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <div style="margin-bottom: 8px;">
+          <span class="badge">📊 BigQuery</span>
+          <span class="badge badge-preview">Preview</span>
+        </div>
+        <h1>⚡ Apache Arrow 形式でのクエリ結果取得</h1>
+        <div class="subtitle">クエリ結果を列指向フォーマットで直接取得し、分析パイプラインへの取り込みを高速化</div>
+      </div>
+      <div class="subtitle">リリース日: 2026-10-30</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📝 概要</h2>
+      <p>
+        BigQuery のクエリ結果を <span class="highlight">Apache Arrow 形式</span>で直接取得できる機能が Preview として発表されました。
+        従来のキーバリューペアエンコーディング (<code>STRUCT_ENCODING</code>) と比較して、<span class="highlight">シリアライズ効率と取得速度が向上</span>します。
+      </p>
+      <p>利用方法は 2 つあります。</p>
+      <div class="flow-diagram">
+        <div class="flow-step">🔌 方法 1<br/><strong>jobs.query</strong><br/><code>queryResultsFormat = ARROW</code></div>
+        <div class="flow-step">📡 方法 2<br/><strong>Storage Read API</strong><br/><code>ReadRows</code> で <code>_default</code> ストリームを読む</div>
+      </div>
+      <p>
+        Apache Arrow は列指向のインメモリデータフォーマットで、pandas や PyArrow などのデータ分析ツールと親和性が高く、
+        大量のクエリ結果を分析基盤やアプリケーションに高速に取り込みたい<strong>データエンジニアやデータサイエンティスト</strong>にとって有用なアップデートです。
+      </p>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before (アップデート前の課題)</h3>
+          <ul>
+            <li><code>jobs.query</code> の結果はキーバリューペアエンコーディング (<code>STRUCT_ENCODING</code>) で返却され、シリアライズ / デシリアライズのオーバーヘッドが大きい</li>
+            <li>Arrow 形式での取得には Storage Read API で読み取りセッション (ReadSession) を作成してテーブルを読む必要があり、クエリジョブの結果を直接 Arrow で受け取る手段がなかった</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After (アップデート後の改善)</h3>
+          <ul>
+            <li><code>queryResultsFormat</code> を <code>ARROW</code> に設定するだけで、IPC シリアライズされた Arrow スキーマ / RecordBatch を直接取得</li>
+            <li>ジョブの <code>_default</code> ストリームへの <code>ReadRows</code> で、ReadSession 不要の高スループットストリーミング</li>
+            <li><code>arrowSerializationOptions</code> で圧縮コーデック (<code>LZ4_FRAME</code> / <code>ZSTD</code>) を指定可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    Client([👤 クライアント&lt;br/&gt;アプリケーション])
+    API[🔌 BigQuery API&lt;br/&gt;jobs.query]
+    ReadRows[📡 Storage Read API&lt;br/&gt;ReadRows _default ストリーム]
+    Arrow[⚡ Arrow 形式の結果&lt;br/&gt;serializedSchema +&lt;br/&gt;serializedRecordBatch]
+    JSON[🐢 従来の結果&lt;br/&gt;rows / schema&lt;br/&gt;キーバリューペア]
+    Pandas[📊 PyArrow / pandas&lt;br/&gt;分析ツール]
+
+    Client --&gt;|queryResultsFormat = ARROW| API
+    API --&gt;|初回ページ| Arrow
+    API -.-&gt;|残りのページ| ReadRows
+    ReadRows --&gt;|高スループット&lt;br/&gt;ストリーミング| Arrow
+    Arrow --&gt; Pandas
+    Client -.-&gt;|従来方式&lt;br/&gt;STRUCT_ENCODING| API
+    API -.-&gt;|シリアライズ&lt;br/&gt;オーバーヘッド大| JSON
+        </pre>
+      </div>
+      <div class="note-box">
+        <strong>💡 ポイント:</strong> <code>queryResultsFormat</code> を <code>ARROW</code> に設定すると、クエリ結果が Arrow 形式で返却されます。
+        初回レスポンスに収まらない結果は、Storage Read API の <code>ReadRows</code> でジョブの <code>_default</code> ストリームからストリーミング取得します。
+      </div>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>🚀 主要機能</h2>
+
+      <div class="card">
+        <h3>1️⃣ jobs.query での Arrow サポート</h3>
+        <div class="icon-text"><span class="arrow">→</span><span><code>QueryRequest</code> の <code>queryResultsFormat</code> を <code>ARROW</code> に設定すると、<code>QueryResponse</code> に IPC シリアライズされた Arrow スキーマ (<code>arrowSchema.serializedSchema</code>) と最初のページの RecordBatch (<code>arrowRecordBatch.serializedRecordBatch</code>) が返却される</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>最初のページの行数は <code>pageRowCount</code> で返却される</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>arrowSerializationOptions.bufferCompression</code> で圧縮コーデック (<code>COMPRESSION_UNSPECIFIED</code> / <code>LZ4_FRAME</code> / <code>ZSTD</code>) を指定可能</span></div>
+      </div>
+
+      <div class="card">
+        <h3>2️⃣ ReadRows によるクエリ結果の直接ストリーミング</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>クエリジョブの特別なストリーム <code>projects/{PROJECT_ID}/locations/{LOCATION}/jobs/{JOB_ID}/streams/_default</code> に対して <code>ReadRows</code> を呼び出すことで、任意のクエリジョブの結果を直接ストリーミング可能</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>ジョブの <code>_default</code> ストリームの出力は、ジョブ作成時の指定にかかわらず常に Arrow 形式がデフォルト</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>クエリジョブが実行中の場合、Storage Read API はジョブの完了を自動的に待機してから結果をストリーミング</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>ReadRowsResponse</code> の <code>total_estimated_row_count</code> にクエリ結果の推定行数が設定される</span></div>
+      </div>
+
+      <div class="card">
+        <h3>3️⃣ クライアントライブラリとの統合</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>Python クライアントライブラリでは <code>query_and_wait()</code> に <code>query_results_format=enums.QueryResultsFormat.ARROW</code> と <code>compression_codec</code> を指定し、<code>to_arrow_iterable()</code> で <code>pyarrow.RecordBatch</code> のイテラブルとして結果を取得可能</span></div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>⚙️ 技術仕様</h2>
+
+      <h3>jobs.query で Arrow 形式を使用した場合の動作</h3>
+      <table>
+        <tr><th>項目</th><th>詳細</th></tr>
+        <tr><td>リクエスト設定</td><td><code>QueryRequest.queryResultsFormat</code> を <code>ARROW</code> に設定</td></tr>
+        <tr><td>圧縮オプション</td><td><code>arrowSerializationOptions.bufferCompression</code>: <code>COMPRESSION_UNSPECIFIED</code> / <code>LZ4_FRAME</code> / <code>ZSTD</code></td></tr>
+        <tr><td>レスポンス (スキーマ)</td><td><code>arrowSchema.serializedSchema</code> (IPC シリアライズされた Arrow スキーマ)</td></tr>
+        <tr><td>レスポンス (データ)</td><td><code>arrowRecordBatch.serializedRecordBatch</code> (最初のページの IPC シリアライズされた RecordBatch)</td></tr>
+        <tr><td>レスポンス (行数)</td><td><code>pageRowCount</code> (最初のページで返却された行数)</td></tr>
+        <tr><td>標準フィールド</td><td>従来の <code>rows</code> / <code>schema</code> フィールドは設定されない</td></tr>
+        <tr><td>初回レスポンス</td><td>結果が初回レスポンスに収まらない場合、空のシリアライズ済み Arrow データが返る場合がある</td></tr>
+        <tr><td>後続ページの取得</td><td><code>jobs.getQueryResults</code> は Arrow 形式に非対応。残りの結果は Storage Read API の <code>ReadRows</code> でジョブの <code>_default</code> ストリームからストリーミング</td></tr>
+      </table>
+
+      <h3>ReadRows の _default ストリーム名の形式</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Text</span>
+          <span class="code-title">ストリーム名の形式</span>
+        </div>
+        <pre><code class="language-text">projects/PROJECT_ID/locations/LOCATION/jobs/JOB_ID/streams/_default</code></pre>
+      </div>
+      <ul>
+        <li><code>PROJECT_ID</code>: クエリジョブを実行したプロジェクト ID</li>
+        <li><code>LOCATION</code>: クエリジョブを実行したロケーション (例: <code>us</code>、<code>us-central1</code>)</li>
+        <li><code>JOB_ID</code>: BigQuery クエリジョブの ID</li>
+      </ul>
+      <div class="note-box">
+        <strong>💡 ヒント:</strong> <code>ReadRowsRequest</code> の <code>arrow_serialization_options</code> フィールドで、圧縮などの Arrow シリアライズオプションをオーバーライドできます (ジョブの <code>_default</code> ストリームでサポート)。
+      </div>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>BigQuery API を有効化したプロジェクト</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>クライアントライブラリ使用時は Application Default Credentials による認証設定</span></div>
+
+      <h3>ステップ 1: Python クライアントライブラリで Arrow 形式を指定してクエリを実行</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Python</span>
+          <span class="code-title">query_and_wait で Arrow 形式を取得</span>
+        </div>
+        <pre><code class="language-python">from typing import Iterable
+import pyarrow
+from google.cloud.bigquery import enums
+from google.cloud import bigquery
+
+def query_and_wait_arrow() -&gt; Iterable[pyarrow.RecordBatch]:
+    client = bigquery.Client()
+    query = """
+        SELECT name, number, state
+        FROM `bigquery-public-data.usa_names.usa_1910_current`
+        LIMIT 100000
+    """
+    # Arrow 形式 (LZ4_FRAME 圧縮) で結果を直接取得
+    results = client.query_and_wait(
+        query,
+        query_results_format=enums.QueryResultsFormat.ARROW,
+        compression_codec=enums.QueryResultsCompressionCodec.LZ4_FRAME,
+    )
+    # pyarrow.RecordBatch のイテラブルとして返却
+    return results.to_arrow_iterable()</code></pre>
+      </div>
+      <p>公式ドキュメントに掲載されている Python のサンプルです。<code>to_arrow_iterable()</code> で各バッチを Apache Arrow 形式のまま処理できます。</p>
+
+      <h3>ステップ 2: REST API で直接指定する場合</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">JSON</span>
+          <span class="code-title">jobs.query リクエストボディ</span>
+        </div>
+        <pre><code class="language-json">{
+  "query": "SELECT name, number, state FROM `bigquery-public-data.usa_names.usa_1910_current` LIMIT 100000",
+  "useLegacySql": false,
+  "queryResultsFormat": "ARROW",
+  "arrowSerializationOptions": {
+    "bufferCompression": "LZ4_FRAME"
+  }
+}</code></pre>
+      </div>
+      <p>
+        <code>jobs.query</code> のリクエストボディに <code>queryResultsFormat</code> と <code>arrowSerializationOptions</code> を指定します。
+        レスポンスの <code>jobComplete</code> が <code>true</code> の場合、<code>arrowSchema.serializedSchema</code> と
+        <code>arrowRecordBatch.serializedRecordBatch</code> から結果を読み取ります。
+      </p>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div class="grid-2">
+        <div class="card" style="border-left-color: var(--gc-green);">
+          <h3>💼 ビジネス面</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>データ取得の高速化</strong>: 従来のキーバリューペアエンコーディングと比較して取得速度が向上し、分析結果の提供までの時間を短縮</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>既存エコシステムの活用</strong>: Apache Arrow は pandas / PyArrow など主要なデータ分析ツールが対応する標準フォーマットであり、追加の変換コストなしに分析パイプラインへ組み込める</span></div>
+        </div>
+        <div class="card" style="border-left-color: var(--gc-green);">
+          <h3>🔧 技術面</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>シリアライズ効率の向上</strong>: 列指向の Arrow 形式により、<code>STRUCT_ENCODING</code> と比較してシリアライズ / デシリアライズのオーバーヘッドを削減</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>読み取りセッション不要のストリーミング</strong>: ジョブの <code>_default</code> ストリームで、ReadSession を作成せずに高スループットでストリーミング</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>圧縮コーデックの選択</strong>: <code>LZ4_FRAME</code> / <code>ZSTD</code> の圧縮でネットワーク転送量を削減</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>ジョブ完了の自動待機</strong>: ジョブ実行中に <code>ReadRows</code> を呼び出しても API が完了を自動待機するためポーリング処理が不要</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>制限事項</h3>
+      <div class="check-item"><span class="cross-icon">✗</span><span>Preview 段階の機能であり、Pre-GA Offerings Terms が適用される (サポートが限定される場合がある)</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span><code>jobs.getQueryResults</code> メソッドは Arrow 形式に非対応。初回レスポンスに含まれない残りの結果は Storage Read API の <code>ReadRows</code> でストリーミングする必要がある</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span><code>queryResultsFormat</code> を <code>ARROW</code> に設定した場合、<code>QueryResponse</code> の標準の <code>rows</code> / <code>schema</code> フィールドは設定されない</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>結果が初回レスポンスに収まらない場合、最初のページで空のシリアライズ済み Arrow データが返ることがある</span></div>
+
+      <div class="warning-box">
+        <strong>⚠️ 考慮すべき点:</strong>
+        <ul style="margin-bottom: 0;">
+          <li>既存のコードが <code>QueryResponse</code> の <code>rows</code> / <code>schema</code> フィールドに依存している場合は、Arrow データの読み取り処理への変更が必要</li>
+          <li>フィードバックやサポートのリクエストは専用メールアドレス (<code>bq-arrow-support-in-query-results-preview@google.com</code>) 宛てに送付</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase-box">
+        <h3>📊 ユースケース 1: pandas / PyArrow を使ったデータ分析パイプラインの高速化</h3>
+        <p><strong>シナリオ</strong>: データサイエンティストが BigQuery 上の大規模データセットに対してクエリを実行し、結果を pandas DataFrame に取り込んで機械学習の特徴量エンジニアリングを行う。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Python</span>
+            <span class="code-title">実装例</span>
+          </div>
+          <pre><code class="language-python">results = client.query_and_wait(
+    query,
+    query_results_format=enums.QueryResultsFormat.ARROW,
+    compression_codec=enums.QueryResultsCompressionCodec.LZ4_FRAME,
+)
+for batch in results.to_arrow_iterable():
+    df = batch.to_pandas()  # Arrow からゼロコピーに近い変換
+    # 特徴量エンジニアリング処理</code></pre>
+        </div>
+        <p style="margin-bottom: 0;"><strong>効果</strong>: JSON ベースの行データを DataFrame に変換するオーバーヘッドが削減され、大量データの取り込み時間を短縮できる。</p>
+      </div>
+
+      <div class="usecase-box">
+        <h3>📡 ユースケース 2: クエリ結果の高スループットストリーミング</h3>
+        <p><strong>シナリオ</strong>: アプリケーションがクエリジョブを発行し、数百万行の結果を下流の処理系へ転送する。</p>
+        <p style="margin-bottom: 0;"><strong>効果</strong>: ジョブの <code>_default</code> ストリーム (<code>.../jobs/{JOB_ID}/streams/_default</code>) に対して <code>ReadRows</code> を呼び出すだけで、ReadSession の作成なしに結果を Arrow 形式で高スループットにストリーミングできる。ジョブ実行中でも API が完了を自動待機するため、ポーリングロジックの実装が不要になる。</p>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>
+        この機能固有の料金情報はリリースノートおよびドキュメントに記載されていません。
+        BigQuery のクエリ料金および Storage Read API の料金については、公式の料金ページを参照してください。
+      </p>
+      <div class="icon-text"><span class="arrow">→</span><a class="gc-link" href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer">BigQuery の料金</a></div>
+    </div>
+
+    <!-- 関連サービス・機能 -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <h3>📡 BigQuery Storage Read API</h3>
+        <p style="margin-bottom: 0;">ジョブの <code>_default</code> ストリームに対する <code>ReadRows</code> でクエリ結果を Arrow 形式のままストリーミングでき、本機能の後続ページ取得にも使用する。</p>
+      </div>
+      <div class="card">
+        <h3>🐍 BigQuery クライアントライブラリ (Python など)</h3>
+        <p style="margin-bottom: 0;"><code>query_and_wait()</code> の <code>query_results_format</code> オプションを通じて本機能を利用でき、<code>to_arrow_iterable()</code> で PyArrow の RecordBatch として結果を扱える。</p>
+      </div>
+      <div class="card">
+        <h3>🏹 Apache Arrow / PyArrow / pandas</h3>
+        <p style="margin-bottom: 0;">列指向インメモリフォーマットとそのエコシステム。Arrow 形式の結果をそのまま分析処理に利用できる。</p>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📌 まとめ</h2>
+      <div class="success-box">
+        <p>
+          BigQuery のクエリ結果を <strong>Apache Arrow 形式で直接取得</strong>できるようになり、pandas / PyArrow ベースの分析パイプラインへのデータ取り込みが<strong>高速化・効率化</strong>されます。
+        </p>
+        <p style="margin-bottom: 0;">
+          大量のクエリ結果をアプリケーションや分析基盤へ転送しているワークロードでは、Preview 段階のうちに
+          <code>queryResultsFormat=ARROW</code> と <code>ReadRows</code> による直接ストリーミングを検証し、
+          取得速度と転送コストの改善効果を確認することを推奨します。
+        </p>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="padding-left: 20px;">
+        <li><a href="https://docs.cloud.google.com/release-notes#October_30_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026-10-30)</a></li>
+        <li><a href="https://docs.cloud.google.com/bigquery/docs/running-queries#arrow-format" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: Return query results in the Arrow format</a></li>
+        <li><a href="https://docs.cloud.google.com/bigquery/docs/reference/storage#stream-query-results" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: Stream query results in the Arrow format (Storage Read API)</a></li>
+        <li><a href="https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/jobs/query" target="_blank" rel="noopener noreferrer" class="gc-link">jobs.query API リファレンス</a></li>
+        <li><a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">BigQuery 料金ページ</a></li>
+      </ul>
+      <p>タグ: BigQuery / Apache Arrow / Storage Read API / クエリ結果 / Preview / データ分析 / PyArrow</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Compute Engine: C4D + Hyperdisk Balanced HA (GA)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+      text-align: right;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge-service { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green { border-left-color: var(--gc-green); }
+    .card-red { border-left-color: var(--gc-red); }
+    .card-orange { border-left-color: var(--gc-orange); }
+    .card-purple { border-left-color: var(--gc-purple); }
+    .card-teal { border-left-color: var(--gc-teal); }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h4, .after-box h4 {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .before-box h4 { color: var(--gc-red); }
+    .after-box h4 { color: var(--gc-green); }
+
+    .before-box ul, .after-box ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li { margin: 4px 0; }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-800);
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .usecase-card p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 13px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 13px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      background: #1E1E1E;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      color: #E8E8E8;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    footer {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    .related-services {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .related-item {
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 14px;
+    }
+
+    .related-item strong {
+      color: var(--gc-on-surface);
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; align-items: flex-start; }
+      .subtitle { text-align: left; margin-top: 8px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .feature-grid { grid-template-columns: 1fr; }
+      .related-services { grid-template-columns: 1fr; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>&#x2601;&#xFE0F; C4D マシンシリーズが Hyperdisk Balanced HA をサポート</h1>
+        <div>
+          <span class="badge badge-service">Compute Engine</span>
+          <span class="badge badge-ga">GA</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-06-08</div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>&#x1F4CB; 概要</h2>
+      <p>
+        C4D マシンシリーズで <span class="highlight">Hyperdisk Balanced High Availability (HA)</span> ディスクのサポートが一般提供 (GA) になりました。AMD EPYC Turin プロセッサを搭載した高性能 C4D VM で、ゾーン間の同期レプリケーションによる高可用性ブロックストレージが利用可能になります。
+      </p>
+      <p>
+        Hyperdisk Balanced HA は、同一リージョン内の 2 つのゾーンにデータを同期的にレプリケートし、ゾーン障害からアプリケーションを保護するディスクタイプです。C4D の高い計算性能と耐障害性の高いストレージを組み合わせた、ミッションクリティカルなワークロード向けの構成が実現します。
+      </p>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>&#x1F504; Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h4>&#x274C; Before (アップデート前)</h4>
+          <ul>
+            <li>C4D で Hyperdisk Balanced HA を利用不可</li>
+            <li>同期レプリケーション活用には他マシンシリーズが必要</li>
+            <li>高可用性にはアプリレベルのレプリケーション実装が必要</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h4>&#x2705; After (アップデート後)</h4>
+          <ul>
+            <li>C4D で Hyperdisk Balanced HA を直接利用可能</li>
+            <li>インフラレベルでの同期レプリケーション</li>
+            <li>最大 320,000 IOPS / 10,000 MiB/s を HA 構成で利用可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Statistics -->
+    <div class="section">
+      <h2>&#x1F4CA; 数字で見るパフォーマンス</h2>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value">320,000</div>
+          <div class="stat-label">最大 IOPS (C4D-384)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">10,000</div>
+          <div class="stat-label">最大スループット MiB/s</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">384</div>
+          <div class="stat-label">最大 vCPU 数</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-green), #1B5E20);">
+          <div class="stat-value">RPO 0</div>
+          <div class="stat-label">同期レプリケーション</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>&#x1F3D7;&#xFE0F; アーキテクチャ図</h2>
+      <p>C4D VM が Hyperdisk Balanced HA を使用する際の構成です。同一リージョン内の 2 ゾーンにデータが同期レプリケートされ、ゾーン障害時にフェイルオーバーで高可用性を実現します。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TB
+    subgraph Region["Google Cloud リージョン"]
+        subgraph ZoneA["ゾーン A"]
+            VM1["C4D VM\nAMD EPYC Turin\n最大 384 vCPU"]
+            Replica1["Hyperdisk Balanced HA\nレプリカ 1"]
+        end
+        subgraph ZoneB["ゾーン B"]
+            VM2["C4D VM スタンバイ\nAMD EPYC Turin"]
+            Replica2["Hyperdisk Balanced HA\nレプリカ 2"]
+        end
+        VM1 -->|"読み書き"| Replica1
+        Replica1 <-->|"同期レプリケーション"| Replica2
+        VM2 -.->|"フェイルオーバー時接続"| Replica2
+    end
+
+    subgraph Perf["パフォーマンス仕様"]
+        IOPS["最大 100,000 IOPS/ボリューム"]
+        Throughput["最大 2,400 MiB/s/ボリューム"]
+        Size["4 GiB - 64 TiB"]
+    end
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>&#x2B50; 主要機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h3>&#x1F504; 同期レプリケーション</h3>
+          <p>同一リージョン内の 2 ゾーンにデータを同期的に複製。ゾーン障害時もデータ可用性を維持し、<strong>RPO ゼロ</strong>を実現。</p>
+        </div>
+        <div class="card card-green">
+          <h3>&#x1F4DD; マルチライターモード</h3>
+          <p>同じ Hyperdisk Balanced HA ボリュームを複数 VM に同時接続可能。<strong>1 秒未満の RTO</strong> でフェイルオーバーが可能。</p>
+        </div>
+        <div class="card card-purple">
+          <h3>&#x2699;&#xFE0F; プロビジョン可能なパフォーマンス</h3>
+          <p>IOPS とスループットを個別に指定可能。作成後もパフォーマンスやサイズの変更が可能 (4 時間に 1 回まで)。</p>
+        </div>
+        <div class="card card-teal">
+          <h3>&#x1F30D; 非同期レプリケーション</h3>
+          <p>別リージョンへのデータ複製でリージョン障害にも対応。同期レプリケーションと組み合わせた多層的な保護が可能。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>&#x1F4D0; 技術仕様</h2>
+
+      <h3>C4D マシンシリーズでの Hyperdisk Balanced HA パフォーマンス上限</h3>
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>マシンタイプ</th>
+              <th>最大 IOPS</th>
+              <th>最大スループット (MiB/s)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>c4d-*-2</td><td>22,500</td><td>400</td></tr>
+            <tr><td>c4d-*-4</td><td>50,000</td><td>400</td></tr>
+            <tr><td>c4d-*-8</td><td>50,000</td><td>800</td></tr>
+            <tr><td>c4d-*-16</td><td>75,000</td><td>1,200</td></tr>
+            <tr><td>c4d-*-32</td><td>75,000</td><td>1,600</td></tr>
+            <tr><td>c4d-*-48</td><td>75,000</td><td>1,600</td></tr>
+            <tr><td>c4d-*-64</td><td>160,000</td><td>2,400</td></tr>
+            <tr><td>c4d-*-96</td><td>160,000</td><td>2,800</td></tr>
+            <tr><td>c4d-*-192</td><td>240,000</td><td>4,800</td></tr>
+            <tr><td>c4d-*-384</td><td>320,000</td><td>10,000</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Hyperdisk Balanced HA ボリューム仕様</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>最大 IOPS (単一ボリューム)</td><td>100,000</td></tr>
+          <tr><td>最大スループット (単一ボリューム)</td><td>2,400 MiB/s</td></tr>
+          <tr><td>サイズ範囲</td><td>4 GiB - 64 TiB</td></tr>
+          <tr><td>デフォルトサイズ</td><td>100 GiB</td></tr>
+          <tr><td>ベースラインパフォーマンス (無料)</td><td>3,000 IOPS / 140 MiB/s</td></tr>
+          <tr><td>レプリケーション方式</td><td>同一リージョン内 2 ゾーン間の同期レプリケーション</td></tr>
+          <tr><td>I/O サイズ (IOPS 最大化)</td><td>4 KB</td></tr>
+          <tr><td>I/O サイズ (スループット最大化)</td><td>256 KB 以上</td></tr>
+        </tbody>
+      </table>
+
+      <h3>C4D マシンシリーズの主要スペック</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>プロセッサ</td><td>第 5 世代 AMD EPYC Turin</td></tr>
+          <tr><td>最大ブースト周波数</td><td>4.1 GHz</td></tr>
+          <tr><td>最大 vCPU 数</td><td>384</td></tr>
+          <tr><td>最大メモリ</td><td>3,024 GB (DDR5)</td></tr>
+          <tr><td>ネットワーク帯域幅</td><td>最大 200 Gbps (Tier_1)</td></tr>
+          <tr><td>ローカル SSD</td><td>最大 12 TiB (Titanium SSD)</td></tr>
+          <tr><td>セキュリティ</td><td>Confidential VM (AMD SEV) サポート</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup Instructions -->
+    <div class="section">
+      <h2>&#x1F6E0;&#xFE0F; 設定方法</h2>
+
+      <div class="note-box">
+        <strong>&#x1F4A1; 前提条件:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px; font-size: 14px;">
+          <li>C4D マシンシリーズが利用可能なリージョン・ゾーンであること</li>
+          <li>Hyperdisk Balanced HA のクォータが十分にあること</li>
+          <li>2 つのゾーンを指定して Regional Disk として作成すること</li>
+        </ul>
+      </div>
+
+      <h3>ステップ 1: Hyperdisk Balanced HA ボリュームの作成</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">Hyperdisk Balanced HA ボリューム作成</span>
+        </div>
+        <pre><code class="language-bash">gcloud compute disks create my-ha-disk \
+    --type=hyperdisk-balanced-high-availability \
+    --size=500GB \
+    --provisioned-iops=10000 \
+    --provisioned-throughput=500 \
+    --region=us-central1 \
+    --replica-zones=us-central1-a,us-central1-b</code></pre>
+      </div>
+      <p style="font-size: 14px; color: var(--gc-on-surface-variant);">同期レプリケーション用に 2 つのレプリカゾーンを指定してリージョナルディスクとして作成します。</p>
+
+      <h3>ステップ 2: C4D インスタンスの作成とディスクの接続</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">C4D インスタンス作成 + ディスク接続</span>
+        </div>
+        <pre><code class="language-bash">gcloud compute instances create my-c4d-vm \
+    --machine-type=c4d-standard-64 \
+    --zone=us-central1-a \
+    --disk=name=my-ha-disk,scope=regional</code></pre>
+      </div>
+      <p style="font-size: 14px; color: var(--gc-on-surface-variant);">C4D インスタンスを作成し、先ほど作成した Hyperdisk Balanced HA ボリュームを接続します。</p>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>&#x1F3AF; ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>&#x1F5C4;&#xFE0F; Microsoft SQL Server Failover Cluster Instances (FCI)</h4>
+        <p><strong>シナリオ:</strong> 基幹業務系 SQL Server データベースで高可用性が必要だが、Always On Availability Groups のライセンスコストを抑えたい場合。</p>
+        <p><strong>効果:</strong> Hyperdisk Balanced HA のマルチライターモードと同期レプリケーションにより、インフラレイヤーでのフェイルオーバーを実現。1 秒未満の RTO でサービスを継続。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>&#x1F310; 高パフォーマンス Web/アプリケーションサーバー</h4>
+        <p><strong>シナリオ:</strong> 大規模トラフィックの Web アプリケーションで、ゾーン障害時にもサービスを中断させたくない場合。C4D の高い CPU 性能 (C3D 比 80% のスループット向上) を活かしつつストレージの高可用性を確保。</p>
+        <p><strong>効果:</strong> C4D-64 以上で安定した 350,000 IOPS を維持しながら、ゾーン間フェイルオーバーにより高い SLA を実現。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>&#x26A1; データ分析・インメモリデータベース</h4>
+        <p><strong>シナリオ:</strong> Redis や Memcached などのインメモリデータベースの永続化レイヤーとして使用し、ゾーン障害時もデータを保護する場合。C4D は Memorystore for Redis ワークロードで C3D 比 35% 高い ops/sec を実現。</p>
+        <p><strong>効果:</strong> 高い I/O 性能と同期レプリケーションの組み合わせにより、パフォーマンスを犠牲にすることなくデータ保護を実現。</p>
+      </div>
+    </div>
+
+    <!-- Merits -->
+    <div class="section">
+      <h2>&#x2705; メリット</h2>
+      <div class="feature-grid">
+        <div>
+          <h3>ビジネス面</h3>
+          <div class="card card-green">
+            <div class="icon-text"><span>&#x1F4C9;</span><span><strong>ダウンタイムの最小化</strong> - ゾーン障害時もデータ損失なくフェイルオーバーが可能で、SLA の向上に寄与</span></div>
+          </div>
+          <div class="card card-green">
+            <div class="icon-text"><span>&#x1F4B0;</span><span><strong>コスト最適化</strong> - C4D の高い性能密度 (C3D 比 30% のパフォーマンス向上) により、少ないリソースで高可用性を実現</span></div>
+          </div>
+          <div class="card card-green">
+            <div class="icon-text"><span>&#x1F512;</span><span><strong>コンプライアンス対応</strong> - データレプリケーションの規制要件に対応可能</span></div>
+          </div>
+        </div>
+        <div>
+          <h3>技術面</h3>
+          <div class="card">
+            <div class="icon-text"><span>&#x26A1;</span><span><strong>高パフォーマンスと高可用性の両立</strong> - 最大 320,000 IOPS / 10,000 MiB/s を C4D-384 で実現しつつ、同期レプリケーションで保護</span></div>
+          </div>
+          <div class="card">
+            <div class="icon-text"><span>&#x1F3D7;&#xFE0F;</span><span><strong>シンプルなインフラ構成</strong> - アプリケーションレベルのレプリケーション実装が不要</span></div>
+          </div>
+          <div class="card">
+            <div class="icon-text"><span>&#x1F4C8;</span><span><strong>Steady State パフォーマンス</strong> - C4D-64 以上のマシンタイプでは最大性能を安定的に維持</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>&#x26A0;&#xFE0F; 制約事項・注意点</h2>
+
+      <h3>制限事項</h3>
+      <div class="warning-box">
+        <ul style="margin: 0; padding-left: 20px; font-size: 14px;">
+          <li><strong>マシンイメージの作成不可</strong>: Hyperdisk Balanced HA ボリュームからマシンイメージを作成できない</li>
+          <li><strong>パフォーマンス変更頻度制限</strong>: サイズやパフォーマンスの変更は 4 時間に 1 回まで</li>
+          <li><strong>AI ゾーンでの作成不可</strong>: AI ゾーンでは Hyperdisk Balanced HA を作成できない</li>
+          <li><strong>Persistent Disk 非サポート</strong>: C4D は Hyperdisk のみをサポートし、従来の Persistent Disk は使用不可</li>
+        </ul>
+      </div>
+
+      <h3>考慮すべき点</h3>
+      <div class="note-box">
+        <ul style="margin: 0; padding-left: 20px; font-size: 14px;">
+          <li><strong>半二重パフォーマンス</strong>: IOPS とスループットは読み取りと書き込みの合計であり、片方向での最大値ではない</li>
+          <li><strong>単一ボリュームの上限</strong>: 100,000 IOPS / 2,400 MiB/s を超えるパフォーマンスには複数ボリュームの接続が必要</li>
+          <li><strong>コスト</strong>: プロビジョンされたサイズ・IOPS・スループットの全てに課金されるため、適切なサイジングが重要</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>&#x1F4B0; 料金情報</h2>
+      <p>Hyperdisk Balanced HA は、プロビジョンされた<strong>サイズ</strong>、<strong>IOPS</strong>、<strong>スループット</strong>のそれぞれに課金されます。ディスクがインスタンスに接続されていない場合や、インスタンスが停止中でも課金が発生します。</p>
+      <div class="note-box">
+        <strong>&#x1F4A1; ベースラインパフォーマンス:</strong> 3,000 IOPS / 140 MiB/s は無料で提供され、それを超える分のみが課金対象です。
+      </div>
+      <p style="font-size: 14px;">詳細な料金については <a href="https://cloud.google.com/compute/disks-image-pricing#disk" target="_blank" class="gc-link">Disk pricing</a> を参照してください。</p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#x1F517; 関連サービス・機能</h2>
+      <div class="related-services">
+        <div class="related-item">
+          <strong>Hyperdisk Balanced</strong>
+          高可用性機能なしの標準 Hyperdisk。コスト重視のワークロード向け。
+        </div>
+        <div class="related-item">
+          <strong>Hyperdisk Extreme</strong>
+          さらに高い IOPS (最大 350,000) を提供。C4D-64 以上で利用可能。
+        </div>
+        <div class="related-item">
+          <strong>非同期レプリケーション</strong>
+          リージョン間のデータ複製。Hyperdisk Balanced HA と組み合わせて多層防御を構成可能。
+        </div>
+        <div class="related-item">
+          <strong>インスタントスナップショット</strong>
+          Hyperdisk Balanced HA のポイントインタイムバックアップに対応。
+        </div>
+        <div class="related-item">
+          <strong>Confidential VM (AMD SEV)</strong>
+          C4D で利用可能なセキュリティ機能。暗号化されたメモリでワークロードを保護。
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>&#x1F4DD; まとめ</h2>
+      <p>
+        C4D マシンシリーズでの Hyperdisk Balanced HA サポート (GA) は、<span class="highlight">AMD EPYC Turin の高い計算性能</span>と、<span class="highlight">ゾーン間同期レプリケーションによる高可用性ストレージ</span>を組み合わせることを可能にする重要なアップデートです。
+      </p>
+      <p>
+        ミッションクリティカルなデータベースや高トラフィック Web アプリケーションを運用するユーザーは、C4D への移行またはストレージの Hyperdisk Balanced HA への切り替えを検討することを推奨します。
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>&#x1F4CE; 出典:</strong></p>
+      <ul style="list-style: none; padding: 0; margin: 8px 0;">
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/release-notes#June_08_2026" target="_blank" rel="noopener noreferrer">Google Cloud Release Notes (June 08, 2026)</a></li>
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/compute/docs/disks/hd-types/hyperdisk-balanced-ha" target="_blank" rel="noopener noreferrer">About Hyperdisk Balanced High Availability</a></li>
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/compute/docs/disks/hyperdisk-perf-limits" target="_blank" rel="noopener noreferrer">Performance limits for machine series</a></li>
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/compute/docs/general-purpose-machines#c4d_series" target="_blank" rel="noopener noreferrer">C4D machine series</a></li>
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/compute/disks-image-pricing#disk" target="_blank" rel="noopener noreferrer">Disk pricing</a></li>
+      </ul>
+      <p style="margin-top: 12px; font-size: 11px; color: var(--gc-outline);">Generated: 2026-06-09 | Google Cloud News Summary</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cloud Storage: ソフト削除オブジェクトのハード削除一時停止機能</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+:root {
+  --gc-blue: #4285F4;
+  --gc-red: #EA4335;
+  --gc-yellow: #FBBC04;
+  --gc-green: #34A853;
+  --gc-blue-900: #174EA6;
+  --gc-blue-800: #185ABC;
+  --gc-blue-700: #1967D2;
+  --gc-blue-600: #1A73E8;
+  --gc-blue-500: #4285F4;
+  --gc-blue-300: #669DF6;
+  --gc-blue-200: #8AB4F8;
+  --gc-blue-100: #AECBFA;
+  --gc-blue-50: #E8F0FE;
+  --gc-on-surface: #202124;
+  --gc-on-surface-variant: #5F6368;
+  --gc-outline: #80868B;
+  --gc-surface: #FFFFFF;
+  --gc-surface-container-lowest: #F8F9FA;
+  --gc-surface-container-low: #F1F3F4;
+  --gc-surface-container: #E8EAED;
+  --gc-outline-variant: #DADCE0;
+  --gc-blue-tint: #E8F0FE;
+  --gc-green-tint: #E6F4EA;
+  --gc-red-tint: #FCE8E6;
+  --gc-yellow-tint: #FEF7E0;
+  --gc-purple-tint: #F3E8FD;
+  --gc-teal-tint: #E0F7FA;
+  --gc-purple: #A142F4;
+  --gc-teal: #00BCD4;
+  --gc-orange: #FF6D00;
+}
+
+body {
+  background-color: var(--gc-surface);
+  font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+  color: var(--gc-on-surface-variant);
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 20px;
+  margin: 0;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 16px;
+  border-bottom: 3px solid var(--gc-blue-600);
+}
+
+h1, .title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--gc-on-surface);
+  margin: 8px 0 0 0;
+  line-height: 1.4;
+}
+
+h2, .section-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 20px 0 8px 0;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: var(--gc-outline);
+}
+
+.section {
+  background: var(--gc-surface-container-low);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid var(--gc-outline-variant);
+}
+
+.highlight {
+  background-color: var(--gc-blue-50);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--gc-blue-800);
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+.card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border-left: 4px solid var(--gc-blue-600);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+}
+
+.card h3 {
+  margin-top: 0;
+}
+
+.icon-text {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+  color: var(--gc-on-surface-variant);
+}
+
+.arrow {
+  color: var(--gc-blue-600);
+  font-size: 20px;
+}
+
+.gc-link {
+  color: var(--gc-blue-600);
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.gc-link:hover {
+  color: var(--gc-blue-800);
+  text-decoration: underline;
+}
+
+.badge,
+.badge-ga,
+.badge-preview,
+.badge-deprecated {
+  display: inline-block;
+  color: #FFFFFF;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+  margin: 4px 8px 4px 0;
+}
+
+.badge {
+  background: var(--gc-blue-600);
+}
+
+.badge-ga {
+  background: var(--gc-green);
+  color: #FFFFFF;
+}
+
+/* Before/After 比較 */
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+@media (max-width: 720px) {
+  .before-after {
+    grid-template-columns: 1fr;
+  }
+}
+
+.before-panel {
+  background: var(--gc-red-tint);
+  border: 1px solid rgba(234, 67, 53, 0.3);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.after-panel {
+  background: var(--gc-green-tint);
+  border: 1px solid rgba(52, 168, 83, 0.3);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.before-panel h3, .after-panel h3 {
+  margin-top: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.before-panel h3 { color: #C5221F; }
+.after-panel h3 { color: #188038; }
+
+.before-panel ul, .after-panel ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.before-panel li, .after-panel li {
+  margin: 8px 0;
+  font-size: 14px;
+}
+
+/* フロー図スタイル */
+.flow-diagram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 24px 0;
+}
+
+.flow-step {
+  background: var(--gc-surface);
+  border: 2px solid var(--gc-blue-600);
+  border-radius: 12px;
+  padding: 12px 20px;
+  text-align: center;
+  min-width: 100px;
+  color: var(--gc-on-surface);
+  font-size: 14px;
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+}
+
+.flow-arrow {
+  color: var(--gc-blue-600);
+  font-size: 24px;
+  font-weight: bold;
+}
+
+/* チェックリスト */
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.check-icon {
+  color: var(--gc-green);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.cross-icon {
+  color: var(--gc-red);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+/* コードブロック (Mermaid の pre を除外) */
+.code-block,
+pre:not(.mermaid) {
+  background: #1E1E1E;
+  border-radius: 8px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: #E8E8E8;
+  margin: 16px 0;
+}
+
+.code-block {
+  overflow: hidden;
+}
+
+.code-header {
+  background: #2D2D2D;
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.code-lang {
+  color: #9CDCFE;
+  font-weight: bold;
+  font-family: 'Roboto Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.code-title {
+  color: #AAAAAA;
+}
+
+.code-block pre {
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+}
+
+.code-block code {
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 16px !important;
+  display: block;
+}
+
+pre:not(.mermaid) code {
+  background: none;
+  border: none;
+  font-size: inherit;
+}
+
+/* インラインコード */
+code:not(pre code) {
+  background: var(--gc-surface-container-low);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 0.9em;
+  color: var(--gc-blue-900);
+}
+
+.section code:not(pre code) {
+  background: var(--gc-surface);
+}
+
+/* テーブル */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--gc-outline-variant);
+  background: var(--gc-surface);
+}
+
+th {
+  background: var(--gc-blue-50);
+  color: var(--gc-blue-900);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 2px solid var(--gc-blue-200);
+}
+
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--gc-outline-variant);
+  font-size: 14px;
+}
+
+tr:nth-child(even) {
+  background: var(--gc-surface-container-lowest);
+}
+
+tr:hover {
+  background: var(--gc-blue-50);
+}
+
+/* 注意・警告ボックス */
+.note-box {
+  background: var(--gc-blue-tint);
+  border-left: 4px solid var(--gc-blue-600);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.warning-box {
+  background: var(--gc-yellow-tint);
+  border-left: 4px solid var(--gc-yellow);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.error-box {
+  background: var(--gc-red-tint);
+  border-left: 4px solid var(--gc-red);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.success-box {
+  background: var(--gc-green-tint);
+  border-left: 4px solid var(--gc-green);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+/* 統計カード */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.stat-card {
+  background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+  color: var(--gc-surface);
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+/* ユースケース */
+.usecase {
+  background: var(--gc-blue-tint);
+  border: 1px solid var(--gc-blue-100);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 16px 0;
+}
+
+.usecase h3 {
+  margin-top: 0;
+  color: var(--gc-blue-900);
+}
+
+/* Mermaid コンテナ */
+.mermaid-container {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 20px 0;
+  border: 2px solid rgba(66, 133, 244, 0.3);
+  overflow-x: auto;
+}
+
+.mermaid {
+  display: flex;
+  justify-content: center;
+}
+
+/* ステップ番号 */
+.step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--gc-blue-600);
+  color: #FFFFFF;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 14px;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+/* 関連サービスリスト */
+.related-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.related-list li {
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--gc-outline-variant);
+  font-size: 14px;
+}
+
+.related-list li:last-child {
+  border-bottom: none;
+}
+
+footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gc-outline-variant);
+  font-size: 12px;
+  color: var(--gc-outline);
+}
+
+footer ul {
+  padding-left: 20px;
+  margin: 8px 0;
+}
+
+footer li {
+  margin: 4px 0;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ヘッダー -->
+  <div class="header">
+    <div>
+      <span class="badge">🪣 Cloud Storage</span>
+      <span class="badge badge-ga">Feature リリース済み</span>
+      <h1>⏸️ ソフト削除オブジェクトのハード削除一時停止機能</h1>
+    </div>
+    <div class="subtitle">📅 リリース日: 2026-11-04</div>
+  </div>
+
+  <!-- 概要 -->
+  <div class="section">
+    <h2>📝 概要</h2>
+    <p>
+      Cloud Storage に、<span class="highlight">バケット単位でソフト削除オブジェクトの完全削除 (ハード削除) を一時停止</span>できる機能が追加されました。
+      通常、ソフト削除されたオブジェクトは保持期間 (デフォルト 7 日間、最大 90 日間) が経過すると自動的に完全削除されますが、
+      本機能を使うと<strong>保持期間が満了してもオブジェクトは完全削除されず</strong>、ハード削除を再開するまでソフト削除状態のまま保持されます。
+    </p>
+    <p>
+      大規模な誤削除インシデントや悪意ある削除の発生時に、<span class="highlight">復元作業のための時間を確保</span>することが目的です。
+      数十億オブジェクト規模の復旧では復元処理が保持期間内に完了しない可能性がありますが、
+      ハード削除を一時停止すれば「保持期間切れによるデータの恒久的な喪失」というタイムリミットを気にせず、調査・復元・検証を進められます。
+    </p>
+    <div class="note-box">
+      <strong>💡 誰に嬉しい?</strong> ストレージ管理者、データ保護 (バックアップ/DR) 担当者、セキュリティインシデント対応チーム。
+      ランサムウェアや誤操作によるマスデリーションへの対応手段が強化されます。
+    </div>
+
+    <div class="before-after">
+      <div class="before-panel">
+        <h3>❌ Before (アップデート前の課題)</h3>
+        <ul>
+          <li>ソフト削除されたオブジェクトは保持期間 (最大 90 日間) 満了で自動的に完全削除され、<strong>止める手段がなかった</strong></li>
+          <li>保持期間の変更は変更後に削除されたオブジェクトにのみ適用され、<strong>ソフト削除済みオブジェクトの保持期間は延長できなかった</strong></li>
+          <li>数十億オブジェクト規模の復元や調査に時間がかかる場合、保持期間内に作業が完了せず<strong>データを恒久的に失うリスク</strong>があった</li>
+        </ul>
+      </div>
+      <div class="after-panel">
+        <h3>✅ After (アップデート後の改善)</h3>
+        <ul>
+          <li>バケット単位でハード削除を一時停止でき、ソフト削除済みオブジェクトを<strong>保持期間満了後も削除されない状態で保持</strong>できる</li>
+          <li>大規模復元や削除インシデントの調査・復旧検証を<strong>時間的制約なく実施</strong>できる</li>
+          <li>一時停止は<strong>即時に反映</strong>されるため、インシデント検知後すぐにデータ喪失を食い止められる</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- アーキテクチャ図 -->
+  <div class="section">
+    <h2>🗺️ アーキテクチャ図</h2>
+    <div class="mermaid-container">
+      <pre class="mermaid">
+flowchart TD
+    A([👤 ユーザー / アプリ]) -->|オブジェクト削除| B[🗑️ ソフト削除状態<br>保持期間: 7〜90 日]
+    B -->|保持期間満了| C{⏸️ ハード削除<br>一時停止中?}
+    C -->|いいえ 通常動作| D[❌ 完全削除<br>復元不可]
+    C -->|はい| E[🛡️ ソフト削除状態を維持<br>完全削除されない]
+    E -->|復元作業| F[📦 オブジェクト復元<br>個別 / 一括]
+    F --> G([✅ 復旧検証完了])
+    G -->|ハード削除を再開| H[▶️ 保持期間超過分は<br>即時に完全削除]
+    I([🚨 削除インシデント検知]) -.->|PATCH Bucket<br>hardDeletePause: enabled=true| C
+      </pre>
+    </div>
+    <p>
+      削除インシデント検知時にハード削除を一時停止すると、保持期間が満了してもオブジェクトはソフト削除状態のまま維持され、
+      復元・検証完了後に再開するというインシデント対応フローを示しています。
+    </p>
+  </div>
+
+  <!-- 主要機能 -->
+  <div class="section">
+    <h2>⚙️ 主要機能</h2>
+
+    <div class="card">
+      <h3>1️⃣ ハード削除の一時停止 (Pause)</h3>
+      <div class="icon-text"><span class="arrow">→</span><span>ソフト削除ポリシーに <code>hardDeletePause</code> 設定を追加し、<code>enabled: true</code> で有効化</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>一時停止中は、保持期間が満了したソフト削除オブジェクトも<strong>完全削除されず保持</strong>される</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span><strong>即時に有効化</strong> (キャッシュされた API レスポンスでは反映に数秒かかる場合あり)</span></div>
+    </div>
+
+    <div class="card">
+      <h3>2️⃣ ハード削除の再開 (Resume)</h3>
+      <div class="icon-text"><span class="arrow">→</span><span><code>hardDeletePause</code> の <code>enabled</code> を <code>false</code> に設定して再開</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>再開時、すでに保持期間を超過していたオブジェクトは<strong>即時に完全削除</strong>される</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>保持期間内のオブジェクトは、通常どおり保持期間満了時に完全削除</span></div>
+    </div>
+
+    <div class="card">
+      <h3>3️⃣ 一時停止中の動作</h3>
+      <div class="icon-text"><span class="check-icon">✓</span><span>オブジェクトの削除操作自体は引き続き可能 (削除されたオブジェクトはソフト削除状態になる)</span></div>
+      <div class="icon-text"><span class="check-icon">✓</span><span>ソフト削除の保持期間の変更は可能</span></div>
+      <div class="icon-text"><span class="cross-icon">✗</span><span>ソフト削除の無効化はできない</span></div>
+      <div class="icon-text"><span class="cross-icon">✗</span><span>バケット自体を削除できない</span></div>
+    </div>
+  </div>
+
+  <!-- 技術仕様 -->
+  <div class="section">
+    <h2>🔬 技術仕様</h2>
+    <table>
+      <tr><th>項目</th><th>詳細</th></tr>
+      <tr><td>設定単位</td><td>バケット単位</td></tr>
+      <tr><td>設定フィールド</td><td><code>softDeletePolicy.hardDeletePause.enabled</code> (boolean)</td></tr>
+      <tr><td>前提条件</td><td>バケットでソフト削除が有効であること</td></tr>
+      <tr><td>操作頻度の制限</td><td>一時停止 / 再開の切り替えは <strong>24 時間に 1 回</strong>まで</td></tr>
+      <tr><td>反映タイミング</td><td>即時 (キャッシュにより数秒の遅延の可能性あり)</td></tr>
+      <tr><td>一時停止中の削除操作</td><td>可能 (削除されたオブジェクトはソフト削除状態になる)</td></tr>
+      <tr><td>一時停止中のバケット削除</td><td>不可</td></tr>
+      <tr><td>一時停止中のソフト削除無効化</td><td>不可 (保持期間の変更は可能)</td></tr>
+      <tr><td>必要なロール / 権限</td><td>Storage 管理者 (<code>roles/storage.admin</code>)、<code>storage.buckets.update</code></td></tr>
+    </table>
+
+    <h3>📄 設定例 (JSON API)</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">JSON</span>
+        <span class="code-title">バケット更新リクエストボディ</span>
+      </div>
+      <pre><code class="language-json">{
+  "softDeletePolicy": {
+    "hardDeletePause": {
+      "enabled": true
+    }
+  }
+}</code></pre>
+    </div>
+  </div>
+
+  <!-- 設定方法 -->
+  <div class="section">
+    <h2>🛠️ 設定方法</h2>
+
+    <h3>📋 前提条件</h3>
+    <div class="check-item"><span class="check-icon">✓</span><span>対象バケットでソフト削除が有効であること (バケット作成時には一時停止を設定できない)</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span><code>storage.buckets.update</code> 権限を含むロール (例: <code>roles/storage.admin</code>) を持っていること</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span>gcloud CLI がインストール・初期化されていること (アクセストークンの取得に使用)</span></div>
+
+    <div class="flow-diagram">
+      <div class="flow-step">⏸️ ステップ 1<br>ハード削除を一時停止</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">📦 ステップ 2<br>復元作業を実施</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">▶️ ステップ 3<br>ハード削除を再開</div>
+    </div>
+
+    <h3><span class="step-number">1</span>ハード削除を一時停止する</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Bash</span>
+        <span class="code-title">JSON API でハード削除を一時停止</span>
+      </div>
+      <pre><code class="language-bash"># 設定ファイルを作成
+cat &gt; pause.json &lt;&lt; 'EOF'
+{
+  "softDeletePolicy": {
+    "hardDeletePause": {
+      "enabled": true
+    }
+  }
+}
+EOF
+
+# JSON API でバケットを更新
+curl -X PATCH --data-binary @pause.json \
+  -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Content-Type: application/json" \
+  "https://storage.googleapis.com/storage/v1/b/BUCKET_NAME"</code></pre>
+    </div>
+    <p><code>BUCKET_NAME</code> を対象バケット名に置き換えます。これ以降、ソフト削除オブジェクトは保持期間が満了しても完全削除されません。</p>
+
+    <h3><span class="step-number">2</span>復元作業を実施する</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Bash</span>
+        <span class="code-title">ソフト削除されたオブジェクトを一括復元 (例)</span>
+      </div>
+      <pre><code class="language-bash">gcloud storage restore "gs://BUCKET_NAME/**" --async</code></pre>
+    </div>
+    <p>削除範囲の調査、必要なオブジェクトの復元 (個別または一括)、復旧内容の検証を行います。</p>
+
+    <h3><span class="step-number">3</span>ハード削除を再開する</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Bash</span>
+        <span class="code-title">JSON API でハード削除を再開</span>
+      </div>
+      <pre><code class="language-bash"># 設定ファイルを作成
+cat &gt; resume.json &lt;&lt; 'EOF'
+{
+  "softDeletePolicy": {
+    "hardDeletePause": {
+      "enabled": false
+    }
+  }
+}
+EOF
+
+# JSON API でバケットを更新
+curl -X PATCH --data-binary @resume.json \
+  -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Content-Type: application/json" \
+  "https://storage.googleapis.com/storage/v1/b/BUCKET_NAME"</code></pre>
+    </div>
+    <div class="warning-box">
+      <strong>⚠️ 注意:</strong> 再開すると、保持期間をすでに超過していたオブジェクトは<strong>即時に完全削除</strong>されます。復旧の検証が完了してから再開してください。
+    </div>
+  </div>
+
+  <!-- メリット -->
+  <div class="section">
+    <h2>👍 メリット</h2>
+    <div class="card">
+      <h3>💼 ビジネス面</h3>
+      <div class="icon-text"><span class="check-icon">✓</span><span><strong>データ喪失リスクの低減</strong>: 誤削除やランサムウェア等によるマスデリーション発生時に、保持期間のタイムリミットに追われることなく確実に復旧できる</span></div>
+      <div class="icon-text"><span class="check-icon">✓</span><span><strong>インシデント対応の質の向上</strong>: 削除の影響範囲の調査や復旧後の検証を、データ喪失のプレッシャーなく丁寧に実施できる</span></div>
+    </div>
+    <div class="card">
+      <h3>🔧 技術面</h3>
+      <div class="icon-text"><span class="check-icon">✓</span><span><strong>大規模復元への対応</strong>: 数十億オブジェクト規模のバケットなど、復元処理が保持期間内に完了しないケースでも安全に復旧できる</span></div>
+      <div class="icon-text"><span class="check-icon">✓</span><span><strong>即時性</strong>: 一時停止は即時に反映されるため、インシデント検知直後の初動対応として有効</span></div>
+      <div class="icon-text"><span class="check-icon">✓</span><span><strong>既存機能との統合</strong>: ソフト削除ポリシーの拡張として提供されるため、既存のバケット設定 (PATCH Bucket) の延長で利用できる</span></div>
+    </div>
+  </div>
+
+  <!-- デメリット・制約事項 -->
+  <div class="section">
+    <h2>⚠️ デメリット・制約事項</h2>
+    <div class="error-box">
+      <strong>🚫 制限事項</strong>
+      <div class="icon-text"><span class="cross-icon">✗</span><span>一時停止 / 再開の切り替えは <strong>24 時間に 1 回まで</strong>に制限される</span></div>
+      <div class="icon-text"><span class="cross-icon">✗</span><span>ソフト削除が有効なバケットでのみ利用可能 (バケット作成時には設定できない)</span></div>
+      <div class="icon-text"><span class="cross-icon">✗</span><span>一時停止中はソフト削除を無効化できず、バケット自体の削除もできない</span></div>
+    </div>
+    <div class="warning-box">
+      <strong>🤔 考慮すべき点</strong>
+      <div class="icon-text"><span class="arrow">→</span><span>一時停止中もソフト削除オブジェクトの<strong>ストレージ料金は発生し続ける</strong>ため、長期間の一時停止はコストが大幅に増加する可能性がある。復旧完了後は速やかに再開することが推奨される</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>再開した時点で、保持期間を超過していたオブジェクトは<strong>即座に完全削除</strong>されるため、再開前に復元の完了と検証を必ず済ませておく必要がある</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>24 時間に 1 回という切り替え頻度の制限があるため、一時停止 / 再開の操作は<strong>計画的に</strong>行う必要がある</span></div>
+    </div>
+  </div>
+
+  <!-- ユースケース -->
+  <div class="section">
+    <h2>🎯 ユースケース</h2>
+
+    <div class="usecase">
+      <h3>📦 ユースケース 1: マスデリーションインシデントからの大規模復旧</h3>
+      <p><strong>シナリオ:</strong> 誤って実行されたバッチ処理により、数億オブジェクトを格納する本番バケットの大部分が削除された。ソフト削除の保持期間は 7 日間だが、全オブジェクトの復元と整合性検証には 2 週間以上かかる見込み。</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">実装例</span>
+        </div>
+        <pre><code class="language-bash"># 1. 即座にハード削除を一時停止
+curl -X PATCH --data-binary '{"softDeletePolicy":{"hardDeletePause":{"enabled":true}}}' \
+  -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Content-Type: application/json" \
+  "https://storage.googleapis.com/storage/v1/b/prod-data-bucket"
+
+# 2. 一括復元を非同期で実行
+gcloud storage restore "gs://prod-data-bucket/**" --async
+
+# 3. 検証完了後にハード削除を再開</code></pre>
+      </div>
+      <div class="success-box">
+        <strong>✅ 効果:</strong> 保持期間の 7 日間を超えても復元対象のオブジェクトが完全削除されず、時間をかけて確実に全データを復旧できる。
+      </div>
+    </div>
+
+    <div class="usecase">
+      <h3>🔍 ユースケース 2: セキュリティインシデントの調査</h3>
+      <p><strong>シナリオ:</strong> 不正アクセスの疑いがあり、バケット内で意図しない削除が行われた形跡がある。削除の影響範囲が特定できておらず、どのオブジェクトを復元すべきか調査が必要。</p>
+      <div class="success-box">
+        <strong>✅ 効果:</strong> 調査が完了するまで証跡 (ソフト削除オブジェクト) が完全削除されることを防ぎ、影響範囲の特定後に必要なオブジェクトだけを確実に復元できる。
+      </div>
+    </div>
+  </div>
+
+  <!-- 料金 -->
+  <div class="section">
+    <h2>💰 料金</h2>
+    <p>
+      ハード削除の一時停止機能自体に<span class="highlight">追加料金は発生しません</span>が、
+      一時停止中もソフト削除状態のオブジェクトには<strong>ストレージ料金が継続して課金</strong>されます。
+      保持期間満了後も削除されずに保持され続けるため、一時停止期間が長引くほどストレージコストが増加します。
+      復旧完了後は速やかにハード削除を再開することが推奨されます。
+    </p>
+    <p>詳細は <a href="https://cloud.google.com/storage/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud Storage の料金ページ</a> を参照してください。</p>
+  </div>
+
+  <!-- 関連サービス・機能 -->
+  <div class="section">
+    <h2>🔗 関連サービス・機能</h2>
+    <ul class="related-list">
+      <li>🗑️ <strong>ソフト削除 (Soft Delete)</strong>: 本機能の前提となる機能。削除されたオブジェクトを 7〜90 日間保持し、復元を可能にする。本機能はこのソフト削除ポリシーの拡張として提供される</li>
+      <li>📦 <strong>一括復元 (Bulk Restore)</strong>: ソフト削除オブジェクトの大規模復元に使用する非同期の長時間実行オペレーション。本機能と組み合わせることで大規模復旧を時間制約なく実施できる</li>
+      <li>🗂️ <strong>オブジェクトのバージョニング (Object Versioning)</strong>: 非現行バージョンの削除時もソフト削除状態になるため、本機能による保護の対象となる</li>
+      <li>🔒 <strong>バケットロック / オブジェクト保持ロック</strong>: 削除自体を防止する機能。ソフト削除と本機能は、削除後の復元可能期間を保護する補完的なレイヤーとして機能する</li>
+      <li>💡 <strong>ソフト削除向け Recommender</strong>: Cloud Billing のコストと使用状況に基づき、ソフト削除の有効化 / 無効化の推奨事項を提示する</li>
+    </ul>
+  </div>
+
+  <!-- まとめ -->
+  <div class="section">
+    <h2>✨ まとめ</h2>
+    <p>
+      ソフト削除の保持期間という「復旧のタイムリミット」を一時的に止められる本機能は、
+      大規模な誤削除やセキュリティインシデントへの対応力を大きく高めるアップデートです。
+    </p>
+    <div class="note-box">
+      <strong>📌 推奨アクション</strong>
+      <div class="icon-text"><span class="arrow">→</span><span>ソフト削除を利用しているバケットの運用手順書 (ランブック) に、インシデント検知時の初動として<strong>「ハード削除の一時停止」</strong>を組み込む</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>一時停止中はストレージコストが増加するため、<strong>復旧完了後に速やかに再開する運用ルール</strong>も整備しておく</span></div>
+    </div>
+  </div>
+
+  <!-- フッター -->
+  <footer>
+    <p>📎 出典・参考リンク:</p>
+    <ul>
+      <li><a href="https://docs.cloud.google.com/release-notes#November_04_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026-11-04)</a></li>
+      <li><a href="https://docs.cloud.google.com/storage/docs/pause-hard-deletions" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: Pause permanent (hard) deletions of soft-deleted objects</a></li>
+      <li><a href="https://docs.cloud.google.com/storage/docs/soft-delete" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: ソフト削除の概要</a></li>
+      <li><a href="https://docs.cloud.google.com/storage/docs/use-soft-deleted-objects" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: ソフト削除されたオブジェクトの復元</a></li>
+      <li><a href="https://cloud.google.com/storage/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud Storage 料金ページ</a></li>
+    </ul>
+    <p>🏷️ タグ: Cloud Storage, ソフト削除, ハード削除, データ保護, 災害復旧, インシデント対応, ストレージ</p>
+    <p>このインフォグラフィックは Google Cloud News レポート (2026-11-04-cloud-storage-pause-hard-deletions.md) を基に生成されました。</p>
+  </footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#4285F4',
+      primaryTextColor: '#202124',
+      primaryBorderColor: '#4285F4',
+      lineColor: '#4285F4',
+      secondaryColor: '#F1F3F4',
+      tertiaryColor: '#FAFAFA',
+      background: '#FFFFFF',
+      mainBkg: '#E8F0FE',
+      nodeBorder: '#4285F4',
+      clusterBkg: '#E8F0FE',
+      clusterBorder: '#4285F4',
+      edgeLabelBackground: '#FFFFFF',
+      textColor: '#202124'
+    }
+  });
+</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

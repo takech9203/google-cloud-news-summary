@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BigQuery: ベクトルインデックスの機能強化 (ドリフト統計 / パーティション対応)</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--gc-outline);
+      text-align: right;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-green);
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h4, .after-box h4 {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .before-box ul, .after-box ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin-bottom: 6px;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      background: #1E1E1E;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-900);
+      margin: 0 0 8px 0;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+      .stat-grid {
+        grid-template-columns: 1fr;
+      }
+      h1 {
+        font-size: 24px;
+      }
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+      .subtitle {
+        text-align: left;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>📊 BigQuery: ベクトルインデックスの機能強化</h1>
+        <p style="margin: 8px 0 0 0; color: var(--gc-on-surface-variant);">ドリフト統計 / パーティション対応</p>
+        <div style="margin-top: 8px;">
+          <span class="badge">BigQuery</span>
+          <span class="badge-ga">GA</span>
+          <span class="badge">Vector Index</span>
+        </div>
+      </div>
+      <div class="subtitle">
+        <div>2026-04-29</div>
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>🎯 概要</h2>
+      <p>BigQuery のベクトルインデックスに関する <span class="highlight">2 つの重要な機能が GA</span> となった。大規模なベクトル検索ワークロードにおいて、<strong>検索精度 (Recall) の維持</strong>と <strong>I/O コストの削減</strong>を実現する。</p>
+
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">0~1</div>
+          <div class="stat-label">ドリフトスコア範囲<br>(0.3以上で再構築推奨)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">0</div>
+          <div class="stat-label">ダウンタイム<br>(シャドウインデックス方式)</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-green), #1B5E20);">
+          <div class="stat-value">TreeAH</div>
+          <div class="stat-label">パーティション対応<br>インデックスタイプ</div>
+        </div>
+      </div>
+
+      <p style="margin-top: 16px; font-size: 14px; color: var(--gc-on-surface-variant);">対象ユーザー: BigQuery でベクトル検索 (類似検索、セマンティック検索、レコメンデーション) を活用しているデータエンジニア、ML エンジニア、Solutions Architect</p>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>🔄 Before / After</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h4>❌ Before (アップデート前)</h4>
+          <ul>
+            <li>データドリフトの程度を定量的に把握する手段がなかった</li>
+            <li>インデックス再作成にはDROPが必要でダウンタイムが発生</li>
+            <li>TreeAH でパーティションプルーニングが利用不可、全データスキャンが必要</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h4>✅ After (アップデート後)</h4>
+          <ul>
+            <li><code>VECTOR_INDEX.STATISTICS</code> で 0~1 のスコアとしてドリフトを計測可能</li>
+            <li><code>ALTER VECTOR INDEX REBUILD</code> でダウンタイムなし再構築</li>
+            <li><code>PARTITION BY</code> 句でパーティションプルーニングによる I/O 削減</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>ベクトルインデックスのドリフト検出から再構築までのフロー (上段) と、パーティション対応による効率的なベクトル検索の仕組み (下段) を示す。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph "ベクトルインデックス管理フロー"
+        A[("テーブル\n(エンベディング列)")]
+        B["VECTOR_INDEX.STATISTICS\nドリフトスコア計測"]
+        C{{"ドリフト >= 0.3?"}}
+        D["ALTER VECTOR INDEX REBUILD"]
+        E[("シャドウインデックス\n(バックグラウンド構築)")]
+        F[("アクティブインデックス\n(切り替え完了)")]
+    end
+
+    subgraph "パーティション対応ベクトル検索"
+        G[("パーティションテーブル\n(日付/整数/タイムスタンプ)")]
+        H["CREATE VECTOR INDEX\nPARTITION BY 句"]
+        I[("パーティション化\nTreeAH インデックス")]
+        J["VECTOR_SEARCH\n(WHERE フィルタ付き)"]
+        K["パーティションプルーニング\n(不要パーティションをスキップ)"]
+    end
+
+    A --> B
+    B --> C
+    C -->|"はい"| D
+    C -->|"いいえ"| A
+    D --> E
+    E -->|"十分なカバレッジ達成"| F
+
+    G --> H
+    H --> I
+    I --> J
+    J --> K
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+
+      <div class="feature-grid">
+        <div class="card">
+          <h3>📈 1. VECTOR_INDEX.STATISTICS 関数 (データドリフト計測)</h3>
+          <ul style="margin: 8px 0; padding-left: 20px; font-size: 14px;">
+            <li>インデックス作成時点と現在のデータ間のドリフトを <strong>FLOAT64 値 (0~1)</strong> で返す</li>
+            <li>値が低いほどドリフトが少なく、<span class="highlight">0.3 以上で再構築推奨</span></li>
+            <li>テーブルにアクティブなインデックスがない場合は空の結果を返す</li>
+            <li>インデックスのトレーニング未完了の場合は NULL を返す</li>
+            <li>必要ロール: <code>roles/bigquery.dataEditor</code> または <code>roles/bigquery.dataOwner</code></li>
+          </ul>
+        </div>
+
+        <div class="card card-green">
+          <h3>🔄 2. ALTER VECTOR INDEX REBUILD (ダウンタイムなし再構築)</h3>
+          <ul style="margin: 8px 0; padding-left: 20px; font-size: 14px;">
+            <li><strong>シャドウインデックス方式</strong>: バックグラウンドで新インデックスを構築し、カバレッジ達成後にアクティブ化</li>
+            <li>再構築中も既存インデックスが利用可能 (ダウンタイムなし)</li>
+            <li><code>INFORMATION_SCHEMA.VECTOR_INDEXES</code> で進行状況をモニタリング可能</li>
+            <li><code>BQ.CANCEL_INDEX_ALTERATION</code> で再構築をキャンセル可能</li>
+          </ul>
+        </div>
+
+        <div class="card card-purple">
+          <h3>📂 3. TreeAH ベクトルインデックスのパーティション対応</h3>
+          <ul style="margin: 8px 0; padding-left: 20px; font-size: 14px;">
+            <li><code>CREATE VECTOR INDEX</code> の <code>PARTITION BY</code> 句でパーティションを指定</li>
+            <li>パーティションプルーニングによりフィルタ一致パーティションのみスキャン</li>
+            <li>プレフィルタリング時に検索結果の漏れが発生しにくい</li>
+            <li>対応タイプ: DATE, DATETIME, TIMESTAMP, INTEGER RANGE, 取り込み時間</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3>VECTOR_INDEX.STATISTICS 関数</h3>
+      <table>
+        <tr><th>項目</th><th>詳細</th></tr>
+        <tr><td>構文</td><td><code>SELECT * FROM VECTOR_INDEX.STATISTICS(TABLE dataset.table_name)</code></td></tr>
+        <tr><td>戻り値</td><td>FLOAT64 (範囲: 0~1)</td></tr>
+        <tr><td>推奨再構築閾値</td><td>0.3 以上</td></tr>
+        <tr><td>必要権限</td><td><code>roles/bigquery.dataEditor</code> または <code>roles/bigquery.dataOwner</code></td></tr>
+      </table>
+
+      <h3>ALTER VECTOR INDEX REBUILD</h3>
+      <table>
+        <tr><th>項目</th><th>詳細</th></tr>
+        <tr><td>構文</td><td><code>ALTER VECTOR INDEX IF EXISTS index_name ON dataset.table REBUILD</code></td></tr>
+        <tr><td>再構築方式</td><td>シャドウインデックス (バックグラウンド)</td></tr>
+        <tr><td>ダウンタイム</td><td>なし</td></tr>
+        <tr><td>モニタリング</td><td><code>INFORMATION_SCHEMA.VECTOR_INDEXES</code> (last_index_alteration_info)</td></tr>
+        <tr><td>キャンセル</td><td><code>BQ.CANCEL_INDEX_ALTERATION</code> プロシージャ</td></tr>
+      </table>
+
+      <h3>パーティション対応の制限事項</h3>
+      <table>
+        <tr><th>項目</th><th>詳細</th></tr>
+        <tr><td>対応インデックスタイプ</td><td>TreeAH のみ (IVF は非対応)</td></tr>
+        <tr><td>自動生成エンベディング列</td><td>パーティションインデックス作成不可</td></tr>
+        <tr><td>PARTITION BY 句</td><td>テーブルの PARTITION BY と同じ指定が必要</td></tr>
+        <tr><td>ストレージ</td><td>整数範囲/時間単位パーティションではストレージコスト増</td></tr>
+      </table>
+    </div>
+
+    <!-- Setup Guide -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <div class="note-box">
+        <strong>📋 前提条件:</strong>
+        <ul style="margin: 8px 0; padding-left: 20px; font-size: 14px;">
+          <li>BigQuery Enterprise Edition 以上のリザベーション</li>
+          <li>テーブルサイズが 10 MB 以上</li>
+          <li>BigQuery Data Editor または Data Owner の IAM ロール</li>
+        </ul>
+      </div>
+
+      <h3>Step 1: データドリフトの確認</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">ドリフトスコアの確認</span>
+        </div>
+        <pre><code class="language-sql">-- インデックス付きテーブルのデータドリフトを確認
+SELECT * FROM VECTOR_INDEX.STATISTICS(TABLE my_dataset.my_table);</code></pre>
+      </div>
+
+      <h3>Step 2: ベクトルインデックスの再構築</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">ダウンタイムなしでの再構築</span>
+        </div>
+        <pre><code class="language-sql">-- ダウンタイムなしでベクトルインデックスを再構築
+ALTER VECTOR INDEX IF EXISTS my_index ON my_dataset.my_table REBUILD;</code></pre>
+      </div>
+
+      <h3>Step 3: 再構築の進行状況モニタリング</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">ステータスとカバレッジの確認</span>
+        </div>
+        <pre><code class="language-sql">-- 再構築のステータスとカバレッジを確認
+SELECT
+  table_name,
+  index_name,
+  last_index_alteration_info.status AS status,
+  last_index_alteration_info.new_coverage_percentage AS coverage
+FROM my_project.my_dataset.INFORMATION_SCHEMA.VECTOR_INDEXES;</code></pre>
+      </div>
+
+      <h3>Step 4: パーティション付きベクトルインデックスの作成</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">パーティション付き TreeAH インデックス</span>
+        </div>
+        <pre><code class="language-sql">-- 日付パーティションテーブルの作成
+CREATE TABLE my_dataset.my_table(
+  embeddings ARRAY&lt;FLOAT64&gt;,
+  id INT64,
+  date DATE
+) PARTITION BY date;
+
+-- パーティション付き TreeAH ベクトルインデックスの作成
+CREATE VECTOR INDEX my_index
+ON my_dataset.my_table(embeddings)
+PARTITION BY date
+OPTIONS(index_type='TREE_AH', distance_type='COSINE');</code></pre>
+      </div>
+
+      <h3>Step 5: パーティションプルーニングを活用したベクトル検索</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">WHERE 句でパーティション列をフィルタ</span>
+        </div>
+        <pre><code class="language-sql">-- WHERE 句でパーティション列をフィルタし、プルーニングを有効化
+SELECT query.id, base.id, distance
+FROM VECTOR_SEARCH(
+  (SELECT * FROM my_dataset.my_table WHERE date = '2026-04-01'),
+  'embeddings',
+  TABLE my_dataset.query_table,
+  distance_type => 'COSINE',
+  top_k => 10
+);</code></pre>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>🛒 UC1: EC サイトの商品レコメンデーション (日次データ更新)</h4>
+        <p style="font-size: 14px; margin: 8px 0;">数百万点の商品エンベディングテーブルに毎日新商品が追加・更新される環境で、日次バッチでドリフトをチェックし、必要に応じてインデックスを再構築する。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">日次バッチジョブ: ドリフトチェック + 条件付き再構築</span>
+          </div>
+          <pre><code class="language-sql">DECLARE drift_score FLOAT64;
+SET drift_score = (
+  SELECT * FROM VECTOR_INDEX.STATISTICS(TABLE ecommerce.products)
+);
+
+-- ドリフトが閾値を超えた場合に再構築
+IF drift_score >= 0.3 THEN
+  ALTER VECTOR INDEX IF EXISTS product_embedding_idx
+  ON ecommerce.products REBUILD;
+END IF;</code></pre>
+        </div>
+        <p style="font-size: 14px; margin: 8px 0;"><strong>効果:</strong> 検索精度の劣化を自動検知・修復し、レコメンデーション品質を維持。ダウンタイムなしで再構築されるため、ユーザー体験に影響しない。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>📋 UC2: 時系列ログデータのセマンティック検索</h4>
+        <p style="font-size: 14px; margin: 8px 0;">日付パーティションされたログテーブルに対し、直近 7 日間のログから類似イベントを検索。パーティション付きインデックスにより検索対象を限定し I/O コストを削減。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">直近 7 日間のみを対象としたセマンティック検索</span>
+          </div>
+          <pre><code class="language-sql">-- 日付パーティション付き TreeAH ベクトルインデックス
+CREATE VECTOR INDEX log_embedding_idx
+ON observability.logs(embedding)
+PARTITION BY log_date
+OPTIONS(index_type='TREE_AH', distance_type='COSINE');
+
+-- 直近 7 日間のみを対象としたセマンティック検索
+SELECT base.log_id, base.message, distance
+FROM VECTOR_SEARCH(
+  (SELECT * FROM observability.logs
+   WHERE log_date BETWEEN '2026-04-22' AND '2026-04-29'),
+  'embedding',
+  TABLE observability.query_embeddings,
+  top_k => 5
+);</code></pre>
+        </div>
+        <p style="font-size: 14px; margin: 8px 0;"><strong>効果:</strong> パーティションプルーニングにより 7 日分のデータのみスキャンし、全期間スキャンと比較して I/O コストを大幅に削減。</p>
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+
+      <h3>ビジネス面</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>運用コスト削減</strong>: パーティションプルーニングにより不要なデータスキャンを回避し、オンデマンド料金を直接削減</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>サービス可用性の向上</strong>: ダウンタイムなしの再構築により SLA を維持しながらインデックスの鮮度を保持</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>データ品質管理の定量化</strong>: ドリフトスコアにより数値基準でメンテナンスタイミングを判断、運用の属人化を防止</span></div>
+
+      <h3>技術面</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>検索精度 (Recall) の維持</strong>: データ変更に追従して再構築し、ANN 検索の精度劣化を防止</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>I/O 効率の向上</strong>: パーティションプルーニングで対象パーティションのみスキャン、レイテンシと処理コストを削減</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>シャドウインデックス方式</strong>: 再構築中も既存インデックスが有効、検索クエリのパフォーマンスに影響なし</span></div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>制限事項</h3>
+      <div class="check-item"><span class="cross-icon">✗</span><span>パーティション対応は <strong>TreeAH のみ</strong> (IVF インデックスでは利用不可)</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>自動生成エンベディング列にはパーティション付きインデックスを作成できない</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>整数範囲/時間単位パーティション列のインデックス格納でストレージコスト増</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>テーブルサイズ 10 MB 未満ではベクトルインデックス自体が無効化</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>Standard Edition ではインデックスの利用がサポートされない</span></div>
+
+      <div class="warning-box" style="margin-top: 16px;">
+        <strong>💡 考慮すべき点:</strong>
+        <ul style="margin: 8px 0; padding-left: 20px; font-size: 14px;">
+          <li>パーティション化されたインデックスは、大部分のクエリが少数のパーティションに絞り込まれるユースケースで最も効果的</li>
+          <li>インデックス再構築はバックグラウンドスロットを消費するため、リザベーションのスロット容量に余裕が必要</li>
+          <li>ドリフトスコアが 0.3 未満でも、精度要件が高い場合は再構築が有効な場合がある</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <table>
+        <tr><th>項目</th><th>詳細</th></tr>
+        <tr><td>インデックス構築・更新</td><td>組織あたりのインデックス対象テーブル合計サイズが上限以下であれば無料。上限超過時は独自リザベーションが必要</td></tr>
+        <tr><td>ベクトル検索クエリ</td><td>BigQuery のコンピュート料金 (オンデマンドまたは Editions) に基づく</td></tr>
+        <tr><td>インデックスストレージ</td><td>アクティブストレージ料金が適用</td></tr>
+      </table>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <div class="check-item"><span style="font-size: 18px;">☁️</span><span><strong>Vertex AI Vector Search</strong>: 超低レイテンシのオンラインベクトル検索が必要な場合の補完サービス</span></div>
+      </div>
+      <div class="card">
+        <div class="check-item"><span style="font-size: 18px;">🔍</span><span><strong>VECTOR_SEARCH 関数</strong>: ベクトルインデックスを活用して類似検索を実行する関数</span></div>
+      </div>
+      <div class="card">
+        <div class="check-item"><span style="font-size: 18px;">💬</span><span><strong>AI.SEARCH 関数</strong>: 自然言語クエリから直接セマンティック検索を実行 (自動エンベディング生成併用)</span></div>
+      </div>
+      <div class="card">
+        <div class="check-item"><span style="font-size: 18px;">📊</span><span><strong>INFORMATION_SCHEMA.VECTOR_INDEXES</strong>: インデックスのステータス、カバレッジ、再構築状況モニタリング</span></div>
+      </div>
+      <div class="card">
+        <div class="check-item"><span style="font-size: 18px;">🤖</span><span><strong>BigQuery ML (ML.GENERATE_EMBEDDING)</strong>: エンベディング生成に使用。Vertex AI のリモートモデルを利用</span></div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <p>BigQuery のベクトルインデックスにおけるドリフト統計・再構築機能とパーティション対応の GA は、大規模ベクトル検索ワークロードの運用品質を大幅に向上させる。特に、データが頻繁に更新される環境での検索精度維持と、パーティションプルーニングによる I/O コスト削減は、本番環境での AI/ML アプリケーション運用に直接的な効果をもたらす。</p>
+      <div class="note-box">
+        <strong>📌 推奨アクション:</strong> 既にベクトルインデックスを利用しているユーザーは、定期的なドリフトチェックの自動化と、適切なパーティション戦略の検討を推奨。
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>📎 出典・参考リンク:</strong></p>
+      <ul style="list-style: none; padding: 0; margin: 8px 0;">
+        <li style="margin: 4px 0;">- <a href="https://docs.google.com/release-notes#April_29_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li style="margin: 4px 0;">- <a href="https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/vectorindex_functions#vector_indexstatistics" target="_blank" rel="noopener noreferrer">VECTOR_INDEX.STATISTICS 関数リファレンス</a></li>
+        <li style="margin: 4px 0;">- <a href="https://docs.cloud.google.com/bigquery/docs/vector-index#rebuild_a_vector_index" target="_blank" rel="noopener noreferrer">ベクトルインデックスの再構築</a></li>
+        <li style="margin: 4px 0;">- <a href="https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#alter_vector_index_rebuild_statement" target="_blank" rel="noopener noreferrer">ALTER VECTOR INDEX REBUILD ステートメント</a></li>
+        <li style="margin: 4px 0;">- <a href="https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#create_vector_index_statement" target="_blank" rel="noopener noreferrer">CREATE VECTOR INDEX ステートメント</a></li>
+        <li style="margin: 4px 0;">- <a href="https://docs.cloud.google.com/bigquery/docs/vector-index#partitions" target="_blank" rel="noopener noreferrer">パーティション付きインデックス</a></li>
+        <li style="margin: 4px 0;">- <a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer">BigQuery 料金</a></li>
+      </ul>
+      <p style="margin-top: 12px; font-size: 11px; color: var(--gc-outline);">Generated: 2026-04-29 | BigQuery Vector Index Enhancements Infographic</p>
+    </footer>
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+    hljs.highlightAll();
+  </script>
+</body>
+</html>

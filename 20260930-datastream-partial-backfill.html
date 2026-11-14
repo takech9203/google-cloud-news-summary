@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Datastream: 部分バックフィル (Partial Backfill) のサポート</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+      text-align: right;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); color: #FFFFFF; }
+    .badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+    .badge-deprecated { background: var(--gc-red); color: #FFFFFF; }
+
+    /* Before / After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box, .after-box {
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid rgba(234, 67, 53, 0.35);
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid rgba(52, 168, 83, 0.35);
+    }
+
+    .before-box h3 { color: var(--gc-red); }
+    .after-box h3 { color: var(--gc-green); }
+
+    .before-box ul, .after-box ul {
+      margin: 8px 0 0 0;
+      padding-left: 20px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    @media (max-width: 720px) {
+      .before-after { grid-template-columns: 1fr; }
+      h1 { font-size: 26px; }
+      .merit-grid { grid-template-columns: 1fr; }
+    }
+
+    /* フロー図スタイル */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+      font-size: 14px;
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* チェックリスト */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon { color: var(--gc-green); font-size: 18px; flex-shrink: 0; }
+    .cross-icon { color: var(--gc-red); font-size: 18px; flex-shrink: 0; }
+
+    /* コードブロック (Mermaid の pre を除外) */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block { padding: 0; overflow: hidden; }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang { color: #9CDCFE; font-weight: bold; }
+    .code-title { color: #AAAAAA; }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .card code:not(pre code),
+    .usecase-box code:not(pre code) {
+      background: var(--gc-blue-50);
+    }
+
+    /* テーブル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* ユースケース */
+    .usecase-box {
+      background: var(--gc-blue-tint);
+      border: 1px solid var(--gc-blue-200);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+    }
+
+    .usecase-box h3 { color: var(--gc-blue-800); }
+
+    /* メリットグリッド */
+    .merit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 12px 0;
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+      background: #FFFFFF;
+    }
+
+    /* 禁止構文リスト */
+    .forbidden-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 4px 24px;
+      margin: 12px 0;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 13px;
+      color: var(--gc-outline);
+    }
+
+    footer ul { margin: 8px 0; padding-left: 20px; }
+    footer li { margin: 4px 0; word-break: break-all; }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <div>
+          <span class="badge">🔄 Datastream</span>
+          <span class="badge badge-preview">Feature</span>
+        </div>
+        <h1>部分バックフィル (Partial Backfill) のサポート</h1>
+        <p style="margin: 8px 0 0 0; color: var(--gc-on-surface-variant);">SQL WHERE 句で必要なデータだけをバックフィル — SQL Server / Spanner / Oracle / PostgreSQL / MySQL ソースに対応</p>
+      </div>
+      <div class="subtitle">📅 リリース日: 2026-09-30</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📌 概要</h2>
+      <p>
+        Datastream が SQL Server、Spanner、Oracle、PostgreSQL、MySQL の各ソースに対して<span class="highlight">部分バックフィル (Partial Backfill)</span> をサポートしました。SQL の <strong>WHERE 句をカスタムフィルタ</strong>として指定することで、ソースデータベースの<strong>特定のサブセットのみ</strong>を宛先にロードできます。
+      </p>
+      <p>
+        Datastream はサーバーレスの変更データキャプチャ (CDC) およびレプリケーションサービスで、「CDC (継続的な変更の取り込み)」と「バックフィル (既存データのスナップショット転送)」の 2 方式を提供します。従来のバックフィルはテーブル単位の全件転送のみでしたが、今回のアップデートで<strong>行レベルの条件を指定した部分的なデータロード</strong>が可能になりました。大規模テーブルの再同期や特定条件のデータ修復において、<strong>ソース負荷・転送量・時間を削減</strong>できる重要な機能強化です。
+      </p>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before: アップデート前の課題</h3>
+          <ul>
+            <li>バックフィルは<strong>テーブル単位の全件転送のみ</strong>で、行レベルの絞り込みが不可</li>
+            <li>一部データの欠損・不整合でも<strong>テーブル全体を再バックフィル</strong>する必要があり、大規模テーブルではソース負荷と処理データ量 (課金対象) が大きい</li>
+            <li>必要なデータが一部だけでも<strong>全データの転送完了を待つ</strong>必要があり、復旧までの時間が長い</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After: アップデート後の改善</h3>
+          <ul>
+            <li><strong>SQL WHERE 句をカスタムフィルタ</strong>として指定し、条件に一致する行のみをバックフィル可能</li>
+            <li>不整合修復時に<strong>対象範囲だけ</strong> (特定の日時以降、ID 範囲など) を再ロードでき、ソース負荷と転送量を最小化</li>
+            <li>コンソールに加えて <strong>gcloud CLI (<code>--sql-where-clause</code>) や Datastream API</strong> からも実行可能</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="note-box">
+        <strong>💡 段階的提供:</strong> Oracle、PostgreSQL、MySQL ソースへの部分バックフィルは段階的にロールアウト中です。ストリームがこの機能をサポートしている場合にのみ、Google Cloud コンソールにオプションが表示されます。
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    subgraph Source["ソースデータベース"]
+        DB[("🗄️ SQL Server / Spanner /
+Oracle / PostgreSQL / MySQL")]
+    end
+
+    subgraph DS["🔄 Datastream"]
+        CDC["CDC
+(継続的な変更取り込み)"]
+        BF{"バックフィル"}
+        FULL["全件バックフィル
+(従来)"]
+        PARTIAL["✨ 部分バックフィル
+WHERE 句フィルタ
+例: product_id > 12"]
+        VALIDATE["フィルタ検証"]
+    end
+
+    subgraph Dest["宛先"]
+        BQ[("📊 BigQuery /
+Cloud Storage")]
+    end
+
+    DB --> CDC --> BQ
+    DB --> BF
+    BF --> FULL --> BQ
+    BF --> PARTIAL --> VALIDATE
+    VALIDATE -->|"検証成功: 条件一致行のみロード"| BQ
+        </pre>
+      </div>
+      <p>Datastream のバックフィル経路に、SQL WHERE 句によるカスタムフィルタを適用した部分バックフィルが追加されました。Datastream は<strong>フィルタを検証したうえで</strong>、条件に一致するサブセットのみを宛先へストリーミングします。</p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>🔧 主要機能</h2>
+
+      <div class="card">
+        <h3>1️⃣ SQL WHERE 句によるカスタムフィルタ</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>バックフィル開始時に「Enable custom filter」を有効化し、WHERE 句 (<strong>WHERE キーワード自体は含めない</strong>) を入力</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>例: <code>product_id &gt; 12 AND timestamp = '2025-01-06T22:00:00.00'</code></span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>Datastream がフィルタを<strong>事前検証</strong>。失敗時はエディタ上にエラーメッセージを表示し、成功するとバックフィルジョブが開始</span></div>
+      </div>
+
+      <div class="card">
+        <h3>2️⃣ 5 種類のソースデータベースに対応</h3>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>SQL Server、Spanner、Oracle、PostgreSQL、MySQL</strong> の各ソースで利用可能</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>Oracle / PostgreSQL / MySQL は<strong>段階的提供 (gradual rollout)</strong>。コンソールでは、ストリームが機能をサポートしている場合にのみオプションを表示</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>未対応のストリームに gcloud CLI や API で部分バックフィルを構成した場合、<strong>リクエストは失敗</strong>する</span></div>
+      </div>
+
+      <div class="card">
+        <h3>3️⃣ コンソール / gcloud CLI / API からの実行</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>Google Cloud コンソールのストリームの「Objects」タブから対象オブジェクトを選択して開始</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>gcloud では <code>gcloud datastream objects start-backfill</code> コマンドの <code>--sql-where-clause</code> フラグで指定 (SQL ソースのみサポート)</span></div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>⚙️ 技術仕様</h2>
+
+      <h3>📝 サポートされるカスタムフィルタ構文</h3>
+      <table>
+        <thead>
+          <tr><th>要素</th><th>サポート内容</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>論理演算子</td><td><code>AND</code>、<code>OR</code></td></tr>
+          <tr><td>比較演算子</td><td><code>=</code>、<code>&lt;</code>、<code>&gt;</code>、<code>&lt;=</code>、<code>&gt;=</code>、<code>!=</code></td></tr>
+          <tr><td>条件</td><td><code>IN</code>、<code>NOT IN</code>、<code>IS NULL</code>、<code>IS NOT NULL</code></td></tr>
+          <tr><td>グループ化</td><td>括弧 <code>()</code> による条件グループの定義</td></tr>
+          <tr><td>文字列値</td><td>シングルクォートで囲んだテキスト (例: <code>'value'</code>)</td></tr>
+          <tr><td>数値</td><td>整数 (<code>123</code>)、小数 (<code>123.45</code>)、負数 (<code>-10</code>)、指数表記 (<code>1.2e3</code>)</td></tr>
+          <tr><td>ブール値</td><td><code>TRUE</code> / <code>FALSE</code> (大文字小文字を区別)。ブール列は <code>is_active = TRUE</code> のように演算子で比較する必要がある</td></tr>
+          <tr><td>識別子</td><td>ドット区切りの完全修飾が可能 (例: <code>mySchema.myTable.myColumn</code>)。引用なし識別子は英字・数字・アンダースコアで構成し、先頭は英字またはアンダースコア。引用付き識別子はダブルクォート <code>"</code> で囲む</td></tr>
+        </tbody>
+      </table>
+      <div class="warning-box">
+        <strong>⚠️ 注意:</strong> <code>DATE</code>、<code>TIME</code>、<code>BYTE</code> などの複合型リテラルは直接サポートされません。
+      </div>
+
+      <h3>📚 バックフィルの種類</h3>
+      <table>
+        <thead>
+          <tr><th>種類</th><th>説明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>増分バックフィル (Incremental)</td><td>デフォルトのバックフィル方式。行範囲を複数バッチに分けて取得し、バッチごとに宛先へストリーミング</td></tr>
+          <tr><td>フルダンプ (Full dump)</td><td>全データを一度に取得して宛先へストリーミング</td></tr>
+          <tr><td><strong>部分バックフィル (Partial)</strong> ✨</td><td><strong>今回追加</strong>。WHERE 句フィルタに一致するサブセットのみをロード</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>✅ 前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>Datastream のストリームが作成済みで、対象オブジェクト (テーブル) がストリームに含まれていること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>ソースが SQL Server、Spanner、Oracle、PostgreSQL、MySQL のいずれかであること (Oracle / PostgreSQL / MySQL は段階的提供のため、ストリームが機能をサポートしている必要がある)</span></div>
+
+      <h3 style="margin-top: 20px;">🖥️ ステップ 1: コンソールから部分バックフィルを開始</h3>
+      <div class="flow-diagram">
+        <div class="flow-step">📄 「Streams」ページ<br>に移動</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🔍 ストリームを開き<br>「Objects」タブで<br>対象を選択</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">▶️ 「Initiate backfill」<br>をクリック</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">☑️ 「Enable custom filter」<br>を選択し WHERE 句を入力</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">✅ 検証成功で<br>ジョブ開始</div>
+      </div>
+      <div class="icon-text"><span class="arrow">→</span><span>WHERE 句の入力例: <code>product_id &gt; 12 AND timestamp = '2025-01-06T22:00:00.00'</code></span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>Datastream がフィルタを検証し、成功するとバックフィルジョブが開始されます</span></div>
+
+      <h3 style="margin-top: 20px;">⌨️ ステップ 2: gcloud CLI から部分バックフィルを開始</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">gcloud で部分バックフィルを開始</span>
+        </div>
+        <pre><code class="language-bash">gcloud datastream objects start-backfill my-object \
+  --stream=my-stream \
+  --location=us-central1 \
+  --sql-where-clause="t.key1 = 'value1' AND t.key2 = 'value2'"</code></pre>
+      </div>
+      <div class="note-box">
+        <strong>💡 ポイント:</strong> <code>--sql-where-clause</code> には WHERE キーワード自体を含めず、<strong>条件式のみ</strong>を指定します。SQL ソースのみでサポートされます。
+      </div>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>🌟 メリット</h2>
+      <div class="merit-grid">
+        <div class="card" style="border-left-color: var(--gc-green); margin: 0;">
+          <h3>💼 ビジネス面</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>データ修復の迅速化</strong>: 不整合が発生した範囲だけを再ロードでき、データ品質問題からの復旧時間 (MTTR) を短縮</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>コスト最適化</strong>: 宛先へ処理・ストリーミングしたデータ量 (GB) 課金のため、必要なサブセットのみのロードで処理データ量を抑制</span></div>
+        </div>
+        <div class="card" style="border-left-color: var(--gc-blue-600); margin: 0;">
+          <h3>🔧 技術面</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>ソースデータベースへの負荷軽減</strong>: 読み取り範囲を限定し、本番 DB への影響を最小化</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>柔軟なフィルタリング</strong>: <code>AND</code> / <code>OR</code>、<code>IN</code>、<code>IS NULL</code>、括弧グループ化など実用的な WHERE 句サブセット</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>事前検証による安全性</strong>: フィルタ構文を検証してからジョブを開始し、不正なフィルタによる意図しない動作を防止</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>🚫 使用できない構文 (使用するとエラー)</h3>
+      <div class="error-box">
+        <div class="forbidden-grid">
+          <div class="check-item"><span class="cross-icon">✗</span><span>コメント (<code>--</code>、<code>/* */</code>)</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>関数 (例: <code>UPPER(column)</code>、<code>NOW()</code>)</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>算術式 (例: <code>column + 1 &gt; 10</code>)</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span><code>LIKE</code> 演算子 (ワイルドカード <code>%</code>、<code>_</code> を含む)</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span><code>BETWEEN</code> 演算子 (代わりに <code>&gt;=</code> と <code>&lt;=</code> を使用)</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>サブクエリ (WHERE 句内の <code>(SELECT ...)</code>)</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span><code>CASE</code> 文</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>列同士の比較 (例: <code>column1 = column2</code>)。比較はリテラルのみ</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span><code>DATE</code> / <code>TIME</code> 固有の型や関数</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>配列や JSON 固有の演算子</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>明示的なキャスト (例: <code>CAST(column AS INT)</code>)</span></div>
+        </div>
+      </div>
+
+      <h3>🤔 考慮すべき点</h3>
+      <div class="warning-box">
+        <div class="icon-text"><span class="arrow">→</span><span>Oracle、PostgreSQL、MySQL ソースでは<strong>段階的提供</strong>のため、すべてのストリームで即座に利用できるとは限らない。コンソールにオプションが表示されるかで対応状況を確認できる</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>未対応ストリームに対して CLI / API で部分バックフィルを構成すると<strong>リクエストが失敗</strong>する</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>列名・テーブル名の<strong>大文字小文字の区別</strong>は、対象データベースに依存する</span></div>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase-box">
+        <h3>📌 ユースケース 1: 宛先データの部分的な不整合の修復</h3>
+        <p><strong>シナリオ</strong>: BigQuery 宛先で特定日時以降のデータが誤って削除された。テーブル全体は数 TB 規模のため、全件バックフィルはソース負荷と時間の面で避けたい。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">欠損期間のみを再ロード</span>
+          </div>
+          <pre><code class="language-bash">gcloud datastream objects start-backfill orders-table \
+  --stream=prod-stream \
+  --location=us-central1 \
+  --sql-where-clause="order_date >= '2026-09-01T00:00:00.00'"</code></pre>
+        </div>
+        <p style="margin-bottom: 0;"><strong>効果</strong>: 欠損した期間のデータのみを再ロードでき、全件バックフィルと比較して<span class="highlight">処理データ量・ソース負荷・復旧時間を大幅に削減</span>。</p>
+      </div>
+
+      <div class="usecase-box">
+        <h3>📌 ユースケース 2: 特定エンティティのデータのみを宛先に取り込む</h3>
+        <p><strong>シナリオ</strong>: 分析基盤には特定の商品カテゴリやアクティブなレコードのみが必要で、履歴データの初期ロード時に不要な行を除外したい。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">カスタムフィルタの例</span>
+          </div>
+          <pre><code class="language-sql">is_active = TRUE AND category_id IN (10, 20, 30)</code></pre>
+        </div>
+        <p style="margin-bottom: 0;"><strong>効果</strong>: 必要なサブセットのみをロードすることで、<span class="highlight">宛先のストレージと Datastream の処理データ量を抑制</span>。</p>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>Datastream は、ソースから宛先へ<strong>処理されたデータ量 (GB)</strong> に基づいて課金されます。宛先へストリーミングされたデータに対してのみ課金されるため、部分バックフィルでロード対象を絞り込むことは<span class="highlight">処理データ量の削減に直結</span>します。</p>
+      <div class="success-box">
+        <strong>🎁 無料枠:</strong> 2026 年 6 月より、AlloyDB for PostgreSQL や Spanner などの Google Cloud ソースからの <strong>CDC 処理データ</strong>については、請求先アカウントごとに<strong>毎月最初の 100 GiB が無料</strong>になる無料枠が提供されています (CDC が対象であり、バックフィルは対象外)。
+      </div>
+      <p>詳細は <a href="https://cloud.google.com/datastream/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Datastream の料金ページ</a> を参照してください。</p>
+    </div>
+
+    <!-- 関連サービス・機能 -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card" style="border-left-color: var(--gc-green);">
+        <h3>📊 BigQuery</h3>
+        <p style="margin: 0;">Datastream の主要な宛先。部分バックフィルにより、BigQuery 側のデータ不整合をテーブル全体の再ロードなしで修復できる</p>
+      </div>
+      <div class="card" style="border-left-color: var(--gc-blue-300);">
+        <h3>🪣 Cloud Storage</h3>
+        <p style="margin: 0;">Datastream の宛先の 1 つ。変更ストリームをファイルとして出力し、イベント駆動アーキテクチャに活用できる</p>
+      </div>
+      <div class="card" style="border-left-color: var(--gc-teal);">
+        <h3>🌊 Dataflow</h3>
+        <p style="margin: 0;">Datastream のテンプレート統合により、Cloud SQL や Spanner へのレプリケーションを実現する</p>
+      </div>
+      <div class="card" style="border-left-color: var(--gc-orange);">
+        <h3>📈 Cloud Monitoring</h3>
+        <p style="margin: 0;">ストリームおよびオブジェクト単位のバックフィル状況 (処理イベント数、処理サイズなど) のモニタリングに使用する</p>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="success-box">
+        <div class="check-item"><span class="check-icon">✓</span><span>Datastream の部分バックフィルは、「テーブル全体の再ロード」しか選択肢がなかったバックフィル運用に、<strong>SQL WHERE 句による行レベルの柔軟性</strong>をもたらすアップデート</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>データ不整合の修復やサブセットの初期ロードにおいて、<strong>ソース負荷・処理データ量・所要時間を削減</strong></span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>Datastream を利用中のチームは、まず自身のストリームでコンソールに部分バックフィルオプションが表示されるか (特に Oracle / PostgreSQL / MySQL ソースの場合) を確認し、<strong>運用手順に組み込むことを推奨</strong></span></div>
+      </div>
+      <p style="margin-bottom: 0;">
+        <strong>🏷️ タグ:</strong>
+        <span class="badge">Datastream</span>
+        <span class="badge">CDC</span>
+        <span class="badge">バックフィル</span>
+        <span class="badge">データレプリケーション</span>
+        <span class="badge">BigQuery</span>
+        <span class="badge">SQL Server</span>
+        <span class="badge">Spanner</span>
+        <span class="badge">Oracle</span>
+        <span class="badge">PostgreSQL</span>
+        <span class="badge">MySQL</span>
+      </p>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p>📎 出典・参考リンク:</p>
+      <ul>
+        <li>公式リリースノート: <a href="https://docs.cloud.google.com/release-notes#September_30_2026" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/release-notes#September_30_2026</a></li>
+        <li>ドキュメント (Initiate partial backfill): <a href="https://docs.cloud.google.com/datastream/docs/manage-backfill-for-the-objects-of-a-stream#initiatepartialbackfill" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/datastream/docs/manage-backfill-for-the-objects-of-a-stream#initiatepartialbackfill</a></li>
+        <li>gcloud datastream objects start-backfill リファレンス: <a href="https://docs.cloud.google.com/sdk/gcloud/reference/datastream/objects/start-backfill" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/sdk/gcloud/reference/datastream/objects/start-backfill</a></li>
+        <li>料金ページ: <a href="https://cloud.google.com/datastream/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">https://cloud.google.com/datastream/pricing</a></li>
+      </ul>
+      <p>ソースレポート: reports/2026/2026-09-30-datastream-partial-backfill.md | 生成日: 2026-09-30</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

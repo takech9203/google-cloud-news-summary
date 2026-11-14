@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Storage: オブジェクトライフサイクル管理のサイズ条件</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-green);
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before h3 {
+      color: var(--gc-red);
+      margin-top: 0;
+    }
+
+    .after {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after h3 {
+      color: var(--gc-green);
+      margin-top: 0;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h3 {
+      color: var(--gc-blue-800);
+      margin-top: 0;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .feature-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .feature-card h3 {
+      margin-top: 0;
+      color: var(--gc-blue-800);
+    }
+
+    .pricing-highlight {
+      background: var(--gc-green-tint);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin: 8px 0;
+      border: 1px solid var(--gc-green);
+      font-size: 14px;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .feature-grid { grid-template-columns: 1fr; }
+      .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>🪣 Cloud Storage: ライフサイクル管理のサイズ条件</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Cloud Storage</span>
+          <span class="badge-ga">Feature</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-07-20</div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>Google Cloud Storage の Object Lifecycle Management に <span class="highlight">sizeAboveBytes</span> および <span class="highlight">sizeBelowBytes</span> 条件が追加されました。オブジェクトのサイズに基づいてライフサイクルアクション（ストレージクラスの変更や削除）を実行するかどうかを制御できるようになります。</p>
+      <p>最小サイズしきい値と最大サイズしきい値を定義することで、コスト効率の高いストレージ管理を実現します。データレイクやログ管理など、多様なサイズのオブジェクトが混在する環境で、きめ細かいコスト最適化が可能になります。</p>
+
+      <!-- Before/After -->
+      <div class="before-after">
+        <div class="before">
+          <h3>❌ Before (課題)</h3>
+          <div class="check-item"><span class="cross-icon">✗</span><span>小さなオブジェクトにも一律でクラス変更が実行され、オペレーションコストが節約を上回る場合があった</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>サイズ範囲に基づくフィルタリングが不可能で、全オブジェクトに一律適用するしかなかった</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>サイズベースの管理にはカスタムスクリプトや外部ツールが必要だった</span></div>
+        </div>
+        <div class="after">
+          <h3>✅ After (改善)</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><code>sizeAboveBytes</code> で指定バイト数より大きいオブジェクトのみにアクション適用可能</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><code>sizeBelowBytes</code> で指定バイト数より小さいオブジェクトのみにアクション適用可能</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>両条件を組み合わせて特定のサイズ範囲内のオブジェクトを対象としたルール定義が可能</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>Object Lifecycle Management がオブジェクトを評価する際の判定フロー。サイズ条件は他の条件（age、matchesStorageClass など）と AND 条件で組み合わされ、すべての条件を満たした場合にのみアクションが実行されます。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    A[Cloud Storage バケット内のオブジェクト] --> B{ライフサイクルルール評価}
+    B --> C{age / createdBefore 等の<br>時間条件を満たすか?}
+    C -->|No| Z[アクションなし]
+    C -->|Yes| D{sizeAboveBytes 条件<br>が設定されているか?}
+    D -->|No| F{sizeBelowBytes 条件<br>が設定されているか?}
+    D -->|Yes| E{オブジェクトサイズ ><br>sizeAboveBytes?}
+    E -->|No| Z
+    E -->|Yes| F
+    F -->|No| G{他の条件を<br>すべて満たすか?}
+    F -->|Yes| H{オブジェクトサイズ <<br>sizeBelowBytes?}
+    H -->|No| Z
+    H -->|Yes| G
+    G -->|No| Z
+    G -->|Yes| I{アクションの種類}
+    I -->|Delete| J[オブジェクト削除]
+    I -->|SetStorageClass| K[ストレージクラス変更]
+    I -->|AbortIncompleteMultipartUpload| L[未完了マルチパート<br>アップロード中止]
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <h3>📏 sizeAboveBytes 条件</h3>
+          <p>オブジェクトのデータサイズが指定値より大きい場合に条件が満たされる。ライフサイクルアクションの最小サイズしきい値を定義するために使用。</p>
+          <p style="font-size: 14px; color: var(--gc-outline);">小さなオブジェクトでストレージクラス変更のコストが節約を上回るケースの除外に有効</p>
+        </div>
+        <div class="feature-card">
+          <h3>📐 sizeBelowBytes 条件</h3>
+          <p>オブジェクトのデータサイズが指定値より小さい場合に条件が満たされる。ライフサイクルアクションの最大サイズしきい値を定義するために使用。</p>
+          <p style="font-size: 14px; color: var(--gc-outline);">大きなオブジェクトを特定のルールから除外する場合に有効</p>
+        </div>
+        <div class="feature-card">
+          <h3>🎯 サイズ範囲指定</h3>
+          <p><code>sizeAboveBytes</code> と <code>sizeBelowBytes</code> を同一ルール内で組み合わせて使用可能。特定のサイズ範囲（例: 1MB〜100MB）のオブジェクトのみを対象としたルールを作成可能。</p>
+          <p style="font-size: 14px; color: var(--gc-outline);">既存の条件（age、matchesStorageClass、matchesPrefix/Suffix など）と組み合わせ可能</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+      <h3>サイズ条件の仕様</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>sizeAboveBytes</td><td>オブジェクトサイズが指定バイト数を超える場合に真</td></tr>
+          <tr><td>sizeBelowBytes</td><td>オブジェクトサイズが指定バイト数未満の場合に真</td></tr>
+          <tr><td>最大指定値</td><td>5 TiB (5,497,558,138,880 bytes)</td></tr>
+          <tr><td>評価対象</td><td>オブジェクトのデータサイズのみ（メタデータは除外）</td></tr>
+          <tr><td>組み合わせ</td><td>同一ルール内で両条件を併用可能（サイズ範囲指定）</td></tr>
+          <tr><td>利用可能アクション</td><td>Delete, SetStorageClass, AbortIncompleteMultipartUpload</td></tr>
+        </tbody>
+      </table>
+
+      <h3>制約事項</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>階層的名前空間バケット</td><td>sizeBelowBytes で空フォルダの削除は不可</td></tr>
+          <tr><td>メタデータ</td><td>サイズ評価にメタデータは含まれない</td></tr>
+          <tr><td>反映時間</td><td>設定変更後、最大 24 時間で反映</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Configuration -->
+    <div class="section">
+      <h2>⚙️ 設定方法</h2>
+
+      <div class="note-box">
+        <strong>💡 前提条件:</strong> Google Cloud プロジェクト作成済み / Cloud Storage バケット作成済み / <code>storage.buckets.update</code> 権限を持つ IAM ロール（Storage Admin など）が付与されていること
+      </div>
+
+      <h3>ステップ 1: ライフサイクル設定ファイルの作成</h3>
+      <p>3 つのルールを定義する例: (1) 5MB を超える Standard オブジェクトを 365 日後に Nearline に移行、(2) 1KB 未満のオブジェクトを 90 日後に削除、(3) 1MB〜100GB のオブジェクトを 180 日後に Coldline に移行。</p>
+      <span class="code-label">JSON</span>
+      <pre><code class="language-json">{
+  "lifecycle": {
+    "rule": [
+      {
+        "action": {
+          "type": "SetStorageClass",
+          "storageClass": "NEARLINE"
+        },
+        "condition": {
+          "age": 365,
+          "matchesStorageClass": ["STANDARD"],
+          "sizeAboveBytes": 5242880
+        }
+      },
+      {
+        "action": {
+          "type": "Delete"
+        },
+        "condition": {
+          "age": 90,
+          "sizeBelowBytes": 1024
+        }
+      },
+      {
+        "action": {
+          "type": "SetStorageClass",
+          "storageClass": "COLDLINE"
+        },
+        "condition": {
+          "age": 180,
+          "sizeAboveBytes": 1048576,
+          "sizeBelowBytes": 107374182400
+        }
+      }
+    ]
+  }
+}</code></pre>
+
+      <h3>ステップ 2: gcloud CLI でライフサイクル設定を適用</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># ライフサイクル設定ファイルを適用
+gcloud storage buckets update gs://MY_BUCKET --lifecycle-file=lifecycle.json</code></pre>
+
+      <h3>ステップ 3: 設定の確認</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># 現在のライフサイクル設定を確認
+gcloud storage buckets describe gs://MY_BUCKET --format="json(lifecycle)"</code></pre>
+
+      <h3>ステップ 4: REST API での設定（代替方法）</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># JSON API を使用して設定を適用
+curl -X PATCH --data-binary @lifecycle.json \
+  -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Content-Type: application/json" \
+  "https://storage.googleapis.com/storage/v1/b/MY_BUCKET?fields=lifecycle"</code></pre>
+    </div>
+
+    <!-- Statistics -->
+    <div class="section">
+      <h2>📊 数字で見るアップデート効果</h2>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value">5 TiB</div>
+          <div class="stat-label">最大指定可能サイズ</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">24h</div>
+          <div class="stat-label">設定反映の最大時間</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">$0</div>
+          <div class="stat-label">機能自体の追加料金</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div class="feature-grid">
+        <div class="feature-card" style="border-left-color: var(--gc-green);">
+          <h3 style="color: var(--gc-green);">💰 ビジネス面</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>コスト最適化の精度向上</strong>: 小さなオブジェクトの移行によるオペレーションコスト超過を防止</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>運用の簡素化</strong>: カスタムスクリプト不要でネイティブにサイズベースポリシーを実装</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>ガバナンスの強化</strong>: データサイズに応じた保持・削除ポリシーを宣言的に定義可能</span></div>
+        </div>
+        <div class="feature-card" style="border-left-color: var(--gc-blue-600);">
+          <h3 style="color: var(--gc-blue-800);">🔧 技術面</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>きめ細かいルール定義</strong>: 既存条件とサイズ条件を自由に組み合わせ可能</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>宣言的設定</strong>: JSON/XML で管理でき、IaC との統合が容易</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>スケーラビリティ</strong>: オブジェクト数に関係なく自動的にルールを評価・適用</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <div class="warning-box">
+        <strong>⚠️ 制限事項:</strong>
+        <ul style="margin: 8px 0; padding-left: 20px;">
+          <li>サイズ条件の最大値は 5 TiB まで。それ以上のオブジェクトには対応できない</li>
+          <li>オブジェクトのメタデータサイズは評価対象外</li>
+          <li>階層的名前空間（HNS）バケットでは <code>sizeBelowBytes</code> で空フォルダの削除は不可</li>
+          <li>ライフサイクル設定変更後、反映まで最大 24 時間のタイムラグ</li>
+        </ul>
+      </div>
+      <div class="note-box">
+        <strong>💡 考慮すべき点:</strong>
+        <ul style="margin: 8px 0; padding-left: 20px;">
+          <li>サイズ条件は他の条件と AND で評価される。意図しないオブジェクトが対象外にならないようルール全体の設計を慎重に</li>
+          <li>圧縮済みオブジェクトは圧縮後のサイズで評価される</li>
+          <li>複数ルールが同時に条件を満たした場合、Delete が SetStorageClass より優先。SetStorageClass 間ではより低コストのクラスが優先</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h3>1. 小さなオブジェクトのストレージクラス移行除外</h3>
+        <p><strong>シナリオ:</strong> データレイクに数バイトのメタデータファイルから数 GB のデータファイルまでが混在。365 日後に Nearline に移行したいが、小さなファイルは移行コストが節約を上回るため除外したい。</p>
+        <span class="code-label">JSON</span>
+        <pre><code class="language-json">{
+  "action": { "type": "SetStorageClass", "storageClass": "NEARLINE" },
+  "condition": {
+    "age": 365,
+    "matchesStorageClass": ["STANDARD"],
+    "sizeAboveBytes": 5242880
+  }
+}</code></pre>
+        <div class="pricing-highlight">
+          <strong>効果:</strong> 5MB 以下のオブジェクトを除外し、不要な Class A オペレーション料金の発生を防止。小さなオブジェクトが多い環境では、年間数百〜数千ドルのコスト削減が見込める。
+        </div>
+      </div>
+
+      <div class="usecase-card">
+        <h3>2. 一時ファイルのサイズベース自動削除</h3>
+        <p><strong>シナリオ:</strong> 一時的に生成する小さなログフラグメントや空ファイルを 30 日後に自動削除。大きなログファイルは監査目的で保持。</p>
+        <span class="code-label">JSON</span>
+        <pre><code class="language-json">{
+  "action": { "type": "Delete" },
+  "condition": {
+    "age": 30,
+    "sizeBelowBytes": 1024,
+    "matchesPrefix": ["tmp/", "logs/fragments/"]
+  }
+}</code></pre>
+        <div class="pricing-highlight">
+          <strong>効果:</strong> 1KB 未満の一時ファイルが 30 日後に自動削除され、ストレージの無駄を排除。大きなログファイルは影響を受けず保持される。
+        </div>
+      </div>
+
+      <div class="usecase-card">
+        <h3>3. サイズ範囲に基づく段階的アーカイブ</h3>
+        <p><strong>シナリオ:</strong> メディアファイル管理で、中程度サイズ（1MB〜1GB）のファイルは早期に Coldline へ移行し、1GB 以上のファイルはアクセス頻度が高いため Standard に長く保持。</p>
+        <span class="code-label">JSON</span>
+        <pre><code class="language-json">{
+  "action": { "type": "SetStorageClass", "storageClass": "COLDLINE" },
+  "condition": {
+    "age": 90,
+    "matchesStorageClass": ["STANDARD"],
+    "sizeAboveBytes": 1048576,
+    "sizeBelowBytes": 1073741824
+  }
+}</code></pre>
+        <div class="pricing-highlight">
+          <strong>効果:</strong> ファイルサイズに応じた最適なストレージクラス移行戦略を実現。中サイズファイルは早期に低コストクラスへ移行しつつ、大きなファイルへの高速アクセスを維持。
+        </div>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金情報</h2>
+      <div class="success-box">
+        <strong>✅ Object Lifecycle Management 自体には追加料金は発生しません。</strong>ライフサイクルアクションの実行に伴う以下のコストのみが発生します。
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>料金 (USD)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>SetStorageClass アクション (Class A オペレーション)</td><td>$0.05 / 10,000 オペレーション (Standard)</td></tr>
+          <tr><td>Delete アクション</td><td>無料</td></tr>
+          <tr><td>Standard ストレージ保存料金</td><td>$0.020 / GiB / 月〜</td></tr>
+          <tr><td>Nearline ストレージ保存料金</td><td>$0.010 / GiB / 月〜</td></tr>
+          <tr><td>Coldline ストレージ保存料金</td><td>$0.004 / GiB / 月〜</td></tr>
+          <tr><td>Archive ストレージ保存料金</td><td>$0.0012 / GiB / 月〜</td></tr>
+          <tr><td>Nearline 取得料金</td><td>$0.01 / GiB</td></tr>
+          <tr><td>Coldline 取得料金</td><td>$0.02 / GiB</td></tr>
+          <tr><td>Archive 取得料金</td><td>$0.05 / GiB</td></tr>
+        </tbody>
+      </table>
+
+      <div class="note-box">
+        <strong>💡 コスト最適化のポイント:</strong> <code>sizeAboveBytes</code> 条件を活用することで、SetStorageClass の Class A オペレーション費用が保存料金の節約を上回るケースを回避できます。例えば 1KB のオブジェクトを Standard から Nearline に移行しても月額 $0.00001 の節約にしかなりませんが、5MB 以上のオブジェクトでは月額 $0.05 の節約となり、オペレーション費用を大幅に上回ります。
+      </div>
+    </div>
+
+    <!-- Region -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <div class="success-box">
+        <strong>✅ 全リージョン対応:</strong> この機能はすべての Cloud Storage リージョン、マルチリージョン、およびデュアルリージョンで利用可能です。特定のリージョン制限はありません。
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <strong>Autoclass</strong>
+          <p style="font-size: 14px; margin: 8px 0 0 0;">アクセスパターンに基づいてストレージクラスを自動移行。matchesStorageClass 条件との併用はできない。</p>
+        </div>
+        <div class="card">
+          <strong>Storage Intelligence</strong>
+          <p style="font-size: 14px; margin: 8px 0 0 0;">バケットの使用状況を分析し、コスト最適化の推奨事項を提供。サイズ条件のしきい値決定に活用可能。</p>
+        </div>
+        <div class="card">
+          <strong>Object Versioning</strong>
+          <p style="font-size: 14px; margin: 8px 0 0 0;">バージョン管理オブジェクトにもサイズ条件が適用。numNewerVersions や isLive 条件と組み合わせ可能。</p>
+        </div>
+        <div class="card">
+          <strong>Terraform</strong>
+          <p style="font-size: 14px; margin: 8px 0 0 0;">google_storage_bucket リソースで IaC としてサイズ条件を含むライフサイクルルールを管理可能。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <p><code>sizeAboveBytes</code> と <code>sizeBelowBytes</code> 条件の追加により、オブジェクトサイズに基づくきめ細かいライフサイクルポリシーの定義が可能になりました。特にストレージクラス移行のコスト効率を最適化したい場合や、サイズに基づくデータ保持ポリシーを実装したい場合に有効です。</p>
+      <div class="success-box">
+        <strong>推奨アクション:</strong> 既存のライフサイクルルールにサイズ条件を追加することで、即座にコスト最適化を実現できます。大量のオブジェクトを管理しているすべてのユーザーにおいて設定の見直しを推奨します。
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>タグ:</strong> Cloud Storage, Object Lifecycle Management, sizeAboveBytes, sizeBelowBytes, Cost Optimization, Storage Management</p>
+      <p>📎 出典:</p>
+      <ul style="list-style: none; padding: 0; margin: 4px 0;">
+        <li><a href="https://cloud.google.com/release-notes#July_20_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li><a href="https://cloud.google.com/storage/docs/lifecycle" target="_blank" rel="noopener noreferrer">Object Lifecycle Management ドキュメント</a></li>
+        <li><a href="https://cloud.google.com/storage/docs/lifecycle-configurations" target="_blank" rel="noopener noreferrer">ライフサイクル設定例</a></li>
+        <li><a href="https://cloud.google.com/storage/docs/managing-lifecycles" target="_blank" rel="noopener noreferrer">ライフサイクル管理の設定方法</a></li>
+        <li><a href="https://cloud.google.com/storage/pricing" target="_blank" rel="noopener noreferrer">Cloud Storage 料金ページ</a></li>
+      </ul>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

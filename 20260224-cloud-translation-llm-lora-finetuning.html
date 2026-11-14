@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Translation: Translation LLM が LoRA による完全ファインチューニングをサポート</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    /* Google Cloud Light Theme Base Styles */
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; min-width: 280px; }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .header-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h4 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 8px;
+    }
+
+    .card p, .card ul {
+      color: var(--gc-on-surface-variant);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .card ul {
+      padding-left: 20px;
+    }
+
+    .card ul li {
+      margin-bottom: 4px;
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-preview {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      background: var(--gc-orange);
+    }
+
+    .badge-service {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      background: var(--gc-purple);
+    }
+
+    /* Before/After */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h4 {
+      color: var(--gc-red);
+      margin-bottom: 8px;
+      font-size: 15px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box h4 {
+      color: var(--gc-green);
+      margin-bottom: 8px;
+      font-size: 15px;
+    }
+
+    .before-box ul, .after-box ul {
+      padding-left: 18px;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .before-box li, .after-box li {
+      margin-bottom: 4px;
+    }
+
+    /* Stats grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    /* Mermaid */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* Feature cards grid */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .feature-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .feature-card.purple { border-left-color: var(--gc-purple); }
+    .feature-card.green { border-left-color: var(--gc-green); }
+    .feature-card.orange { border-left-color: var(--gc-orange); }
+    .feature-card.teal { border-left-color: var(--gc-teal); }
+
+    .feature-card h4 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 8px;
+    }
+
+    .feature-card p, .feature-card ul {
+      color: var(--gc-on-surface-variant);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .feature-card ul {
+      padding-left: 18px;
+    }
+
+    .feature-card ul li {
+      margin-bottom: 4px;
+    }
+
+    /* Use case cards */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--gc-blue-900);
+      margin-bottom: 8px;
+    }
+
+    .usecase-card p {
+      color: var(--gc-on-surface-variant);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    /* Merit / Demerit */
+    .merit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .merit-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .merit-box h4 {
+      color: var(--gc-green);
+      margin-bottom: 8px;
+    }
+
+    .demerit-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .demerit-box h4 {
+      color: #E37400;
+      margin-bottom: 8px;
+    }
+
+    .merit-box ul, .demerit-box ul {
+      padding-left: 18px;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .merit-box li, .demerit-box li {
+      margin-bottom: 4px;
+    }
+
+    /* Note / Warning boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .ai-box {
+      background: var(--gc-purple-tint);
+      border-left: 4px solid var(--gc-purple);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Code blocks */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      background: #1E1E1E;
+      border-radius: 0;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Flow diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Links */
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* Region badge */
+    .region-badge {
+      display: inline-block;
+      background: var(--gc-teal-tint);
+      color: #006064;
+      padding: 4px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      margin: 4px 4px 4px 0;
+      border: 1px solid rgba(0, 188, 212, 0.3);
+    }
+
+    /* Related services */
+    .related-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .related-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 16px;
+      border: 1px solid var(--gc-outline-variant);
+      box-shadow: 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .related-card h4 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      margin-bottom: 4px;
+    }
+
+    .related-card p {
+      font-size: 13px;
+      color: var(--gc-on-surface-variant);
+      line-height: 1.6;
+    }
+
+    /* Footer */
+    footer {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    footer ul {
+      list-style: none;
+      padding: 0;
+      margin: 8px 0;
+    }
+
+    footer li {
+      margin-bottom: 4px;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .before-after, .merit-grid, .features-grid { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .related-grid { grid-template-columns: 1fr; }
+      body { padding: 12px; }
+      .section { padding: 16px; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>🌐 Cloud Translation: Translation LLM が LoRA による完全ファインチューニングをサポート</h1>
+        <div class="subtitle">2026-02-24 | Cloud Translation</div>
+        <div class="header-badges">
+          <span class="badge">Change (機能強化)</span>
+          <span class="badge-service">Translation LLM</span>
+          <span class="badge-preview">Preview</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>Google Cloud の <span class="highlight">Translation LLM (TLLM)</span> が、<span class="highlight">LoRA (Low-Rank Adaptation)</span> を用いた完全ファインチューニング (Supervised Fine-Tuning) をサポートしました。Translation LLM は Gemini をベースとした翻訳特化型の大規模言語モデルであり、MetricX や COMET といった翻訳品質評価指標で他の翻訳モデルを大きく上回る性能を発揮します。</p>
+      <p style="margin-top: 12px;">ファインチューニングの対象モデルは <code>translation-llm-002</code> であり、Vertex AI の Supervised Tuning API を通じてチューニングジョブを作成・管理できます。データセットは JSONL 形式で Cloud Storage にアップロードし、最低 100 件のトレーニング例から開始できます。チューニング済みモデルは <code>translation-llm-custom/{model-id}</code> というモデル ID で Cloud Translation API から呼び出すことが可能です。</p>
+
+      <div class="ai-box" style="margin-top: 16px;">
+        <strong>🎯 対象ユーザー:</strong> 法律、医療、金融、テクノロジーなどの専門分野で高品質な翻訳を必要とする企業や、独自のブランドトーンや用語体系を維持しながら多言語展開を進めるグローバル企業
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value">100件~</div>
+          <div class="stat-label">最小トレーニングデータ</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">1,000</div>
+          <div class="stat-label">トークン上限 (~4,000文字)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">1GB</div>
+          <div class="stat-label">最大データセットサイズ</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">LoRA Rank 4</div>
+          <div class="stat-label">アダプターサイズ (固定)</div>
+        </div>
+      </div>
+
+      <!-- Before/After -->
+      <h3>Before / After</h3>
+      <div class="before-after">
+        <div class="before-box">
+          <h4>❌ アップデート前の課題</h4>
+          <ul>
+            <li>TLLM はドメイン固有の専門用語やスタイルに対応させるカスタマイズの選択肢が限定的</li>
+            <li>NMT モデルのカスタマイズ (AutoML Translation) は利用可能だったが、TLLM の高品質な翻訳性能をベースにしたカスタマイズは不可</li>
+            <li>Adaptive Translation は利用できたが、大規模なドメイン適応には不十分</li>
+            <li>専門分野の翻訳では、汎用モデルの出力を人手で修正する工程が発生</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h4>✅ アップデート後の改善</h4>
+          <ul>
+            <li>Translation LLM を LoRA ベースの SFT でドメイン固有データに適応可能に</li>
+            <li>100 件程度の少量データセットからチューニングを開始でき、数千件まで拡張可能</li>
+            <li>Vertex AI の Tuning API および Python SDK でジョブの作成・管理・モニタリングが可能</li>
+            <li>カスタマイズ済みモデルを Cloud Translation API から直接利用可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>Translation LLM の LoRA ファインチューニングは、データ準備、Vertex AI でのチューニング実行、Cloud Translation API を通じた推論の 3 段階で構成されます。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    subgraph データ準備
+        A["データセット<br/>(JSONL形式)"] --> B[("Cloud Storage<br/>バケット")]
+    end
+
+    subgraph Vertex AI チューニング
+        B --> C["Supervised<br/>Fine-Tuning ジョブ"]
+        C --> D["translation-llm-002<br/>(ベースモデル)"]
+        D -->|LoRA 適応| E["カスタムモデル<br/>translation-llm-custom"]
+    end
+
+    subgraph 推論
+        F(["アプリケーション"]) --> G["Cloud Translation<br/>Advanced API"]
+        G --> E
+        E --> H["ドメイン特化<br/>翻訳結果"]
+    end
+        </pre>
+      </div>
+      <div class="note-box">
+        <strong>💡 ポイント:</strong> チューニング済みモデルは既存の Cloud Translation API ワークフローにシームレスに統合できます。アプリケーション側の変更はモデル ID の指定のみです。
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="features-grid">
+        <div class="feature-card purple">
+          <h4>🧠 LoRA ベースの Supervised Fine-Tuning</h4>
+          <ul>
+            <li>LoRA (Low-Rank Adaptation) 技術によりモデルの重みを効率的に調整</li>
+            <li>ベースモデル <code>translation-llm-002</code> に対してチューニング</li>
+            <li>アダプターサイズは 4 のみサポート (他の値はエラー)</li>
+          </ul>
+        </div>
+        <div class="feature-card green">
+          <h4>📦 柔軟なデータセット管理</h4>
+          <ul>
+            <li>JSONL 形式でトレーニングデータを準備</li>
+            <li>最低 100 件から開始可能、数千件まで拡張可能</li>
+            <li>バリデーションデータセット (最大 1,024 件) を指定して効果を検証</li>
+            <li>AutoML Translation の既存データセットや TSV/CSV/TMX 形式からの変換をサポート</li>
+          </ul>
+        </div>
+        <div class="feature-card orange">
+          <h4>🖥️ Vertex AI Studio 統合</h4>
+          <ul>
+            <li>Google Cloud コンソールの Vertex AI Studio からジョブの作成・管理が可能</li>
+            <li>トレーニングメトリクス (損失、トークン精度、予測数) のリアルタイムモニタリング</li>
+            <li>バリデーションメトリクスによるモデル評価</li>
+          </ul>
+        </div>
+        <div class="feature-card teal">
+          <h4>🔗 Cloud Translation API との統合</h4>
+          <ul>
+            <li>チューニング済みモデルを <code>translation-llm-custom/{model-id}</code> で呼び出し可能</li>
+            <li>既存の翻訳ワークフロー (REST API、Python クライアント) から直接利用可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>📐 技術仕様</h2>
+      <h3>モデルとデータセットの制限事項</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>ベースモデル</td><td><code>translation-llm-002</code></td></tr>
+          <tr><td>カスタムモデル ID</td><td><code>translation-llm-custom/{model-id}</code></td></tr>
+          <tr><td>アダプターサイズ (LoRA Rank)</td><td>4 (固定、他の値は不可)</td></tr>
+          <tr><td>入出力トークン上限 (推論時)</td><td>1,000 トークン (~4,000 文字)</td></tr>
+          <tr><td>トレーニング例の長さ上限</td><td>1,000 トークン (~4,000 文字)</td></tr>
+          <tr><td>トレーニングデータセットサイズ</td><td>最大 1GB (JSONL)</td></tr>
+          <tr><td>バリデーションデータセット</td><td>最大 1,024 件</td></tr>
+          <tr><td>推奨最小トレーニング件数</td><td>100 件</td></tr>
+          <tr><td>チューニング対応リージョン</td><td>us-central1 のみ</td></tr>
+          <tr><td>同時実行チューニングジョブ</td><td>プロジェクトあたりデフォルト 1 件 (クォータ申請で増加可能)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>トレーニングメトリクス</h3>
+      <table>
+        <thead>
+          <tr><th>メトリクス</th><th>説明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>/train_total_loss</code></td><td>トレーニングデータセットに対する損失値</td></tr>
+          <tr><td><code>/train_fraction_of_correct_next_step_preds</code></td><td>トレーニングステップでのトークン精度</td></tr>
+          <tr><td><code>/train_num_predictions</code></td><td>トレーニングステップでの予測トークン数</td></tr>
+          <tr><td><code>/eval_total_loss</code></td><td>バリデーションデータセットに対する損失値</td></tr>
+          <tr><td><code>/eval_fraction_of_correct_next_step_preds</code></td><td>バリデーションステップでのトークン精度</td></tr>
+          <tr><td><code>/eval_num_predictions</code></td><td>バリデーションステップでの予測トークン数</td></tr>
+        </tbody>
+      </table>
+
+      <h3>データセット形式</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">JSON</span>
+          <span class="code-title">トレーニングデータの JSONL 形式</span>
+        </div>
+        <pre><code class="language-json">{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "English: Hello. Spanish:"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Hola."
+        }
+      ]
+    }
+  ]
+}</code></pre>
+      </div>
+    </div>
+
+    <!-- Setup Guide -->
+    <div class="section">
+      <h2>🔧 設定方法</h2>
+
+      <h3>前提条件</h3>
+      <div class="card">
+        <ul>
+          <li>Google Cloud プロジェクトで Cloud Translation - Advanced API が有効化されていること</li>
+          <li>Vertex AI API が有効化されていること</li>
+          <li>サービスアカウントに適切な IAM ロール (<code>roles/cloudtranslate.user</code>、Vertex AI 関連ロール) が付与されていること</li>
+          <li>トレーニングデータセットが JSONL 形式で Cloud Storage にアップロード済みであること</li>
+        </ul>
+      </div>
+
+      <h3>ステップ 1: データセットの準備とアップロード</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">Cloud Storage バケットの作成とデータアップロード</span>
+        </div>
+        <pre><code class="language-bash"># Cloud Storage バケットの作成 (us-central1 推奨)
+gcloud storage buckets create gs://my-translation-tuning-data \
+    --location=us-central1
+
+# JSONL 形式のトレーニングデータをアップロード
+gcloud storage cp training_data.jsonl gs://my-translation-tuning-data/</code></pre>
+      </div>
+
+      <h3>ステップ 2: REST API でチューニングジョブを作成</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">REST API によるチューニングジョブの作成</span>
+        </div>
+        <pre><code class="language-bash">PROJECT_ID=myproject
+LOCATION=us-central1
+
+curl -X POST \
+  -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Content-Type: application/json; charset=utf-8" \
+  "https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${LOCATION}/tuningJobs" \
+  -d '{
+    "baseModel": "translation-llm-002",
+    "supervisedTuningSpec": {
+      "trainingDatasetUri": "gs://my-translation-tuning-data/training_data.jsonl",
+      "validationDatasetUri": "gs://my-translation-tuning-data/validation_data.jsonl"
+    },
+    "tunedModelDisplayName": "my-custom-translation-model"
+  }'</code></pre>
+      </div>
+
+      <h3>ステップ 3: Python SDK でチューニングジョブを作成</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Python</span>
+          <span class="code-title">Vertex AI Python SDK によるチューニング</span>
+        </div>
+        <pre><code class="language-python">import vertexai
+from vertexai.tuning import sft
+
+vertexai.init(project="PROJECT_ID", location="us-central1")
+
+sft_tuning_job = sft.train(
+    source_model="translation-llm-002",
+    train_dataset="gs://my-translation-tuning-data/training_data.jsonl",
+    validation_dataset="gs://my-translation-tuning-data/validation_data.jsonl",
+    tuned_model_display_name="my-custom-translation-model",
+)
+
+# ジョブ完了を待機
+import time
+while not sft_tuning_job.has_ended:
+    time.sleep(60)
+    sft_tuning_job.refresh()
+
+print(sft_tuning_job.tuned_model_name)
+print(sft_tuning_job.tuned_model_endpoint_name)</code></pre>
+      </div>
+
+      <h3>ステップ 4: カスタムモデルで翻訳を実行</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Python</span>
+          <span class="code-title">カスタムモデルによる翻訳の実行</span>
+        </div>
+        <pre><code class="language-python">from google.cloud import translate_v3
+
+def translate_with_custom_model():
+    response = translate_v3.TranslationServiceClient().translate_text(
+        contents=["This is domain-specific text to translate."],
+        target_language_code="ja",
+        source_language_code="en",
+        parent="projects/PROJECT_ID/locations/us-central1",
+        model="projects/PROJECT_ID/locations/us-central1/models/translation-llm-custom/MODEL_ID"
+    )
+    print(response)
+    return response</code></pre>
+      </div>
+    </div>
+
+    <!-- Merits & Demerits -->
+    <div class="section">
+      <h2>⚖️ メリット・デメリット</h2>
+      <div class="merit-grid">
+        <div class="merit-box">
+          <h4>✅ ビジネス面のメリット</h4>
+          <ul>
+            <li><strong>専門分野の翻訳品質向上</strong>: 法律、医療、金融などの業界固有の用語やスタイルを正確に翻訳し、人手修正コストを削減</li>
+            <li><strong>ブランド一貫性の維持</strong>: 企業固有のトーンや用語体系をモデルに学習させ、多言語コンテンツのブランド一貫性を確保</li>
+            <li><strong>市場投入の迅速化</strong>: 専門翻訳者への外注や手動修正の工程を削減し、多言語コンテンツの公開スピードを向上</li>
+          </ul>
+          <h4 style="margin-top: 16px;">✅ 技術面のメリット</h4>
+          <ul>
+            <li><strong>LoRA の効率性</strong>: 全パラメータのファインチューニングと比較して、少量のデータと計算リソースで効果的なカスタマイズ</li>
+            <li><strong>既存ワークフローとの互換性</strong>: Cloud Translation API の <code>translateText</code> エンドポイントから直接利用でき、大幅な変更が不要</li>
+            <li><strong>段階的なカスタマイズ</strong>: 100 件の少量データから開始し、結果を評価しながら拡充可能</li>
+          </ul>
+        </div>
+        <div class="demerit-box">
+          <h4>⚠️ 制限事項</h4>
+          <ul>
+            <li>チューニングジョブのリージョンは <code>us-central1</code> のみ</li>
+            <li>ベースモデルは <code>translation-llm-002</code> のみサポート</li>
+            <li>LoRA アダプターサイズは 4 に固定 (変更不可)</li>
+            <li>入出力トークンは最大 1,000 トークン (約 4,000 文字)</li>
+            <li>同時実行のチューニングジョブ数にクォータ制限あり (デフォルト 1 件)</li>
+            <li>Customized Translation LLM は Preview ステージ</li>
+          </ul>
+          <h4 style="margin-top: 16px;">⚠️ 考慮すべき点</h4>
+          <ul>
+            <li>チューニングデータの品質がモデル性能に直接影響するため、高品質な翻訳ペアの準備が重要</li>
+            <li>ドメイン特化度が高い場合、数百件以上のトレーニングデータが推奨</li>
+            <li>Cloud Storage、Translation LLM Prediction の料金も別途発生</li>
+            <li>Adaptive Translation と比較して、より多くのデータと準備時間が必要</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💼 ユースケース</h2>
+      <div class="usecase-card">
+        <h4>📜 ユースケース 1: 法律文書の専門翻訳</h4>
+        <p><strong>シナリオ:</strong> 国際的な法律事務所が、契約書や法的文書を複数言語に翻訳する必要がある。法律用語の正確な翻訳と、法的文書特有の文体の維持が求められる。</p>
+        <div class="code-block" style="margin-top: 12px;">
+          <div class="code-header">
+            <span class="code-lang">JSON</span>
+            <span class="code-title">法律文書のトレーニングデータ例</span>
+          </div>
+          <pre><code class="language-json">{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [{"text": "English: The indemnifying party shall hold harmless the indemnified party. Japanese:"}]
+    },
+    {
+      "role": "model",
+      "parts": [{"text": "補償当事者は、被補償当事者を免責するものとする。"}]
+    }
+  ]
+}</code></pre>
+        </div>
+        <p style="margin-top: 8px;"><strong>効果:</strong> 法律用語の正確な翻訳により、翻訳後のリーガルレビュー工程を大幅に短縮し、契約書の多言語化プロセスを高速化できる。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>💻 ユースケース 2: 技術文書のローカリゼーション</h4>
+        <p><strong>シナリオ:</strong> ソフトウェア企業が、API ドキュメントやユーザーガイドを多言語で提供する必要がある。技術用語の一貫した翻訳と、技術文書特有の簡潔な文体が求められる。</p>
+        <p style="margin-top: 8px;"><strong>効果:</strong> 製品固有の技術用語を正確に翻訳し、ドキュメントの多言語展開を効率化。Glossary との併用でさらに用語の一貫性を高められる。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>Translation LLM のファインチューニングに関する料金は、以下の要素で構成されます。</p>
+      <div class="card">
+        <ul>
+          <li><strong>チューニング料金:</strong> Vertex AI の Translation Model Tuning 料金に基づいて課金</li>
+          <li><strong>推論料金:</strong> Cloud Translation API の文字数ベースの課金 (送信文字数に基づく月額課金)</li>
+          <li><strong>関連サービス料金:</strong> Cloud Storage (データセット保存)</li>
+        </ul>
+      </div>
+      <p style="margin-top: 8px;">料金の詳細は公式料金ページを参照してください。</p>
+      <ul style="margin-top: 8px; padding-left: 20px; font-size: 14px;">
+        <li><a href="https://cloud.google.com/translate/pricing" target="_blank" class="gc-link">Cloud Translation 料金</a></li>
+        <li><a href="https://cloud.google.com/vertex-ai/generative-ai/pricing#model-tuning" target="_blank" class="gc-link">Vertex AI Generative AI 料金 (Translation Model Tuning)</a></li>
+      </ul>
+    </div>
+
+    <!-- Regions -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <div class="card">
+        <h4>チューニングジョブ</h4>
+        <p><span class="region-badge">us-central1</span> のみ</p>
+      </div>
+      <div class="card">
+        <h4>Translation LLM (推論)</h4>
+        <p>Cloud Translation - Advanced API が利用可能なリージョンで実行可能</p>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="related-grid">
+        <div class="related-card">
+          <h4>Adaptive Translation</h4>
+          <p>Translation LLM の軽量なリアルタイムカスタマイズ機能。少数の翻訳例を使ってスタイルや用語を調整。ファインチューニングよりも手軽だが大規模ドメイン適応には不向き。</p>
+        </div>
+        <div class="related-card">
+          <h4>NMT カスタマイズ (AutoML Translation)</h4>
+          <p>Neural Machine Translation モデルのカスタマイズ。Translation LLM よりもレイテンシが低いが、翻訳品質では Translation LLM に劣る。</p>
+        </div>
+        <div class="related-card">
+          <h4>Glossary</h4>
+          <p>特定の用語の翻訳を制御する辞書機能。ファインチューニングと併用することで、用語の一貫性をさらに高められる。</p>
+        </div>
+        <div class="related-card">
+          <h4>Vertex AI Studio</h4>
+          <p>ファインチューニングジョブの作成・管理・モニタリングを GUI で実行できるインターフェース。</p>
+        </div>
+        <div class="related-card">
+          <h4>Cloud Storage</h4>
+          <p>トレーニングデータセットの保存先として使用。us-central1 リージョンに配置推奨。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <p>今回のアップデートにより、Translation LLM が LoRA ベースの Supervised Fine-Tuning をサポートし、ドメイン固有の翻訳品質を大幅に向上させる手段が提供されました。法律、医療、金融、テクノロジーなどの専門分野で高品質な翻訳を必要とする組織にとって、翻訳後の人手修正コストの削減とコンテンツの多言語展開の迅速化が期待できます。</p>
+      <div class="note-box" style="margin-top: 16px;">
+        <strong>💡 推奨アクション:</strong> まずは Adaptive Translation や Glossary と比較しながら自社のユースケースに最適なカスタマイズ手法を選定し、100 件程度の高品質なトレーニングデータから試験的にファインチューニングを開始することを推奨します。
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>📎 出典・参考リンク:</strong></p>
+      <ul>
+        <li><a href="https://cloud.google.com/release-notes#February_24_2026" target="_blank">公式リリースノート</a></li>
+        <li><a href="https://cloud.google.com/translate/docs/translation-llm" target="_blank">Translation LLM ドキュメント</a></li>
+        <li><a href="https://cloud.google.com/vertex-ai/generative-ai/docs/models/translation-use-supervised-tuning" target="_blank">Supervised Fine-Tuning ガイド</a></li>
+        <li><a href="https://cloud.google.com/vertex-ai/generative-ai/docs/models/translation-supervised-tuning-prepare" target="_blank">データセット準備ガイド</a></li>
+        <li><a href="https://cloud.google.com/vertex-ai/generative-ai/docs/models/translation-supervised-tuning" target="_blank">Supervised Fine-Tuning 概要</a></li>
+        <li><a href="https://cloud.google.com/translate/docs/advanced/compare-models" target="_blank">モデル比較ガイド</a></li>
+        <li><a href="https://cloud.google.com/translate/docs/advanced/custom-translations" target="_blank">カスタム翻訳の概要</a></li>
+        <li><a href="https://cloud.google.com/translate/pricing" target="_blank">Cloud Translation 料金</a></li>
+      </ul>
+      <p style="margin-top: 12px; font-size: 11px; color: #9AA0A6;">Generated on 2026-02-24 | Google Cloud News Infographic</p>
+    </footer>
+
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

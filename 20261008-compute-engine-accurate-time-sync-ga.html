@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Compute Engine: 高精度時刻同期 (Accurate Time) が GA</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 10px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    /* フロー図スタイル */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* チェックリストスタイル */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+    }
+
+    /* コードブロック (Mermaid の pre は除外) */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block {
+      overflow: hidden;
+      padding: 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code),
+    .card code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブルスタイル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* 統計カード */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 20px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 20px 0;
+    }
+
+    .before-col, .after-col {
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-col {
+      background: var(--gc-red-tint);
+      border: 1px solid rgba(234, 67, 53, 0.3);
+    }
+
+    .after-col {
+      background: var(--gc-green-tint);
+      border: 1px solid rgba(52, 168, 83, 0.3);
+    }
+
+    .before-col h3, .after-col h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-col h3 { color: var(--gc-red); }
+    .after-col h3 { color: var(--gc-green); }
+
+    .before-col ul, .after-col ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-col li, .after-col li {
+      margin: 8px 0;
+    }
+
+    @media (max-width: 700px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+      h1 { font-size: 26px; }
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-100);
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-800);
+      font-size: 16px;
+    }
+
+    .usecase p {
+      margin: 8px 0;
+      font-size: 14px;
+    }
+
+    /* 2 カラムグリッド */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 700px) {
+      .two-col {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    ul {
+      padding-left: 24px;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <div style="margin-bottom: 8px;">
+          <span class="badge">☁️ Compute Engine</span>
+          <span class="badge badge-ga">✅ GA (一般提供)</span>
+        </div>
+        <h1>⏱️ 高精度時刻同期 (Accurate Time) が GA</h1>
+        <div class="subtitle">chrony + ptp_kvm によるホストクロック同期で 1 ms 以内の精度を目標</div>
+      </div>
+      <div class="subtitle">📅 リリース日: 2026-10-08</div>
+    </div>
+
+    <!-- 統計 -->
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-value">1 ms 以内</div>
+        <div class="stat-label">目標とする時刻同期精度</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">全リージョン</div>
+        <div class="stat-label">すべての標準的な公開リージョン・ゾーンで利用可能</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">4 シリーズ</div>
+        <div class="stat-label">対応マシンタイプ C3 / C4 / C3D / C4D</div>
+      </div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📝 概要</h2>
+      <p>
+        Compute Engine VM のシステムクロックを<span class="highlight">ホストサーバーのクロックと直接同期</span>する「高精度時刻同期 (Accurate Time)」が GA になりました。
+        chrony と Linux カーネルの <code>ptp_kvm</code> モジュールを組み合わせ、ネットワーク経由の NTP を介さずにホストの高精度クロックを参照することで、<span class="highlight">1 ms 以内の精度を目標</span>とした時刻同期を実現します。
+      </p>
+      <p>
+        金融取引、分散データベース、ログの時系列相関分析など、イベントの正確な順序付けやタイムスタンプの監査可能性が重要なワークロードを運用する <strong>Solutions Architect、SRE、金融・分散システムの開発者</strong>が主な対象です。
+      </p>
+
+      <div class="before-after">
+        <div class="before-col">
+          <h3>❌ Before (従来の NTP ベース同期)</h3>
+          <ul>
+            <li>ネットワーク遅延や仮想化レイヤーの変動により、ミリ秒未満の厳密な精度保証が困難</li>
+            <li>ライブマイグレーション後、NTP のポーリング間隔に起因してクロックのずれが拡大することがあった</li>
+            <li>VM クロックの UTC 精度を監視・監査する標準的な仕組みを自前で構築する必要があった</li>
+          </ul>
+        </div>
+        <div class="after-col">
+          <h3>✅ After (高精度時刻同期 GA)</h3>
+          <ul>
+            <li><code>ptp_kvm</code> 経由でホストクロックを直接参照し、変動の影響を受けにくい <strong>1 ms 以内目標</strong>の同期が GA に</li>
+            <li>すべての標準的な公開リージョン・ゾーンで本番ワークロードに適用可能</li>
+            <li><code>nanosecond_accuracy</code> 指標 + chrony ログで UTC トレーサビリティを Cloud Monitoring で可視化</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Host["🖥️ Google Cloud ホストサーバー"]
+        HC["⏱️ ホストクロック<br/>(UTC にトレーサブル / うるう秒スメアリング済み)"]
+    end
+
+    subgraph VM["☁️ Compute Engine VM"]
+        PTP["🔌 ptp_kvm カーネルモジュール<br/>(/dev/ptp_kvm)"]
+        CHRONY["🔄 chrony<br/>(refclock PHC poll -1)"]
+        CLOCK["🕐 VM システムクロック<br/>(精度 1 ms 以内を目標)"]
+        LOG[("📝 tracking.log")]
+        OPS["📡 Ops Agent"]
+    end
+
+    MON["📊 Cloud Monitoring<br/>精度ダッシュボード"]
+
+    HC -- "クロスタイムスタンプ提供" --> PTP
+    PTP -- "PHC 参照クロックとして供給" --> CHRONY
+    CHRONY -- "同期" --> CLOCK
+    CHRONY -- "精度記録" --> LOG
+    LOG --> OPS
+    OPS -- "ログベース指標" --> MON
+    HC -. "nanosecond_accuracy 指標" .-> MON
+        </pre>
+      </div>
+      <p style="font-size: 14px;">
+        ホストクロックが <code>ptp_kvm</code> を通じて VM に供給され、chrony がそれを参照クロック (PHC) として VM のシステムクロックを同期します。精度は chrony のトラッキングログと Google Cloud 指標を組み合わせて Cloud Monitoring で監視できます。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>🚀 主要機能</h2>
+
+      <div class="card">
+        <h3>1️⃣ ptp_kvm によるホストクロック直接参照</h3>
+        <p style="font-size: 14px; margin: 0;">
+          VM がプラットフォーム提供クロックと VM CPU クロック (サイクルカウンター) のクロスタイムスタンプを読み取る仕組み。ネットワークや仮想化レイヤーの変動の影響を受けにくく、NTP よりも安定した同期が可能。chrony の設定に <code>refclock PHC /dev/ptp_kvm poll -1</code> を追加して利用します。
+        </p>
+      </div>
+
+      <div class="card">
+        <h3>2️⃣ 1 ms 以内の精度を目標とした設計</h3>
+        <p style="font-size: 14px; margin: 0;">
+          サポートされる構成において、VM クロックとホストクロックの誤差が <strong>1 ms 以内</strong>となるよう設計。Google のクロックは<span class="highlight">うるう秒スメアリング</span>を行っているため、タイムスタンプの逆行 (リピート) を避けられます。
+        </p>
+      </div>
+
+      <div class="card">
+        <h3>3️⃣ 時刻精度の監視・監査</h3>
+        <p style="font-size: 14px; margin: 0;">
+          chrony のトラッキングログ (<code>/var/log/chrony/tracking.log</code>) を Ops Agent で収集してログベース指標を作成。ホストクロックの UTC 精度を示す指標 <code>instance/clock_accuracy/ptp_kvm/nanosecond_accuracy</code> と組み合わせ、VM クロックの <strong>UTC トレーサビリティ</strong>をダッシュボードで可視化できます。
+        </p>
+      </div>
+
+      <div class="card">
+        <h3>4️⃣ 全標準リージョン・ゾーンでの GA</h3>
+        <p style="font-size: 14px; margin: 0;">
+          サポート対象のマシンタイプと OS において、<strong>すべての標準的な公開 Google Cloud リージョン・ゾーン</strong>で利用可能。本番環境への導入に適した GA ステータスです。
+        </p>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>⚙️ 技術仕様</h2>
+
+      <h3>🔄 NTP と高精度時刻同期 (PTP ベース) の比較</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>NTP (従来のデフォルト)</th>
+            <th>高精度時刻同期 (今回 GA)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>時刻ソース</strong></td>
+            <td>メタデータサーバー (<code>metadata.google.internal</code>)</td>
+            <td>ホストクロック (<code>/dev/ptp_kvm</code>)</td>
+          </tr>
+          <tr>
+            <td><strong>同期経路</strong></td>
+            <td>ネットワーク経由 (NTP プロトコル)</td>
+            <td>ハイパーバイザー経由のクロスタイムスタンプ</td>
+          </tr>
+          <tr>
+            <td><strong>精度</strong></td>
+            <td>ネットワーク遅延に依存</td>
+            <td>1 ms 以内を目標とした設計</td>
+          </tr>
+          <tr>
+            <td><strong>うるう秒処理</strong></td>
+            <td>Google NTP のスメアリング</td>
+            <td>ホストクロック側でスメアリング済み</td>
+          </tr>
+          <tr>
+            <td><strong>精度の監視</strong></td>
+            <td>標準的な仕組みなし</td>
+            <td>chrony ログ + Cloud Monitoring 指標</td>
+          </tr>
+          <tr>
+            <td><strong>設定</strong></td>
+            <td>デフォルトで有効</td>
+            <td>chrony + ptp_kvm の構成が必要</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="two-col">
+        <div>
+          <h3>🖥️ サポート対象マシンタイプ</h3>
+          <table>
+            <thead>
+              <tr><th>シリーズ</th><th>マシンタイプ</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>汎用 (Intel)</td><td>C3、C4</td></tr>
+              <tr><td>汎用 (AMD)</td><td>C3D、C4D</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <h3>🐧 サポート対象 OS (主なもの)</h3>
+          <table>
+            <thead>
+              <tr><th>OS</th><th>バージョン</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>CentOS Stream</td><td>9</td></tr>
+              <tr><td>Container-Optimized OS</td><td>COS 105 / 109 / 113 / 117 LTS</td></tr>
+              <tr><td>Debian</td><td>11 (Bullseye)、12 (Bookworm)</td></tr>
+              <tr><td>Fedora Cloud</td><td>39</td></tr>
+              <tr><td>RHEL</td><td>8、9 (SAP HA イメージ含む)</td></tr>
+              <tr><td>Rocky Linux</td><td>8、9</td></tr>
+              <tr><td>SLES</td><td>15 (BYOS / SAP イメージ含む)</td></tr>
+              <tr><td>Ubuntu</td><td>22.04 LTS、24.04 LTS</td></tr>
+              <tr><td>Ubuntu Pro</td><td>20.04 LTS</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🔧 設定方法</h2>
+
+      <h3>📋 前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>サポート対象のマシンタイプ (C3、C4、C3D、C4D) とサポート対象 OS を使用した VM であること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>時刻精度の監視を行う場合、VM のサービスアカウントに <code>roles/monitoring.metricWriter</code> と <code>roles/logging.logWriter</code> が付与されていること</span></div>
+
+      <div class="flow-diagram">
+        <div class="flow-step">1️⃣ chrony を<br/>ptp_kvm で構成</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">2️⃣ Ops Agent で<br/>精度ログ収集</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">3️⃣ 同期状態の<br/>確認</div>
+      </div>
+
+      <h3>ステップ 1: chrony を ptp_kvm の参照クロックとして構成</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">chrony + ptp_kvm の設定</span>
+        </div>
+        <pre><code class="language-bash"># ptp_kvm カーネルモジュールをロード (起動時にも自動ロード)
+/sbin/modprobe ptp_kvm
+echo "ptp_kvm" > /etc/modules-load.d/ptp_kvm.conf
+
+# NTP サーバー設定を無効化 (混在によるクロック精度低下を防止)
+sed -i '/^server /d' /etc/chrony/chrony.conf
+sed -i '/^pool /d' /etc/chrony/chrony.conf
+
+# ホストクロックはうるう秒スメアリング済みのため leapsectz を無効化
+sed "s/^leapsectz/#leapsectz/" -i /etc/chrony/chrony.conf
+
+# PTP-KVM ベースの参照クロックとトラッキングログを設定
+echo "refclock PHC /dev/ptp_kvm poll -1" >> /etc/chrony/chrony.conf
+echo "log tracking" >> /etc/chrony/chrony.conf
+
+# chrony を再起動
+systemctl restart chronyd</code></pre>
+      </div>
+      <div class="warning-box">
+        <strong>⚠️ 注意:</strong> NTP サーバーを併用すると、ライブマイグレーションイベント後などにクロック同期へ悪影響を与える可能性があるため、公式手順では NTP ソースを削除し ptp_kvm のみを時刻ソースとします。
+      </div>
+
+      <h3>ステップ 2: Ops Agent で精度ログを収集 (監視を行う場合)</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">YAML</span>
+          <span class="code-title">/etc/google-cloud-ops-agent/config.yaml</span>
+        </div>
+        <pre><code class="language-yaml">logging:
+  receivers:
+    chrony_tracking_receiver:
+      type: files
+      include_paths:
+        - /var/log/chrony/tracking.log
+  processors:
+    chrony_tracking_processor:
+      type: parse_regex
+      regex: "^.*PHC0.* (?&lt;max_error&gt;[-\\d\\.eE]+)$"
+  service:
+    pipelines:
+      chrony_tracking_pipeline:
+        receivers: [chrony_tracking_receiver]
+        processors: [chrony_tracking_processor]</code></pre>
+      </div>
+      <p style="font-size: 14px;">
+        Ops Agent 設定後、プロジェクトでログベース指標とダッシュボードを作成するスクリプト (公式ドキュメント参照) を実行すると、VM クロックの UTC トレーサビリティを可視化できます。
+      </p>
+
+      <h3>ステップ 3: 同期状態の確認</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">同期状態の確認コマンド</span>
+        </div>
+        <pre><code class="language-bash">chronyc sources
+chronyc sourcestats</code></pre>
+      </div>
+      <div class="success-box">
+        <strong>✅ 確認ポイント:</strong> <code>PHC0</code> (ptp_kvm) が時刻ソースとして表示され、オフセットが小さい値で安定していれば設定は成功です。
+      </div>
+    </div>
+
+    <!-- メリット / デメリット -->
+    <div class="section">
+      <h2>⚖️ メリットと制約事項</h2>
+
+      <div class="two-col">
+        <div>
+          <h3>💼 ビジネス面のメリット</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>規制・監査要件への対応</strong>: 金融取引など、タイムスタンプの精度とトレーサビリティが規制上要求されるワークロードを構築しやすい</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>GA による本番適用</strong>: SLA を重視する本番システムへ安心して導入できる</span></div>
+
+          <h3>🔬 技術面のメリット</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>高精度かつ安定した同期</strong>: ネットワーク変動や仮想化オーバーヘッドの影響を受けにくい</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>タイムスタンプの単調性</strong>: うるう秒スメアリングにより逆行・重複を回避</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>精度の可観測性</strong>: 時刻精度そのものを継続的に監視・証明できる</span></div>
+        </div>
+        <div>
+          <h3>🚧 制限事項</h3>
+          <div class="check-item"><span class="cross-icon">✗</span><span>サポート対象マシンタイプは C3、C4、C3D、C4D に限られる (N 系や E2 などは対象外)</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>サポート対象 OS が限定されており、対象外の OS・イメージでは利用不可</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>デフォルトでは有効にならず、VM ごとに chrony と ptp_kvm の構成が必要</span></div>
+
+          <h3>🤔 考慮すべき点</h3>
+          <div class="check-item"><span class="arrow">→</span><span>NTP との精度比較を行う場合は、変更を加えない chrony の 2 つ目のインスタンスを別途実行する必要がある</span></div>
+          <div class="check-item"><span class="arrow">→</span><span>うるう秒はホスト側でスメアリングされるため、chrony の <code>leapsectz</code> は無効化が必要</span></div>
+          <div class="check-item"><span class="arrow">→</span><span>外部システムとの時刻整合には Google Public NTP を利用するなど、スメアリング方式の混在を避ける設計が必要</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>💹 ユースケース 1: 金融取引システムのタイムスタンプ精度確保</h3>
+        <p><strong>シナリオ</strong>: 証券取引や決済処理において、約定イベントの正確な順序付けと、規制対応のためのタイムスタンプ監査証跡が求められる。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">C4 インスタンスで高精度時刻同期を構成</span>
+          </div>
+          <pre><code class="language-bash"># C4 インスタンスで高精度時刻同期を構成し、
+# Cloud Monitoring ダッシュボードで精度を常時監視
+gcloud compute instances create trading-vm \
+  --machine-type=c4-standard-8 \
+  --image-family=debian-12 --image-project=debian-cloud \
+  --metadata-from-file=startup-script=configure-time-sync.sh</code></pre>
+        </div>
+        <p><strong>効果</strong>: 1 ms 以内を目標とした精度でイベントを時刻順に記録でき、クロック精度の監視データを監査証跡として活用できる。</p>
+      </div>
+
+      <div class="usecase">
+        <h3>🗄️ ユースケース 2: 分散データベース・分散システムの整合性向上</h3>
+        <p><strong>シナリオ</strong>: 複数ノードにまたがる分散データベースで、タイムスタンプベースの順序付け (コミットタイムスタンプなど) に依存しており、ノード間のクロックずれが整合性やパフォーマンスに影響する。</p>
+        <p><strong>効果</strong>: 各ノードのクロックがホストクロック経由で高精度に同期されることで、クロック不確実性のマージンを小さくでき、トランザクション順序付けの信頼性が向上する。</p>
+      </div>
+
+      <div class="usecase">
+        <h3>🔍 ユースケース 3: マイクロサービスのログ相関・分散トレーシング</h3>
+        <p><strong>シナリオ</strong>: 多数の VM にまたがるマイクロサービスの障害調査で、サービス間のログをタイムスタンプで突き合わせてイベントの因果関係を特定したい。</p>
+        <p><strong>効果</strong>: VM 間のクロックずれが 1 ms 以内を目標に抑えられるため、ログの時系列相関の精度が上がり、障害の根本原因分析が容易になる。</p>
+      </div>
+    </div>
+
+    <!-- 料金・リージョン -->
+    <div class="section">
+      <h2>💰 料金と利用可能リージョン</h2>
+      <div class="note-box">
+        <strong>💡 料金:</strong> 高精度時刻同期の機能自体に対する個別の料金は記載されていません。VM の料金 (サポート対象マシンタイプ C3 / C4 / C3D / C4D) と、監視に Ops Agent / Cloud Monitoring を利用する場合の料金が適用されます。
+      </div>
+      <ul style="font-size: 14px;">
+        <li><a href="https://cloud.google.com/compute/all-pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Compute Engine の料金</a></li>
+        <li><a href="https://cloud.google.com/stackdriver/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Google Cloud Observability の料金</a></li>
+      </ul>
+      <div class="success-box">
+        <strong>🌏 利用可能リージョン:</strong> サポート対象のマシンタイプと OS において、<strong>すべての標準的な公開 Google Cloud リージョンとゾーン</strong>でサポートされています。
+      </div>
+    </div>
+
+    <!-- 関連サービス -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Cloud Monitoring / Ops Agent</strong>: chrony のトラッキングログを収集してログベース指標を作成し、<code>instance/clock_accuracy/ptp_kvm/nanosecond_accuracy</code> 指標と組み合わせて時刻精度ダッシュボードを構築</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Google Kubernetes Engine (GKE)</strong>: ノードのシステム構成カスタマイズ (DaemonSet / node system config) により、GKE ノードにも同様の時刻同期設定を適用可能</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Google Public NTP</strong>: Google Cloud 外部のシステムをスメアリング済み時刻に同期させる場合に利用し、スメアリング方式の混在を回避</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>超低遅延 (ULL) ソリューション</strong>: さらに高い精度が必要な金融向けワークロードでは、NIC の PTP ハードウェアクロックを利用する専用構成も提供</span></div>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>🎯 まとめ</h2>
+      <p>
+        Compute Engine の高精度時刻同期が GA となり、chrony と ptp_kvm によるホストクロック同期で <span class="highlight">1 ms 以内を目標とした時刻精度</span>を、すべての標準リージョン・ゾーンの本番環境で利用できるようになりました。
+      </p>
+      <div class="note-box">
+        <strong>💡 推奨アクション:</strong> 金融取引、分散データベース、ログ相関分析など時刻精度が重要なワークロードを運用している場合は、まず C3 / C4 系インスタンスとサポート対象 OS で構成を検証し、Cloud Monitoring による精度監視とあわせて導入を検討することを推奨します。
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p><strong>📎 出典 / 参考リンク</strong></p>
+      <ul style="padding-left: 20px; margin: 8px 0;">
+        <li>レポート: <a href="https://github.com/takech9203/google-cloud-news-summary/blob/main/reports/2026/2026-10-08-compute-engine-accurate-time-sync-ga.md" target="_blank" rel="noopener noreferrer" class="gc-link">reports/2026/2026-10-08-compute-engine-accurate-time-sync-ga.md</a></li>
+        <li>公式リリースノート: <a href="https://docs.cloud.google.com/release-notes#October_08_2026" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/release-notes#October_08_2026</a></li>
+        <li>Configure accurate time for Compute Engine VMs: <a href="https://docs.cloud.google.com/compute/docs/instances/time-synchronization/configure-time-sync" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/compute/docs/instances/time-synchronization/configure-time-sync</a></li>
+        <li>Configure NTP on a VM: <a href="https://docs.cloud.google.com/compute/docs/instances/time-synchronization/configure-ntp" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/compute/docs/instances/time-synchronization/configure-ntp</a></li>
+        <li>Compute Engine の料金: <a href="https://cloud.google.com/compute/all-pricing" target="_blank" rel="noopener noreferrer" class="gc-link">https://cloud.google.com/compute/all-pricing</a></li>
+      </ul>
+      <p>🏷️ タグ: Compute Engine, 時刻同期, chrony, ptp_kvm, PTP, NTP, GA, 金融, 分散システム, Cloud Monitoring</p>
+      <p>生成日: 2026-10-10 | このインフォグラフィックは Google Cloud News レポートから自動生成されました。</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

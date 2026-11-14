@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Hypercomputer: RoCE VPC で MRDMA vNIC へのエイリアス IP レンジ割り当てをサポート</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--gc-outline);
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-teal {
+      border-left-color: var(--gc-teal);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-preview {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-orange);
+    }
+
+    .badge-service {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-teal);
+    }
+
+    /* Before/After */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h4 {
+      color: var(--gc-red);
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box h4 {
+      color: var(--gc-green);
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .before-box ul, .after-box ul {
+      margin: 0;
+      padding-left: 16px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin-bottom: 6px;
+    }
+
+    /* Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.teal {
+      background: linear-gradient(135deg, var(--gc-teal), #00838F);
+    }
+
+    .stat-card.purple {
+      background: linear-gradient(135deg, var(--gc-purple), #7B1FA2);
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    /* Flow diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Mermaid */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* Code blocks */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      background: #1E1E1E;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      color: #E8E8E8;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Use case */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-900);
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .usecase-card p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    /* Note/Warning boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Related services */
+    .related-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .related-item {
+      background: var(--gc-surface);
+      border-radius: 8px;
+      padding: 16px;
+      border: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    .related-item strong {
+      color: var(--gc-on-surface);
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    /* Footer */
+    footer {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    footer ul {
+      list-style: none;
+      padding: 0;
+      margin: 8px 0;
+    }
+
+    footer li {
+      margin-bottom: 4px;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; }
+      .subtitle { text-align: left; margin-top: 8px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .related-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>🌐 AI Hypercomputer: RoCE VPC で MRDMA vNIC へのエイリアス IP レンジ割り当てをサポート</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge-preview">Preview</span>
+          <span class="badge-service">AI Hypercomputer</span>
+          <span class="badge-service">VPC</span>
+          <span class="badge">Networking</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-06-22</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>Google Cloud の AI Hypercomputer 向け <span class="highlight">RoCE (RDMA over Converged Ethernet) VPC ネットワーク</span> において、VM インスタンスの <span class="highlight">MRDMA vNIC にエイリアス IP レンジを割り当てる機能</span> が Preview として利用可能になりました。</p>
+      <p>GPU クラスタ内の RDMA 通信において、より柔軟な IP アドレス管理とネットワーク構成が可能になります。A3 Ultra、A4、A4X などの GPU アクセラレータ最適化マシンタイプで使用される RoCE VPC ネットワークに適用されます。</p>
+
+      <!-- Before/After -->
+      <h3>Before / After 比較</h3>
+      <div class="before-after">
+        <div class="before-box">
+          <h4>&#x274C; アップデート前</h4>
+          <ul>
+            <li>MRDMA vNIC にはプライマリ IP のみ割り当て可能</li>
+            <li>追加 IP が必要な場合は別途 NIC を追加</li>
+            <li>コンテナ/ポッドへの個別 IP 割り当てが制限</li>
+            <li>RDMA ネットワーク上のマルチテナント分離が困難</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h4>&#x2705; アップデート後</h4>
+          <ul>
+            <li>1 つの NIC で複数の IP アドレスを使用可能</li>
+            <li>IPVLAN L2 モードで名前空間ベースの分離を実現</li>
+            <li>GKE ポッド IP 管理が柔軟に</li>
+            <li>アンチスプーフィングによるセキュリティ自動適用</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value">8,896</div>
+        <div class="stat-label">MTU バイト (デフォルト)</div>
+      </div>
+      <div class="stat-card teal">
+        <div class="stat-value">20,000</div>
+        <div class="stat-label">最大接続数 (2-tuple)</div>
+      </div>
+      <div class="stat-card purple">
+        <div class="stat-value">3 種</div>
+        <div class="stat-label">対応マシンタイプ (A3 Ultra/A4/A4X)</div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>RoCE VPC ネットワーク内で MRDMA vNIC にエイリアス IP レンジを割り当て、IPVLAN L2 モードを使用して名前空間内のコンテナに RDMA 接続を提供する構成を示しています。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph VPC["RoCE VPC Network (roce profile)"]
+        subgraph Subnet1["Subnet A (Primary: 10.0.0.0/24)"]
+            direction LR
+        end
+        subgraph Subnet2["Subnet B (Secondary: 172.16.0.0/20)"]
+            direction LR
+        end
+    end
+
+    subgraph VM["GPU VM Instance (A3 Ultra / A4 / A4X)"]
+        NIC0["nic0 (gVNIC) Regular VPC"]
+        MRDMA1["MRDMA vNIC 1 Primary IP: 10.0.0.2 Alias IP: 172.16.0.0/27"]
+        MRDMA2["MRDMA vNIC 2 Primary IP: 10.0.0.3 Alias IP: 172.16.0.32/27"]
+        GPU["NVIDIA GPUs (H200/B200/GB200)"]
+    end
+
+    subgraph NS["Network Namespace (Pod/Container)"]
+        IPVLAN["IPVLAN L2 Interface 172.16.0.1/32"]
+        RDMA_APP["RDMA Application (NCCL Collective)"]
+    end
+
+    MRDMA1 --> Subnet1
+    MRDMA2 --> Subnet1
+    MRDMA1 -.->|"Alias IP Range"| Subnet2
+    GPU -->|"PCIe/NVLink"| MRDMA1
+    GPU -->|"PCIe/NVLink"| MRDMA2
+    MRDMA1 -->|"IPVLAN L2"| IPVLAN
+    IPVLAN --> RDMA_APP
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>&#x2B50; 主要機能</h2>
+
+      <div class="card">
+        <h3>1. MRDMA vNIC へのエイリアス IP レンジ割り当て</h3>
+        <ul>
+          <li>RoCE VPC ネットワーク (<code>roce</code> プロファイル) の MRDMA NIC にエイリアス IP アドレスを設定可能</li>
+          <li>プライマリ CIDR レンジまたはセカンダリ CIDR レンジからエイリアス IP を割り当て可能</li>
+          <li><code>/32</code> の単一 IP から <code>/24</code> などのレンジまで柔軟に指定可能</li>
+        </ul>
+      </div>
+
+      <div class="card card-teal">
+        <h3>2. IPVLAN L2 モードによる名前空間分離</h3>
+        <ul>
+          <li>エイリアス IP を使用して IPVLAN L2 インターフェースを作成し、ネットワーク名前空間 (Pod/コンテナ) に RDMA 接続を提供</li>
+          <li>ルートネームスペースまたは非ルートネームスペースの両方で RDMA デバイスを使用可能</li>
+        </ul>
+      </div>
+
+      <div class="card card-green">
+        <h3>3. アンチスプーフィングによるセキュリティ</h3>
+        <ul>
+          <li>エイリアス IP が設定されると Google Cloud が自動的にアンチスプーフィングチェックを実施</li>
+          <li>VM からのトラフィックが正当な送信元 IP アドレス (プライマリ IP またはエイリアス IP) を使用していることを検証</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Technical Specs -->
+    <div class="section">
+      <h2>&#x2699;&#xFE0F; 技術仕様</h2>
+
+      <h3>対応マシンタイプとネットワーク構成</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>対応ネットワークプロファイル</td>
+            <td><code>ZONE-vpc-roce</code> (VM インスタンス用)</td>
+          </tr>
+          <tr>
+            <td>非対応ネットワークプロファイル</td>
+            <td><code>ZONE-vpc-roce-metal</code> (ベアメタル用では非対応)</td>
+          </tr>
+          <tr>
+            <td>対応マシンタイプ</td>
+            <td>A3 Ultra (H200)、A4 (B200)、A4X (GB200)</td>
+          </tr>
+          <tr>
+            <td>NIC タイプ</td>
+            <td>MRDMA のみ</td>
+          </tr>
+          <tr>
+            <td>サブネットタイプ</td>
+            <td>IPv4 のみ (デュアルスタック/IPv6 非対応)</td>
+          </tr>
+          <tr>
+            <td>MTU</td>
+            <td>8896 バイト (デフォルト)</td>
+          </tr>
+          <tr>
+            <td>最大接続数</td>
+            <td>20,000 (2-tuple あたり)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>RoCE VPC ネットワークの機能サポート状況</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>機能</th>
+            <th>サポート状況</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>エイリアス IP レンジ</td>
+            <td>&#x2705; 対応</td>
+          </tr>
+          <tr>
+            <td>同一ネットワーク内マルチ NIC</td>
+            <td>&#x2705; 対応</td>
+          </tr>
+          <tr>
+            <td>外部 IP アドレス</td>
+            <td>&#x274C; 非対応</td>
+          </tr>
+          <tr>
+            <td>IP フォワーディング</td>
+            <td>&#x274C; 非対応</td>
+          </tr>
+          <tr>
+            <td>nic0 のアタッチ</td>
+            <td>&#x274C; 非対応</td>
+          </tr>
+          <tr>
+            <td>Dynamic NIC (サブインターフェース)</td>
+            <td>&#x274C; 非対応</td>
+          </tr>
+          <tr>
+            <td>ネットワーク移行</td>
+            <td>&#x274C; 非対応</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup -->
+    <div class="section">
+      <h2>&#x1F6E0;&#xFE0F; 設定方法</h2>
+
+      <h3>前提条件</h3>
+      <ul>
+        <li>RoCE VPC ネットワークの作成 (<code>roce</code> ネットワークプロファイルを使用)</li>
+        <li>対応するゾーンでの GPU マシンタイプの容量予約 (A3 Ultra / A4 / A4X)</li>
+        <li>セカンダリ CIDR レンジを持つサブネットの作成 (エイリアス IP 用)</li>
+      </ul>
+
+      <h3>ステップ 1: RoCE VPC ネットワークの作成</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">RoCE VPC ネットワーク作成</span>
+        </div>
+        <pre><code class="language-bash">gcloud compute networks create my-roce-network \
+    --subnet-mode=custom \
+    --network-profile=us-central1-b-vpc-roce</code></pre>
+      </div>
+
+      <h3>ステップ 2: セカンダリレンジ付きサブネットの作成</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">セカンダリレンジ付きサブネット作成</span>
+        </div>
+        <pre><code class="language-bash">gcloud compute networks subnets create my-roce-subnet \
+    --network=my-roce-network \
+    --range=10.0.0.0/24 \
+    --secondary-range=alias-range=172.16.0.0/20 \
+    --region=us-central1</code></pre>
+      </div>
+
+      <h3>ステップ 3: エイリアス IP 付きインスタンスの作成</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">エイリアス IP 付き GPU インスタンス作成</span>
+        </div>
+        <pre><code class="language-bash">gcloud compute instances create my-gpu-instance \
+    --zone=us-central1-b \
+    --machine-type=a3-ultragpu-8g \
+    --network-interface="subnet=my-roce-subnet,aliases=alias-range:172.16.0.0/27"</code></pre>
+      </div>
+
+      <h3>IPVLAN L2 モードでの名前空間構成</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">IPVLAN L2 名前空間構成</span>
+        </div>
+        <pre><code class="language-bash"># 1. ネットワーク名前空間を作成
+sudo ip netns add example_ns
+
+# 2. MRDMA NIC にリンクした IPVLAN L2 インターフェースを作成
+sudo ip link add gpu0rdma0_ipvlanl2 link gpu0rdma0 type ipvlan mode l2
+
+# 3. IPVLAN インターフェースを名前空間に移動
+sudo ip link set gpu0rdma0_ipvlanl2 netns example_ns
+
+# 4. 名前空間内のループバックインターフェースを起動
+sudo ip netns exec example_ns ip link set lo up
+
+# 5. エイリアス IP アドレスを割り当て (/32 はポイントツーポイントとして使用)
+sudo ip netns exec example_ns ip addr add 172.16.1.0/32 dev gpu0rdma0_ipvlanl2
+
+# 6. インターフェースを有効化
+sudo ip netns exec example_ns ip link set gpu0rdma0_ipvlanl2 up
+
+# 7. 確認
+sudo ip netns exec example_ns ip addr show gpu0rdma0_ipvlanl2</code></pre>
+      </div>
+    </div>
+
+    <!-- Merits -->
+    <div class="section">
+      <h2>&#x1F4C8; メリット</h2>
+
+      <h3>ビジネス面</h3>
+      <div class="card card-green">
+        <p><strong>&#x2705; 運用効率の向上</strong></p>
+        <p>1 つの NIC で複数の IP アドレスを管理できるため、ネットワーク構成がシンプルになり、運用コストが削減される。</p>
+      </div>
+      <div class="card card-green">
+        <p><strong>&#x2705; マルチテナント対応の強化</strong></p>
+        <p>エイリアス IP を使用した名前空間分離により、複数のワークロードを安全に同一クラスタ上で実行可能。</p>
+      </div>
+
+      <h3>技術面</h3>
+      <div class="card card-teal">
+        <p><strong>&#x26A1; 柔軟な IP 管理</strong></p>
+        <p>コンテナオーケストレータがエイリアス IP を活用して RDMA ネットワーク上のポッドに IP を動的に割り当て可能。</p>
+      </div>
+      <div class="card card-teal">
+        <p><strong>&#x1F512; セキュリティ強化</strong></p>
+        <p>IP フォワーディングを有効にせずにエイリアス IP によるトラフィックルーティングが可能。アンチスプーフィングチェックが自動適用される。</p>
+      </div>
+      <div class="card card-teal">
+        <p><strong>&#x1F680; NCCL との統合</strong></p>
+        <p>RDMA 通信で使用される NCCL (NVIDIA Collective Communications Library) と組み合わせて、名前空間内から直接 GPU-to-GPU 通信が可能。</p>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>&#x26A0;&#xFE0F; デメリット・制約事項</h2>
+
+      <div class="warning-box">
+        <strong>&#x26A0;&#xFE0F; 制限事項</strong>
+        <ul>
+          <li>Preview ステータスのため、本番ワークロードでの使用は推奨されない (SLA 対象外)</li>
+          <li>RoCE VPC ネットワーク (VM インスタンス用) のみ対応。ベアメタルインスタンス用 (<code>roce-metal</code>) では非対応</li>
+          <li>1 つの RoCE VPC ネットワークあたり最大 20,000 接続 (2-tuple ベース) の制限あり</li>
+          <li>外部 IP アドレスは割り当て不可 (インターネットアクセスには別途 nic0 経由が必要)</li>
+          <li>IPv4 のみ対応 (IPv6/デュアルスタック非対応)</li>
+        </ul>
+      </div>
+
+      <div class="note-box">
+        <strong>&#x1F4A1; 考慮すべき点</strong>
+        <ul>
+          <li>同一 RoCE VPC 内に複数の MRDMA NIC を配置するとレイテンシが増加する可能性がある (クロスレール通信)</li>
+          <li>ゾーン制約あり: RoCE VPC ネットワーク内のリソースはネットワークプロファイルと同一ゾーンに限定される</li>
+          <li>IPVLAN L2 モードの設定はゲスト OS 内で手動 (またはスクリプト) で行う必要がある</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>&#x1F3AF; ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>&#x1F916; ユースケース 1: GKE 上の大規模 AI トレーニングクラスタ</h4>
+        <p><strong>シナリオ:</strong> 数百 GPU を使用した大規模言語モデル (LLM) のトレーニングにおいて、各トレーニングポッドに RDMA ネットワーク経由で通信可能な個別 IP アドレスを割り当てたい。</p>
+        <p><strong>効果:</strong> エイリアス IP レンジにより、GKE のポッドネットワーキングと RDMA を統合し、ポッドごとに RDMA 通信可能なエンドポイントを提供。NCCL AllReduce などの集合通信をポッドレベルで実行可能になる。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>&#x1F3E2; ユースケース 2: マルチテナント GPU クラスタの分離</h4>
+        <p><strong>シナリオ:</strong> 複数のチームが共有 GPU クラスタ上で異なるトレーニングジョブを実行する環境で、RDMA ネットワーク上のトラフィックをテナントごとに分離したい。</p>
+        <p><strong>効果:</strong> エイリアス IP と名前空間分離を組み合わせることで、各テナントのワークロードが独自の RDMA エンドポイントを持ち、他テナントのトラフィックから論理的に分離される。</p>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#x1F517; 関連サービス・機能</h2>
+      <div class="related-grid">
+        <div class="related-item">
+          <strong>&#x2601;&#xFE0F; AI Hypercomputer</strong>
+          GPU クラスタのプロビジョニングと管理基盤。Hypercompute Cluster による大規模 GPU 環境のデプロイに対応。
+        </div>
+        <div class="related-item">
+          <strong>&#x1F4BB; Compute Engine</strong>
+          A3 Ultra、A4、A4X マシンタイプが RoCE VPC ネットワークの MRDMA NIC を使用。
+        </div>
+        <div class="related-item">
+          <strong>&#x2638;&#xFE0F; Google Kubernetes Engine</strong>
+          GPU ワークロードのオーケストレーション。エイリアス IP によるポッドネットワーキングとの統合。
+        </div>
+        <div class="related-item">
+          <strong>&#x1F6E1;&#xFE0F; Cloud NGFW for RoCE</strong>
+          RoCE VPC ネットワーク向けのリージョナルネットワークファイアウォールポリシー。
+        </div>
+        <div class="related-item">
+          <strong>&#x1F3AE; NVIDIA NCCL</strong>
+          GPU 間の集合通信ライブラリ。RDMA トランスポートを使用した高性能通信を実現。
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>&#x1F4DD; まとめ</h2>
+      <p>RoCE VPC ネットワークでの MRDMA vNIC へのエイリアス IP レンジ割り当てサポートは、AI/ML ワークロード向けの GPU クラスタにおけるネットワーク柔軟性を大幅に向上させる重要なアップデートです。</p>
+      <p>特に <span class="highlight">GKE 上でのコンテナ化された GPU ワークロード</span> や、<span class="highlight">マルチテナント環境での RDMA ネットワーク分離</span> において大きな価値を発揮します。</p>
+      <p>Preview 段階であるため、検証環境での評価を開始し、GA 時の本番適用に備えることを推奨します。</p>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>&#x1F4CE; 出典・参考リンク:</strong></p>
+      <ul>
+        <li><a href="https://docs.google.com/release-notes#June_22_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li><a href="https://docs.cloud.google.com/ai-hypercomputer/docs/create-rdma-network-profiles" target="_blank" rel="noopener noreferrer">RDMA network profiles</a></li>
+        <li><a href="https://docs.cloud.google.com/vpc/docs/alias-ip" target="_blank" rel="noopener noreferrer">Alias IP ranges overview</a></li>
+        <li><a href="https://docs.cloud.google.com/vpc/docs/create-vpc-network-rdma" target="_blank" rel="noopener noreferrer">Create a VPC network for RDMA NICs</a></li>
+        <li><a href="https://docs.cloud.google.com/vpc/docs/rdma-network-profiles" target="_blank" rel="noopener noreferrer">RDMA network profiles - Supported features</a></li>
+        <li><a href="https://docs.cloud.google.com/compute/docs/accelerator-optimized-machines" target="_blank" rel="noopener noreferrer">Accelerator-optimized machine types</a></li>
+      </ul>
+      <p style="margin-top: 12px; font-size: 11px; color: #9AA0A6;">Generated on 2026-06-22 | Google Cloud News Summary</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

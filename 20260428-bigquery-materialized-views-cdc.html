@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BigQuery: マテリアライズドビューが CDC 対応テーブルをサポート (GA)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 12px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-green);
+    }
+
+    .badge-service {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    /* Before/After comparison */
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 640px) {
+      .comparison {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .before {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .before h4 {
+      color: var(--gc-red);
+      margin: 0 0 12px 0;
+      font-size: 16px;
+    }
+
+    .after {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .after h4 {
+      color: var(--gc-green);
+      margin: 0 0 12px 0;
+      font-size: 16px;
+    }
+
+    .before ul, .after ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .before li, .after li {
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    /* Mermaid container */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Stats grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 640px) {
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Feature cards */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .feature-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .feature-card h4 {
+      margin: 0 0 8px 0;
+      color: var(--gc-on-surface);
+      font-size: 16px;
+    }
+
+    .feature-card p {
+      margin: 0;
+      font-size: 14px;
+      color: var(--gc-on-surface-variant);
+    }
+
+    /* Use case cards */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      margin: 0 0 8px 0;
+      color: var(--gc-blue-900);
+      font-size: 16px;
+    }
+
+    .usecase-card p {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      color: var(--gc-on-surface-variant);
+    }
+
+    /* Table styles */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    /* Code blocks */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      background: #1E1E1E;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    /* Inline code */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Warning/note boxes */
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Pricing section */
+    .pricing-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--gc-outline-variant);
+    }
+
+    .pricing-item:last-child {
+      border-bottom: none;
+    }
+
+    .pricing-icon {
+      font-size: 24px;
+      width: 40px;
+      text-align: center;
+    }
+
+    /* Related services */
+    .related-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 640px) {
+      .related-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .related-card {
+      background: var(--gc-surface);
+      border-radius: 8px;
+      padding: 16px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .related-card h4 {
+      margin: 0 0 4px 0;
+      font-size: 14px;
+      color: var(--gc-on-surface);
+    }
+
+    .related-card p {
+      margin: 0;
+      font-size: 13px;
+      color: var(--gc-on-surface-variant);
+    }
+
+    /* Links */
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    footer ul {
+      list-style: none;
+      padding: 0;
+      margin: 8px 0;
+    }
+
+    footer li {
+      margin-bottom: 6px;
+    }
+
+    /* Summary box */
+    .summary-box {
+      background: linear-gradient(135deg, var(--gc-blue-50), #FFFFFF);
+      border: 2px solid var(--gc-blue-200);
+      border-radius: 12px;
+      padding: 24px;
+      margin: 16px 0;
+    }
+
+    .summary-box p {
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.8;
+      color: var(--gc-on-surface-variant);
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>📊 BigQuery: マテリアライズドビューが CDC 対応テーブルをサポート</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge-service">BigQuery</span>
+          <span class="badge-ga">GA</span>
+          <span class="badge">Change Data Capture</span>
+          <span class="badge">Materialized Views</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-04-28</div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>🎯 概要</h2>
+      <p>BigQuery において、アクティブな <span class="highlight">Change Data Capture (CDC)</span> が有効化されたテーブル上にマテリアライズドビューを作成できるようになりました。CDC は Storage Write API を介してストリーミングされる UPSERT や DELETE 操作をリアルタイムで BigQuery テーブルに反映する仕組みです。</p>
+      <p>今回のアップデートにより、リアルタイムに変更が反映されるテーブルに対してもマテリアライズドビューを適用でき、<strong>事前集計によるクエリ高速化</strong>と<strong>データの鮮度</strong>を両立したリアルタイム分析基盤の構築が可能になりました。</p>
+
+      <!-- Before/After -->
+      <div class="comparison">
+        <div class="before">
+          <h4>❌ Before (アップデート前)</h4>
+          <ul>
+            <li>CDC テーブルにマテリアライズドビューを作成できなかった</li>
+            <li>毎回ベーステーブル全体をスキャンし、コストとレイテンシが増大</li>
+            <li>リアルタイム性とパフォーマンスの両立には別途 ETL パイプラインが必要</li>
+          </ul>
+        </div>
+        <div class="after">
+          <h4>✅ After (アップデート後)</h4>
+          <ul>
+            <li>CDC テーブル上に直接マテリアライズドビューを作成可能</li>
+            <li>事前集計・フィルタリングでコストとレイテンシを大幅削減</li>
+            <li>集計パイプラインが不要になりアーキテクチャが簡素化</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value">90%+</div>
+        <div class="stat-label">クエリコスト削減 (大量データ時)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">30分~3日</div>
+        <div class="stat-label">max_staleness 設定範囲</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">16列</div>
+        <div class="stat-label">複合プライマリキー上限</div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>CDC ストリームで更新されるベーステーブルに対し、マテリアライズドビューが自動リフレッシュによって事前集計データを維持し、低レイテンシな分析クエリを実現する構成です。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    subgraph データソース
+        A[("運用DB\n(PostgreSQL等)")]
+    end
+
+    subgraph BigQuery
+        B["Storage Write API\n(CDC ストリーム)"]
+        C[("CDC 対応テーブル\n(_CHANGE_TYPE: UPSERT/DELETE)")]
+        D["自動リフレッシュ"]
+        E[("マテリアライズドビュー\n(事前集計/フィルタリング)")]
+    end
+
+    subgraph 分析
+        F["BI ダッシュボード"]
+        G["アドホッククエリ"]
+    end
+
+    A -->|変更データストリーム| B
+    B -->|UPSERT/DELETE| C
+    C --> D
+    D -->|定期リフレッシュ| E
+    E --> F
+    E --> G
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <h4>📋 CDC テーブル上のマテリアライズドビュー作成</h4>
+          <p>アクティブな CDC が有効化されたテーブルをベーステーブルとしてマテリアライズドビューを定義可能。通常のテーブル上のマテリアライズドビューと同様に動作し、自動リフレッシュの恩恵を受けられます。</p>
+        </div>
+        <div class="feature-card">
+          <h4>🕐 max_staleness による鮮度制御</h4>
+          <p>マテリアライズドビューに <code>max_staleness</code> オプションを設定し、許容可能なデータの古さを制御。CDC テーブルの <code>max_staleness</code> 値の少なくとも 2 倍以上に設定する必要があります。ランタイムマージジョブを回避し、安定したパフォーマンスを確保します。</p>
+        </div>
+        <div class="feature-card">
+          <h4>🔄 自動リフレッシュとの統合</h4>
+          <p><code>enable_refresh = true</code> と <code>refresh_interval_minutes</code> を組み合わせて定期的な自動更新を設定。リフレッシュ間隔を <code>max_staleness</code> の範囲内に設定することで、常にキャッシュからの高速な応答を実現します。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specs -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+      <h3>マテリアライズドビューと CDC の構成要件</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ベーステーブル要件</td>
+            <td>Storage Write API のデフォルトストリームで CDC が有効</td>
+          </tr>
+          <tr>
+            <td>プライマリキー</td>
+            <td>ベーステーブルにプライマリキーの宣言が必要 (最大 16 列の複合キー対応)</td>
+          </tr>
+          <tr>
+            <td>max_staleness 設定</td>
+            <td>CDC テーブルの max_staleness の少なくとも 2 倍以上</td>
+          </tr>
+          <tr>
+            <td>max_staleness 範囲</td>
+            <td>30 分から 3 日の間</td>
+          </tr>
+          <tr>
+            <td>ランタイムマージジョブ</td>
+            <td>マテリアライズドビューでは実行不可</td>
+          </tr>
+          <tr>
+            <td>スマートチューニング</td>
+            <td>CDC 対応テーブル上のマテリアライズドビューでは非対応</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Configuration -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>前提条件</h3>
+      <div class="note-box">
+        <strong>必要な条件:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>ベーステーブルに CDC が有効化されていること (Storage Write API のデフォルトストリームで <code>_CHANGE_TYPE</code> を使用)</li>
+          <li>ベーステーブルにプライマリキーが宣言されていること</li>
+          <li><code>bigquery.tables.create</code> 権限を持つ IAM ロール (BigQuery Data Editor 以上)</li>
+        </ul>
+      </div>
+
+      <h3>ステップ 1: CDC 対応テーブルの確認</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">プライマリキーと CDC 設定を確認</span>
+        </div>
+        <pre><code class="language-sql">-- テーブルのプライマリキーとCDC設定を確認
+SELECT
+  table_name,
+  constraint_type,
+  column_name
+FROM my_project.my_dataset.INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+JOIN my_project.my_dataset.INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE
+  USING (constraint_name)
+WHERE table_name = 'sales_cdc_table';</code></pre>
+      </div>
+
+      <h3>ステップ 2: マテリアライズドビューの作成</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">max_staleness を CDC テーブルの 2 倍以上に設定</span>
+        </div>
+        <pre><code class="language-sql">-- max_staleness をCDCテーブルの2倍以上に設定
+CREATE MATERIALIZED VIEW my_project.my_dataset.sales_summary_mv
+OPTIONS (
+  enable_refresh = true,
+  refresh_interval_minutes = 30,
+  max_staleness = INTERVAL "2:0:0" HOUR TO SECOND
+)
+AS
+SELECT
+  region,
+  product_category,
+  DATE(event_time) AS event_date,
+  SUM(revenue) AS total_revenue,
+  COUNT(DISTINCT customer_id) AS unique_customers
+FROM my_project.my_dataset.sales_cdc_table
+GROUP BY 1, 2, 3;</code></pre>
+      </div>
+
+      <h3>ステップ 3: マテリアライズドビューのクエリ</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">通常のテーブルと同様にクエリ可能</span>
+        </div>
+        <pre><code class="language-sql">-- 通常のテーブルと同様にクエリ可能
+SELECT region, total_revenue
+FROM my_project.my_dataset.sales_summary_mv
+WHERE event_date >= '2026-04-01'
+ORDER BY total_revenue DESC;</code></pre>
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div class="comparison" style="grid-template-columns: 1fr 1fr;">
+        <div style="background: var(--gc-green-tint); border-radius: 12px; padding: 20px;">
+          <h4 style="color: var(--gc-green); margin: 0 0 12px 0;">💼 ビジネス面</h4>
+          <ul style="margin: 0; padding-left: 20px; font-size: 14px;">
+            <li><strong>リアルタイム分析の実現</strong>: 運用 DB の変更をリアルタイム反映しつつ高速分析クエリを実行可能</li>
+            <li><strong>運用コストの削減</strong>: 別途 ETL パイプラインや集計テーブルの管理が不要に</li>
+          </ul>
+        </div>
+        <div style="background: var(--gc-blue-tint); border-radius: 12px; padding: 20px;">
+          <h4 style="color: var(--gc-blue-800); margin: 0 0 12px 0;">🔧 技術面</h4>
+          <ul style="margin: 0; padding-left: 20px; font-size: 14px;">
+            <li><strong>クエリパフォーマンス向上</strong>: 事前集計でスキャンデータ量を削減</li>
+            <li><strong>アーキテクチャ簡素化</strong>: 単一サービスでリアルタイム DWH を構築</li>
+            <li><strong>自動メンテナンス</strong>: 自動リフレッシュで手動更新不要</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ 制約事項・注意点</h2>
+      <div class="warning-box">
+        <strong>制限事項:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px; font-size: 14px;">
+          <li>同一クエリ内で CDC ベーステーブルとマテリアライズドビューを同時に参照できない</li>
+          <li>ランタイムマージジョブが実行できないため、<code>max_staleness</code> を適切に設定しないとクエリが失敗する</li>
+          <li>スマートチューニング (クエリの自動リライト) は CDC テーブル上のマテリアライズドビューでは利用不可</li>
+          <li><code>max_staleness</code> は 30 分から 3 日の範囲で設定が必要</li>
+        </ul>
+      </div>
+      <div class="note-box">
+        <strong>設計時の考慮点:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px; font-size: 14px;">
+          <li>CDC テーブルの <code>max_staleness</code> の少なくとも 2 倍以上をマテリアライズドビュー側に設定</li>
+          <li>自動リフレッシュの頻度とデータの鮮度要件のバランス調整が必要</li>
+          <li>バックグラウンド適用ジョブのコンピュートリソース消費を監視し、必要に応じてリザベーションを設定することを推奨</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+      <div class="usecase-card">
+        <h4>🛒 EC サイトのリアルタイム売上ダッシュボード</h4>
+        <p><strong>シナリオ:</strong> EC サイトの注文データベースから CDC でリアルタイムに注文情報を BigQuery にストリーミングし、カテゴリ別・地域別の売上集計をダッシュボードで可視化。</p>
+        <p><strong>効果:</strong> 15 分間隔の自動リフレッシュにより、ほぼリアルタイムの売上状況を低コストで可視化。ダッシュボードのクエリがマテリアライズドビューから直接応答されるため、レイテンシが大幅に削減されます。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">EC サイト売上ダッシュボード用マテリアライズドビュー</span>
+          </div>
+          <pre><code class="language-sql">CREATE MATERIALIZED VIEW ecommerce.realtime_sales_dashboard
+OPTIONS (
+  enable_refresh = true,
+  refresh_interval_minutes = 15,
+  max_staleness = INTERVAL "1:0:0" HOUR TO SECOND
+)
+AS
+SELECT
+  product_category,
+  shipping_region,
+  DATE(order_time) AS order_date,
+  SUM(order_total) AS daily_revenue,
+  COUNT(*) AS order_count,
+  AVG(order_total) AS avg_order_value
+FROM ecommerce.orders_cdc
+GROUP BY 1, 2, 3;</code></pre>
+        </div>
+      </div>
+
+      <div class="usecase-card">
+        <h4>📡 IoT デバイスのセンサーデータ集計</h4>
+        <p><strong>シナリオ:</strong> 数千台の IoT デバイスからのセンサーデータが CDC 経由で BigQuery にストリーミングされ、デバイスごとの異常検知用に統計値 (平均、最大、最小) を事前集計。</p>
+        <p><strong>効果:</strong> 大量のセンサーデータを毎回フルスキャンする代わりに、マテリアライズドビューの事前集計結果を参照することで、異常検知クエリのコストを 90% 以上削減可能。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>BigQuery CDC インジェストは以下のコンポーネントに対して料金が発生します。</p>
+      <div class="pricing-item">
+        <div class="pricing-icon">📡</div>
+        <div>
+          <strong>Storage Write API</strong>
+          <p style="margin: 4px 0 0 0; font-size: 14px;">データインジェスト料金</p>
+        </div>
+      </div>
+      <div class="pricing-item">
+        <div class="pricing-icon">🗄️</div>
+        <div>
+          <strong>BigQuery ストレージ</strong>
+          <p style="margin: 4px 0 0 0; font-size: 14px;">データ保存料金</p>
+        </div>
+      </div>
+      <div class="pricing-item">
+        <div class="pricing-icon">⚙️</div>
+        <div>
+          <strong>BigQuery コンピュート</strong>
+          <p style="margin: 4px 0 0 0; font-size: 14px;">CDC 行変更操作およびマテリアライズドビューのリフレッシュ処理</p>
+        </div>
+      </div>
+      <div class="note-box">
+        <strong>💡 コスト最適化のヒント:</strong> マテリアライズドビュー自体の追加料金は発生しませんが、自動リフレッシュジョブのコンピュートリソースが消費されます。大量の CDC 操作がある場合は、オンデマンド料金の代わりに容量ベースの料金モデル (リザベーション) の利用を推奨します。
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス</h2>
+      <div class="related-grid">
+        <div class="related-card">
+          <h4>📡 BigQuery Storage Write API</h4>
+          <p>CDC のデータインジェストに使用される API。デフォルトストリームで <code>_CHANGE_TYPE</code> 疑似列を指定して UPSERT/DELETE を実行。</p>
+        </div>
+        <div class="related-card">
+          <h4>📊 BigQuery リザベーション</h4>
+          <p>CDC バックグラウンドジョブに専用コンピュートリソースを割り当て、コストの上限を設定可能。</p>
+        </div>
+        <div class="related-card">
+          <h4>🕐 max_staleness</h4>
+          <p>データの鮮度とクエリパフォーマンスのバランスを制御する機能。</p>
+        </div>
+        <div class="related-card">
+          <h4>🔄 Datastream</h4>
+          <p>運用データベースから BigQuery への CDC レプリケーションを簡素化するマネージドサービス。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="summary-box">
+        <p>BigQuery のマテリアライズドビューが CDC 対応テーブルをサポートしたことで、<strong>リアルタイムデータストリーミングと高速分析クエリを単一のプラットフォーム上で統合</strong>できるようになりました。CDC パイプラインを構築済みの組織は、<code>max_staleness</code> を適切に設定したマテリアライズドビューを追加することで、既存のワークロードを変更せずにクエリパフォーマンスとコスト効率を大幅に改善できます。</p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>出典:</strong></p>
+      <ul>
+        <li><a href="https://cloud.google.com/bigquery/docs/materialized-views-intro#cdc" target="_blank" rel="noopener noreferrer">マテリアライズドビューの概要 - CDC セクション</a></li>
+        <li><a href="https://cloud.google.com/bigquery/docs/change-data-capture" target="_blank" rel="noopener noreferrer">BigQuery CDC ドキュメント</a></li>
+        <li><a href="https://cloud.google.com/bigquery/docs/materialized-views-create#max_staleness" target="_blank" rel="noopener noreferrer">マテリアライズドビューの作成 (max_staleness)</a></li>
+        <li><a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer">BigQuery 料金</a></li>
+      </ul>
+      <p style="margin-top: 12px; font-size: 11px; color: var(--gc-outline);">Generated: 2026-04-29 | #BigQuery #CDC #MaterializedViews #GA</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

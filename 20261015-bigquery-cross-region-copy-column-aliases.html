@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BigQuery: クロスリージョンテーブルコピー / GoogleSQL 列エイリアス / 会話型分析エクスポートが GA</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-title {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); color: #FFFFFF; }
+    .badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+    .badge-deprecated { background: var(--gc-red); color: #FFFFFF; }
+
+    .badge-small {
+      display: inline-block;
+      color: #FFFFFF;
+      background: var(--gc-green);
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .badge-small.optin { background: var(--gc-orange); }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box, .after-box {
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid rgba(234, 67, 53, 0.3);
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid rgba(52, 168, 83, 0.3);
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-box h3 { color: #C5221F; }
+    .after-box h3 { color: #188038; }
+
+    .before-box ul, .after-box ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li { margin: 8px 0; }
+
+    @media (max-width: 720px) {
+      .before-after { grid-template-columns: 1fr; }
+    }
+
+    /* フロー図スタイル */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+      font-size: 14px;
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* チェックリストスタイル */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon { color: var(--gc-green); font-size: 18px; flex-shrink: 0; }
+    .cross-icon { color: var(--gc-red); font-size: 18px; flex-shrink: 0; }
+
+    /* コードブロック (Mermaid の pre を除外) */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* テーブルスタイル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .ai-box {
+      background: var(--gc-purple-tint);
+      border-left: 4px solid var(--gc-purple);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* 統計カード */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 720px) {
+      .stat-grid { grid-template-columns: 1fr; }
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-100);
+    }
+
+    .usecase-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--gc-blue-900);
+      margin-bottom: 8px;
+    }
+
+    .usecase p { margin: 8px 0; font-size: 14px; }
+
+    ul { padding-left: 24px; }
+    li { margin: 6px 0; }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer ul { margin: 8px 0; padding-left: 20px; }
+    footer li { margin: 4px 0; word-break: break-all; }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <h1>📊 BigQuery 3 つの機能が GA に</h1>
+        <div class="subtitle" style="margin-top: 8px;">クロスリージョンテーブルコピー / GoogleSQL 列エイリアス / 会話型分析エクスポート</div>
+        <div style="margin-top: 12px;">
+          <span class="badge">BigQuery</span>
+          <span class="badge badge-ga">GA (一般提供)</span>
+          <span class="badge">Analytics</span>
+        </div>
+      </div>
+      <div class="subtitle" style="text-align: right;">
+        <div>リリース日</div>
+        <div style="font-size: 20px; font-weight: 600; color: var(--gc-on-surface);">2026-10-15</div>
+      </div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📌 概要</h2>
+      <p>2026 年 10 月 15 日、BigQuery に関する <span class="highlight">3 つの機能が一般提供 (GA)</span> になりました。</p>
+      <div class="card">
+        <div class="card-title">1️⃣ クロスリージョンテーブルコピー <span class="badge-small">GA</span></div>
+        <p style="margin: 0; font-size: 14px;">テーブル、テーブルスナップショット、テーブルクローンを BigQuery のあるリージョン (またはマルチリージョン) から別のリージョンへ直接コピー。リージョン移行や分析基盤の地域展開をシンプルなコピージョブとして実行できます。</p>
+      </div>
+      <div class="card">
+        <div class="card-title">2️⃣ GoogleSQL 列エイリアス (再利用可能カラムエイリアス) <span class="badge-small">GA</span> <span class="badge-small optin">オプトイン</span></div>
+        <p style="margin: 0; font-size: 14px;">SELECT 句で定義したエイリアスを、同一 SELECT リストの後続の式や同一クエリブロックの WHERE 句から参照可能に。Snowflake / Teradata の SQL 構文をサポートし、移行作業を効率化します。<strong>利用には事前の有効化が必要</strong>です。</p>
+      </div>
+      <div class="card">
+        <div class="card-title">3️⃣ 会話型分析エージェント回答の PDF / CSV エクスポート <span class="badge-small">GA</span></div>
+        <p style="margin: 0; font-size: 14px;">会話型分析 (Conversational Analytics) エージェントの回答 (テキスト・可視化・テーブル・引用) を PDF または CSV ファイルとして保存・共有できます。</p>
+      </div>
+
+      <h3>🔄 Before / After</h3>
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ アップデート前の課題</h3>
+          <ul>
+            <li>クロスリージョンコピーは Preview 提供で、GA 水準の SLA・サポートを前提とした本番利用の判断が難しかった</li>
+            <li>SELECT 句のエイリアスを同じ SELECT リストや WHERE 句から参照できず (GROUP BY / ORDER BY / HAVING のみ)、複雑な式の繰り返しやサブクエリ化が必要だった</li>
+            <li>Snowflake / Teradata などエイリアス再利用を許容する SQL 方言からの移行時にクエリの書き換えが必要だった</li>
+            <li>エージェント回答をファイルとして保存・共有する標準的な手段がなかった</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ アップデート後の改善</h3>
+          <ul>
+            <li>クロスリージョンのテーブル・スナップショット・クローンのコピーを本番ワークロードで安心して利用可能に</li>
+            <li>有効化すると、エイリアスを同一 SELECT リスト内の後続式や WHERE 句で再利用でき、可読性が向上しサブクエリの多用が不要に</li>
+            <li>Snowflake / Teradata の構文サポートで他データウェアハウスからの移行がスムーズに</li>
+            <li>回答をテキスト・可視化・テーブル・引用を含めて PDF / CSV にエクスポートでき、共有・保存が容易に</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🗺️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph CP["1. クロスリージョンテーブルコピー (GA)"]
+        SRC[("🗄️ ソーステーブル<br>us-central1")] -->|"コピージョブ"| DST[("🗄️ 宛先テーブル<br>asia-northeast1")]
+    end
+
+    subgraph CA["2. GoogleSQL 列エイリアス (GA / オプトイン)"]
+        OPT["⚙️ ALTER PROJECT SET OPTIONS<br>reusable_column_aliases_mode = on"] --> SQL["📝 SELECT x AS a, a*2 AS b<br>WHERE b < 10"]
+    end
+
+    subgraph EX["3. 会話型分析エクスポート (GA)"]
+        USER(["👤 ユーザー"]) -->|"自然言語で質問"| AGENT["🤖 会話型分析エージェント"]
+        AGENT -->|"回答 (テキスト/可視化/テーブル/引用)"| FILE["📄 PDF / CSV エクスポート"]
+    end
+        </pre>
+      </div>
+      <p style="font-size: 14px;">3 つの GA 機能の全体像です。リージョン間のテーブルコピー、オプトインで有効化する列エイリアスの再利用、エージェント回答のファイルエクスポートをそれぞれ示しています。</p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+
+      <div class="card">
+        <div class="card-title">🌏 クロスリージョンテーブルコピー (GA)</div>
+        <div class="icon-text"><span class="arrow">→</span><span>テーブル、テーブルスナップショット、テーブルクローンを BigQuery のリージョンまたはマルチリージョン間でコピーできる</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>顧客管理暗号鍵 (CMEK) が適用されたテーブルのコピーにも対応 (宛先データセットとの CMEK 構成の組み合わせには制約あり)</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>リージョン間のコピーにはデータ転送料金が別途発生する</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📝 GoogleSQL 列エイリアス / 再利用可能カラムエイリアス (GA、オプトイン)</div>
+        <div class="icon-text"><span class="arrow">→</span><span>SELECT 句の式に定義したエイリアスを、同一 SELECT リストの後続の式 (左から右の順) や同一クエリブロックの WHERE 句で参照可能</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>reusable_column_aliases_mode</code> オプションを <code>ALTER ORGANIZATION SET OPTIONS</code> または <code>ALTER PROJECT SET OPTIONS</code> で <code>on</code> に設定して有効化 (リージョンスコープのオプション)</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>Snowflake や Teradata のエイリアス構文をサポートし、BigQuery Migration Service と組み合わせた移行を効率化</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📄 会話型分析エージェント回答の PDF / CSV エクスポート (GA)</div>
+        <div class="icon-text"><span class="arrow">→</span><span>エージェントの回答 (テキスト、可視化、テーブル、引用を含む) をダウンロードボタンから PDF または CSV として保存できる</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>PDF は各テーブル最大 20 行、詳細 PDF は最大 1,000 行、CSV は最大 5,000 行を含められる</span></div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3>📋 列エイリアスの名前解決の優先順位</h3>
+      <p style="font-size: 14px;">列エイリアスを有効化すると、名前解決の優先順位が以下のようになります。<strong>既存クエリの結果が変わる可能性がある</strong>ため、有効化前に影響評価が推奨されます。</p>
+      <table>
+        <thead>
+          <tr><th style="width: 120px;">優先順位</th><th>解決対象</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1</td><td>物理的な列名 (テーブルの列が常に優先)</td></tr>
+          <tr><td>2</td><td>列エイリアス</td></tr>
+          <tr><td>3</td><td>外側のクエリの列</td></tr>
+          <tr><td>4</td><td>UDF / TVF の引数</td></tr>
+          <tr><td>5</td><td>スクリプト変数</td></tr>
+        </tbody>
+      </table>
+
+      <h3>⚙️ 列エイリアスの有効化 (DDL)</h3>
+      <div class="code-block">
+        <span class="code-label">SQL</span>
+        <pre><code class="language-sql">-- プロジェクトレベルで有効化 (リージョンスコープ)
+ALTER PROJECT my_project
+SET OPTIONS (
+  `region-us.reusable_column_aliases_mode` = "on"
+);</code></pre>
+      </div>
+
+      <h3>📊 エクスポート形式と行数上限</h3>
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">20 行</div>
+          <div class="stat-label">PDF (テーブルあたり)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">1,000 行</div>
+          <div class="stat-label">詳細 PDF (テーブルあたり)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">5,000 行</div>
+          <div class="stat-label">CSV (テーブルあたり)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>✅ 前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>列エイリアスの有効化には BigQuery Admin ロール、または <code>bigquery.projects.update</code> / <code>bigquery.organizations.update</code> 権限が必要</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>会話型分析の利用には Gemini Data Analytics Data Agent User などのロールと、対象データへの BigQuery Data Viewer / BigQuery Job User 等のアクセス権が必要</span></div>
+
+      <h3>ステップ 1: クロスリージョンテーブルコピーの実行</h3>
+      <div class="code-block">
+        <span class="code-label">Bash</span>
+        <pre><code class="language-bash"># bq コマンドでリージョンをまたいでテーブルをコピー
+bq cp \
+  --cross_region_copy \
+  source_project:source_dataset.source_table \
+  dest_project:dest_dataset.dest_table</code></pre>
+      </div>
+      <p style="font-size: 14px;">テーブルコピージョブとしてリージョン間コピーを実行します。コンソール、bq コマンドライン、API、クライアントライブラリから利用できます (オプションの詳細は公式ドキュメントを参照してください)。</p>
+
+      <h3>ステップ 2: 列エイリアスの有効化と利用</h3>
+      <div class="code-block">
+        <span class="code-label">SQL</span>
+        <pre><code class="language-sql">-- 有効化後、エイリアスを同一クエリブロック内で再利用
+SELECT
+  net_price * 1.23 AS gross_price,
+  gross_price * 0.5 AS discounted_gross_price
+FROM product
+WHERE discounted_gross_price < 10.0;</code></pre>
+      </div>
+      <p style="font-size: 14px;"><code>gross_price</code> を同じ SELECT リスト内で参照し、<code>discounted_gross_price</code> を WHERE 句で参照しています。従来はサブクエリ化が必要だったパターンです。</p>
+
+      <h3>ステップ 3: エージェント回答のエクスポート</h3>
+      <div class="flow-diagram">
+        <div class="flow-step">💬 回答に移動<br><span style="font-size: 12px; color: var(--gc-outline);">会話型分析で保存したい回答へ</span></div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">⬇️ ダウンロード<br><span style="font-size: 12px; color: var(--gc-outline);">形式 (PDF / 詳細 PDF / CSV) を選択</span></div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">📄 ファイル取得<br><span style="font-size: 12px; color: var(--gc-outline);">ブラウザ経由でダウンロード</span></div>
+      </div>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>💡 メリット</h2>
+
+      <h3>💼 ビジネス面</h3>
+      <div class="success-box">
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>移行コストの削減</strong>: Snowflake / Teradata の SQL 構文との互換性により、データウェアハウス移行時のクエリ書き換え工数を削減できる</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>分析結果の共有促進</strong>: エージェントの回答を PDF / CSV として配布でき、非技術者を含むステークホルダーへのレポーティングが容易になる</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>本番利用の安心感</strong>: クロスリージョンコピーが GA となり、リージョン移行やマルチリージョン展開を GA 水準のサポートのもとで計画できる</span></div>
+      </div>
+
+      <h3>⚙️ 技術面</h3>
+      <div class="success-box">
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>クエリの簡素化</strong>: 複雑な式の繰り返しやサブクエリのネストが不要になり、SQL の可読性と保守性が向上する</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>シンプルなリージョン間データ移動</strong>: コピージョブだけでテーブル単位のリージョン間移動が完結し、エクスポート/インポートのパイプライン構築が不要になる</span></div>
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>🚫 制限事項</h3>
+      <div class="error-box">
+        <div class="check-item"><span class="cross-icon">✗</span><span><strong>クロスリージョンコピー</strong>: 開始後のコピー操作は停止できない (ジョブをキャンセルしてもデータ転送料金と宛先リージョンのストレージ料金が発生)。コピージョブのクォータ・上限の対象となる</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span><strong>列エイリアス</strong>: 集計・ウィンドウ関数を参照するエイリアスは WHERE 句や他の集計関数内で使用できない。パイプ構文および Graph Query Language (GQL) では未サポート。同一 SELECT リスト内の前方参照は不可 (左から右の順でのみ参照可能)</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span><strong>エクスポート</strong>: 形式ごとにテーブルの行数上限がある (PDF: 20 行、詳細 PDF: 1,000 行、CSV: 5,000 行)。会話は 180 日間更新がないと自動削除される</span></div>
+      </div>
+
+      <h3>🤔 考慮すべき点</h3>
+      <div class="warning-box">
+        <div class="icon-text"><span class="arrow">→</span><span>列エイリアスの有効化は名前解決の優先順位を変更するため、エイリアスが外側クエリの列・関数引数・スクリプト変数と同名の場合、<strong>既存クエリの結果が暗黙的に変わる可能性</strong>がある。有効化前に既存ワークロードへの影響評価を行うこと</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>クロスリージョンコピーはデータ転送料金が発生するため、大規模テーブルや頻繁なコピーではコストを事前に見積もること</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>CMEK 暗号化テーブルのクロスリージョンコピーには宛先側の CMEK 構成に関する制約があるため、暗号化要件のある環境では事前確認が必要</span></div>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <div class="usecase-title">🌏 ユースケース 1: 分析基盤のリージョン移行・地域展開</div>
+        <p><strong>シナリオ</strong>: 米国リージョンに蓄積した BigQuery テーブルを、日本国内の分析チーム向けに asia-northeast1 へ複製したい。</p>
+        <div class="code-block">
+          <span class="code-label">Bash</span>
+          <pre><code class="language-bash">bq cp --cross_region_copy \
+  myproject:us_dataset.sales \
+  myproject:tokyo_dataset.sales</code></pre>
+        </div>
+        <p><strong>効果</strong>: エクスポート/インポートのパイプラインを構築せずに、コピージョブのみでテーブルをリージョン間移動でき、運用がシンプルになる。</p>
+      </div>
+
+      <div class="usecase">
+        <div class="usecase-title">🔁 ユースケース 2: Snowflake / Teradata からの SQL 移行</div>
+        <p><strong>シナリオ</strong>: Snowflake で運用していたクエリ資産を BigQuery に移行する。既存クエリは SELECT 句のエイリアスを WHERE 句や後続の式で再利用している。</p>
+        <p><strong>効果</strong>: 列エイリアスを有効化することで、エイリアス再利用を前提としたクエリをほぼそのまま移行でき、BigQuery Migration Service の SQL 変換と合わせて書き換え工数を大幅に削減できる。</p>
+      </div>
+
+      <div class="usecase">
+        <div class="usecase-title">📈 ユースケース 3: 会話型分析の結果を経営層へレポート</div>
+        <p><strong>シナリオ</strong>: データアナリストが会話型分析エージェントで売上動向を分析し、その回答 (グラフ・テーブル・考察を含む) を経営会議の資料として配布したい。</p>
+        <p><strong>効果</strong>: 回答をワンクリックで PDF にエクスポートでき、BigQuery へのアクセス権を持たない関係者にも分析結果をそのまま共有できる。</p>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <div class="card">
+        <div class="card-title">🌏 クロスリージョンテーブルコピー</div>
+        <p style="margin: 0; font-size: 14px;">リージョン間のデータ転送料金が BigQuery の料金体系 (データレプリケーション料金) に従って発生します。コピージョブを完了前にキャンセルした場合でも転送分の料金が発生します。詳細は <a href="https://cloud.google.com/bigquery/pricing#data_replication" target="_blank" rel="noopener noreferrer" class="gc-link">BigQuery の料金ページ</a> を参照してください。</p>
+      </div>
+      <div class="card">
+        <div class="card-title">📝 列エイリアス / エクスポート機能</div>
+        <p style="margin: 0; font-size: 14px;">機能固有の追加料金に関する公式情報は確認できていません。通常のクエリ料金・Gemini in BigQuery の料金体系に従います。</p>
+      </div>
+    </div>
+
+    <!-- 関連サービス・機能 -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="icon-text"><span class="arrow">→</span><span><strong>BigQuery Migration Service</strong>: Snowflake / Teradata からの SQL 変換を支援するサービス。列エイリアスのサポートと組み合わせることで移行がさらに容易になる</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span><strong>BigQuery データセットレプリケーション</strong>: データセット単位でセカンダリリージョンにレプリカを作成する機能。継続的なリージョン間レプリケーションが必要な場合はこちらを検討</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span><strong>Gemini in BigQuery / Conversational Analytics API</strong>: 会話型分析エージェントの基盤。データエージェントの作成やコンテキスト定義により回答精度を高められる</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span><strong>Cloud KMS (CMEK)</strong>: クロスリージョンコピーは CMEK 適用テーブルにも対応するが、宛先側の暗号化構成に制約がある</span></div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="note-box">
+        <p style="margin: 0;">今回の BigQuery アップデートは、<span class="highlight">データのリージョン間移動</span> (クロスリージョンコピー)、<span class="highlight">SQL 開発体験と他 DWH からの移行性</span> (列エイリアス)、<span class="highlight">分析結果の共有</span> (PDF/CSV エクスポート) という 3 つの観点で実務に直結する GA です。特に列エイリアスはオプトイン方式で名前解決の挙動が変わるため、既存クエリへの影響を評価したうえで組織・プロジェクト単位の有効化を検討してください。Snowflake / Teradata からの移行を計画中のチームは、BigQuery Migration Service と合わせて活用することを推奨します。</p>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p>📎 出典・参考リンク:</p>
+      <ul>
+        <li><a href="https://docs.cloud.google.com/release-notes#October_15_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026-10-15)</a></li>
+        <li><a href="https://docs.cloud.google.com/bigquery/docs/managing-tables" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: テーブルのコピー (クロスリージョン)</a></li>
+        <li><a href="https://docs.cloud.google.com/bigquery/docs/column-aliases" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: 列エイリアス</a></li>
+        <li><a href="https://docs.cloud.google.com/bigquery/docs/conversational-analytics" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: 会話型分析の概要</a></li>
+        <li><a href="https://docs.cloud.google.com/bigquery/docs/create-conversations" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: 会話でデータを分析する</a></li>
+        <li><a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">BigQuery 料金ページ</a></li>
+      </ul>
+      <p>タグ: #BigQuery #GA #DataWarehouse #GoogleSQL #CrossRegionCopy #ConversationalAnalytics #Migration #Snowflake #Teradata</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

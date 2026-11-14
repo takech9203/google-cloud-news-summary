@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BigQuery DTS: PostgreSQL / ServiceNow 増分データ転送が GA</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+:root {
+  --gc-blue: #4285F4;
+  --gc-red: #EA4335;
+  --gc-yellow: #FBBC04;
+  --gc-green: #34A853;
+  --gc-blue-900: #174EA6;
+  --gc-blue-800: #185ABC;
+  --gc-blue-700: #1967D2;
+  --gc-blue-600: #1A73E8;
+  --gc-blue-500: #4285F4;
+  --gc-blue-300: #669DF6;
+  --gc-blue-200: #8AB4F8;
+  --gc-blue-100: #AECBFA;
+  --gc-blue-50: #E8F0FE;
+  --gc-on-surface: #202124;
+  --gc-on-surface-variant: #5F6368;
+  --gc-outline: #80868B;
+  --gc-surface: #FFFFFF;
+  --gc-surface-container-lowest: #F8F9FA;
+  --gc-surface-container-low: #F1F3F4;
+  --gc-surface-container: #E8EAED;
+  --gc-outline-variant: #DADCE0;
+  --gc-blue-tint: #E8F0FE;
+  --gc-green-tint: #E6F4EA;
+  --gc-red-tint: #FCE8E6;
+  --gc-yellow-tint: #FEF7E0;
+  --gc-purple-tint: #F3E8FD;
+  --gc-teal-tint: #E0F7FA;
+  --gc-purple: #A142F4;
+  --gc-teal: #00BCD4;
+  --gc-orange: #FF6D00;
+}
+
+body {
+  background-color: var(--gc-surface);
+  font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+  color: var(--gc-on-surface-variant);
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 20px;
+  margin: 0;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 16px;
+  border-bottom: 3px solid var(--gc-blue-600);
+}
+
+h1, .title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--gc-on-surface);
+  margin: 0;
+  line-height: 1.4;
+}
+
+h2, .section-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 20px 0 8px 0;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: var(--gc-outline);
+}
+
+.section {
+  background: var(--gc-surface-container-low);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid var(--gc-outline-variant);
+}
+
+.highlight {
+  background-color: var(--gc-blue-50);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--gc-blue-800);
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+.card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border-left: 4px solid var(--gc-blue-600);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+}
+
+.card h4 {
+  margin: 0 0 8px 0;
+  color: var(--gc-on-surface);
+  font-size: 16px;
+}
+
+.card p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.badge,
+.badge-ga,
+.badge-preview,
+.badge-deprecated {
+  display: inline-block;
+  color: #FFFFFF;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+  margin: 4px 8px 4px 0;
+}
+
+.badge { background: var(--gc-blue-600); }
+.badge-ga { background: var(--gc-green); color: #FFFFFF; }
+.badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+.badge-deprecated { background: var(--gc-red); color: #FFFFFF; }
+
+.meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 24px;
+  align-items: center;
+}
+
+/* Before / After 比較 */
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+@media (max-width: 768px) {
+  .before-after { grid-template-columns: 1fr; }
+}
+
+.before-box, .after-box {
+  border-radius: 12px;
+  padding: 16px 20px;
+}
+
+.before-box {
+  background: var(--gc-red-tint);
+  border: 1px solid rgba(234, 67, 53, 0.3);
+}
+
+.after-box {
+  background: var(--gc-green-tint);
+  border: 1px solid rgba(52, 168, 83, 0.3);
+}
+
+.before-box h3, .after-box h3 {
+  margin-top: 0;
+  font-size: 16px;
+}
+
+.before-box h3 { color: #C5221F; }
+.after-box h3 { color: #188038; }
+
+.before-box ul, .after-box ul {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 14px;
+}
+
+.before-box li, .after-box li { margin: 6px 0; }
+
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.check-icon { color: var(--gc-green); font-size: 18px; }
+.cross-icon { color: var(--gc-red); font-size: 18px; }
+
+/* Mermaid コンテナ */
+.mermaid-container {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 20px 0;
+  border: 2px solid rgba(66, 133, 244, 0.3);
+  overflow-x: auto;
+}
+
+.mermaid {
+  display: flex;
+  justify-content: center;
+}
+
+/* コードブロック */
+.code-block,
+pre:not(.mermaid) {
+  background: #1E1E1E;
+  border-radius: 8px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: #E8E8E8;
+  margin: 16px 0;
+}
+
+.code-block { overflow: hidden; }
+
+.code-header {
+  background: #2D2D2D;
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.code-lang { color: #9CDCFE; font-weight: bold; }
+.code-title { color: #AAAAAA; }
+
+.code-block pre {
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+}
+
+.code-block code {
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 16px !important;
+  display: block;
+}
+
+pre code {
+  background: none;
+  border: none;
+  font-size: inherit;
+}
+
+code:not(pre code) {
+  background: var(--gc-surface-container-low);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 0.9em;
+  color: var(--gc-blue-900);
+}
+
+/* テーブル */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--gc-outline-variant);
+  background: var(--gc-surface);
+}
+
+th {
+  background: var(--gc-blue-50);
+  color: var(--gc-blue-900);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 2px solid var(--gc-blue-200);
+}
+
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--gc-outline-variant);
+  font-size: 14px;
+}
+
+tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+tr:hover { background: var(--gc-blue-50); }
+
+/* ボックス類 */
+.note-box {
+  background: var(--gc-blue-tint);
+  border-left: 4px solid var(--gc-blue-600);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.warning-box {
+  background: var(--gc-yellow-tint);
+  border-left: 4px solid var(--gc-yellow);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.error-box {
+  background: var(--gc-red-tint);
+  border-left: 4px solid var(--gc-red);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.success-box {
+  background: var(--gc-green-tint);
+  border-left: 4px solid var(--gc-green);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+/* ユースケース */
+.usecase {
+  background: var(--gc-blue-tint);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border: 1px solid var(--gc-blue-100);
+}
+
+.usecase h4 {
+  margin: 0 0 8px 0;
+  color: var(--gc-blue-900);
+  font-size: 16px;
+}
+
+.usecase p {
+  margin: 6px 0;
+  font-size: 14px;
+}
+
+/* 2 カラムグリッド */
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 768px) {
+  .grid-2 { grid-template-columns: 1fr; }
+}
+
+ul.compact {
+  margin: 8px 0;
+  padding-left: 22px;
+}
+
+ul.compact li { margin: 6px 0; font-size: 14px; }
+
+.gc-link {
+  color: var(--gc-blue-600);
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.gc-link:hover {
+  color: var(--gc-blue-800);
+  text-decoration: underline;
+}
+
+footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gc-outline-variant);
+  font-size: 12px;
+  color: var(--gc-outline);
+}
+
+footer ul {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+footer li { margin: 4px 0; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <h1>📊 BigQuery Data Transfer Service<br>PostgreSQL / ServiceNow 増分データ転送が GA</h1>
+    <div class="subtitle">リリース日: 2026-10-12</div>
+  </div>
+
+  <div class="meta-row">
+    <span class="badge">BigQuery</span>
+    <span class="badge">Data Transfer Service</span>
+    <span class="badge">PostgreSQL</span>
+    <span class="badge">ServiceNow</span>
+    <span class="badge badge-ga">GA (一般提供)</span>
+  </div>
+
+  <!-- 概要 -->
+  <div class="section">
+    <h2>💡 概要</h2>
+    <p>
+      BigQuery Data Transfer Service (DTS) の <span class="highlight">PostgreSQL / ServiceNow コネクタの増分データ転送 (Incremental Data Transfers)</span> が
+      <strong>GA (一般提供)</strong> になりました。転送のたびにデータセット全体をロードする代わりに、
+      <span class="highlight">前回の転送以降に作成・更新された行のみ</span>を BigQuery に転送します。
+    </p>
+    <p>
+      ウォーターマーク列 (watermark column) で最終同期ポイントを追跡し、書き込みモードは
+      <strong>Append (追記)</strong> と <strong>Upsert (主キーに基づく更新または挿入)</strong> から選択できます。
+      Cloud SQL / AlloyDB / オンプレミス / AWS / Azure 上の PostgreSQL や ServiceNow のデータを定期的に取り込む組織にとって、
+      転送時間・ソース負荷・コストを大幅に削減できるアップデートです。
+    </p>
+
+    <div class="before-after">
+      <div class="before-box">
+        <h3>❌ Before: アップデート前の課題</h3>
+        <ul>
+          <li>増分転送は <strong>Preview</strong> 段階で、Pre-GA Offerings Terms が適用され本番採用が難しかった</li>
+          <li>フル転送のみでは毎回テーブル全体を再ロードし、データ量増加に伴い転送時間とソース負荷が増大</li>
+          <li>大規模テーブルの頻繁な同期では転送の重複によるスキップが発生しやすく、転送間隔を長く取る必要があった</li>
+        </ul>
+      </div>
+      <div class="after-box">
+        <h3>✅ After: アップデート後の改善</h3>
+        <ul>
+          <li><strong>GA</strong> となり、SLA を伴う本番データパイプラインで安心して利用可能に</li>
+          <li>新規・更新行のみ転送し、転送あたりのデータ量と転送時間を大幅削減</li>
+          <li><strong>Upsert モード</strong>で主キーに基づく更新・挿入を行い、ソースとの同期を自動維持</li>
+          <li>ソースのスキーマ変更 (列の追加・削除・リネーム) にも定義された動作で追従</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- アーキテクチャ図 -->
+  <div class="section">
+    <h2>🏗️ アーキテクチャ図</h2>
+    <div class="mermaid-container">
+      <pre class="mermaid">
+flowchart LR
+    subgraph Sources["📦 データソース"]
+        PG[("🐘 PostgreSQL<br/>(Cloud SQL / AlloyDB /<br/>オンプレミス / AWS / Azure)")]
+        SN["🎫 ServiceNow<br/>インスタンス"]
+    end
+
+    subgraph DTS["🔄 BigQuery Data Transfer Service"]
+        WM{"💧 ウォーターマーク列で<br/>変更行をフィルタ"}
+        MODE{"✍️ 書き込みモード"}
+    end
+
+    subgraph BQ["☁️ BigQuery"]
+        TBL[("📊 宛先テーブル<br/>(主キーでクラスタ化)")]
+    end
+
+    NA["🔌 ネットワーク<br/>アタッチメント"]
+
+    PG -->|"前回転送以降の<br/>新規・更新行のみ"| WM
+    SN -->|"Table API 経由"| WM
+    NA -.->|"プライベート接続"| PG
+    WM --> MODE
+    MODE -->|"Append: 追記"| TBL
+    MODE -->|"Upsert: 主キーで<br/>更新 or 挿入"| TBL
+      </pre>
+    </div>
+    <p style="font-size: 14px;">
+      増分転送では、DTS コネクタがウォーターマーク列 (PostgreSQL は <code>TIMESTAMP</code> 型、ServiceNow は <code>DATETIME</code> 型) を使って
+      前回の転送以降に変更された行だけを抽出し、Append または Upsert モードで BigQuery の宛先テーブルに書き込みます。
+    </p>
+  </div>
+
+  <!-- 主要機能 -->
+  <div class="section">
+    <h2>⚙️ 主要機能</h2>
+
+    <div class="card">
+      <h4>1️⃣ 増分取り込み (Incremental Ingestion)</h4>
+      <p>
+        転送設定の Ingestion type で <code>Full</code> または <code>Incremental</code> を選択可能。
+        増分転送では、ウォーターマーク列を基準に<strong>前回の正常な転送以降に作成・変更された行のみ</strong>を転送します。
+        既存のフル転送設定を増分モードに変更した場合、変更後の初回転送は全データを転送し、以降は差分のみを転送します。
+      </p>
+    </div>
+
+    <div class="card">
+      <h4>2️⃣ Append / Upsert 書き込みモード</h4>
+      <p>
+        <strong>Append (<code>WRITE_MODE_APPEND</code>)</strong>: 新規・更新行を宛先テーブルに追記。ウォーターマーク列の指定が必要。<br>
+        <strong>Upsert (<code>WRITE_MODE_UPSERT</code>)</strong>: 主キーを基に、存在する行は更新、存在しない行は挿入。ウォーターマーク列と主キーの指定が必要。<br>
+        ※ ServiceNow コネクタの増分転送では Upsert モードを使用します。
+      </p>
+    </div>
+
+    <div class="card">
+      <h4>3️⃣ スキーマ変更への追従</h4>
+      <p>
+        ✓ <strong>列追加</strong>: 宛先 BigQuery テーブルに新しい列が追加される (過去レコードは NULL)<br>
+        ✓ <strong>列削除</strong>: 宛先テーブルに列は残り、新規エントリは NULL で埋められる<br>
+        ✓ <strong>型変更</strong>: <code>ALTER COLUMN</code> DDL でサポートされる型変換のみ対応<br>
+        ✓ <strong>リネーム</strong>: 元の列は残り、新しい名前の列が追加される
+      </p>
+    </div>
+  </div>
+
+  <!-- 技術仕様 -->
+  <div class="section">
+    <h2>🔬 技術仕様</h2>
+
+    <h3>📋 増分転送の要件</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>項目</th>
+          <th>🐘 PostgreSQL</th>
+          <th>🎫 ServiceNow</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>ウォーターマーク列の型</td>
+          <td>TIMESTAMP のみ</td>
+          <td>DATETIME のみ</td>
+        </tr>
+        <tr>
+          <td>書き込みモード</td>
+          <td>Append / Upsert</td>
+          <td>Upsert</td>
+        </tr>
+        <tr>
+          <td>主キー</td>
+          <td>Upsert 時に必須</td>
+          <td>必須 (例: <code>sys_id</code>)</td>
+        </tr>
+        <tr>
+          <td>データ型マッピング</td>
+          <td>更新版マッピング必須<br>(<code>connector.legacyMapping: false</code>)</td>
+          <td>更新版マッピング必須<br>(<code>connector.legacyMapping: false</code>)</td>
+        </tr>
+        <tr>
+          <td>宛先テーブル</td>
+          <td>主キーでクラスタ化される</td>
+          <td>主キーでクラスタ化される</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>⚠️ 増分転送の主な制約</h3>
+    <ul class="compact">
+      <li>ウォーターマーク列の値は<strong>単調増加 (monotonically increasing)</strong> である必要がある</li>
+      <li>ソーステーブルでの<strong>削除操作は同期されない</strong></li>
+      <li>1 つの転送設定は増分またはフルの<strong>どちらか一方のみ</strong>をサポート</li>
+      <li>初回の増分転送実行後は、アセットリスト・書き込みモード・ウォーターマーク列・主キーを<strong>変更できない</strong></li>
+      <li>宛先テーブルはクラスタ化テーブルの制限の対象となる</li>
+      <li>(PostgreSQL) ウォーターマーク列に<strong>インデックス</strong>を作成するとフィルタ性能が向上する</li>
+    </ul>
+  </div>
+
+  <!-- 設定方法 -->
+  <div class="section">
+    <h2>🛠️ 設定方法</h2>
+
+    <h3>✅ 前提条件</h3>
+    <ul class="compact">
+      <li>BigQuery Data Transfer Service を有効化し、<code>roles/bigquery.admin</code> など必要な IAM ロールを取得する</li>
+      <li>転送先の BigQuery データセットを作成する</li>
+      <li>(PostgreSQL) パブリック IP がない場合は<strong>ネットワークアタッチメント</strong>を設定する</li>
+      <li>(ServiceNow) OAuth 認証情報 (Client ID / Client Secret) を作成し、Procurement / Product Catalog / Contract Management アプリケーションを有効化する</li>
+    </ul>
+
+    <h3>📝 ステップ 1: PostgreSQL の増分転送設定を作成する</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Bash</span>
+        <span class="code-title">PostgreSQL 増分転送 (Append)</span>
+      </div>
+      <pre><code class="language-bash">bq mk --transfer_config \
+  --target_dataset=mydataset \
+  --data_source=postgresql \
+  --display_name='My Incremental PG Transfer' \
+  --params='{
+    "assets": ["DB1/PUBLIC/DEPARTMENT"],
+    "connector.database": "DB1",
+    "connector.endpoint.host": "192.168.0.1",
+    "connector.endpoint.port": 5432,
+    "connector.authentication.username": "User1",
+    "connector.authentication.password": "********",
+    "connector.tls.mode": "ENCRYPT_VERIFY_CA_AND_HOST",
+    "ingestionType": "incremental",
+    "writeMode": "WRITE_MODE_APPEND",
+    "watermarkColumns": ["createdAt"],
+    "connector.legacyMapping": false
+  }'</code></pre>
+    </div>
+    <p style="font-size: 14px;">
+      <code>ingestionType</code> に <code>incremental</code> を指定し、ウォーターマーク列を設定します。
+      増分転送では <code>connector.legacyMapping</code> を <code>false</code> (更新版データ型マッピング) にする必要があります。
+    </p>
+
+    <h3>📝 ステップ 2: ServiceNow の増分転送設定を作成する (Upsert)</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Bash</span>
+        <span class="code-title">ServiceNow 増分転送 (Upsert)</span>
+      </div>
+      <pre><code class="language-bash">bq mk --transfer_config \
+  --target_dataset=mydataset \
+  --data_source=servicenow \
+  --display_name='My Incremental ServiceNow Transfer' \
+  --params='{
+    "assets": ["incident", "change_request"],
+    "connector.instanceId": "dev-instance",
+    "connector.authentication.username": "user1",
+    "connector.authentication.password": "********",
+    "connector.authentication.oauth.clientId": "1234567890",
+    "connector.authentication.oauth.clientSecret": "********",
+    "ingestionType": "incremental",
+    "writeMode": "WRITE_MODE_UPSERT",
+    "watermarkColumns": ["sys_updated_on", "sys_updated_on"],
+    "primaryKeys": [["sys_id"], ["sys_id"]]
+  }'</code></pre>
+    </div>
+    <div class="note-box">
+      <strong>💡 ヒント:</strong> 複数アセットを指定する場合、<code>watermarkColumns</code> と <code>primaryKeys</code> の値は
+      <code>assets</code> の並び順に対応させます。Google Cloud コンソールの「データ転送」ページからも同様の設定が可能です。
+    </div>
+  </div>
+
+  <!-- メリット -->
+  <div class="section">
+    <h2>🚀 メリット</h2>
+    <div class="grid-2">
+      <div>
+        <h3>💼 ビジネス面</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>コスト効率の向上</strong>: 転送データ量が差分のみになり、転送時間とリソース消費を削減</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>本番利用への道が開けた</strong>: GA により Pre-GA 条項の制約がなくなり、エンタープライズの本番パイプラインに組み込める</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>鮮度の高い分析</strong>: 高頻度な同期 (ServiceNow は最短 15 分間隔) が現実的になり、分析データの鮮度が向上</span></div>
+      </div>
+      <div>
+        <h3>🔧 技術面</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>ソース負荷の軽減</strong>: PostgreSQL / ServiceNow へのクエリ負荷が差分抽出のみに抑えられる</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>Upsert による同期の自動化</strong>: 宛先テーブルをソースと一致させる処理を自作する必要がない</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>クエリ性能の最適化</strong>: 宛先テーブルが主キーでクラスタ化され、キー条件のクエリ性能が向上</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- デメリット・制約事項 -->
+  <div class="section">
+    <h2>⚠️ デメリット・制約事項</h2>
+
+    <h3>🚫 制限事項</h3>
+    <div class="check-item"><span class="cross-icon">✗</span><span><strong>削除操作は同期されない</strong>ため、ソースで削除された行は宛先テーブルに残り続ける (完全な一致が必要な場合はフル転送や別途の削除処理が必要)</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span>ウォーターマーク列は PostgreSQL では TIMESTAMP 型、ServiceNow では DATETIME 型のみで、値が<strong>単調増加</strong>している必要がある</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span>初回の増分転送実行後は、アセットリスト・書き込みモード・ウォーターマーク列・主キーを変更できない (変更する場合は転送設定の作り直しが必要)</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span>増分転送では<strong>更新版データ型マッピングが必須</strong> (PostgreSQL: <code>timestamp</code> → DATETIME、<code>json</code>/<code>jsonb</code> → JSON など、レガシーとは型マッピングが異なる)</span></div>
+
+    <h3>🤔 考慮すべき点</h3>
+    <div class="warning-box">
+      <ul class="compact" style="margin: 0;">
+        <li>Upsert モードで指定する主キーは<strong>全行で一意かつ非 NULL</strong> である必要がある。一意性に確信が持てない場合はフル取り込みが推奨されている</li>
+        <li>既存のフル転送設定を増分に切り替えた直後の<strong>初回転送は全データを転送</strong>するため、初回のみ時間とコストがかかる</li>
+        <li>行の物理的な削除や履歴管理が必要な場合は、<strong>Datastream などの CDC ソリューション</strong>との比較検討が必要</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ユースケース -->
+  <div class="section">
+    <h2>🎯 ユースケース</h2>
+
+    <div class="usecase">
+      <h4>🎫 ユースケース 1: ServiceNow インシデントデータのニアリアルタイム分析</h4>
+      <p><strong>シナリオ</strong>: ITSM チームが ServiceNow の <code>incident</code> / <code>change_request</code> テーブルを BigQuery に同期し、Looker Studio でインシデント対応状況のダッシュボードを運用。従来のフル転送では転送時間が長く、1 日 1 回の更新が限界だった。</p>
+      <p><strong>実装例</strong>: ウォーターマーク列に <code>sys_updated_on</code>、主キーに <code>sys_id</code> を指定した Upsert 増分転送を構成し、転送頻度を短縮する。</p>
+      <p><strong>効果</strong>: 転送あたりのデータ量が差分のみとなり、ServiceNow インスタンスへの負荷を抑えながら高頻度の同期が可能に。ダッシュボードがより新しいデータを反映できる。</p>
+    </div>
+
+    <div class="usecase">
+      <h4>🐘 ユースケース 2: 業務系 PostgreSQL データベースの DWH への差分ロード</h4>
+      <p><strong>シナリオ</strong>: Cloud SQL for PostgreSQL 上の数億行規模のトランザクションテーブルを BigQuery に日次ロードしており、フルロードによる転送時間の長期化とソース DB の負荷が課題。</p>
+      <p><strong>効果</strong>: <code>updated_at</code> のような TIMESTAMP 列をウォーターマークとした増分転送 (Append または Upsert) により、日次の転送が差分のみで完了し、転送ウィンドウとソース DB の負荷が大幅に削減。宛先テーブルは主キーでクラスタ化されるためクエリ効率も向上する。</p>
+    </div>
+  </div>
+
+  <!-- 料金 -->
+  <div class="section">
+    <h2>💰 料金</h2>
+    <p>
+      PostgreSQL / ServiceNow 転送の料金は BigQuery Data Transfer Service の料金体系に従います。
+      増分転送により転送対象のデータ量が削減されるため、フル転送と比較して<span class="highlight">転送関連コストの最適化</span>が期待できます。
+    </p>
+    <p>
+      📎 <a class="gc-link" href="https://cloud.google.com/bigquery/pricing#data-transfer-service-pricing" target="_blank" rel="noopener noreferrer">BigQuery Data Transfer Service の料金</a>
+    </p>
+  </div>
+
+  <!-- 関連サービス -->
+  <div class="section">
+    <h2>🔗 関連サービス・機能</h2>
+    <ul class="compact">
+      <li><strong>Cloud SQL for PostgreSQL / AlloyDB for PostgreSQL</strong>: PostgreSQL コネクタの代表的な転送元。ネットワークアタッチメント経由でプライベート接続が可能</li>
+      <li><strong>VPC ネットワークアタッチメント</strong>: パブリック IP を持たないデータベースや、固定 IP での接続が必要な ServiceNow インスタンスへの接続に使用</li>
+      <li><strong>Datastream</strong>: CDC (変更データキャプチャ) ベースのレプリケーションサービス。削除の同期や低レイテンシのレプリケーションが必要な場合の代替・補完手段</li>
+      <li><strong>Pub/Sub / メール通知</strong>: 転送実行の成否を通知する BigQuery Data Transfer Service の実行通知機能</li>
+      <li><strong>BigQuery クラスタ化テーブル</strong>: 増分転送の宛先テーブルは主キーでクラスタ化され、その制限事項が適用される</li>
+    </ul>
+  </div>
+
+  <!-- まとめ -->
+  <div class="section">
+    <h2>📝 まとめ</h2>
+    <div class="success-box">
+      <p style="margin: 0 0 8px 0;">
+        BigQuery Data Transfer Service の PostgreSQL / ServiceNow 向け増分データ転送が <strong>GA</strong> となり、
+        <span class="highlight">差分のみを転送する効率的なデータパイプライン</span>を本番環境で構築できるようになりました。
+      </p>
+      <p style="margin: 0;">
+        現在フル転送を使用している場合は、ウォーターマーク列と主キーの設計 (単調増加する TIMESTAMP/DATETIME 列、一意な主キー) を確認のうえ、
+        増分転送への移行を検討することを推奨します。削除の同期が必要な場合は <strong>Datastream などの CDC ソリューション</strong>との使い分けも併せて検討してください。
+      </p>
+    </div>
+  </div>
+
+  <footer>
+    <p>📎 出典・参考リンク:</p>
+    <ul>
+      <li><a class="gc-link" href="https://docs.cloud.google.com/release-notes#October_12_2026" target="_blank" rel="noopener noreferrer">公式リリースノート (2026-10-12)</a></li>
+      <li><a class="gc-link" href="https://docs.cloud.google.com/bigquery/docs/postgresql-transfer-intro#full-incremental-transfers" target="_blank" rel="noopener noreferrer">ドキュメント: PostgreSQL データ転送の概要 (Full or incremental transfers)</a></li>
+      <li><a class="gc-link" href="https://docs.cloud.google.com/bigquery/docs/postgresql-transfer" target="_blank" rel="noopener noreferrer">ドキュメント: PostgreSQL 転送のスケジュール設定</a></li>
+      <li><a class="gc-link" href="https://docs.cloud.google.com/bigquery/docs/servicenow-transfer#full_or_incremental_transfers" target="_blank" rel="noopener noreferrer">ドキュメント: ServiceNow データの BigQuery への読み込み (Full or incremental transfers)</a></li>
+      <li><a class="gc-link" href="https://docs.cloud.google.com/bigquery/docs/dts-introduction" target="_blank" rel="noopener noreferrer">ドキュメント: BigQuery Data Transfer Service の概要</a></li>
+      <li><a class="gc-link" href="https://cloud.google.com/bigquery/pricing#data-transfer-service-pricing" target="_blank" rel="noopener noreferrer">料金ページ</a></li>
+    </ul>
+    <p>タグ: BigQuery / BigQuery Data Transfer Service / PostgreSQL / ServiceNow / 増分転送 / データパイプライン / GA</p>
+  </footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#4285F4',
+      primaryTextColor: '#202124',
+      primaryBorderColor: '#4285F4',
+      lineColor: '#4285F4',
+      secondaryColor: '#F1F3F4',
+      tertiaryColor: '#FAFAFA',
+      background: '#FFFFFF',
+      mainBkg: '#E8F0FE',
+      nodeBorder: '#4285F4',
+      clusterBkg: '#E8F0FE',
+      clusterBorder: '#4285F4',
+      edgeLabelBackground: '#FFFFFF',
+      textColor: '#202124'
+    }
+  });
+</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

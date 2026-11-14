@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GKE: HealthCheckPolicy バリデーション強化</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* Header */
+    .header {
+      margin-bottom: 32px;
+      padding-bottom: 20px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .header h1 {
+      font-size: 34px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      line-height: 1.3;
+    }
+    .header-meta {
+      text-align: right;
+      font-size: 14px;
+      color: var(--gc-outline);
+      white-space: nowrap;
+    }
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      background: var(--gc-blue-600);
+    }
+    .badge-change {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      background: var(--gc-orange);
+    }
+
+    /* Section */
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    /* Cards */
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+    .card h3 {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 8px;
+    }
+    .card p, .card ul {
+      font-size: 15px;
+      color: var(--gc-on-surface-variant);
+    }
+    .card ul {
+      padding-left: 20px;
+      margin-top: 8px;
+    }
+    .card ul li {
+      margin-bottom: 4px;
+    }
+
+    /* Before/After */
+    .before-after-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 16px;
+    }
+    @media (max-width: 600px) {
+      .before-after-grid { grid-template-columns: 1fr; }
+    }
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+    .before-box h3 {
+      color: var(--gc-red);
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+    .after-box h3 {
+      color: var(--gc-green);
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .before-box ul, .after-box ul {
+      padding-left: 20px;
+      font-size: 14px;
+      color: var(--gc-on-surface-variant);
+    }
+    .before-box ul li, .after-box ul li {
+      margin-bottom: 6px;
+    }
+
+    /* Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-top: 16px;
+    }
+    @media (max-width: 700px) {
+      .stats-grid { grid-template-columns: 1fr; }
+    }
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Flow diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Feature grid */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 16px;
+    }
+    @media (max-width: 600px) {
+      .feature-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* Note/Warning boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Usecase */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+    .usecase-card h3 {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--gc-blue-900);
+      margin-bottom: 8px;
+    }
+    .usecase-card p {
+      font-size: 15px;
+      color: var(--gc-on-surface-variant);
+    }
+
+    /* Mermaid */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Code blocks */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+    .code-title {
+      color: #AAAAAA;
+    }
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      background: #1E1E1E;
+    }
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Link */
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* Related service */
+    .related-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 16px;
+    }
+    @media (max-width: 600px) {
+      .related-grid { grid-template-columns: 1fr; }
+    }
+    .related-card {
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+    .related-card strong {
+      color: var(--gc-on-surface);
+      font-size: 14px;
+    }
+    .related-card p {
+      font-size: 13px;
+      color: var(--gc-outline);
+      margin-top: 4px;
+    }
+
+    /* Check items */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+    .check-icon { color: var(--gc-green); font-size: 18px; }
+    .cross-icon { color: var(--gc-red); font-size: 18px; }
+
+    /* Steps */
+    .step-list {
+      counter-reset: step-counter;
+      list-style: none;
+      padding: 0;
+    }
+    .step-list li {
+      counter-increment: step-counter;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 16px;
+      padding: 14px 16px;
+      background: var(--gc-surface);
+      border-radius: 8px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+    .step-list li::before {
+      content: counter(step-counter);
+      flex-shrink: 0;
+      width: 32px;
+      height: 32px;
+      background: var(--gc-blue-600);
+      color: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 15px;
+    }
+
+    /* Footer */
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-top">
+        <h1>&#9875; GKE: HealthCheckPolicy<br>バリデーション強化</h1>
+        <div class="header-meta">2026-04-13</div>
+      </div>
+      <div class="badge-row">
+        <span class="badge">Google Kubernetes Engine</span>
+        <span class="badge">Gateway API</span>
+        <span class="badge">HealthCheckPolicy</span>
+        <span class="badge-change">Change</span>
+        <span class="badge" style="background: var(--gc-blue-500);">GKE 1.34+</span>
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>&#128221; 概要</h2>
+      <p><span class="highlight">GKE バージョン 1.34</span> 以降において、GKE Gateway API の <span class="highlight">HealthCheckPolicy</span> カスタムリソースのバリデーションが強化されました。具体的には、HealthCheckPolicy の <code>config</code> セクション内の <code>type</code> フィールドと、実際に指定されたヘルスチェック設定フィールド (例: <code>httpHealthCheck</code>, <code>tcpHealthCheck</code>) の<strong>整合性が自動的に検証</strong>されるようになりました。</p>
+      <p style="margin-top: 12px;">以前のバージョンでは、<code>type</code> フィールドと実際のヘルスチェック設定フィールドが一致しない場合でもリソースが受け入れられ、<code>type</code> フィールドの値が優先される暗黙的な動作がありました。GKE 1.34 以降では、このようなミスマッチが検出された場合に <code>kubectl</code> がポリシーを拒否し、設定ミスをデプロイ前に防止できます。</p>
+
+      <div class="stats-grid" style="margin-top: 20px;">
+        <div class="stat-card">
+          <div class="stat-value">5</div>
+          <div class="stat-label">対応ヘルスチェックタイプ</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-green), #2E7D32);">
+          <div class="stat-value">v1.34+</div>
+          <div class="stat-label">適用対象 GKE バージョン</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-orange), #E65100);">
+          <div class="stat-value">即時</div>
+          <div class="stat-label">デプロイ時バリデーション</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Before / After -->
+    <div class="section">
+      <h2>&#128260; Before / After 比較</h2>
+      <div class="before-after-grid">
+        <div class="before-box">
+          <h3>&#10060; Before (GKE 1.33 以前)</h3>
+          <ul>
+            <li><code>type: TCP</code> と指定しながら <code>httpHealthCheck</code> を設定するなど、不一致でも受け入れられていた</li>
+            <li>不一致の場合、<code>type</code> フィールドの値のみが使用され、設定したヘルスチェックフィールドの内容が<strong>無視</strong>されていた</li>
+            <li>設定ミスが検出されないまま運用され、意図しないプロトコルでヘルスチェックが実行される可能性があった</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>&#9989; After (GKE 1.34 以降)</h3>
+          <ul>
+            <li>HealthCheckPolicy の作成・更新時に <code>type</code> フィールドとヘルスチェック設定フィールドの整合性が<strong>自動検証</strong></li>
+            <li>ミスマッチが検出された場合、<code>kubectl</code> がポリシーを即座に<strong>拒否</strong>し、設定ミスをデプロイ前に防止</li>
+            <li>既存のミスマッチを含むリソースは後方互換性のため<strong>免除</strong>され、引き続き動作</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid from source) -->
+    <div class="section">
+      <h2>&#127959; アーキテクチャ図</h2>
+      <p>GKE 1.34 以降の HealthCheckPolicy バリデーションの動作を示しています。<code>type</code> フィールドと対応するヘルスチェック設定フィールドが一致する場合のみ適用が成功し、不一致の場合は拒否されます。既存のミスマッチリソースは免除されますが、更新時に新たなミスマッチを導入することはできません。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Valid["有効な設定例"]
+        V1["type: HTTP\n+ httpHealthCheck"] -->|kubectl apply| V1R["適用成功"]
+        V2["type: TCP\n+ tcpHealthCheck"] -->|kubectl apply| V2R["適用成功"]
+        V3["type: HTTPS\n+ httpsHealthCheck"] -->|kubectl apply| V3R["適用成功"]
+        V4["type: GRPC\n+ grpcHealthCheck"] -->|kubectl apply| V4R["適用成功"]
+        V5["type: HTTP2\n+ http2HealthCheck"] -->|kubectl apply| V5R["適用成功"]
+    end
+
+    subgraph Invalid["無効な設定例 (GKE 1.34 以降で拒否)"]
+        I1["type: TCP\n+ httpHealthCheck"] -->|kubectl apply| I1R["拒否"]
+        I2["type: HTTP\n+ tcpHealthCheck"] -->|kubectl apply| I2R["拒否"]
+        I3["type: GRPC\n+ httpsHealthCheck"] -->|kubectl apply| I3R["拒否"]
+    end
+
+    subgraph Existing["既存リソースの扱い"]
+        E1["既存のミスマッチ\nリソース"] -->|変更なし| E1R["引き続き動作"]
+        E1 -->|ミスマッチを\n更新| E1F["拒否"]
+    end
+
+    style Valid fill:#e8f5e9,stroke:#4caf50
+    style Invalid fill:#ffebee,stroke:#f44336
+    style Existing fill:#fff3e0,stroke:#ff9800
+    style V1R fill:#c8e6c9,stroke:#4caf50
+    style V2R fill:#c8e6c9,stroke:#4caf50
+    style V3R fill:#c8e6c9,stroke:#4caf50
+    style V4R fill:#c8e6c9,stroke:#4caf50
+    style V5R fill:#c8e6c9,stroke:#4caf50
+    style I1R fill:#ffcdd2,stroke:#f44336
+    style I2R fill:#ffcdd2,stroke:#f44336
+    style I3R fill:#ffcdd2,stroke:#f44336
+    style E1R fill:#ffe0b2,stroke:#ff9800
+    style E1F fill:#ffcdd2,stroke:#f44336
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>&#9889; 主要機能</h2>
+      <div class="card">
+        <h3>&#128270; type フィールドとヘルスチェック設定の整合性検証</h3>
+        <ul>
+          <li>HealthCheckPolicy の <code>config.type</code> フィールドが、指定されたヘルスチェック設定フィールドと一致するかを検証</li>
+          <li>例: <code>type: TCP</code> を指定した場合、<code>tcpHealthCheck</code> フィールドの設定が必要であり、<code>httpHealthCheck</code> を設定するとバリデーションエラー</li>
+          <li>GKE バージョン 1.34 以降で自動的に適用される</li>
+        </ul>
+      </div>
+      <div class="card" style="border-left-color: var(--gc-green);">
+        <h3>&#128260; 既存リソースの後方互換性</h3>
+        <ul>
+          <li>GKE 1.34 へのアップグレード前に作成された、ミスマッチを含む HealthCheckPolicy リソースは引き続き動作</li>
+          <li>これらの既存リソースは<strong>免除 (exempt)</strong> として扱われ、既存の動作が維持される</li>
+          <li>ただし、既存リソースを更新する際に新たなミスマッチを導入したり、既存のミスマッチフィールドを別の無効な値に変更することはできない</li>
+        </ul>
+      </div>
+      <div class="card" style="border-left-color: var(--gc-orange);">
+        <h3>&#128640; デプロイ時の即時フィードバック</h3>
+        <ul>
+          <li><code>kubectl apply</code> や <code>kubectl create</code> の実行時にバリデーションエラーが即座に返される</li>
+          <li>CI/CD パイプラインでの設定ミス検出が容易になり、本番環境への不正な設定のデプロイを防止</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Technical Specs -->
+    <div class="section">
+      <h2>&#128295; 技術仕様</h2>
+
+      <h3 style="font-size: 18px; margin: 0 0 12px; color: var(--gc-on-surface);">type フィールドとヘルスチェック設定の対応表</h3>
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>type フィールド</th>
+              <th>対応するヘルスチェック設定</th>
+              <th>主な用途</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>HTTP</code></td>
+              <td><code>httpHealthCheck</code></td>
+              <td>HTTP エンドポイントのヘルスチェック</td>
+            </tr>
+            <tr>
+              <td><code>HTTPS</code></td>
+              <td><code>httpsHealthCheck</code></td>
+              <td>HTTPS エンドポイントのヘルスチェック</td>
+            </tr>
+            <tr>
+              <td><code>TCP</code></td>
+              <td><code>tcpHealthCheck</code></td>
+              <td>TCP ポートの疎通確認</td>
+            </tr>
+            <tr>
+              <td><code>GRPC</code></td>
+              <td><code>grpcHealthCheck</code></td>
+              <td>gRPC ヘルスチェックプロトコル</td>
+            </tr>
+            <tr>
+              <td><code>HTTP2</code></td>
+              <td><code>http2HealthCheck</code></td>
+              <td>HTTP/2 エンドポイントのヘルスチェック</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 style="font-size: 18px; margin: 24px 0 12px; color: var(--gc-on-surface);">バリデーションルール</h3>
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>シナリオ</th>
+              <th>GKE 1.33 以前</th>
+              <th>GKE 1.34 以降</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>type と設定が一致</td>
+              <td style="color: var(--gc-green); font-weight: 600;">適用成功</td>
+              <td style="color: var(--gc-green); font-weight: 600;">適用成功</td>
+            </tr>
+            <tr>
+              <td>type と設定が不一致 (新規作成)</td>
+              <td>適用成功 (type が優先、設定は無視)</td>
+              <td style="color: var(--gc-red); font-weight: 600;">拒否</td>
+            </tr>
+            <tr>
+              <td>type と設定が不一致 (既存リソース、変更なし)</td>
+              <td>動作継続</td>
+              <td style="color: var(--gc-orange); font-weight: 600;">動作継続 (免除)</td>
+            </tr>
+            <tr>
+              <td>既存ミスマッチリソースへの新たなミスマッチ追加</td>
+              <td>適用成功</td>
+              <td style="color: var(--gc-red); font-weight: 600;">拒否</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Code Examples -->
+    <div class="section">
+      <h2>&#128187; 設定例</h2>
+
+      <h3 style="font-size: 18px; margin: 0 0 12px; color: var(--gc-on-surface);">&#9989; 有効な HealthCheckPolicy の設定例</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">YAML</span>
+          <span class="code-title">type: TCP と tcpHealthCheck が一致</span>
+        </div>
+        <pre><code class="language-yaml">apiVersion: networking.gke.io/v1
+kind: HealthCheckPolicy
+metadata:
+  name: tcp-healthcheck
+  namespace: my-app
+spec:
+  default:
+    checkIntervalSec: 15
+    timeoutSec: 5
+    healthyThreshold: 2
+    unhealthyThreshold: 3
+    logConfig:
+      enabled: true
+    config:
+      type: TCP
+      tcpHealthCheck:
+        port: 8080
+  targetRef:
+    group: ""
+    kind: Service
+    name: my-backend-service</code></pre>
+      </div>
+
+      <h3 style="font-size: 18px; margin: 24px 0 12px; color: var(--gc-on-surface);">&#10060; 無効な HealthCheckPolicy の設定例 (GKE 1.34 以降で拒否)</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">YAML</span>
+          <span class="code-title">type: TCP と httpHealthCheck が不一致</span>
+        </div>
+        <pre><code class="language-yaml">apiVersion: networking.gke.io/v1
+kind: HealthCheckPolicy
+metadata:
+  name: mismatched-healthcheck
+  namespace: my-app
+spec:
+  default:
+    config:
+      type: TCP          # TCP を指定
+      httpHealthCheck:    # しかし HTTP のヘルスチェック設定を記述 (不一致)
+        port: 8080
+        requestPath: /health
+  targetRef:
+    group: ""
+    kind: Service
+    name: my-backend-service</code></pre>
+      </div>
+
+      <h3 style="font-size: 18px; margin: 24px 0 12px; color: var(--gc-on-surface);">&#128736; ミスマッチの修正例</h3>
+      <div class="feature-grid">
+        <div>
+          <p style="font-size: 14px; font-weight: 600; color: var(--gc-on-surface); margin-bottom: 8px;">パターン A: type に合わせて設定を変更</p>
+          <div class="code-block">
+            <div class="code-header">
+              <span class="code-lang">YAML</span>
+              <span class="code-title">type: TCP に合わせる</span>
+            </div>
+            <pre><code class="language-yaml">spec:
+  default:
+    config:
+      type: TCP
+      tcpHealthCheck:   # type: TCP と一致
+        port: 8080</code></pre>
+          </div>
+        </div>
+        <div>
+          <p style="font-size: 14px; font-weight: 600; color: var(--gc-on-surface); margin-bottom: 8px;">パターン B: 設定に合わせて type を変更</p>
+          <div class="code-block">
+            <div class="code-header">
+              <span class="code-lang">YAML</span>
+              <span class="code-title">httpHealthCheck に合わせる</span>
+            </div>
+            <pre><code class="language-yaml">spec:
+  default:
+    config:
+      type: HTTP
+      httpHealthCheck:  # type: HTTP と一致
+        port: 8080
+        requestPath: /health</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Setup Steps -->
+    <div class="section">
+      <h2>&#128736; 設定方法</h2>
+
+      <h3 style="font-size: 18px; margin-bottom: 12px; color: var(--gc-on-surface);">前提条件</h3>
+      <div class="note-box">
+        <div class="check-item"><span class="check-icon">&#10003;</span><span>GKE クラスタがバージョン 1.34 以降にアップグレードされていること</span></div>
+        <div class="check-item"><span class="check-icon">&#10003;</span><span>GKE Gateway API が有効化されていること (<code>--gateway-api=standard</code>)</span></div>
+        <div class="check-item"><span class="check-icon">&#10003;</span><span>HealthCheckPolicy CRD がクラスタにインストールされていること</span></div>
+      </div>
+
+      <h3 style="font-size: 18px; margin: 24px 0 12px; color: var(--gc-on-surface);">手順</h3>
+      <ol class="step-list">
+        <li>
+          <div>
+            <strong>既存の HealthCheckPolicy リソースの確認</strong>
+            <p style="margin-top: 6px; font-size: 14px;">クラスタ内の全ての HealthCheckPolicy リソースを一覧表示し、確認対象を把握します。</p>
+            <div class="code-block" style="margin-top: 10px;">
+              <div class="code-header"><span class="code-lang">Bash</span></div>
+              <pre><code class="language-bash">kubectl get healthcheckpolicies --all-namespaces</code></pre>
+            </div>
+          </div>
+        </li>
+        <li>
+          <div>
+            <strong>各ポリシーの type フィールドとヘルスチェック設定の整合性を確認</strong>
+            <p style="margin-top: 6px; font-size: 14px;">出力された YAML の <code>spec.default.config</code> セクションで、<code>type</code> フィールドと実際のヘルスチェック設定フィールドが一致しているかを確認します。</p>
+            <div class="code-block" style="margin-top: 10px;">
+              <div class="code-header"><span class="code-lang">Bash</span></div>
+              <pre><code class="language-bash">kubectl get healthcheckpolicy &lt;POLICY_NAME&gt; -n &lt;NAMESPACE&gt; -o yaml</code></pre>
+            </div>
+          </div>
+        </li>
+        <li>
+          <div>
+            <strong>ミスマッチの修正</strong>
+            <p style="margin-top: 6px; font-size: 14px;">ミスマッチが見つかった場合、<code>type</code> フィールドまたはヘルスチェック設定フィールドのいずれかを修正して整合性を確保します。意図するヘルスチェックプロトコルに基づいて修正パターンを選択してください。</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <strong>修正の適用と確認</strong>
+            <p style="margin-top: 6px; font-size: 14px;">修正したポリシーを適用し、Conditions セクションで正常にアタッチされていることを確認します。</p>
+            <div class="code-block" style="margin-top: 10px;">
+              <div class="code-header"><span class="code-lang">Bash</span></div>
+              <pre><code class="language-bash">kubectl apply -f healthcheckpolicy.yaml
+kubectl describe healthcheckpolicy &lt;POLICY_NAME&gt; -n &lt;NAMESPACE&gt;</code></pre>
+            </div>
+          </div>
+        </li>
+      </ol>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>&#128161; メリット</h2>
+      <div class="feature-grid">
+        <div style="padding: 0;">
+          <h3 style="font-size: 18px; margin-bottom: 12px; color: var(--gc-on-surface);">&#128188; ビジネス面</h3>
+          <div class="success-box">
+            <div class="check-item"><span class="check-icon">&#10003;</span><span><strong>運用リスクの低減</strong>: 設定ミスが自動的に検出されるため、意図しないヘルスチェック動作による本番障害リスクが低減</span></div>
+            <div class="check-item"><span class="check-icon">&#10003;</span><span><strong>デバッグ時間の短縮</strong>: ヘルスチェックの設定ミスがデプロイ時に即座にフィードバックされるため、問題の原因調査時間を大幅に短縮</span></div>
+          </div>
+        </div>
+        <div style="padding: 0;">
+          <h3 style="font-size: 18px; margin-bottom: 12px; color: var(--gc-on-surface);">&#9881; 技術面</h3>
+          <div class="success-box">
+            <div class="check-item"><span class="check-icon">&#10003;</span><span><strong>設定の明示性向上</strong>: <code>type</code> フィールドとヘルスチェック設定が必ず一致するため、ポリシーの意図が明確になり、コードレビューや監査が容易に</span></div>
+            <div class="check-item"><span class="check-icon">&#10003;</span><span><strong>CI/CD パイプラインとの親和性</strong>: バリデーションエラーが <code>kubectl</code> レベルで検出されるため、GitOps ワークフローの品質ゲートとして機能</span></div>
+            <div class="check-item"><span class="check-icon">&#10003;</span><span><strong>後方互換性の確保</strong>: 既存リソースが免除されるため、GKE 1.34 へのアップグレード時にワークロードへの即時影響なし</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>&#9888; デメリット・制約事項</h2>
+      <h3 style="font-size: 18px; margin-bottom: 12px; color: var(--gc-on-surface);">制限事項</h3>
+      <div class="warning-box">
+        <div class="check-item"><span class="cross-icon">&#10005;</span><span>GKE バージョン 1.34 以降でのみ有効であり、1.33 以前のクラスタでは従来の動作が継続される</span></div>
+        <div class="check-item"><span class="cross-icon">&#10005;</span><span>既存のミスマッチリソースは免除されるため、アップグレード後に自動的に修正されるわけではない。手動での確認と修正が必要</span></div>
+      </div>
+
+      <h3 style="font-size: 18px; margin: 20px 0 12px; color: var(--gc-on-surface);">考慮すべき点</h3>
+      <div class="note-box">
+        <ul style="padding-left: 20px; font-size: 15px;">
+          <li style="margin-bottom: 6px;">GKE 1.34 へのアップグレード前に、既存の HealthCheckPolicy リソースに <code>type</code> フィールドとヘルスチェック設定のミスマッチがないか事前に確認することを推奨</li>
+          <li style="margin-bottom: 6px;">免除された既存リソースは動作し続けるが、<code>type</code> フィールドの値が実際のヘルスチェックプロトコルとして使用され、ヘルスチェック設定フィールドの内容は無視されるという従来の動作が維持される</li>
+          <li>CI/CD パイプラインでマニフェストの lint や dry-run テストを実行している場合、GKE 1.34 クラスタへの適用時に新たなバリデーションエラーが発生する可能性がある</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>&#127919; ユースケース</h2>
+      <div class="usecase-card">
+        <h3>&#128268; ユースケース 1: TCP バックエンドサービスのヘルスチェック設定</h3>
+        <p><strong>シナリオ</strong>: GKE Gateway の背後で TCP ベースのバックエンドサービス (データベースプロキシなど) を運用しており、TCP ポートの疎通確認でヘルスチェックを行いたい。</p>
+        <div class="code-block" style="margin-top: 12px;">
+          <div class="code-header"><span class="code-lang">YAML</span><span class="code-title">TCP ヘルスチェック設定例</span></div>
+          <pre><code class="language-yaml">apiVersion: networking.gke.io/v1
+kind: HealthCheckPolicy
+metadata:
+  name: tcp-backend-healthcheck
+  namespace: database
+spec:
+  default:
+    checkIntervalSec: 10
+    timeoutSec: 5
+    unhealthyThreshold: 3
+    config:
+      type: TCP
+      tcpHealthCheck:
+        port: 5432
+  targetRef:
+    group: ""
+    kind: Service
+    name: db-proxy-service</code></pre>
+        </div>
+        <div class="success-box" style="margin-top: 10px;">
+          <strong>効果</strong>: <code>type: TCP</code> と <code>tcpHealthCheck</code> が一致しているため、GKE 1.34 でもバリデーションを通過。TCP ポート 5432 の疎通確認によるヘルスチェックが意図通りに動作。
+        </div>
+      </div>
+
+      <div class="usecase-card">
+        <h3>&#128269; ユースケース 2: GKE 1.34 アップグレード前の既存設定の監査</h3>
+        <p><strong>シナリオ</strong>: GKE 1.33 で運用中のクラスタを 1.34 にアップグレードする前に、既存の HealthCheckPolicy リソースにミスマッチがないか確認したい。</p>
+        <div class="code-block" style="margin-top: 12px;">
+          <div class="code-header"><span class="code-lang">Bash</span><span class="code-title">ミスマッチ確認コマンド</span></div>
+          <pre><code class="language-bash"># 全 HealthCheckPolicy を YAML で出力して確認
+kubectl get healthcheckpolicies --all-namespaces -o yaml | \
+  grep -A 10 "config:" | grep -E "(type:|HealthCheck:)"</code></pre>
+        </div>
+        <div class="success-box" style="margin-top: 10px;">
+          <strong>効果</strong>: アップグレード前にミスマッチを特定し、修正することで、アップグレード後のポリシー更新時にバリデーションエラーが発生するリスクを排除。
+        </div>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#128279; 関連サービス・機能</h2>
+      <div class="related-grid">
+        <div class="related-card">
+          <strong>&#9875; GKE Gateway API</strong>
+          <p>HealthCheckPolicy は GKE Gateway API のポリシーリソースの一つであり、ロードバランサのヘルスチェック動作を制御</p>
+        </div>
+        <div class="related-card">
+          <strong>&#9878; Cloud Load Balancing</strong>
+          <p>GKE Gateway の基盤となるロードバランシングサービス。HealthCheckPolicy の設定は Cloud Load Balancing のヘルスチェックリソースにマッピングされる</p>
+        </div>
+        <div class="related-card">
+          <strong>&#128737; GCPBackendPolicy</strong>
+          <p>バックエンドサービスのセッションアフィニティ、Cloud Armor、CDN などを構成するポリシーリソース。HealthCheckPolicy と同様に Service を対象とする</p>
+        </div>
+        <div class="related-card">
+          <strong>&#127760; GCPGatewayPolicy</strong>
+          <p>Gateway のフロントエンド設定 (SSL ポリシー、グローバルアクセスなど) を構成するポリシーリソース</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>&#128206; 出典:</strong></p>
+      <ul style="list-style: none; padding: 0; margin-top: 8px;">
+        <li style="margin-bottom: 4px;">&#8594; <a href="https://cloud.google.com/release-notes#April_13_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li style="margin-bottom: 4px;">&#8594; <a href="https://docs.cloud.google.com/kubernetes-engine/docs/how-to/configure-gateway-resources#configure_health_check" target="_blank" rel="noopener noreferrer">Gateway リソースのヘルスチェック構成</a></li>
+        <li style="margin-bottom: 4px;">&#8594; <a href="https://docs.cloud.google.com/kubernetes-engine/docs/concepts/gateway-api" target="_blank" rel="noopener noreferrer">GKE Gateway API の概要</a></li>
+        <li style="margin-bottom: 4px;">&#8594; <a href="https://docs.cloud.google.com/load-balancing/docs/health-check-concepts" target="_blank" rel="noopener noreferrer">Cloud Load Balancing ヘルスチェックの概要</a></li>
+        <li style="margin-bottom: 4px;">&#8594; <a href="https://docs.cloud.google.com/compute/docs/reference/rest/v1/healthChecks" target="_blank" rel="noopener noreferrer">Compute Engine HealthChecks REST API リファレンス</a></li>
+      </ul>
+      <p style="margin-top: 12px; font-size: 11px; color: #999;">Generated on 2026-04-14</p>
+    </footer>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

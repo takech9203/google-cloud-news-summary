@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Managed Service for Apache Kafka: Cloud Storage Sink コネクタのパフォーマンス改善</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .badge-deprecated {
+      background: var(--gc-red);
+      color: #FFFFFF;
+    }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box, .after-box {
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid rgba(234, 67, 53, 0.3);
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid rgba(52, 168, 83, 0.3);
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-box h3 { color: #C5221F; }
+    .after-box h3 { color: #188038; }
+
+    .before-box ul, .after-box ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 6px 0;
+    }
+
+    @media (max-width: 700px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* フロー図スタイル */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* チェックリストスタイル */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* コードブロック (pre:not(.mermaid) で Mermaid を除外) */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block {
+      overflow: hidden;
+      padding: 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      border-radius: 0;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブルスタイル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* 統計カード */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-100);
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+    }
+
+    .usecase p {
+      margin: 8px 0;
+      font-size: 15px;
+    }
+
+    /* ステップ番号 */
+    .step-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--gc-blue-600);
+      color: #FFFFFF;
+      font-weight: 700;
+      font-size: 15px;
+      margin-right: 8px;
+      flex-shrink: 0;
+    }
+
+    .step-title {
+      display: flex;
+      align-items: center;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px;
+      font-size: 17px;
+    }
+
+    /* 関連サービスグリッド */
+    .related-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .related-card {
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 12px;
+      padding: 16px;
+      font-size: 14px;
+    }
+
+    .related-card strong {
+      color: var(--gc-on-surface);
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    ul {
+      padding-left: 24px;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <div style="margin-bottom: 8px;">
+          <span class="badge">Managed Service for Apache Kafka</span>
+          <span class="badge badge-ga">Feature (機能改善)</span>
+        </div>
+        <h1>📨 Cloud Storage Sink コネクタの<br>パフォーマンス改善</h1>
+      </div>
+      <div class="subtitle">📅 リリース日: 2026-10-14</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📝 概要</h2>
+      <p>
+        Google Cloud Managed Service for Apache Kafka の Kafka Connect で提供されている
+        <span class="highlight">Cloud Storage Sink コネクタ</span> のパフォーマンスが改善されました。
+        <strong>OOM エラーの削減</strong>・<strong>最大スループットの向上</strong>・<strong>大量の小さなファイル生成の回避</strong>が含まれます。
+      </p>
+      <p>
+        Cloud Storage Sink コネクタは、Kafka トピックのデータを Cloud Storage バケットにストリーミングするコネクタで、
+        データレイクへの取り込みや規制要件を満たすためのデータアーカイブなどに利用されます。
+        <span class="highlight">追加の設定変更やコード修正なし</span>でメリットを享受できます。
+      </p>
+
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">🛡️ OOM 削減</div>
+          <div class="stat-label">コネクタタスクの安定性が向上</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">⚡ スループット向上</div>
+          <div class="stat-label">大規模ストリーミングに対応</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">📦 小ファイル回避</div>
+          <div class="stat-label">オブジェクト構成を効率化</div>
+        </div>
+      </div>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before: アップデート前の課題</h3>
+          <ul>
+            <li>高負荷時にコネクタタスクで <strong>Out of Memory (OOM) エラー</strong>が発生することがあった</li>
+            <li>最大スループットに制約があり、大量データのストリーミングで<strong>ボトルネック</strong>になり得た</li>
+            <li><strong>大量の小さなファイル</strong>が Cloud Storage に生成され、後続のバッチ処理や分析クエリの効率低下につながっていた</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After: アップデート後の改善</h3>
+          <ul>
+            <li>OOM エラーが削減され、コネクタタスクの<strong>安定性が向上</strong></li>
+            <li>最大スループットが向上し、<strong>より大規模なデータストリーミング</strong>に対応</li>
+            <li>小さなファイルの大量生成を回避し、Cloud Storage 上の<strong>オブジェクト構成が効率化</strong></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="note-box">
+        <strong>💡 対象読者:</strong> Kafka から Cloud Storage へのデータ連携を運用しているデータエンジニアや、
+        データレイク / ロングターム アーカイブ基盤を設計する Solutions Architect にとって注目のアップデートです。
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    P(["👤 プロデューサー<br/>アプリケーション"]) --> T["📨 Kafka トピック<br/>(Managed Service for Apache Kafka)"]
+    T --> C["🔌 Connect クラスタ<br/>Cloud Storage Sink コネクタ<br/>⚡ OOM 削減 / スループット向上"]
+    C --> B[("🗄️ Cloud Storage バケット<br/>✅ 小さなファイルの大量生成を回避")]
+    B --> DL["📊 データレイク分析<br/>(BigQuery / Dataproc など)"]
+    B --> AR["📦 長期アーカイブ<br/>(規制要件対応)"]
+        </pre>
+      </div>
+      <p>
+        Kafka トピックから Cloud Storage Sink コネクタを経由して Cloud Storage バケットへデータが流れるパイプラインです。
+        今回の改善は<span class="highlight">コネクタ部分 (OOM 削減・スループット向上)</span> と
+        <span class="highlight">出力ファイル構成 (小さなファイルの回避)</span> に効いています。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>🚀 主要機能</h2>
+
+      <div class="card">
+        <h3>1️⃣ Out of Memory (OOM) エラーの削減</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span>コネクタタスクで発生していた OOM エラーが削減された</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>タスクの異常終了・再起動が減ることで、パイプラインの安定稼働につながる</span></div>
+      </div>
+
+      <div class="card">
+        <h3>2️⃣ 最大スループットの向上</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span>コネクタが処理できる最大スループットが向上した</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>高トラフィックな Kafka トピックからのデータ取り込みでボトルネックが緩和される</span></div>
+      </div>
+
+      <div class="card">
+        <h3>3️⃣ 大量の小さなファイル生成の回避</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span>Cloud Storage に大量の小さなファイルが作成される事象を回避するようになった</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>オブジェクト数の削減は、後続の分析処理 (ファイルスキャン) やオブジェクト管理の効率化に寄与する</span></div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>⚙️ 技術仕様</h2>
+
+      <h3>📋 Cloud Storage Sink コネクタの概要</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>コネクタクラス</td>
+            <td><code>io.aiven.kafka.connect.gcs.GcsSinkConnector</code></td>
+          </tr>
+          <tr>
+            <td>出力形式</td>
+            <td>CSV、JSON (<code>json</code> / <code>jsonl</code>)、Parquet</td>
+          </tr>
+          <tr>
+            <td>出力フィールド</td>
+            <td><code>key</code>、<code>value</code>、<code>headers</code>、<code>timestamp</code> (<code>format.output.fields</code> で指定)</td>
+          </tr>
+          <tr>
+            <td>認証</td>
+            <td>Managed Kafka サービスアカウント (<code>gcs.credentials.default: true</code>)</td>
+          </tr>
+          <tr>
+            <td>必要な IAM ロール (作成者)</td>
+            <td>Managed Kafka Connector Editor (<code>roles/managedkafka.connectorEditor</code>)</td>
+          </tr>
+          <tr>
+            <td>必要な IAM ロール (サービスアカウント)</td>
+            <td>Storage Object User (<code>roles/storage.objectUser</code>)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>📄 設定ファイルの例</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">YAML</span>
+          <span class="code-title">Cloud Storage Sink コネクタ設定</span>
+        </div>
+        <pre><code class="language-yaml">connector.class: "io.aiven.kafka.connect.gcs.GcsSinkConnector"
+gcs.bucket.name: "BUCKET_NAME"
+gcs.credentials.default: "true"
+format.output.type: "json"
+key.converter: "org.apache.kafka.connect.storage.StringConverter"
+value.converter: "org.apache.kafka.connect.json.JsonConverter"
+value.converter.schemas.enable: "false"
+topics: "TOPIC_LIST"
+tasks.max: "3"</code></pre>
+      </div>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🔧 設定方法</h2>
+
+      <h3>✅ 前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>Managed Service for Apache Kafka クラスタ (ソースクラスタ) を作成済みであること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>コネクタをホストする Connect クラスタを作成済みであること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>データの書き込み先となる Cloud Storage バケットを作成済みであること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>ソースクラスタ内に Kafka トピックを作成・構成済みであること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>Managed Kafka サービスアカウント (<code>service-PROJECT_NUMBER@gcp-sa-managedkafka.iam.gserviceaccount.com</code>) にバケットへの <code>roles/storage.objectUser</code> を付与していること</span></div>
+
+      <div class="flow-diagram">
+        <div class="flow-step">📄 設定ファイル<br>作成</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🔌 コネクタ<br>作成</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🗄️ Cloud Storage へ<br>ストリーミング開始</div>
+      </div>
+
+      <div class="step-title"><span class="step-number">1</span>コネクタ設定ファイルを作成</div>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">gcs-sink-config.yaml の作成</span>
+        </div>
+        <pre><code class="language-bash">cat &lt;&lt;EOF &gt; gcs-sink-config.yaml
+connector.class: "io.aiven.kafka.connect.gcs.GcsSinkConnector"
+gcs.bucket.name: "my-data-lake-bucket"
+gcs.credentials.default: "true"
+format.output.type: "jsonl"
+key.converter: "org.apache.kafka.connect.storage.StringConverter"
+value.converter: "org.apache.kafka.connect.json.JsonConverter"
+value.converter.schemas.enable: "false"
+topics: "my-topic"
+tasks.max: "3"
+EOF</code></pre>
+      </div>
+      <p>出力形式 (<code>format.output.type</code>) は <code>csv</code> / <code>json</code> / <code>jsonl</code> / <code>parquet</code> から選択できます。</p>
+
+      <div class="step-title"><span class="step-number">2</span>コネクタを作成</div>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">gcloud でコネクタを作成</span>
+        </div>
+        <pre><code class="language-bash">gcloud managed-kafka connectors create my-gcs-sink-connector \
+  --location=us-central1 \
+  --connect-cluster=my-connect-cluster \
+  --config-file=gcs-sink-config.yaml</code></pre>
+      </div>
+
+      <div class="success-box">
+        <strong>✅ ポイント:</strong> コネクタは Google Cloud コンソール、Terraform (<code>google_managed_kafka_connector</code>)、
+        クライアントライブラリ (Java / Python / Go) からも作成できます。
+        <strong>既存のコネクタはパフォーマンス改善をマネージドサービス側で自動的に享受します。</strong>
+      </div>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>💡 メリット</h2>
+
+      <h3>💼 ビジネス面</h3>
+      <div class="card">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>運用コストの削減</strong>: OOM エラーによるタスク再起動・障害対応の工数が減り、パイプラインの運用負荷が下がる</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>データレイク活用の促進</strong>: 小さなファイルの大量生成が回避されることで、Cloud Storage 上のデータが後続の分析に適した形で蓄積される</span></div>
+      </div>
+
+      <h3>🔬 技術面</h3>
+      <div class="card">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>安定性の向上</strong>: メモリ起因の障害が減り、大量データのストリーミングでも安定稼働しやすくなる</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>スループットの向上</strong>: コネクタあたりの最大処理能力が上がり、高トラフィックなトピックにも対応しやすくなる</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>オブジェクト効率の改善</strong>: ファイル数が抑制されることで、ファイルリスティングやスキャンのオーバーヘッドが減少する</span></div>
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <div class="warning-box">
+        <strong>⚠️ 考慮すべき点</strong>
+        <ul style="margin: 8px 0 0;">
+          <li>本改善はマネージドサービス側で提供されるものであり、改善の内部実装や具体的な性能数値 (スループットの向上率など) は<strong>公表されていない</strong></li>
+          <li>実際の性能はトピックのパーティション数、<code>tasks.max</code>、出力形式、レコードサイズなどの構成に依存するため、<strong>本番相当のワークロードでの検証を推奨</strong></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>📊 ユースケース 1: データレイクへの取り込み</h3>
+        <p><strong>シナリオ:</strong> アプリケーションのイベントストリームを Kafka で受け、長期保存とバッチ分析のために Cloud Storage のデータレイクに蓄積する。</p>
+        <p><strong>効果:</strong> スループット向上により高トラフィックでも遅延なく取り込みができ、小さなファイルの回避により BigQuery や Dataproc からの読み取り効率が向上する。</p>
+      </div>
+
+      <div class="usecase">
+        <h3>🏛️ ユースケース 2: 規制要件のためのデータアーカイブ</h3>
+        <p><strong>シナリオ:</strong> 金融・医療などの規制業界で、Kafka 上のメッセージを監査・コンプライアンス要件のために Cloud Storage へアーカイブする。</p>
+        <p><strong>効果:</strong> OOM エラーの削減によりアーカイブパイプラインの欠損リスクが低減し、安定した長期アーカイブ運用が可能になる。</p>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <div class="success-box">
+        <strong>✅ 追加料金なし:</strong> 今回のパフォーマンス改善自体に追加料金はありません。
+      </div>
+      <p>
+        Managed Service for Apache Kafka は、クラスタ (vCPU・RAM を抽象化した <span class="highlight">DCU 単位</span>のコンピュート、
+        ストレージ、ネットワーキング) に対して課金され、Connect クラスタのリソースも同様に課金対象です。
+        コンピュート利用には <strong>1 年 (20% 割引) / 3 年 (40% 割引)</strong> の確約利用割引 (CUD) も利用できます。
+      </p>
+      <p>
+        詳細は <a href="https://cloud.google.com/managed-service-for-apache-kafka/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Managed Service for Apache Kafka の料金ページ</a> を参照してください。
+      </p>
+    </div>
+
+    <!-- 関連サービス・機能 -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="related-grid">
+        <div class="related-card">
+          <strong>🗄️ Cloud Storage</strong>
+          コネクタの書き込み先。データレイクやアーカイブのストレージとして機能する
+        </div>
+        <div class="related-card">
+          <strong>📊 BigQuery</strong>
+          Kafka Connect には BigQuery Sink コネクタもあり、Cloud Storage 経由または直接の分析パイプラインを構成できる
+        </div>
+        <div class="related-card">
+          <strong>📈 Cloud Monitoring / Cloud Logging</strong>
+          コネクタと Connect クラスタのメトリクス・ログの監視に使用し、スループットやエラーの状況を可視化できる
+        </div>
+        <div class="related-card">
+          <strong>📬 Pub/Sub</strong>
+          Kafka Connect でソース / シンクとして連携可能なメッセージングサービス
+        </div>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📌 まとめ</h2>
+      <p>
+        Cloud Storage Sink コネクタの <span class="highlight">OOM エラー削減</span>・<span class="highlight">スループット向上</span>・<span class="highlight">小さなファイル生成の回避</span>は、
+        Kafka から Cloud Storage へのデータパイプラインの安定性と効率を底上げするアップデートです。
+      </p>
+      <div class="note-box">
+        <strong>💡 推奨アクション:</strong> 既存のコネクタ利用者は追加設定なしで恩恵を受けられるため、
+        これまでメモリ不足や小さなファイルの大量発生に悩まされていた場合は、現行構成のまま性能を再評価することをおすすめします。
+      </div>
+      <p style="margin-top: 16px;">
+        <span class="badge">#ManagedKafka</span>
+        <span class="badge">#ApacheKafka</span>
+        <span class="badge">#KafkaConnect</span>
+        <span class="badge">#CloudStorage</span>
+        <span class="badge">#DataPipeline</span>
+        <span class="badge">#Performance</span>
+      </p>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p><strong>📎 出典 / 参考リンク</strong></p>
+      <ul style="padding-left: 20px; margin: 8px 0;">
+        <li>公式リリースノート: <a href="https://docs.cloud.google.com/release-notes#October_14_2026" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/release-notes#October_14_2026</a></li>
+        <li>Cloud Storage Sink コネクタの作成 (公式ドキュメント): <a href="https://docs.cloud.google.com/managed-service-for-apache-kafka/docs/connect-cluster/create-cloud-storage-connector" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/managed-service-for-apache-kafka/docs/connect-cluster/create-cloud-storage-connector</a></li>
+        <li>Managed Service for Apache Kafka 概要: <a href="https://docs.cloud.google.com/managed-service-for-apache-kafka/docs/overview" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/managed-service-for-apache-kafka/docs/overview</a></li>
+        <li>料金ページ: <a href="https://cloud.google.com/managed-service-for-apache-kafka/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">https://cloud.google.com/managed-service-for-apache-kafka/pricing</a></li>
+      </ul>
+      <p>レポート: reports/2026/2026-10-14-managed-kafka-gcs-sink-performance.md (Google Cloud News Summary)</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>
