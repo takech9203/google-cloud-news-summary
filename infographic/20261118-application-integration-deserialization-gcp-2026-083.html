@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Application Integration: 安全でないデシリアライゼーションの脆弱性 (GCP-2026-083 / CVE-2026-106169)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 12px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-title {
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin-bottom: 8px;
+      font-size: 16px;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* バッジ */
+    .badge,
+    .badge-critical,
+    .badge-fixed,
+    .badge-security {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-critical { background: var(--gc-red); }
+    .badge-fixed { background: var(--gc-green); }
+    .badge-security { background: var(--gc-orange); }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 720px) {
+      .before-after { grid-template-columns: 1fr; }
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-card .ba-title { color: #C5221F; font-weight: 700; font-size: 16px; margin-bottom: 12px; }
+    .after-card .ba-title { color: #188038; font-weight: 700; font-size: 16px; margin-bottom: 12px; }
+
+    .before-card ul, .after-card ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .before-card li, .after-card li {
+      margin: 8px 0;
+      font-size: 14px;
+      color: var(--gc-on-surface);
+    }
+
+    /* チェックリスト */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon { color: var(--gc-green); font-size: 18px; }
+    .cross-icon { color: var(--gc-red); font-size: 18px; }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* コードブロック (Mermaid の pre を除外) */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* テーブル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+      background: var(--gc-surface);
+    }
+
+    tr:nth-child(even) td { background: var(--gc-surface-container-lowest); }
+    tr:hover td { background: var(--gc-blue-50); }
+
+    .table-wrap { overflow-x: auto; }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* 統計カード */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.critical {
+      background: linear-gradient(135deg, #D93025, #A50E0E);
+    }
+
+    .stat-card.fixed {
+      background: linear-gradient(135deg, #34A853, #188038);
+    }
+
+    .stat-value {
+      font-size: 30px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* タイムライン */
+    .timeline {
+      position: relative;
+      margin: 20px 0;
+      padding-left: 28px;
+      border-left: 3px solid var(--gc-blue-200);
+    }
+
+    .timeline-item {
+      position: relative;
+      margin-bottom: 20px;
+    }
+
+    .timeline-item::before {
+      content: '';
+      position: absolute;
+      left: -37px;
+      top: 6px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--gc-blue-600);
+      border: 3px solid var(--gc-surface);
+    }
+
+    .timeline-item.danger::before { background: var(--gc-red); }
+    .timeline-item.success::before { background: var(--gc-green); }
+    .timeline-item.warn::before { background: var(--gc-yellow); }
+
+    .timeline-date {
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      font-size: 15px;
+    }
+
+    .timeline-text { font-size: 14px; }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a { word-break: break-all; }
+
+    footer ul {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    footer li { margin: 4px 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <h1>🛡️ Application Integration<br>安全でないデシリアライゼーションの脆弱性</h1>
+        <div>
+          <span class="badge">Application Integration</span>
+          <span class="badge-security badge">セキュリティ速報 GCP-2026-083</span>
+          <span class="badge-critical badge">重要度: Critical</span>
+          <span class="badge-fixed badge">✅ 修正済み (対応不要)</span>
+        </div>
+      </div>
+      <div class="subtitle">公開日: 2026-11-18<br>CVE-2026-106169</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        Google Cloud は 2026 年 11 月 18 日、<span class="highlight">Application Integration</span> に関するセキュリティ速報
+        <strong>GCP-2026-083</strong> を公開しました。2026 年 9 月 22 日より前のバージョンにおいて、
+        <span class="highlight">インテグレーション実行パラメータ</span> (integration execution parameter) の処理に
+        「<strong>信頼できないデータのデシリアライゼーション</strong> (Deserialization of Untrusted Data)」の脆弱性が発見され、
+        <strong>CVE-2026-106169</strong> として採番、重要度は <strong>Critical</strong> に分類されています。
+      </p>
+      <p>
+        この脆弱性を悪用すると、認証済みユーザーが細工したシリアライズ済みオブジェクトを使用して
+        <span class="highlight">任意のコードを実行</span>できる可能性がありました。実行パラメータ (<code>inputParameters</code> など) は
+        トリガー経由でインテグレーションに渡される中核的な仕組みであり、実行のたびにユーザー由来のデータがランタイムで処理されます。
+      </p>
+      <div class="success-box">
+        <strong>✅ ユーザー対応は不要:</strong> この脆弱性は <strong>2026 年 9 月 22 日にサーバー側で修正済み</strong>です。
+        Application Integration はフルマネージドサービスであるため、パッチ適用は Google 側で完結しています。
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card critical">
+          <div class="stat-value">Critical</div>
+          <div class="stat-label">重要度 (CVE-2026-106169)</div>
+        </div>
+        <div class="stat-card fixed">
+          <div class="stat-value">2026-09-22</div>
+          <div class="stat-label">パッチ適用日 (Google 側で完結)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">対応不要</div>
+          <div class="stat-label">必要なユーザー側の作業</div>
+        </div>
+      </div>
+
+      <h3>🔄 Before / After</h3>
+      <div class="before-after">
+        <div class="before-card">
+          <div class="ba-title">❌ 修正前 (2026-09-22 より前)</div>
+          <ul>
+            <li>インテグレーション実行パラメータの処理で、信頼できないシリアライズ済みデータが<strong>安全に検証されずにデシリアライズ</strong>される可能性</li>
+            <li>認証済みユーザーが細工したシリアライズ済みオブジェクトを送り込むことで、<strong>任意のコードを実行</strong>できる可能性 (重要度: Critical)</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <div class="ba-title">✅ 修正後 (2026-09-22 以降)</div>
+          <ul>
+            <li>2026 年 9 月 22 日に <strong>Google 側でパッチ適用済み</strong>、脆弱性は解消</li>
+            <li>顧客側での対応 (設定変更、再デプロイなど) は<strong>一切不要</strong></li>
+            <li>セキュリティ速報 <strong>GCP-2026-083</strong> として公開、<strong>CVE-2026-106169</strong> で追跡可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図: 攻撃経路と修正</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Attacker["攻撃シナリオ (修正前)"]
+        U([🧑‍💻 認証済みユーザー]) -->|細工したシリアライズ済み<br/>オブジェクトを送信| P
+    end
+
+    subgraph AI["☁️ Application Integration ランタイム"]
+        P[📥 インテグレーション実行<br/>パラメータ処理] --> D{🔓 デシリアライズ処理}
+        D -->|修正前:<br/>検証不十分| X[💥 任意コード実行<br/>CVE-2026-106169]
+        D -->|修正後 2026-09-22:<br/>安全なデシリアライズ| E[✅ 正常なインテグレーション実行]
+    end
+
+    X -.->|Critical| R[🛡️ GCP-2026-083<br/>パッチ適用済み]
+
+    style X fill:#ffcccc,stroke:#cc0000
+    style E fill:#ccffcc,stroke:#00aa00
+    style R fill:#cce5ff,stroke:#0066cc
+        </pre>
+      </div>
+      <p>
+        修正前は、認証済みユーザーが実行パラメータ経由で細工したシリアライズ済みオブジェクトを注入すると、
+        デシリアライズ処理を通じて任意コード実行に至る可能性がありました。
+        <strong>2026 年 9 月 22 日のパッチにより、この経路は遮断されています。</strong>
+      </p>
+    </div>
+
+    <!-- 脆弱性の詳細 -->
+    <div class="section">
+      <h2>🔍 脆弱性の詳細</h2>
+
+      <div class="card" style="border-left-color: var(--gc-red);">
+        <div class="card-title">1️⃣ 脆弱性の種類: 信頼できないデータのデシリアライゼーション (CWE-502 相当)</div>
+        <div class="icon-text"><span class="arrow">→</span><span>インテグレーション実行パラメータの処理 (integration execution parameter handling) に存在</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>影響範囲は <strong>2026 年 9 月 22 日より前</strong>のバージョンの Application Integration</span></div>
+      </div>
+
+      <div class="card" style="border-left-color: var(--gc-yellow);">
+        <div class="card-title">2️⃣ 攻撃の前提と影響</div>
+        <div class="icon-text"><span class="arrow">→</span><span>攻撃には Application Integration への<strong>認証済みアクセス</strong>が必要</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>細工したシリアライズ済みオブジェクトにより<strong>任意コード実行</strong>が可能だった</span></div>
+      </div>
+
+      <div class="card" style="border-left-color: var(--gc-green);">
+        <div class="card-title">3️⃣ 対応状況</div>
+        <div class="icon-text"><span class="check-icon">✓</span><span>2026 年 9 月 22 日にパッチ適用済み</span></div>
+        <div class="icon-text"><span class="check-icon">✓</span><span><strong>ユーザー側の対応は不要</strong> (フルマネージドサービスのため Google 側で修正完結)</span></div>
+      </div>
+
+      <h3>🧩 技術的背景: インテグレーション実行パラメータとは</h3>
+      <p>
+        Application Integration では、インテグレーションの実行時にトリガー経由でパラメータが渡されます。
+        公式 API リファレンスによると、実行リクエストには <code>inputParameters</code> (実行時入力値のマップ) や
+        <code>configParameters</code> が含まれ、<code>IntegrationParameter</code> の <code>defaultValue</code> は
+        「文字列、整数、倍精度浮動小数点数、任意の proto メッセージ、または<strong>シリアライズ済みオブジェクト</strong>」を取り得ると定義されています。
+      </p>
+      <div class="note-box">
+        <strong>💡 ポイント:</strong> 実行パラメータはシリアライズされたデータを扱う設計であるため、
+        デシリアライズ処理の安全性が攻撃対象領域として特に重要になります。
+      </div>
+
+      <h3>⏱️ タイムライン</h3>
+      <div class="timeline">
+        <div class="timeline-item danger">
+          <div class="timeline-date">〜 2026-09-22 より前</div>
+          <div class="timeline-text">影響バージョン: 実行パラメータ処理にデシリアライゼーション脆弱性が存在</div>
+        </div>
+        <div class="timeline-item success">
+          <div class="timeline-date">2026-09-22</div>
+          <div class="timeline-text">Google 側でパッチ適用 (脆弱性解消、ユーザー対応不要)</div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-date">2026-11-18</div>
+          <div class="timeline-text">セキュリティ速報 GCP-2026-083 公開、CVE-2026-106169 採番</div>
+        </div>
+        <div class="timeline-item warn">
+          <div class="timeline-date">2027-01-15 (UTC)〜</div>
+          <div class="timeline-text">関連速報 GCP-2026-068: 既存インテグレーションでも run-as サービスアカウントが必須化 (準備推奨)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>📊 技術仕様</h2>
+
+      <h3>🗂️ 脆弱性情報サマリー</h3>
+      <div class="table-wrap">
+        <table>
+          <tr><th>項目</th><th>詳細</th></tr>
+          <tr><td>セキュリティ速報 ID</td><td>GCP-2026-083</td></tr>
+          <tr><td>CVE</td><td>CVE-2026-106169</td></tr>
+          <tr><td>公開日</td><td>2026-11-18</td></tr>
+          <tr><td>重要度</td><td><strong style="color: var(--gc-red);">Critical</strong></td></tr>
+          <tr><td>脆弱性の種類</td><td>Deserialization of Untrusted Data (信頼できないデータのデシリアライゼーション)</td></tr>
+          <tr><td>影響箇所</td><td>インテグレーション実行パラメータの処理</td></tr>
+          <tr><td>影響バージョン</td><td>2026 年 9 月 22 日より前の Application Integration</td></tr>
+          <tr><td>パッチ適用日</td><td>2026-09-22 (Google 側で適用済み)</td></tr>
+          <tr><td>必要なユーザー対応</td><td><strong style="color: var(--gc-green);">なし</strong></td></tr>
+          <tr><td>攻撃の前提条件</td><td>認証済みユーザーであること</td></tr>
+          <tr><td>想定される影響</td><td>任意コード実行</td></tr>
+        </table>
+      </div>
+
+      <h3>📅 2026 年の Application Integration 関連セキュリティ速報の流れ</h3>
+      <p>Application Integration では 2026 年に複数のセキュリティ速報が公開されており、一連の文脈で把握しておくことが推奨されます。</p>
+      <div class="table-wrap">
+        <table>
+          <tr><th>速報 ID</th><th>公開日</th><th>脆弱性の種類</th><th>対象コンポーネント</th><th>重要度</th></tr>
+          <tr><td><strong>GCP-2026-083</strong></td><td>2026-11-18</td><td>デシリアライゼーション</td><td>実行パラメータ処理</td><td><strong style="color: var(--gc-red);">Critical</strong></td></tr>
+          <tr><td>GCP-2026-074</td><td>2026-10-28</td><td>デシリアライゼーション</td><td>SubWorkflow タスク</td><td><strong style="color: var(--gc-red);">Critical</strong></td></tr>
+          <tr><td>GCP-2026-068</td><td>2026-10-14</td><td>不適切な認可</td><td>AuthConfig 検証・実行ランタイム</td><td><strong style="color: var(--gc-orange);">High</strong></td></tr>
+          <tr><td>GCP-2026-066</td><td>2026-09-28</td><td>Confused Deputy</td><td>Email タスク</td><td><strong style="color: var(--gc-orange);">High</strong></td></tr>
+          <tr><td>GCP-2026-065</td><td>2026-09-28</td><td>デシリアライゼーション</td><td>JavaScript タスク</td><td><strong style="color: var(--gc-red);">Critical</strong></td></tr>
+          <tr><td>GCP-2026-064</td><td>2026-09-28</td><td>不適切な認可</td><td>タスク構成</td><td><strong style="color: var(--gc-red);">Critical</strong></td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- 推奨される対応 -->
+    <div class="section">
+      <h2>✅ 推奨される対応</h2>
+
+      <h3>🚨 必須の対応</h3>
+      <div class="success-box">
+        <strong>なし。</strong> 本脆弱性は 2026 年 9 月 22 日に Google 側でパッチ適用済みであり、顧客側の対応は不要です。
+      </div>
+
+      <h3>🔐 推奨されるセキュリティプラクティス</h3>
+      <div class="card">
+        <div class="card-title">1. 最小権限の徹底</div>
+        <p style="margin: 0; font-size: 14px;">本脆弱性の悪用には認証済みアクセスが必要でした。<code>integrations.integrations.invoke</code> などのインテグレーション実行権限は、必要なプリンシパルにのみ付与する。</p>
+      </div>
+      <div class="card" style="border-left-color: var(--gc-yellow);">
+        <div class="card-title">2. 関連速報 GCP-2026-068 への対応準備</div>
+        <p style="margin: 0; font-size: 14px;">2027 年 1 月 15 日 (UTC) 以降、2026 年 10 月 15 日より前に作成された既存インテグレーションでも、スケジュール/イベントトリガーの使用に run-as サービスアカウント (および <code>iam.serviceAccounts.actAs</code> 権限) が必須になるため、事前に対応を進める。</p>
+      </div>
+      <div class="card" style="border-left-color: var(--gc-teal);">
+        <div class="card-title">3. セキュリティ速報の購読</div>
+        <p style="margin: 0; font-size: 14px;">Google Cloud セキュリティ速報の <a href="https://cloud.google.com/feeds/google-cloud-security-bulletins.xml" target="_blank" rel="noopener noreferrer" class="gc-link">XML フィード</a>を購読し、今後の速報を早期に把握する。</p>
+      </div>
+      <div class="card" style="border-left-color: var(--gc-green);">
+        <div class="card-title">4. 監査ログの確認</div>
+        <p style="margin: 0; font-size: 14px;">Cloud Audit Logs や Cloud Logging でインテグレーション実行履歴を定期的にレビューし、不審な実行がないか確認する。</p>
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <h3>考慮すべき点</h3>
+      <div class="warning-box">
+        <div class="icon-text"><span class="arrow">→</span><span>本速報には <strong>CVSS スコアや悪用の有無</strong> (in-the-wild exploitation) に関する記載はなく、公開情報は速報の記述に限られる</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>脆弱性の発見から速報公開 (2026-11-18) までの間、パッチは 2026 年 9 月 22 日に適用済みであったため、<strong>公開時点で既に保護されていた</strong></span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>Application Integration はマネージドサービスであり、顧客側で<strong>バージョンを選択・固定することはできない</strong> (常に Google 管理の最新ランタイムで実行される)</span></div>
+      </div>
+    </div>
+
+    <!-- 関連サービス -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <div class="card-title">📝 Cloud Audit Logs / Cloud Logging</div>
+        <p style="margin: 0; font-size: 14px;">インテグレーションの実行履歴・操作ログの監査に使用。不審なアクセスの検知に有効。</p>
+      </div>
+      <div class="card">
+        <div class="card-title">🔑 IAM (Identity and Access Management)</div>
+        <p style="margin: 0; font-size: 14px;">インテグレーションの実行・編集権限の最小化に使用。GCP-2026-068 以降は run-as サービスアカウントへの <code>iam.serviceAccounts.actAs</code> 権限が要求される。</p>
+      </div>
+      <div class="card">
+        <div class="card-title">🛡️ Security Command Center</div>
+        <p style="margin: 0; font-size: 14px;">Google Cloud 環境全体の脆弱性・脅威の一元的な可視化。</p>
+      </div>
+      <div class="card">
+        <div class="card-title">🔌 Integration Connectors</div>
+        <p style="margin: 0; font-size: 14px;">Application Integration と組み合わせて使われる接続サービス。権限設計の見直し時に併せて確認を推奨。</p>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>🎯 まとめ</h2>
+      <div class="note-box">
+        <p style="margin: 0;">
+          Application Integration の実行パラメータ処理に <strong>Critical 評価</strong>のデシリアライゼーション脆弱性
+          (<strong>CVE-2026-106169</strong>) が発見されましたが、<strong>2026 年 9 月 22 日に Google 側で修正済み</strong>であり、
+          <span class="highlight">ユーザー側の対応は不要</span>です。
+          ただし、2026 年に Application Integration 関連のセキュリティ速報が相次いでいることを踏まえ、
+          <strong>インテグレーション実行権限の最小化</strong>と、GCP-2026-068 に伴う
+          <strong>2027 年 1 月 15 日以降の run-as サービスアカウント必須化への準備</strong>を進めることを推奨します。
+        </p>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p><strong>📎 出典・参考リンク</strong></p>
+      <ul>
+        <li>レポート: reports/2026/2026-11-18-application-integration-deserialization-gcp-2026-083.md</li>
+        <li><a href="https://docs.cloud.google.com/release-notes#November_18_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026-11-18)</a></li>
+        <li><a href="https://cloud.google.com/support/bulletins#gcp-2026-083" target="_blank" rel="noopener noreferrer" class="gc-link">セキュリティ速報 GCP-2026-083 (Google Cloud Security Bulletins)</a></li>
+        <li><a href="https://docs.cloud.google.com/application-integration/docs/security-bulletins" target="_blank" rel="noopener noreferrer" class="gc-link">Application Integration セキュリティ速報一覧</a></li>
+        <li><a href="https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-106169" target="_blank" rel="noopener noreferrer" class="gc-link">CVE-2026-106169</a></li>
+        <li><a href="https://docs.cloud.google.com/application-integration/docs" target="_blank" rel="noopener noreferrer" class="gc-link">Application Integration ドキュメント</a></li>
+        <li><a href="https://docs.cloud.google.com/application-integration/docs/prepare-for-authorization-changes" target="_blank" rel="noopener noreferrer" class="gc-link">今後の認可変更への準備 (GCP-2026-068 関連)</a></li>
+      </ul>
+      <p>タグ: Application Integration / セキュリティ / 脆弱性 / CVE-2026-106169 / GCP-2026-083 / デシリアライゼーション / Critical</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+</body>
+</html>
