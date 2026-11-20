@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BigQuery: Data Engineering Agent のエージェント可観測性が GA</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .badge-deprecated {
+      background: var(--gc-red);
+      color: #FFFFFF;
+    }
+
+    /* フロー図スタイル */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* チェックリストスタイル */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+    }
+
+    /* コードブロック (Mermaid の pre は除外) */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* テーブルスタイル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .ai-box {
+      background: var(--gc-purple-tint);
+      border-left: 4px solid var(--gc-purple);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* 統計カード */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border: 1px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border: 1px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-card h3 {
+      color: var(--gc-red);
+      margin-top: 0;
+    }
+
+    .after-card h3 {
+      color: var(--gc-green);
+      margin-top: 0;
+    }
+
+    .before-card ul,
+    .after-card ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+    }
+
+    .before-card li,
+    .after-card li {
+      margin: 8px 0;
+      font-size: 14px;
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* 2 カラムグリッド */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    ul.plain-list {
+      padding-left: 20px;
+      margin: 8px 0;
+    }
+
+    ul.plain-list li {
+      margin: 8px 0;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      word-break: break-all;
+    }
+
+    @media (max-width: 720px) {
+      .before-after,
+      .two-col {
+        grid-template-columns: 1fr;
+      }
+
+      h1, .title {
+        font-size: 28px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <div style="margin-bottom: 8px;">
+          <span class="badge">☁️ BigQuery</span>
+          <span class="badge badge-ga">GA (一般提供)</span>
+        </div>
+        <h1>📊 Data Engineering Agent の<br>エージェント可観測性が GA</h1>
+        <div class="subtitle" style="margin-top: 8px;">トークン消費・レイテンシを Cloud Monitoring で、実行トレースを Cloud Trace で可視化</div>
+      </div>
+      <div class="subtitle" style="text-align: right;">
+        <strong>リリース日</strong><br>2026-11-19
+      </div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>💡 概要</h2>
+      <p>
+        BigQuery の <span class="highlight">Data Engineering Agent</span> で、<span class="highlight">エージェント可観測性 (Agent Observability)</span> を有効化できるようになり、<strong>一般提供 (GA)</strong> が開始されました。有効化すると、エージェントの<strong>トークン消費量・リクエスト数・モデルレイテンシ</strong>を <strong>Cloud Monitoring</strong> でモニタリングし、<strong>実行トレースやツール呼び出し</strong>を <strong>Cloud Trace</strong> で詳細に検査できます。
+      </p>
+      <p>
+        Data Engineering Agent は、自然言語プロンプトで BigQuery のデータパイプラインの<strong>構築・変更・トラブルシューティング</strong>を行えるエージェントです。Dataform との統合、プラン生成、コード検証、自動データラングリングなどの機能を提供します。今回の GA により、エージェントの動作を<strong>プロダクション環境で求められる水準</strong>で監視・デバッグできるようになりました。
+      </p>
+      <div class="ai-box">
+        <strong>🤖 ポイント:</strong> 本機能は BigQuery の会話型分析 (Conversational Analytics) と同じプロジェクトレベルの可観測性設定 (<code>gibqObservabilitySetting</code>) を使用します。<strong>コスト管理 (トークン消費)・パフォーマンス管理 (レイテンシ)・障害解析 (トレース)</strong> の基盤が 1 つの設定で整います。
+      </div>
+
+      <h3>🔄 Before / After</h3>
+      <div class="before-after">
+        <div class="before-card">
+          <h3>❌ アップデート前の課題</h3>
+          <ul>
+            <li>トークン消費量やリクエスト数を標準的なモニタリング基盤で定量的に把握する手段が限られていた</li>
+            <li>ツール呼び出しやモデル呼び出しを追跡できず、エラーやレイテンシの原因調査が難しかった</li>
+            <li>エージェント利用コストやパフォーマンスの傾向をダッシュボードで継続的に可視化する仕組みがなかった</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h3>✅ アップデート後の改善</h3>
+          <ul>
+            <li>トークン消費量 (入力・出力・思考・キャッシュなど)、リクエスト数、モデルレイテンシを Cloud Monitoring のメトリクスとして監視可能に</li>
+            <li>会話ターン内のモデル呼び出し・ツール呼び出しのシーケンスを Cloud Trace のスパンとして可視化し、トラブルシューティングが可能に</li>
+            <li>Metrics Explorer やカスタムダッシュボードで <code>agent_type = DEA</code> フィルタを使い、Data Engineering Agent 固有の利用状況を継続的に可視化可能に</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    User([👤 データエンジニア]) -->|自然言語プロンプト| DEA["🤖 Data Engineering Agent"]
+    DEA -->|パイプライン生成・実行| DF["⚙️ Dataform / BigQuery パイプライン"]
+    DF --> BQ[("🗄️ BigQuery")]
+    Setting["🔧 gibqObservabilitySetting<br/>(プロジェクトレベル設定)"] -.->|可観測性を有効化| DEA
+    DEA -->|"📊 メトリクス<br/>トークン数 / リクエスト数 / レイテンシ"| Mon["📈 Cloud Monitoring"]
+    DEA -->|"🔍 実行トレース<br/>モデル呼び出し / ツール呼び出し"| Trace["🧭 Cloud Trace"]
+    Mon --> Dash["🖥️ カスタムダッシュボード"]
+        </pre>
+      </div>
+      <p>
+        プロジェクトレベルの可観測性設定を有効にすると、Data Engineering Agent の利用状況が<strong>メトリクスとして Cloud Monitoring</strong> に、<strong>実行トレースが Cloud Trace</strong> に送信され、ダッシュボードやトレースエクスプローラで分析できます。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>🚀 主要機能</h2>
+
+      <div class="card">
+        <h3>📈 1. Cloud Monitoring でのメトリクス監視</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>トークン消費量 (入力、出力、候補、思考、キャッシュ)、リクエスト数、モデルレイテンシを監視できる</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>Metrics Explorer で <code>Gemini Data Analytics</code> (<code>geminidataanalytics</code>) のメトリクスを選択し、<code>agent_type = DEA</code> でフィルタして Data Engineering Agent のみを対象にできる</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>カスタムダッシュボードを作成し、合計値や 50/95 パーセンタイルのレイテンシなどを継続的に可視化できる</span></div>
+      </div>
+
+      <div class="card">
+        <h3>🧭 2. Cloud Trace での実行トレース検査</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>会話ターン内のモデル呼び出しやツール呼び出しなどの処理シーケンスをスパンとして可視化できる</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>Trace エクスプローラでスパンの詳細を確認し、エラーやレイテンシの原因を特定できる</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>トレースデータは可観測性データセットに 30 日間保存。長期保持にはリンクされたデータセット経由で BigQuery に移動可能</span></div>
+      </div>
+
+      <div class="card">
+        <h3>🔧 3. 会話型分析と共通のプロジェクトレベル設定</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>会話型分析と同じ可観測性設定 (<code>gibqObservabilitySetting</code>) を使用し、1 つの設定でエージェント群の可観測性を管理できる</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>Google Cloud コンソール (Agents &gt; Monitoring)、gcloud CLI、API のいずれからも有効化できる</span></div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>⚙️ 技術仕様</h2>
+
+      <h3>📊 Data Engineering Agent の主なメトリクス</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>メトリクス</th>
+            <th>メトリクス名</th>
+            <th>フィルタ</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>入力トークン数</td><td><code>geminidataanalytics.googleapis.com/chat/input_token_count</code></td><td><code>agent_type = DEA</code></td></tr>
+          <tr><td>出力トークン数</td><td><code>geminidataanalytics.googleapis.com/chat/output_token_count</code></td><td><code>agent_type = DEA</code></td></tr>
+          <tr><td>候補トークン数</td><td><code>geminidataanalytics.googleapis.com/chat/candidate_token_count</code></td><td><code>agent_type = DEA</code></td></tr>
+          <tr><td>思考トークン数</td><td><code>geminidataanalytics.googleapis.com/chat/thought_token_count</code></td><td><code>agent_type = DEA</code></td></tr>
+          <tr><td>キャッシュトークン数</td><td><code>geminidataanalytics.googleapis.com/chat/cached_token_count</code></td><td><code>agent_type = DEA</code></td></tr>
+          <tr><td>モデルレイテンシ</td><td><code>geminidataanalytics.googleapis.com/chat/model_latencies</code></td><td><code>agent_type = DEA</code></td></tr>
+          <tr><td>A2A リクエストのクォータ使用量</td><td><code>geminidataanalytics.googleapis.com/quota/a2a/requests_per_agent/usage</code></td><td><code>agent_id = dataengineeringagent</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3>🔐 必要な権限 (抜粋)</h3>
+      <p>
+        可観測性の有効化には、<code>cloudaicompanion.gibqObservabilitySettings.create</code> / <code>update</code>、<code>cloudaicompanion.settingBindings.gibqObservabilitySettingsCreate</code>、<code>serviceusage.services.enable</code> などの権限が必要です。監視データの閲覧には以下のロールが推奨されています。
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>用途</th>
+            <th>ロール</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>モニタリングデータの閲覧</td><td>Monitoring Viewer (<code>roles/monitoring.viewer</code>)</td></tr>
+          <tr><td>トレースの閲覧</td><td>Cloud Trace User (<code>roles/cloudtrace.user</code>)</td></tr>
+          <tr><td>ログの閲覧</td><td>Logs Viewer (<code>roles/logging.viewer</code>)</td></tr>
+          <tr><td>データセットの閲覧</td><td>BigQuery Data Viewer (<code>roles/bigquery.dataViewer</code>)</td></tr>
+          <tr><td>管理者設定の閲覧</td><td>Gemini for Google Cloud User (<code>roles/cloudaicompanion.user</code>)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>📋 前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>Cloud Trace、Cloud Monitoring、Cloud Logging、Observability、Gemini for Google Cloud の各 API を有効化していること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>可観測性設定の作成・バインドに必要な IAM 権限を保持していること</span></div>
+
+      <div class="flow-diagram">
+        <div class="flow-step">1️⃣ API を<br>有効化</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">2️⃣ 可観測性設定を<br>作成</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">3️⃣ プロジェクトに<br>バインド</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">📊 収集開始</div>
+      </div>
+
+      <h3>ステップ 1: 必要な API を有効化</h3>
+      <div class="code-block">
+        <div style="background: #2D2D2D; padding: 8px 16px; display: flex; justify-content: space-between; font-size: 12px;">
+          <span style="color: #9CDCFE; font-weight: bold;">Bash</span>
+          <span style="color: #AAAAAA;">API の有効化</span>
+        </div>
+        <pre style="margin: 0; padding: 0;"><code class="language-bash">gcloud services enable \
+    monitoring.googleapis.com \
+    cloudtrace.googleapis.com \
+    --project=PROJECT_ID</code></pre>
+      </div>
+      <p>Cloud Monitoring と Cloud Trace の API をプロジェクトで有効化します。コンソールの場合は「Agents &gt; Monitoring」から「Enable Monitoring」をクリックして一括で有効化できます。</p>
+
+      <h3>ステップ 2: 可観測性設定を作成</h3>
+      <div class="code-block">
+        <div style="background: #2D2D2D; padding: 8px 16px; display: flex; justify-content: space-between; font-size: 12px;">
+          <span style="color: #9CDCFE; font-weight: bold;">Bash</span>
+          <span style="color: #AAAAAA;">可観測性設定の作成</span>
+        </div>
+        <pre style="margin: 0; padding: 0;"><code class="language-bash">gcloud gemini gibq-observability-settings create default \
+    --conversational-analytics-setting-metrics-enabled \
+    --conversational-analytics-setting-traces-enabled \
+    --project=PROJECT_ID \
+    --location=global</code></pre>
+      </div>
+      <p>メトリクスとトレースを有効にしたプロジェクトレベルの可観測性設定を作成します。</p>
+
+      <h3>ステップ 3: 設定をプロジェクトにバインド</h3>
+      <div class="code-block">
+        <div style="background: #2D2D2D; padding: 8px 16px; display: flex; justify-content: space-between; font-size: 12px;">
+          <span style="color: #9CDCFE; font-weight: bold;">Bash</span>
+          <span style="color: #AAAAAA;">設定バインディングの作成</span>
+        </div>
+        <pre style="margin: 0; padding: 0;"><code class="language-bash">gcloud gemini gibq-observability-settings setting-bindings create \
+    binding-PROJECT_ID \
+    --gibq-observability-setting=default \
+    --target=projects/PROJECT_ID \
+    --project=PROJECT_ID \
+    --location=global</code></pre>
+      </div>
+      <p>作成した設定をプロジェクトに適用します。<strong>有効化後に収集が開始され、過去のデータはバックフィルされません。</strong></p>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div class="two-col">
+        <div>
+          <h3 style="margin-top: 0;">💼 ビジネス面</h3>
+          <div class="success-box" style="margin-top: 8px;">
+            <strong>💰 コストの可視化</strong><br>
+            トークン消費量をメトリクスとして追跡できるため、エージェント利用コストの傾向把握と予算管理がしやすくなる
+          </div>
+          <div class="success-box">
+            <strong>🛡️ 本番運用への安心感</strong><br>
+            GA 機能として標準の Google Cloud Observability スタックで監視でき、本番のデータエンジニアリングワークフローへ導入する際のガバナンス要件を満たしやすい
+          </div>
+        </div>
+        <div>
+          <h3 style="margin-top: 0;">🔧 技術面</h3>
+          <div class="success-box" style="margin-top: 8px;">
+            <strong>🔗 標準ツールとの統合</strong><br>
+            Cloud Monitoring / Cloud Trace という既存の運用基盤をそのまま活用でき、アラートやダッシュボードなどの既存プラクティスを適用できる
+          </div>
+          <div class="success-box">
+            <strong>🔍 詳細なトラブルシューティング</strong><br>
+            会話ターン内のモデル呼び出し・ツール呼び出しをスパン単位で検査でき、エラーやレイテンシ悪化の原因特定が容易になる
+          </div>
+          <div class="success-box">
+            <strong>🗂️ 一元管理</strong><br>
+            会話型分析と共通のプロジェクトレベル設定で、BigQuery のエージェント群の可観測性を一括管理できる
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3 style="margin-top: 0;">🚫 制限事項</h3>
+      <div class="warning-box">
+        <div class="check-item"><span class="cross-icon">✗</span><span>メトリクスは可観測性を有効化した後から収集され、<strong>過去のデータはバックフィルされない</strong></span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>Cloud Trace のトレースデータの保存期間は <strong>30 日間</strong> (長期保持には BigQuery への移動が必要)</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>可観測性は<strong>デフォルトで無効</strong>のため、管理者による明示的な有効化が必要</span></div>
+      </div>
+
+      <h3>🤔 考慮すべき点</h3>
+      <div class="note-box">
+        <div class="check-item"><span class="arrow">→</span><span>有効化には Cloud Monitoring / Cloud Trace / Cloud Logging / Observability / Gemini for Google Cloud の API 有効化と複数の IAM 権限が必要</span></div>
+        <div class="check-item"><span class="arrow">→</span><span>Cloud Monitoring や Cloud Trace の利用量に応じた料金が別途発生しうるため、各サービスの料金体系を確認する</span></div>
+        <div class="check-item"><span class="arrow">→</span><span>組織のドメイン制限ポリシーによっては、API 直接呼び出し時にアクセストークンの種別に起因するエラーが発生する場合がある (gcloud CLI またはサービスアカウントの借用で回避)</span></div>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="card">
+        <h3>💰 ユースケース 1: エージェント利用コストのモニタリング</h3>
+        <p><strong>シナリオ</strong>: データエンジニアリングチームが Data Engineering Agent を日常的に利用しており、トークン消費量の傾向を把握して予算超過を防ぎたい。</p>
+        <div class="code-label">実装例</div>
+        <pre><code class="language-plaintext">1. Cloud Monitoring でカスタムダッシュボードを作成
+2. Input/Output/Thought Token Count メトリクスを追加し、agent_type = DEA でフィルタ
+3. Aligner を Delta、Grouping を Sum に設定し、日次のトークン消費量を可視化
+4. しきい値ベースのアラートポリシーを設定</code></pre>
+        <div class="success-box">
+          <strong>✅ 効果:</strong> トークン消費の急増を早期に検知し、プロンプト設計の見直しや利用ルールの整備につなげられる。
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>🐢 ユースケース 2: パイプライン生成が遅い・失敗する場合の原因調査</h3>
+        <p><strong>シナリオ</strong>: エージェントによるパイプライン生成の応答が遅い、または特定のリクエストでエラーが発生しており、どの処理ステップが原因かを特定したい。</p>
+        <div class="success-box">
+          <strong>✅ 効果:</strong> Cloud Trace の Trace エクスプローラで会話ターンのスパンを確認し、モデル呼び出しとツール呼び出しのどこで時間がかかっているか、どこでエラーが発生したかをスパン単位で特定できる。
+        </div>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>
+        エージェント可観測性の有効化に伴い、<strong>Cloud Monitoring や Cloud Trace の利用量に応じた料金</strong>が発生する可能性があります。詳細は Google Cloud Observability の料金ページを参照してください。
+      </p>
+      <div class="note-box">
+        <strong>💡 Data Engineering Agent 自体の料金:</strong> 使用された Gemini モデルの<strong>標準トークンレート (1x)</strong> で課金され、エージェント独自の追加料金はありません (Gemini Flash / Pro モデル間で自動ルーティングされます)。
+      </div>
+      <ul class="plain-list">
+        <li>🔗 <a href="https://cloud.google.com/stackdriver/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Google Cloud Observability の料金</a></li>
+        <li>🔗 <a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">BigQuery の料金</a></li>
+      </ul>
+    </div>
+
+    <!-- 利用可能リージョン -->
+    <div class="section">
+      <h2>🌏 利用可能リージョン</h2>
+      <p>
+        可観測性設定 (<code>gibqObservabilitySettings</code>) は <span class="highlight">global</span> ロケーションで作成します。
+      </p>
+      <p>
+        Data Engineering Agent 自体は <code>us</code>、<code>eu</code>、<code>asia-northeast1</code> (東京)、<code>global</code> の管轄区域レベルのリージョナリゼーションに対応しており、処理リージョンは関連付けられた Dataform ワークスペースのロケーションに基づき決定されます。詳細は <a href="https://docs.cloud.google.com/bigquery/docs/gemini-locations" target="_blank" rel="noopener noreferrer" class="gc-link">Gemini in BigQuery の処理ロケーション</a>を参照してください。
+      </p>
+      <div class="flow-diagram">
+        <div class="flow-step">🇺🇸 us</div>
+        <div class="flow-step">🇪🇺 eu</div>
+        <div class="flow-step">🇯🇵 asia-northeast1<br>(東京)</div>
+        <div class="flow-step">🌐 global</div>
+      </div>
+    </div>
+
+    <!-- 関連サービス・機能 -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <div class="icon-text"><span>📈</span><span><strong>Cloud Monitoring</strong>: エージェントのトークン消費量・リクエスト数・レイテンシをメトリクスとして収集し、ダッシュボードやアラートで活用</span></div>
+        <div class="icon-text"><span>🧭</span><span><strong>Cloud Trace</strong>: 会話ターン内のモデル呼び出し・ツール呼び出しをスパンとして可視化し、トラブルシューティングに活用</span></div>
+        <div class="icon-text"><span>⚙️</span><span><strong>Dataform</strong>: Data Engineering Agent がパイプラインコードを生成・管理するリポジトリ / ワークスペースの基盤</span></div>
+        <div class="icon-text"><span>💬</span><span><strong>会話型分析 (Conversational Analytics)</strong>: 同じプロジェクトレベルの可観測性設定を共有する BigQuery のエージェント機能</span></div>
+        <div class="icon-text"><span>📝</span><span><strong>Cloud Logging / 会話ログ</strong>: 会話単位のログを BigQuery テーブルに記録して GoogleSQL で分析する会話ログ機能も利用可能</span></div>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="success-box">
+        <p style="margin: 0;">
+          Data Engineering Agent のエージェント可観測性が <strong>GA</strong> となり、<strong>トークン消費・リクエスト数・レイテンシのメトリクス監視</strong>と、<strong>実行トレースによる詳細なデバッグ</strong>が標準の Cloud Monitoring / Cloud Trace で可能になりました。
+        </p>
+      </div>
+      <div class="note-box">
+        <strong>🎯 推奨アクション:</strong> エージェントを本番のデータパイプライン運用に組み込んでいる、または導入を検討しているチームは、まず<strong>可観測性設定の有効化</strong>と、<code>agent_type = DEA</code> フィルタを使った<strong>カスタムダッシュボードの整備</strong>から始めることを推奨します。
+      </div>
+      <div style="margin-top: 16px;">
+        <span class="badge">BigQuery</span>
+        <span class="badge">Data Engineering Agent</span>
+        <span class="badge">Gemini</span>
+        <span class="badge">Cloud Monitoring</span>
+        <span class="badge">Cloud Trace</span>
+        <span class="badge">Observability</span>
+        <span class="badge badge-ga">GA</span>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p><strong>📎 出典 / 参考リンク</strong></p>
+      <ul class="plain-list">
+        <li>公式リリースノート: <a href="https://docs.cloud.google.com/release-notes#November_19_2026" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/release-notes#November_19_2026</a></li>
+        <li>Data Engineering Agent でパイプラインを構築 (モニタリング手順): <a href="https://docs.cloud.google.com/bigquery/docs/data-engineering-agent-pipelines" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/bigquery/docs/data-engineering-agent-pipelines</a></li>
+        <li>Data Engineering Agent の概要: <a href="https://docs.cloud.google.com/gemini/data-agents/data-engineering-agent/agent-overview" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/gemini/data-agents/data-engineering-agent/agent-overview</a></li>
+        <li>データエージェントの作成とモニタリング: <a href="https://docs.cloud.google.com/bigquery/docs/create-data-agents" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/bigquery/docs/create-data-agents</a></li>
+        <li>Google Cloud Observability の料金: <a href="https://cloud.google.com/stackdriver/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">https://cloud.google.com/stackdriver/pricing</a></li>
+      </ul>
+      <p>本インフォグラフィックは Google Cloud リリースノート (2026-11-19) のレポートを基に作成されました。</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>
