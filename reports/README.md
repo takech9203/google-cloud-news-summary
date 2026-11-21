@@ -5,6 +5,7 @@
 
 ## 2026 年
 
+- [2026-11-20 - App Engine / Cloud Run / Buildpacks: Java ランタイムセキュリティアップデート (GCP-2026-082 / CVE-2026-114938 対応)](2026/2026-11-20-serverless-java-runtime-security-gcp-2026-082.md)
 - [2026-11-19 - Agent Registry: MCP ツールのプロトコルレベルメタデータ対応 (Preview)](2026/2026-11-19-agent-registry-mcp-tool-metadata.md)
 - [2026-11-19 - Managed Service for Apache Spark: クラスタイメージバージョン 4.0 が GA](2026/2026-11-19-managed-spark-cluster-image-4-0-ga.md)
 - [2026-11-19 - Managed Service for Apache Airflow: CVE-2026-114938 への対応 (修正準備と暫定緩和策)](2026/2026-11-19-managed-airflow-cve-2026-114938-mitigation.md)
@@ -13,10 +14,14 @@
 - [2026-11-19 - Cloud Load Balancing: 認可ポリシーの DENY_BY_DEFAULT アクションが GA](2026/2026-11-19-cloud-load-balancing-deny-by-default-ga.md)
 - [2026-11-19 - Network Intelligence Center: Connectivity Tests が Datastream プライベート接続から Cloud SQL への接続テストに対応](2026/2026-11-19-connectivity-tests-datastream-cloud-sql.md)
 - [2026-11-19 - Dataform / BigQuery: ワークスペースと Git 連携におけるパストラバーサル脆弱性 (GCP-2026-084)](2026/2026-11-19-dataform-path-traversal-vulnerability.md)
+- [2026-11-19 - Google SecOps: セルフサービスによる追加インスタンスプロビジョニングが GA](2026/2026-11-19-google-secops-self-service-instance-provisioning.md)
 - [2026-11-19 - Document AI: カスタム抽出ツールの新モデル pretrained-foundation-model-v3.1-lite (Gemini 3.1 Flash Lite 搭載) が GA](2026/2026-11-19-document-ai-foundation-model-v3-1-lite.md)
 - [2026-11-19 - BigQuery: 生成 AI 関数で gemini-4-neon モデルをサポート (GA)](2026/2026-11-19-bigquery-generative-ai-gemini-4-neon.md)
+- [2026-11-19 - Google Cloud Contact Center as a Service (CCaaS): バージョン 6.33 正式リリースと 6.36 プレリリースノート](2026/2026-11-19-ccaas-6-33-release-6-36-prerelease.md)
 - [2026-11-19 - BigQuery: Data Engineering Agent のエージェント可観測性が GA](2026/2026-11-19-bigquery-data-engineering-agent-observability.md)
 - [2026-11-19 - BigQuery: CREATE AI INDEX ステートメントによる AI インデックス作成 (Preview)](2026/2026-11-19-bigquery-ai-index-natural-language-search.md)
+- [2026-11-19 - Container-Optimized OS: cos-121 / cos-133 セキュリティリリース (CVE-2026-78663 を複数エージェントで修正)](2026/2026-11-19-container-optimized-os-cos-121-cos-133-security-updates.md)
+- [2026-11-19 - Gemini Enterprise Agent Platform: CodeMender が Gemini 4 Hydrogen をサポート (Preview) + v0.23.0 アップデート](2026/2026-11-19-codemender-gemini-4-hydrogen-v0-23-0.md)
 - [2026-11-18 - Compute Engine: C4D ベアメタルインスタンスのマルチ NIC 対応と Titanium SSD 搭載マシンタイプ (Preview)](2026/2026-11-18-compute-engine-c4d-bare-metal-multi-nic.md)
 - [2026-11-18 - Application Integration: 実行ログにおける Config 変数のマスキング対応](2026/2026-11-18-application-integration-mask-config-variables.md)
 - [2026-11-18 - Google Kubernetes Engine: GKE Granular NAT (Preview)](2026/2026-11-18-gke-granular-nat-preview.md)
@@ -26,6 +31,7 @@
 - [2026-11-18 - Gemini Enterprise Agent Platform: Gemini 4 Neon (gemini-4-neon) が GA](2026/2026-11-18-gemini-enterprise-agent-platform-gemini-4-neon-ga.md)
 - [2026-11-18 - BigQuery (Lakehouse): Iceberg テーブルの行レベル/列レベルセキュリティと INFORMATION_SCHEMA.ROW_ACCESS_POLICIES ビューが GA](2026/2026-11-18-bigquery-lakehouse-iceberg-row-column-security-ga.md)
 - [2026-11-18 - API Gateway: モデルルーターが異なるホスト・異なるプロジェクトの Google API バックエンドに対応](2026/2026-11-18-api-gateway-model-routers-multi-host.md)
+- [2026-11-18 - BigQuery: INFORMATION_SCHEMA.ROW_ACCESS_POLICIES ビューが一般提供 (GA)](2026/2026-11-18-bigquery-information-schema-row-access-policies.md)
 - [2026-11-18 - Gemini Enterprise: Canvas でインタラクティブな Web アプリ作成が GA](2026/2026-11-18-gemini-enterprise-canvas-interactive-web-apps.md)
 - [2026-11-18 - Google Kubernetes Engine: アプリケーションレイヤ シークレット暗号化が Secrets のみ暗号化される既知の問題](2026/2026-11-18-gke-application-layer-secrets-encryption-issue.md)
 - [2026-11-18 - Cloud Key Management Service: Cloud HSM for Google Workspace が Workspace Key Access API によるセルフサービス操作をサポート (Preview)](2026/2026-11-18-cloud-kms-hsm-workspace-key-access-api.md)
@@ -33,6 +39,7 @@
 - [2026-11-18 - Application Integration: 安全でないデシリアライゼーションの脆弱性 (GCP-2026-083 / CVE-2026-106169)](2026/2026-11-18-application-integration-deserialization-gcp-2026-083.md)
 - [2026-11-18 - Cloud Run: ワーカープールの CPU オートスケーリング (Preview)](2026/2026-11-18-cloud-run-worker-pools-cpu-autoscaling.md)
 - [2026-11-18 - Cloud Asset Inventory: dataplex.googleapis.com/Environment リソースタイプのサポート非推奨化](2026/2026-11-18-cloud-asset-inventory-dataplex-environment-deprecated.md)
+- [2026-11-18 - Spanner: QueryData による自然言語からの GQL クエリ生成 (Preview)](2026/2026-11-18-spanner-querydata-gql-generation.md)
 - [2026-11-18 - Gemini Enterprise: Gemini 4 Neon が Web アプリ・モバイルアプリ・Workflow Builder・AI developer tools で GA](2026/2026-11-18-gemini-enterprise-gemini-4-neon-ga.md)
 - [2026-11-18 - Apigee hybrid: v1.17.4 パッチリリース (Pod Topology Spread Constraints 対応、CVE-2026-114938 修正)](2026/2026-11-18-apigee-hybrid-v1-17-4.md)
 - [2026-11-17 - Gemini Enterprise Agent Platform (Model Garden): AlphaGenome がアローリスト不要で利用可能に](2026/2026-11-17-alphagenome-allowlist-removal.md)
