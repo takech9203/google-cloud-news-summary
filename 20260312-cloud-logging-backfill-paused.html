@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Logging: Log Analytics バックフィル操作の一時停止</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-red);
+    }
+
+    .header-left { flex: 1; min-width: 280px; }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .badge, .badge-ga, .badge-preview, .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); color: #FFFFFF; }
+    .badge-issue { background: var(--gc-red); color: #FFFFFF; }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .highlight-red {
+      background-color: var(--gc-red-tint);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-red);
+      border-bottom: 2px solid var(--gc-red);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green { border-left-color: var(--gc-green); }
+    .card-red { border-left-color: var(--gc-red); }
+    .card-yellow { border-left-color: var(--gc-yellow); }
+    .card-purple { border-left-color: var(--gc-purple); }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow { color: var(--gc-blue-600); font-size: 20px; }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Before/After */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border: 1px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border: 1px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-card h3 { color: var(--gc-red); }
+    .after-card h3 { color: var(--gc-green); }
+
+    .before-card ul, .after-card ul {
+      list-style: none;
+      padding: 0;
+      margin-top: 8px;
+    }
+
+    .before-card li, .after-card li {
+      padding: 4px 0;
+      font-size: 14px;
+    }
+
+    .before-card li::before { content: "\2717 "; color: var(--gc-red); font-weight: bold; }
+    .after-card li::before { content: "\2713 "; color: var(--gc-green); font-weight: bold; }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.red {
+      background: linear-gradient(135deg, var(--gc-red), #C62828);
+    }
+
+    .stat-card.green {
+      background: linear-gradient(135deg, var(--gc-green), #1B7A35);
+    }
+
+    .stat-card.yellow {
+      background: linear-gradient(135deg, var(--gc-yellow), #F9A825);
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Feature Cards Grid */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    /* Use Case Card */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h3 {
+      color: var(--gc-blue-800);
+      margin-bottom: 8px;
+    }
+
+    /* Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* Code blocks */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Mermaid */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Footer */
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .before-after { grid-template-columns: 1fr; }
+      .feature-grid { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .header { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>&#9888;&#65039; Cloud Logging: Log Analytics バックフィル操作の一時停止</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge badge-issue">Issue</span>
+          <span class="badge">Cloud Logging</span>
+          <span class="badge" style="background: var(--gc-orange);">Log Analytics</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-03-12</div>
+    </div>
+
+    <!-- Alert Banner -->
+    <div class="error-box" style="margin-bottom: 24px;">
+      <strong>&#9888;&#65039; 既知の問題:</strong> Log Analytics にアップグレードされたログバケットに対する<span class="highlight-red">自動バックフィル操作が一時停止</span>されています。アップグレード前のログエントリを Log Analytics で分析するには、Cloud Customer Care への連絡が必要です。
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>&#9729;&#65039; 概要</h2>
+      <p>
+        Cloud Logging の <span class="highlight">Log Analytics</span> にアップグレードされたログバケットに対して自動的に実行される<span class="highlight">バックフィル操作</span>が一時的に停止されている。バックフィル操作とは、Log Analytics へのアップグレード前に書き込まれた古いログエントリを Log Analytics インターフェースで分析可能にするためのプロセスであり、通常はアップグレード後に自動的に開始される。
+      </p>
+      <p style="margin-top: 12px;">
+        新たにログバケットを Log Analytics にアップグレードした場合、アップグレード前のログエントリが Log Analytics で分析できない状態が続く可能性がある。ただし、<span class="highlight">アップグレード後に新規に取り込まれたログエントリは引き続き正常に分析可能</span>である。
+      </p>
+    </div>
+
+    <!-- Impact Stats -->
+    <div class="stats-grid">
+      <div class="stat-card red">
+        <div class="stat-value">&#9888;&#65039;</div>
+        <div class="stat-label">自動バックフィル<br>一時停止中</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-value">&#10004;&#65039;</div>
+        <div class="stat-label">新規ログ取り込み<br>影響なし</div>
+      </div>
+      <div class="stat-card yellow">
+        <div class="stat-value">&#128222;</div>
+        <div class="stat-label">手動バックフィル<br>Customer Care 経由</div>
+      </div>
+    </div>
+
+    <!-- Before / After -->
+    <div class="section">
+      <h2>&#128260; 通常時 vs 現在の状態</h2>
+      <div class="before-after">
+        <div class="after-card">
+          <h3>&#10004;&#65039; 通常時 (自動バックフィル有効)</h3>
+          <ul>
+            <li>ログバケットを Log Analytics にアップグレードすると自動的にバックフィルが開始</li>
+            <li>アップグレード前のログエントリも数時間~数日で分析可能に</li>
+            <li>ユーザーの介入は不要で、自動的にプロセスが完了</li>
+          </ul>
+        </div>
+        <div class="before-card">
+          <h3>&#10060; 現在 (自動バックフィル停止中)</h3>
+          <ul>
+            <li>新規アップグレード時にアップグレード前のログが自動的に利用可能にならない</li>
+            <li>手動バックフィル開始には Cloud Customer Care への連絡が必要</li>
+            <li>自動バックフィルの再開時期は未定</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>&#127959;&#65039; アーキテクチャ図</h2>
+      <p>Log Analytics アップグレード時のバックフィルフローを示す。現在、自動バックフィルが一時停止されており、アップグレード前の古いログを Log Analytics で分析するには Customer Care 経由で手動バックフィルを依頼する必要がある。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph LogBucket["ログバケット"]
+        OldLogs["アップグレード前の\n古いログエントリ"]
+        NewLogs["アップグレード後の\n新しいログエントリ"]
+    end
+
+    Upgrade["Log Analytics\nアップグレード実行"]
+
+    subgraph LogAnalytics["Log Analytics"]
+        SQLQuery["SQL クエリ"]
+    end
+
+    subgraph BackfillProcess["バックフィルプロセス"]
+        AutoBackfill["自動バックフィル\n一時停止中"]
+        ManualBackfill["手動バックフィル\nCustomer Care 経由"]
+    end
+
+    OldLogs --> Upgrade
+    NewLogs --> Upgrade
+    Upgrade -->|"新規ログ: 即時利用可能"| LogAnalytics
+    Upgrade -->|"古いログ: バックフィル必要"| BackfillProcess
+    AutoBackfill -.->|"停止中"| LogAnalytics
+    ManualBackfill -->|"対処方法"| LogAnalytics
+
+    style AutoBackfill fill:#ffcccc,stroke:#cc0000
+    style ManualBackfill fill:#ccffcc,stroke:#00cc00
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Points -->
+    <div class="section">
+      <h2>&#128270; 主要ポイント</h2>
+      <div class="card card-red">
+        <h3>&#9888;&#65039; 自動バックフィルの一時停止</h3>
+        <div class="icon-text"><span class="arrow">&rarr;</span><span>ログバケットを Log Analytics にアップグレードした際に自動的に開始されるバックフィル操作が一時的に停止されている</span></div>
+        <div class="icon-text"><span class="arrow">&rarr;</span><span>既に Log Analytics にアップグレード済みでバックフィルが完了しているバケットには影響しない</span></div>
+      </div>
+      <div class="card card-yellow">
+        <h3>&#127919; 影響範囲</h3>
+        <div class="icon-text"><span class="arrow">&rarr;</span><span>新たに Log Analytics にアップグレードするログバケットが対象</span></div>
+        <div class="icon-text"><span class="arrow">&rarr;</span><span>アップグレード前に書き込まれたログエントリが Log Analytics で分析できない状態が継続する</span></div>
+        <div class="icon-text"><span class="arrow">&rarr;</span><span>アップグレード後の新規ログエントリには影響なし</span></div>
+      </div>
+      <div class="card card-green">
+        <h3>&#128222; 手動バックフィルによる対処</h3>
+        <div class="icon-text"><span class="arrow">&rarr;</span><span>Cloud Customer Care に連絡することで、手動でバックフィル操作を開始できる</span></div>
+        <div class="icon-text"><span class="arrow">&rarr;</span><span>バックフィルの完了には通常数時間から数日を要する</span></div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>&#128295; 技術仕様</h2>
+      <h3>Log Analytics バックフィルの仕組み</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>バックフィル対象</strong></td><td>アップグレード前にログバケットに書き込まれたログエントリ</td></tr>
+          <tr><td><strong>通常の所要時間</strong></td><td>数時間から数日</td></tr>
+          <tr><td><strong>現在のステータス</strong></td><td><span class="highlight-red">自動バックフィル一時停止中</span></td></tr>
+          <tr><td><strong>対処方法</strong></td><td>Cloud Customer Care に手動バックフィルを依頼</td></tr>
+          <tr><td><strong>新規ログへの影響</strong></td><td>なし (アップグレード後のログは即座に Log Analytics で利用可能)</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top: 24px;">Log Analytics アップグレードの制約事項</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>対象バケット</strong></td><td>Google Cloud プロジェクトレベルで作成されたログバケット</td></tr>
+          <tr><td><strong>ロック状態</strong></td><td>アンロック状態のバケット (_Required バケットを除く)</td></tr>
+          <tr><td><strong>保留中の更新</strong></td><td>バケットに保留中の更新がないこと</td></tr>
+          <tr><td><strong>取り消し</strong></td><td>アップグレード操作は取り消し不可</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup Steps -->
+    <div class="section">
+      <h2>&#128736;&#65039; 設定方法・対処手順</h2>
+
+      <h3>前提条件</h3>
+      <div class="note-box" style="margin-bottom: 16px;">
+        <div class="icon-text"><span class="arrow">&rarr;</span><span>Google Cloud プロジェクトレベルで作成されたログバケットが存在すること</span></div>
+        <div class="icon-text"><span class="arrow">&rarr;</span><span>バケットがアンロック状態であること (または _Required バケットであること)</span></div>
+        <div class="icon-text"><span class="arrow">&rarr;</span><span>バケットに保留中の更新がないこと</span></div>
+      </div>
+
+      <h3>ステップ 1: Log Analytics アップグレードの状態を確認</h3>
+      <p><code>analyticsEnabled</code> が <code>true</code> になっていることを確認する。</p>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># ログバケットの状態を確認
+gcloud logging buckets describe BUCKET_ID \
+  --location=LOCATION</code></pre>
+
+      <h3>ステップ 2: Cloud Customer Care に連絡</h3>
+      <p>Google Cloud コンソールからサポートケースを作成し、対象のログバケットに対するバックフィル操作の手動開始を依頼する。</p>
+      <div class="warning-box">
+        <strong>&#128221; サポートケースに含める情報:</strong>
+        <ul style="list-style: none; padding: 0; margin-top: 8px;">
+          <li style="padding: 4px 0;">&rarr; プロジェクト ID</li>
+          <li style="padding: 4px 0;">&rarr; ログバケット ID</li>
+          <li style="padding: 4px 0;">&rarr; ログバケットのロケーション</li>
+          <li style="padding: 4px 0;">&rarr; Log Analytics アップグレードの実施日</li>
+        </ul>
+      </div>
+
+      <h3 style="margin-top: 16px;">アップグレードコマンド (参考)</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># gcloud CLI でログバケットを Log Analytics にアップグレード
+gcloud logging buckets update BUCKET_ID \
+  --location=LOCATION \
+  --enable-analytics \
+  --async</code></pre>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>&#10004;&#65039; メリット (回避策の活用)</h2>
+      <div class="feature-grid">
+        <div class="card card-green">
+          <h3>&#128176; ビジネス面</h3>
+          <div class="icon-text"><span class="arrow">&rarr;</span><span><strong>サポートによる回避策の提供:</strong> Customer Care 経由で手動バックフィルを依頼することで業務への影響を最小限に抑えられる</span></div>
+          <div class="icon-text"><span class="arrow">&rarr;</span><span><strong>新規ログ分析への影響なし:</strong> アップグレード後のログエントリは引き続き Log Analytics で分析可能であり、リアルタイムのログ分析業務に支障はない</span></div>
+        </div>
+        <div class="card">
+          <h3>&#9881;&#65039; 技術面</h3>
+          <div class="icon-text"><span class="arrow">&rarr;</span><span><strong>新規ログの取り込みに影響なし:</strong> Log Analytics のコア機能であるログの取り込みと SQL クエリの実行は正常に動作する</span></div>
+          <div class="icon-text"><span class="arrow">&rarr;</span><span><strong>既存のアップグレード済みバケットへの影響なし:</strong> 既にバックフィルが完了しているバケットは影響を受けない</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>&#9888;&#65039; デメリット・制約事項</h2>
+      <div class="error-box">
+        <strong>制限事項</strong>
+        <ul style="list-style: none; padding: 0; margin-top: 8px;">
+          <li style="padding: 4px 0;">&#9888;&#65039; 自動バックフィルが再開されるまでの間、アップグレード前のログを Log Analytics で分析するには手動対応が必要</li>
+          <li style="padding: 4px 0;">&#9888;&#65039; Customer Care への連絡が必要となるため、サポートプランに応じた対応時間の遅延が発生する可能性がある</li>
+          <li style="padding: 4px 0;">&#9888;&#65039; バックフィル操作自体にも数時間から数日の処理時間が必要</li>
+        </ul>
+      </div>
+      <div class="warning-box" style="margin-top: 12px;">
+        <strong>&#128161; 考慮すべき点</strong>
+        <ul style="list-style: none; padding: 0; margin-top: 8px;">
+          <li style="padding: 4px 0;">&#128161; この問題の解消時期は現時点で未定であるため、Log Analytics へのアップグレードを計画している場合はバックフィルの遅延を考慮した計画が必要</li>
+          <li style="padding: 4px 0;">&#128161; アップグレード前の過去ログの分析が緊急に必要な場合は、<strong>Logs Explorer</strong> を使用する代替手段を検討する</li>
+          <li style="padding: 4px 0;">&#128161; BigQuery にルーティングされたログがある場合は、<strong>BigQuery</strong> 側での分析も代替手段として利用可能</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>&#127919; ユースケース</h2>
+      <div class="usecase-card">
+        <h3>&#128270; ユースケース 1: 新規に Log Analytics へアップグレードする場合</h3>
+        <p><strong>シナリオ:</strong> 運用チームが既存のログバケットを Log Analytics にアップグレードし、過去のログも含めて SQL クエリで分析したいが、自動バックフィルが停止中である。</p>
+        <div style="margin-top: 12px;">
+          <div class="icon-text"><span class="arrow">&rarr;</span><span>アップグレードを実行し、新規ログの分析を開始する</span></div>
+          <div class="icon-text"><span class="arrow">&rarr;</span><span>過去ログの分析が必要な場合は Cloud Customer Care に手動バックフィルを依頼する</span></div>
+          <div class="icon-text"><span class="arrow">&rarr;</span><span>バックフィル完了までの間、過去ログの分析には Logs Explorer を使用する</span></div>
+        </div>
+        <div class="success-box" style="margin-top: 12px;">
+          <strong>効果:</strong> 新規ログの分析は即座に開始でき、過去ログも手動バックフィル完了後に分析可能になる
+        </div>
+      </div>
+      <div class="usecase-card">
+        <h3>&#128197; ユースケース 2: アップグレードのタイミングを検討する場合</h3>
+        <p><strong>シナリオ:</strong> Log Analytics への移行を計画中で、過去ログの分析が重要な要件である。</p>
+        <div style="margin-top: 12px;">
+          <div class="icon-text"><span class="arrow">&rarr;</span><span>自動バックフィルの再開を待ってからアップグレードを実施する</span></div>
+          <div class="icon-text"><span class="arrow">&rarr;</span><span>または、アップグレードを実施しつつ Customer Care 経由で手動バックフィルを依頼する</span></div>
+          <div class="icon-text"><span class="arrow">&rarr;</span><span>代替として BigQuery へのログルーティングを設定し、BigQuery で過去ログを分析する</span></div>
+        </div>
+        <div class="success-box" style="margin-top: 12px;">
+          <strong>効果:</strong> 計画的な移行により、過去ログの分析に関する影響を最小化できる
+        </div>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>&#128178; 料金</h2>
+      <div class="success-box">
+        <strong>&#10004;&#65039; バックフィル操作自体に追加料金は発生しない。</strong>
+      </div>
+      <h3 style="margin-top: 16px;">Cloud Logging 料金体系</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>料金</th>
+            <th>備考</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>ログの取り込み</strong></td>
+            <td>月間 50 GiB まで無料 / 超過分 $0.50/GiB</td>
+            <td>-</td>
+          </tr>
+          <tr>
+            <td><strong>ログの保存</strong></td>
+            <td>デフォルト保持期間中は無料 / 延長分 $0.01/GiB</td>
+            <td>-</td>
+          </tr>
+          <tr>
+            <td><strong>BigQuery リンクドデータセット</strong></td>
+            <td>取り込み・保存コスト不要</td>
+            <td>SQL クエリの実行に BigQuery 分析料金が適用</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Available Regions -->
+    <div class="section">
+      <h2>&#127758; 利用可能リージョン</h2>
+      <div class="note-box">
+        <strong>&#128205; Cloud Logging はすべての Google Cloud リージョンで利用可能。</strong>
+        <br>ログバケットのリージョン設定は作成時に指定し、後から変更することはできない。詳細は <a href="https://cloud.google.com/logging/docs/region-support" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud Logging のリージョンサポート</a> を参照。
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#128279; 関連サービス・機能</h2>
+      <div class="card">
+        <h3>&#128202; Log Analytics</h3>
+        <p>ログバケットのデータに対して SQL クエリを実行する機能。今回の問題はバックフィルに関するものであり、Log Analytics のクエリ機能自体は正常に動作する</p>
+      </div>
+      <div class="card">
+        <h3>&#128451;&#65039; BigQuery (リンクドデータセット)</h3>
+        <p>Log Analytics にアップグレードしたバケットに対して BigQuery データセットをリンクすることで、BigQuery からログデータを直接読み取り・分析できる</p>
+      </div>
+      <div class="card">
+        <h3>&#128269; Logs Explorer</h3>
+        <p>従来のログ閲覧・検索インターフェース。バックフィル完了前でも、ログエントリの閲覧が可能な代替手段</p>
+      </div>
+      <div class="card">
+        <h3>&#128200; Cloud Monitoring</h3>
+        <p>ログベースの指標と連携して、ログデータに基づくアラートやダッシュボードを構成できる</p>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section" style="background: var(--gc-red-tint); border-color: var(--gc-red);">
+      <h2>&#128204; まとめ</h2>
+      <p>
+        Cloud Logging の Log Analytics <span class="highlight-red">バックフィル操作が一時停止</span>されている。Log Analytics にアップグレード済みまたは新規にアップグレードするログバケットにおいて、アップグレード前の古いログエントリを自動的に Log Analytics で分析可能にするバックフィル機能が利用できない状態である。過去ログの分析が必要な場合は <span class="highlight">Cloud Customer Care</span> に連絡して手動バックフィルを依頼するか、<span class="highlight">Logs Explorer</span> や <span class="highlight">BigQuery</span> を代替手段として活用することが推奨される。自動バックフィルの再開については、Google からの追加アナウンスを確認すること。
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>&#128206; 出典:</p>
+      <ul style="list-style: none; padding: 0; margin-top: 4px;">
+        <li>- <a href="https://docs.google.com/release-notes#March_12_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li>- <a href="https://cloud.google.com/logging/docs/buckets" target="_blank" rel="noopener noreferrer">Cloud Logging ログバケット管理ドキュメント</a></li>
+        <li>- <a href="https://cloud.google.com/logging/docs/log-analytics" target="_blank" rel="noopener noreferrer">Log Analytics 概要</a></li>
+        <li>- <a href="https://cloud.google.com/products/observability/pricing" target="_blank" rel="noopener noreferrer">Google Cloud Observability 料金ページ</a></li>
+      </ul>
+      <p style="margin-top: 8px; color: var(--gc-outline);">#CloudLogging #LogAnalytics #Backfill #Issue #Observability #GCP</p>
+    </footer>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

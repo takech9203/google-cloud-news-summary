@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document AI: Layout Parser 画像・テーブルアノテーション GA</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .ai-box {
+      background: var(--gc-purple-tint);
+      border-left: 4px solid var(--gc-purple);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .before-card h4, .after-card h4 {
+      margin: 0 0 12px 0;
+      font-size: 16px;
+    }
+
+    .before-card ul, .after-card ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .before-card li, .after-card li {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-900);
+      margin: 0 0 8px 0;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .feature-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .feature-card.purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .feature-card.green {
+      border-left-color: var(--gc-green);
+    }
+
+    .feature-card.teal {
+      border-left-color: var(--gc-teal);
+    }
+
+    .feature-card h4 {
+      margin: 0 0 8px 0;
+      color: var(--gc-on-surface);
+      font-size: 16px;
+    }
+
+    .feature-card p {
+      margin: 0;
+      font-size: 14px;
+    }
+
+    .version-table {
+      margin: 16px 0;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 24px;
+      }
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>Document AI: Layout Parser<br>画像・テーブルアノテーション GA</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Document AI</span>
+          <span class="badge badge-ga">GA</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-05-27</div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        Google Cloud Document AI の <span class="highlight">Layout Parser</span> において、画像およびテーブルのアノテーション機能が <span class="highlight">General Availability (GA)</span> としてリリースされました。
+      </p>
+      <p>
+        Layout Parser は Google の専用 OCR モデルと Gemini の生成 AI 機能を組み合わせた高度なドキュメント解析サービスです。ドキュメント内の画像やテーブルを識別し、記述的なテキストブロックとしてアノテーションできるようになりました。
+      </p>
+
+      <div class="ai-box">
+        <strong>🤖 RAG パイプラインでの活用:</strong> ドキュメント内の視覚的要素（チャート、図表、データテーブルなど）をテキスト化することで、検索や生成 AI アプリケーションからアクセス可能な情報として活用できます。
+      </div>
+    </div>
+
+    <!-- Before/After Section -->
+    <div class="section">
+      <h2>🔄 Before / After</h2>
+      <div class="before-after">
+        <div class="before-card">
+          <h4>❌ Before (プレビュー段階)</h4>
+          <ul>
+            <li>本番ワークロードで SLA が保証されていなかった</li>
+            <li>ドキュメント内画像は OCR で認識されず情報欠落</li>
+            <li>テーブル構造がフラット化され検索精度が低下</li>
+            <li>視覚情報の処理には別途仕組みの構築が必要</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>✅ After (GA リリース)</h4>
+          <ul>
+            <li>SLA 付き本番環境で安心して利用可能</li>
+            <li>画像が自動識別され記述テキストとして生成</li>
+            <li>テーブルが構造化されデータ整合性を保持</li>
+            <li>単一 API で画像・テーブル含むドキュメント全体を構造化</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>Layout Parser の処理パイプライン: ドキュメントが入力されると、テキスト・画像・テーブルの各要素が識別され、それぞれ適切な処理が施された後、階層構造として統合されます。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    A[ドキュメント入力<br/>PDF/DOCX/PPTX/XLSX] --> B[Layout Parser]
+    B --> C{要素の識別}
+    C --> D[テキスト要素<br/>段落・見出し・リスト]
+    C --> E[画像要素<br/>図・チャート・写真]
+    C --> F[テーブル要素<br/>表・データグリッド]
+
+    D --> G[構造化パース]
+    E --> H[画像アノテーション<br/>Gemini による記述生成]
+    F --> I[テーブルアノテーション<br/>構造保持・データ抽出]
+
+    G --> J[DocumentLayout<br/>階層構造ツリー]
+    H --> J
+    I --> J
+
+    J --> K[チャンキング & コンテキスト付与]
+    K --> L[RAG / 検索 / BigQuery<br/>への出力]
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features Section -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="feature-card purple">
+          <h4>🖼️ 画像アノテーション (Image Annotation)</h4>
+          <p>ドキュメント内の画像（図、チャート、写真など）を自動的に検出し、Gemini の生成 AI 機能を活用して画像の内容を詳細な記述テキストとして生成。例: 銀行レポート内の円グラフから各データポイントを抽出してテキスト化。</p>
+        </div>
+        <div class="feature-card green">
+          <h4>📊 テーブルアノテーション (Table Annotation)</h4>
+          <p>複雑なテーブル構造（結合セル、複雑なヘッダーを含む）を正確に解析。テーブル内のデータを構造化されたテキスト情報として出力し、セルと列の正確なアライメントを維持してデータの整合性を保証。</p>
+        </div>
+        <div class="feature-card teal">
+          <h4>📄 レイアウト認識チャンキング (Layout-aware Chunking)</h4>
+          <p>アノテーション結果を含むセマンティックに一貫したチャンクを生成。祖先の見出しやテーブルヘッダーなどのコンテキスト情報を付与し、単独で取得されてもチャンクの意味が保持される設計。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3>処理制限</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>オンライン処理</th>
+            <th>バッチ処理</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>最大ファイルサイズ</td>
+            <td>20 MB (全ファイル形式)</td>
+            <td>1 GB (PDF)</td>
+          </tr>
+          <tr>
+            <td>最大ページ数</td>
+            <td>15 ページ (PDF)</td>
+            <td>500 ページ (PDF)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>対応ファイル形式</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>ファイル形式</th>
+            <th>MIME Type</th>
+            <th>検出可能な要素</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>PDF</td>
+            <td><code>application/pdf</code></td>
+            <td>figure, paragraph, table, title, heading, page header, page footer</td>
+          </tr>
+          <tr>
+            <td>HTML</td>
+            <td><code>text/html</code></td>
+            <td>paragraph, table, list, title, heading, page header, page footer</td>
+          </tr>
+          <tr>
+            <td>DOCX</td>
+            <td><code>application/vnd.openxmlformats-...</code></td>
+            <td>paragraph, tables, list, title, heading</td>
+          </tr>
+          <tr>
+            <td>PPTX</td>
+            <td><code>application/vnd.openxmlformats-...</code></td>
+            <td>paragraph, table, list, title, heading</td>
+          </tr>
+          <tr>
+            <td>XLSX</td>
+            <td><code>application/vnd.openxmlformats-...</code></td>
+            <td>tables (INT, FLOAT, STRING)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>プロセッサバージョン</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>バージョン</th>
+            <th>説明</th>
+            <th>チャネル</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>v1.0-2024-06-03</code></td>
+            <td>デフォルトの GA バージョン</td>
+            <td><span class="badge badge-ga">Stable</span></td>
+          </tr>
+          <tr>
+            <td><code>v1.5-2025-08-25</code></td>
+            <td>Gemini 2.5 Flash 搭載版</td>
+            <td><span class="badge badge-preview">RC</span></td>
+          </tr>
+          <tr>
+            <td><code>v1.5-pro-2025-08-25</code></td>
+            <td>Gemini 2.5 Pro 搭載版</td>
+            <td><span class="badge badge-preview">RC</span></td>
+          </tr>
+          <tr>
+            <td><code>v1.6-2026-01-13</code></td>
+            <td>Gemini 3.0 Flash 搭載版</td>
+            <td><span class="badge badge-preview">RC</span></td>
+          </tr>
+          <tr>
+            <td><code>v1.6-pro-2025-12-01</code></td>
+            <td>Gemini 3.0 Pro 搭載版</td>
+            <td><span class="badge badge-preview">RC</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup Section -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>Google Cloud プロジェクトが作成済みであること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>Document AI API が有効化されていること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>適切な IAM 権限（Document AI Editor 以上）が付与されていること</span></div>
+
+      <h3>Step 1: Layout Parser プロセッサの作成</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud alpha document-ai processors create \
+  --display-name="layout-parser-with-annotations" \
+  --type="LAYOUT_PARSER_PROCESSOR" \
+  --location=us</code></pre>
+
+      <h3>Step 2: アノテーション機能の有効化</h3>
+      <span class="code-label">JSON</span>
+      <pre><code class="language-json">{
+  "processOptions": {
+    "layoutConfig": {
+      "chunkingConfig": {
+        "chunkSize": 500,
+        "includeAncestorHeadings": true
+      },
+      "returnImages": true,
+      "returnTables": true
+    }
+  }
+}</code></pre>
+
+      <h3>Step 3: ドキュメントの処理</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">curl -X POST \
+  -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Content-Type: application/json" \
+  "https://us-documentai.googleapis.com/v1/projects/PROJECT_ID/locations/us/processors/PROCESSOR_ID:process" \
+  -d '{
+    "rawDocument": {
+      "mimeType": "application/pdf",
+      "content": "BASE64_ENCODED_CONTENT"
+    }
+  }'</code></pre>
+    </div>
+
+    <!-- Benefits Section -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+
+      <h3>ビジネス面</h3>
+      <div class="card">
+        <div class="icon-text"><span class="arrow">→</span><strong>RAG パイプラインの精度向上</strong></div>
+        <p style="margin: 4px 0 0 28px; font-size: 14px;">ドキュメント内の視覚的情報（チャート、図表）がテキスト化されることで、検索・回答生成の精度が大幅に向上</p>
+      </div>
+      <div class="card">
+        <div class="icon-text"><span class="arrow">→</span><strong>ドキュメント処理の自動化促進</strong></div>
+        <p style="margin: 4px 0 0 28px; font-size: 14px;">画像やテーブルを含む複雑なドキュメントも単一 API で処理可能となり、ワークフロー構築コストを削減</p>
+      </div>
+      <div class="card">
+        <div class="icon-text"><span class="arrow">→</span><strong>SLA 保証による本番利用</strong></div>
+        <p style="margin: 4px 0 0 28px; font-size: 14px;">GA リリースにより、ミッションクリティカルなワークロードでの安定利用が保証される</p>
+      </div>
+
+      <h3>技術面</h3>
+      <div class="card" style="border-left-color: var(--gc-teal);">
+        <div class="icon-text"><span class="arrow">→</span><strong>ハルシネーションの低減</strong></div>
+        <p style="margin: 4px 0 0 28px; font-size: 14px;">OCR ベースのアプローチにより、純粋な LLM ベースのパーサーと比較して正確な情報抽出を実現</p>
+      </div>
+      <div class="card" style="border-left-color: var(--gc-teal);">
+        <div class="icon-text"><span class="arrow">→</span><strong>構造保持</strong></div>
+        <p style="margin: 4px 0 0 28px; font-size: 14px;">テーブルのセル・列のアライメントが正確に維持され、データの整合性が保証される</p>
+      </div>
+      <div class="card" style="border-left-color: var(--gc-teal);">
+        <div class="icon-text"><span class="arrow">→</span><strong>コンテキスト認識チャンキング</strong></div>
+        <p style="margin: 4px 0 0 28px; font-size: 14px;">祖先見出しの情報が付与されることで、チャンク単体でも意味が通じる設計</p>
+      </div>
+    </div>
+
+    <!-- Limitations Section -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <div class="warning-box">
+        <strong>制限事項:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>オンライン処理は 20 MB / 15 ページ (PDF) に制限</li>
+          <li>バッチ処理でも PDF は最大 1 GB / 500 ページまで</li>
+          <li>複数ページにまたがるテーブルは 2 つに分割される場合あり</li>
+          <li>ネストされたテーブル (DOCX, PPTX) はサポートされない</li>
+          <li>v1.6 系は Data Residency (DMZ) に非準拠</li>
+        </ul>
+      </div>
+      <div class="note-box">
+        <strong>💡 考慮すべき点:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>Gemini ベースのバージョン (v1.5 以降) は PDF ファイルのみで拡張機能が有効。非 PDF では v1.0 と同等の動作</li>
+          <li>アノテーション機能を有効にすると処理時間が増加する可能性あり</li>
+          <li>画像アノテーションの品質は元画像の解像度や複雑さに依存</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases Section -->
+    <div class="section">
+      <h2>💼 ユースケース</h2>
+      <div class="usecase-card">
+        <h4>🏦 金融レポートの自動解析と RAG</h4>
+        <p>銀行や金融機関が四半期レポートや年次報告書（10-K ファイリングなど）を RAG パイプラインに取り込む際、チャートや財務テーブルの情報も検索可能にする。</p>
+        <p style="margin-top: 8px;"><strong>効果:</strong> 円グラフやデータテーブルの内容がテキスト化され、「第3四半期の収益内訳は?」といった質問に対して、チャート内のデータに基づいた正確な回答が生成可能に。</p>
+      </div>
+
+      <span class="code-label">Python</span>
+      <pre><code class="language-python">from google.cloud import documentai_v1 as documentai
+
+client = documentai.DocumentProcessorServiceClient()
+
+request = documentai.ProcessRequest(
+    name="projects/PROJECT/locations/us/processors/PROCESSOR_ID",
+    raw_document=documentai.RawDocument(
+        content=pdf_content,
+        mime_type="application/pdf"
+    ),
+    process_options=documentai.ProcessOptions(
+        layout_config=documentai.ProcessOptions.LayoutConfig(
+            chunking_config=documentai.ProcessOptions.LayoutConfig.ChunkingConfig(
+                chunk_size=500,
+                include_ancestor_headings=True
+            )
+        )
+    )
+)
+
+result = client.process_document(request=request)
+
+# アノテーション付きチャンクを取得
+for chunk in result.document.chunked_document.chunks:
+    print(f"Chunk: {chunk.content}")
+    # BigQuery や Vector DB に格納</code></pre>
+
+      <div class="usecase-card" style="margin-top: 16px;">
+        <h4>📚 技術文書のナレッジベース構築</h4>
+        <p>社内のアーキテクチャ図やフローチャートを含む技術文書をナレッジベースに取り込み、エンジニアが自然言語で検索できるようにする。</p>
+        <p style="margin-top: 8px;"><strong>効果:</strong> アーキテクチャ図の各コンポーネントやデータフローが記述テキストとして抽出され、「このシステムのデータフローを教えて」といった質問に対して、図の内容に基づいた回答が可能になる。</p>
+      </div>
+    </div>
+
+    <!-- Pricing Section -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>Document AI Layout Parser の料金は Document AI feature pricing に基づきます。GA 対象のファイル形式（PDF, HTML, DOCX, PPTX, XLSX, XLSM）は課金対象です。</p>
+      <div class="note-box">
+        <strong>💡 詳細:</strong> 料金の詳細は <a href="https://cloud.google.com/generative-ai-app-builder/pricing#document_ai_feature_pricing" target="_blank" class="gc-link">Document AI feature pricing</a> を参照してください。
+      </div>
+    </div>
+
+    <!-- Related Services Section -->
+    <div class="section">
+      <h2>🔗 関連サービス</h2>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <h4>🔍 Vertex AI Search</h4>
+          <p>Layout Parser で生成されたチャンクを取り込み、高精度なドキュメント検索を実現</p>
+        </div>
+        <div class="feature-card green">
+          <h4>📊 BigQuery</h4>
+          <p>構造化されたテーブルデータを BigQuery に格納し、分析ワークロードに活用</p>
+        </div>
+        <div class="feature-card purple">
+          <h4>📝 Enterprise Document OCR</h4>
+          <p>テキスト認識の基盤として Layout Parser と組み合わせて使用</p>
+        </div>
+        <div class="feature-card teal">
+          <h4>🏷️ Custom Classifier / Custom Splitter</h4>
+          <p>ドキュメントの分類・分割と組み合わせた自動処理パイプラインの構築</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary Section -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="success-box">
+        <p><strong>Document AI Layout Parser の画像・テーブルアノテーション機能の GA リリース</strong>は、ドキュメント内の視覚的情報を活用した RAG パイプラインや検索システムを構築するユーザーにとって重要なマイルストーンです。</p>
+        <p style="margin-top: 8px;">2025年10月のプレビュー開始から約7か月を経て GA に到達し、本番ワークロードでの安定利用が保証されました。ドキュメント処理パイプラインを構築・運用しているチームは、この機能の有効化を検討し、視覚的情報の活用による検索精度の向上を図ることを推奨します。</p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="list-style: none; padding: 0; margin: 4px 0;">
+        <li><a href="https://cloud.google.com/release-notes#May_27_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li><a href="https://cloud.google.com/document-ai/docs/layout-parse-chunk" target="_blank" rel="noopener noreferrer">Layout Parser ドキュメント</a></li>
+        <li><a href="https://cloud.google.com/document-ai/docs/layout-parse-quickstart" target="_blank" rel="noopener noreferrer">Layout Parser クイックスタート</a></li>
+        <li><a href="https://cloud.google.com/generative-ai-app-builder/pricing#document_ai_feature_pricing" target="_blank" rel="noopener noreferrer">料金ページ</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: #9AA0A6; font-size: 11px;">#DocumentAI #LayoutParser #GA #RAG #OCR #Gemini</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

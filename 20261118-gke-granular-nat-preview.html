@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GKE Granular NAT (Preview) — Namespace 単位の Egress 制御と専用送信元 IP</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+:root {
+  --gc-blue: #4285F4;
+  --gc-red: #EA4335;
+  --gc-yellow: #FBBC04;
+  --gc-green: #34A853;
+  --gc-blue-900: #174EA6;
+  --gc-blue-800: #185ABC;
+  --gc-blue-700: #1967D2;
+  --gc-blue-600: #1A73E8;
+  --gc-blue-500: #4285F4;
+  --gc-blue-300: #669DF6;
+  --gc-blue-200: #8AB4F8;
+  --gc-blue-100: #AECBFA;
+  --gc-blue-50: #E8F0FE;
+  --gc-on-surface: #202124;
+  --gc-on-surface-variant: #5F6368;
+  --gc-outline: #80868B;
+  --gc-surface: #FFFFFF;
+  --gc-surface-container-lowest: #F8F9FA;
+  --gc-surface-container-low: #F1F3F4;
+  --gc-surface-container: #E8EAED;
+  --gc-outline-variant: #DADCE0;
+  --gc-blue-tint: #E8F0FE;
+  --gc-green-tint: #E6F4EA;
+  --gc-red-tint: #FCE8E6;
+  --gc-yellow-tint: #FEF7E0;
+  --gc-purple-tint: #F3E8FD;
+  --gc-teal-tint: #E0F7FA;
+  --gc-purple: #A142F4;
+  --gc-teal: #00BCD4;
+  --gc-orange: #FF6D00;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background-color: var(--gc-surface);
+  font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+  color: var(--gc-on-surface-variant);
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 20px;
+  margin: 0;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 16px;
+  border-bottom: 3px solid var(--gc-blue-600);
+}
+
+h1, .title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--gc-on-surface);
+  margin: 0;
+  line-height: 1.35;
+}
+
+h2, .section-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 20px 0 8px 0;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: var(--gc-outline);
+}
+
+.section {
+  background: var(--gc-surface-container-low);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid var(--gc-outline-variant);
+}
+
+.highlight {
+  background-color: var(--gc-blue-50);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--gc-blue-800);
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+.card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border-left: 4px solid var(--gc-blue-600);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+}
+
+.card h4 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  color: var(--gc-on-surface);
+}
+
+.card p { margin: 0; font-size: 14px; }
+
+.card ul { margin: 8px 0 0 0; padding-left: 20px; font-size: 14px; }
+.card ul li { margin: 4px 0; }
+
+.gc-link {
+  color: var(--gc-blue-600);
+  text-decoration: none;
+}
+.gc-link:hover {
+  color: var(--gc-blue-800);
+  text-decoration: underline;
+}
+
+.badge,
+.badge-ga,
+.badge-preview,
+.badge-deprecated {
+  display: inline-block;
+  color: #FFFFFF;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+  margin: 4px 8px 4px 0;
+}
+.badge { background: var(--gc-blue-600); }
+.badge-ga { background: var(--gc-green); color: #FFFFFF; }
+.badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+.badge-deprecated { background: var(--gc-red); color: #FFFFFF; }
+
+/* Before/After 比較 */
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+.before-box, .after-box {
+  border-radius: 12px;
+  padding: 20px;
+}
+.before-box {
+  background: var(--gc-red-tint);
+  border: 1px solid rgba(234, 67, 53, 0.3);
+}
+.after-box {
+  background: var(--gc-green-tint);
+  border: 1px solid rgba(52, 168, 83, 0.3);
+}
+.before-box h3, .after-box h3 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+}
+.before-box h3 { color: var(--gc-red); }
+.after-box h3 { color: #188038; }
+.before-box ul, .after-box ul {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 14px;
+}
+.before-box li, .after-box li { margin: 8px 0; }
+
+@media (max-width: 700px) {
+  .before-after { grid-template-columns: 1fr; }
+}
+
+/* フロー図 */
+.flow-diagram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 24px 0;
+}
+.flow-step {
+  background: var(--gc-surface);
+  border: 2px solid var(--gc-blue-600);
+  border-radius: 12px;
+  padding: 12px 20px;
+  text-align: center;
+  min-width: 100px;
+  color: var(--gc-on-surface);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+  font-size: 14px;
+}
+.flow-arrow {
+  color: var(--gc-blue-600);
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+  font-size: 15px;
+}
+.check-icon { color: var(--gc-green); font-size: 18px; flex-shrink: 0; }
+.cross-icon { color: var(--gc-red); font-size: 18px; flex-shrink: 0; }
+
+/* コードブロック (Mermaid の pre は除外) */
+.code-block,
+pre:not(.mermaid) {
+  background: #1E1E1E;
+  border-radius: 8px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: #E8E8E8;
+  margin: 16px 0;
+}
+
+.code-block { overflow: hidden; }
+.code-block pre { margin: 0; padding: 0; overflow-x: auto; }
+.code-header {
+  background: #2D2D2D;
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+.code-lang {
+  color: #9CDCFE;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-family: 'Roboto Mono', monospace;
+}
+.code-title { color: #AAAAAA; }
+.code-block code {
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 16px !important;
+  display: block;
+}
+
+pre code { background: none; border: none; font-size: inherit; }
+
+code:not(pre code) {
+  background: var(--gc-surface-container-low);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 0.88em;
+  color: var(--gc-blue-900);
+}
+.section code:not(pre code) { background: var(--gc-surface); }
+
+/* テーブル */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--gc-outline-variant);
+  background: var(--gc-surface);
+}
+th {
+  background: var(--gc-blue-50);
+  color: var(--gc-blue-900);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 2px solid var(--gc-blue-200);
+}
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--gc-outline-variant);
+  font-size: 14px;
+}
+tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+tr:hover { background: var(--gc-blue-50); }
+
+/* 注意・警告ボックス */
+.note-box {
+  background: var(--gc-blue-tint);
+  border-left: 4px solid var(--gc-blue-600);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+  font-size: 15px;
+}
+.warning-box {
+  background: var(--gc-yellow-tint);
+  border-left: 4px solid var(--gc-yellow);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+  font-size: 15px;
+}
+.error-box {
+  background: var(--gc-red-tint);
+  border-left: 4px solid var(--gc-red);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+  font-size: 15px;
+}
+.success-box {
+  background: var(--gc-green-tint);
+  border-left: 4px solid var(--gc-green);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+  font-size: 15px;
+}
+
+/* ユースケース */
+.usecase {
+  background: var(--gc-blue-tint);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border: 1px solid var(--gc-blue-100);
+}
+.usecase h4 {
+  margin: 0 0 8px 0;
+  color: var(--gc-blue-900);
+  font-size: 16px;
+}
+.usecase p { margin: 6px 0; font-size: 14px; }
+
+/* Mermaid コンテナ */
+.mermaid-container {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 20px 0;
+  border: 2px solid rgba(66, 133, 244, 0.3);
+  overflow-x: auto;
+}
+.mermaid {
+  display: flex;
+  justify-content: center;
+}
+
+/* ステップ番号 */
+.step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gc-blue-600);
+  color: #FFFFFF;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 14px;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+/* 関連サービスグリッド */
+.related-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+.related-item {
+  background: var(--gc-surface);
+  border: 1px solid var(--gc-outline-variant);
+  border-left: 4px solid var(--gc-teal);
+  border-radius: 8px;
+  padding: 14px 16px;
+  font-size: 14px;
+}
+.related-item strong { color: var(--gc-on-surface); display: block; margin-bottom: 4px; }
+
+/* タグ */
+.tags { margin-top: 12px; }
+.tag {
+  display: inline-block;
+  background: var(--gc-blue-50);
+  color: var(--gc-blue-800);
+  border-radius: 14px;
+  padding: 3px 12px;
+  font-size: 12px;
+  margin: 3px 4px 3px 0;
+}
+
+footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gc-outline-variant);
+  font-size: 12px;
+  color: var(--gc-outline);
+}
+footer a { word-break: break-all; }
+footer ul { margin: 8px 0; padding-left: 20px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ヘッダー -->
+  <div class="header">
+    <div>
+      <div style="margin-bottom: 8px;">
+        <span class="badge">☸️ Google Kubernetes Engine</span>
+        <span class="badge badge-preview">Preview</span>
+      </div>
+      <h1>🌐 GKE Granular NAT</h1>
+      <div class="subtitle" style="margin-top: 6px;">Namespace 単位の Egress 制御と専用送信元 IP アドレスの割り当て</div>
+    </div>
+    <div class="subtitle" style="text-align: right;">
+      📅 リリース日: 2026-11-18
+    </div>
+  </div>
+
+  <!-- 概要 -->
+  <div class="section">
+    <h2>📝 概要</h2>
+    <p>
+      GKE Granular NAT が <span class="highlight">Preview</span> として利用可能になりました。
+      GKE <strong>1.37.1-gke.2611000 以降</strong>で <strong>GKE Dataplane V2</strong> が有効な
+      Autopilot / Standard クラスタで、<code>CloudNATGateway</code> と <code>TrafficSelector</code> という
+      2 つのカスタムリソースを使い、<span class="highlight">Kubernetes Namespace 単位</span>でアウトバウンドトラフィックを制御し、
+      専用の Egress 送信元 IP アドレスを割り当てられます。
+    </p>
+    <p>
+      特定の Namespace からの Egress を専用の外部 IP アドレス (Public NAT) または専用のサブネット範囲 (Private NAT) 経由でルーティングでき、
+      <strong>カスタムプロキシインスタンスを運用することなく</strong>、外部パートナーやオンプレミスシステムに対して
+      <span class="highlight">決定論的な送信元 IP アドレス</span>を提供できます。
+    </p>
+    <div class="note-box">
+      <strong>🎯 対象ユーザー:</strong> 外部パートナーやオンプレミスシステムに接続するアプリケーションに企業のセキュリティポリシーを適用する Cloud アーキテクト、ネットワークスペシャリスト、オペレーター
+    </div>
+
+    <div class="before-after">
+      <div class="before-box">
+        <h3>❌ Before: アップデート前の課題</h3>
+        <ul>
+          <li>NAT ポリシーは<strong>クラスタ全体で単一</strong>の設定のみ。Namespace やワークロード単位で送信元 IP を使い分け不可</li>
+          <li>パートナー API やペイメントゲートウェイの IP 許可リストに<strong>クラスタ全体の Egress IP</strong> を登録する必要があり、特定サービスだけの許可が不可能</li>
+          <li>Namespace ごとに送信元 IP を分けるには<strong>中間プロキシ Pod やカスタム NAT アプライアンス</strong>のデプロイ・パッチ適用・スケーリングの運用負荷が発生</li>
+        </ul>
+      </div>
+      <div class="after-box">
+        <h3>✅ After: アップデート後の改善</h3>
+        <ul>
+          <li><code>CloudNATGateway</code> と <code>TrafficSelector</code> を kubectl で宣言的に適用するだけで <strong>Namespace 単位の Egress ポリシー</strong>を定義</li>
+          <li>専用の<strong>静的外部 IP (Public NAT)</strong> または<strong>プライベート NAT サブネット範囲 (Private NAT)</strong> 経由でルーティング可能</li>
+          <li>GKE が Cloud NAT ゲートウェイと変換ルールを<strong>自動プロビジョニング・同期</strong>。カスタムプロキシの管理が不要に</li>
+          <li>ネットワーク管理者とクラスタオペレーターの<strong>チーム間責務分離</strong>が可能に</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- アーキテクチャ図 -->
+  <div class="section">
+    <h2>🏗️ アーキテクチャ図</h2>
+    <div class="mermaid-container">
+      <pre class="mermaid">
+flowchart TD
+    subgraph Cluster["☸️ GKE クラスタ (Dataplane V2)"]
+        subgraph NSRed["📦 Namespace: billing"]
+            PodA["🚀 Pod"]
+        end
+        subgraph NSGreen["📦 Namespace: analytics"]
+            PodB["🚀 Pod"]
+        end
+        TS1["📜 TrafficSelector<br/>(nat-ip-1 を指定)"]
+        TS2["📜 TrafficSelector<br/>(nat-ip-2 を指定)"]
+    end
+
+    GW["🌐 CloudNATGateway<br/>(Cloud NAT + Cloud Router)"]
+
+    PodA -->|"eBPF で Link-Local SNAT"| TS1
+    PodB -->|"eBPF で Link-Local SNAT"| TS2
+    TS1 --> GW
+    TS2 --> GW
+    GW -->|"送信元 IP: nat-ip-1"| Partner["🏦 パートナー API<br/>(IP 許可リスト)"]
+    GW -->|"送信元 IP: nat-ip-2"| External["☁️ 外部サービス"]
+      </pre>
+    </div>
+    <p style="font-size: 14px;">
+      各 Namespace の Pod からの Egress トラフィックは、ノード上の <strong>eBPF プログラム</strong>で Link-Local アドレス
+      (<code>169.254.32.0/20</code>) に SNAT された後、<strong>Cloud NAT ゲートウェイ</strong>が TrafficSelector の指定に基づいて
+      Namespace ごとの専用送信元 IP アドレスに最終変換して外部へ送出します。
+    </p>
+  </div>
+
+  <!-- 主要機能 -->
+  <div class="section">
+    <h2>⚡ 主要機能</h2>
+
+    <div class="card">
+      <h4>1️⃣ CloudNATGateway カスタムリソース (クラスタスコープ)</h4>
+      <ul>
+        <li>新しい Public / Private Cloud NAT ゲートウェイのプロビジョニング、または既存ゲートウェイの利用を宣言的に定義</li>
+        <li>Cloud Router との関連付け、接続タイムアウト、ロギング、IP アドレスプール、ポートオプションなどを設定可能</li>
+        <li>ゲートウェイはクラスタと<strong>同一リージョン・同一 VPC ネットワーク</strong>に配置する必要あり</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h4>2️⃣ TrafficSelector カスタムリソース (クラスタスコープ)</h4>
+      <ul>
+        <li><code>namespaceSelector</code> で送信元 Pod (Namespace) をマッチングし、宛先 CIDR (インターネット向けは <code>0.0.0.0/0</code>、オンプレミス向けは特定 CIDR) を指定して Egress ルーティングポリシーを定義</li>
+        <li><code>cloud.google.com/cloud-nat</code> アノテーションで、予約済み静的外部 IP (<code>nat-external-ips</code>) またはプライベート NAT サブネット (<code>nat-subnet</code>) を指定</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h4>3️⃣ Public NAT: Namespace 単位の静的外部 Egress IP アドレス</h4>
+      <ul>
+        <li>予約済み静的外部 IP を Namespace ごとに割り当て、パートナー API やペイメントゲートウェイの IP 許可リスト要件に対応</li>
+        <li>クラスタ全体ではなく<strong>個別サービス単位</strong>での許可リスト登録が可能に</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h4>4️⃣ Private NAT: VPC / NCC 接続向けの専用内部 IP 範囲</h4>
+      <ul>
+        <li><code>PRIVATE_NAT</code> purpose のサブネットを作成し、オンプレミスや NCC ハブ上の他 VPC スポークへ接続するワークロードに特定の内部 IP 範囲を割り当て</li>
+        <li>IP アドレスの重複や枯渇を回避しつつ、予測可能なプライベート IP を利用可能</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h4>5️⃣ 既存 Cloud NAT ゲートウェイの共有</h4>
+      <ul>
+        <li>同一 VPC ネットワーク・同一リージョン内の<strong>複数 GKE クラスタ</strong>で既存の Cloud NAT ゲートウェイを共有可能</li>
+        <li>統一された外部 IP プールから Egress でき、許可リスト管理やコンプライアンス監査を簡素化</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- アウトバウンドパケットフロー -->
+  <div class="section">
+    <h2>🔄 アウトバウンドパケットフロー</h2>
+    <div class="flow-diagram">
+      <div class="flow-step">🔍 ワークロード<br/>識別</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">⚙️ Link-Local<br/>SNAT (eBPF)</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">📋 NAT ルール<br/>照合</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">🚀 最終変換<br/>&amp; Egress</div>
+    </div>
+    <table>
+      <thead>
+        <tr><th style="width: 32%;">ステージ</th><th>処理内容</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>1. ワークロード識別</strong></td><td>GKE Dataplane V2 がノード内で Pod トラフィックを key-value のワークロードセレクタ (例: <code>namespace=NAMESPACE</code>) に関連付け</td></tr>
+        <tr><td><strong>2. ノードレベル変換 (Link-Local SNAT)</strong></td><td>TrafficSelector ルールにマッチしたパケットの送信元 IP を、eBPF プログラムが Namespace に割り当てられた Link-Local IP (<code>169.254.32.0/20</code>) に変換</td></tr>
+        <tr><td><strong>3. ゲートウェイポリシーマッチング</strong></td><td>VPC ネットワークに入ったパケットの Link-Local 送信元 IP を Cloud NAT が NAT ルールと照合</td></tr>
+        <tr><td><strong>4. 最終変換と Egress</strong></td><td>Public NAT は外部 IP アドレス、Private NAT はプライベート NAT サブネットの内部 IP アドレスに送信元を変換して送出</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 技術仕様 -->
+  <div class="section">
+    <h2>🔧 技術仕様</h2>
+    <h3>📋 要件</h3>
+    <table>
+      <thead>
+        <tr><th style="width: 28%;">項目</th><th>詳細</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>GKE バージョン</strong></td><td>1.37.1-gke.2611000 以降</td></tr>
+        <tr><td><strong>クラスタタイプ</strong></td><td>Autopilot / Standard (リージョナル・ゾーナル両対応)、VPC ネイティブクラスタ</td></tr>
+        <tr><td><strong>データプレーン</strong></td><td>GKE Dataplane V2 が必須</td></tr>
+        <tr><td><strong>IAM 権限</strong></td><td>カスタムリソース適用に Kubernetes Engine Admin (<code>roles/container.admin</code>)</td></tr>
+        <tr><td><strong>Shared VPC</strong></td><td>ホストプロジェクト管理者がサービスプロジェクトの GKE サービスエージェントに Compute Network Admin (<code>roles/compute.networkAdmin</code>) を付与する必要あり</td></tr>
+        <tr><td><strong>ファイアウォール</strong></td><td>ノードを対象とするルールで送信元/宛先を指定する場合、Link-Local 範囲 (<code>169.254.32.0/20</code>) を含める必要あり</td></tr>
+        <tr><td><strong>VPC ルート</strong></td><td>Public NAT で処理する各 CIDR に対し、デフォルトインターネットゲートウェイを次ホップとする静的ルートが必要</td></tr>
+      </tbody>
+    </table>
+
+    <h3>📜 TrafficSelector の設定例 (Public NAT)</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">YAML</span>
+        <span class="code-title">traffic-selectors-public.yaml</span>
+      </div>
+      <pre><code class="language-yaml">kind: TrafficSelector
+apiVersion: networking.gke.io/v2
+metadata:
+  name: ns-red-public-route
+  annotations:
+    cloud.google.com/cloud-nat: '{"nat-external-ips":"nat-ip-1"}'
+spec:
+  action:
+    kind: CloudNATGateway
+    name: cloud-nat-public-managed
+  subject:
+    pods:
+      namespaceSelector:
+        matchLabels:
+          app: namespace-red-app
+  egress:
+    to:
+      ipBlock:
+        cidrs:
+        - 0.0.0.0/0</code></pre>
+    </div>
+  </div>
+
+  <!-- 設定方法 -->
+  <div class="section">
+    <h2>🛠️ 設定方法 (Public NAT の例)</h2>
+
+    <h3>✅ 前提条件</h3>
+    <div class="check-item"><span class="check-icon">✓</span><span>GKE 1.37.1-gke.2611000 以降の VPC ネイティブクラスタで GKE Dataplane V2 が有効であること</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span>クラスタに対する Kubernetes Engine Admin (<code>roles/container.admin</code>) 権限があること</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span>カスタムファイアウォールルールを使用している場合、Link-Local 範囲 (<code>169.254.32.0/20</code>) を許可していること</span></div>
+
+    <h3><span class="step-number">1</span>Cloud Router の作成と静的外部 IP アドレスの予約</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Bash</span>
+        <span class="code-title">Cloud Router と静的外部 IP の準備</span>
+      </div>
+      <pre><code class="language-bash"># リージョナル Cloud Router を作成 (GKE は自動作成しない)
+gcloud compute routers create ROUTER_NAME \
+  --network=VPC_NETWORK_NAME \
+  --region=REGION
+
+# デフォルト用と Namespace 用の静的外部 IP アドレスを予約
+gcloud compute addresses create nat-ip-default --region=REGION
+gcloud compute addresses create nat-ip-1 --region=REGION
+gcloud compute addresses create nat-ip-2 --region=REGION</code></pre>
+    </div>
+    <p style="font-size: 14px;">クラスタと同一リージョンに Cloud Router と静的外部 IP アドレスを用意します。</p>
+
+    <h3><span class="step-number">2</span>CloudNATGateway マニフェストの作成</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">YAML</span>
+        <span class="code-title">cloud-nat-public.yaml</span>
+      </div>
+      <pre><code class="language-yaml">kind: CloudNATGateway
+apiVersion: networking.gke.io/v1
+metadata:
+  name: cloud-nat-public-managed
+spec:
+  type: Public
+  cloudRouter:
+    name: projects/PROJECT_ID/regions/REGION/routers/ROUTER_NAME
+  publicNATOptions:
+    defaultNatExternalIPs:
+    - name: nat-ip-default
+  connectionOptions:
+    udpTimeoutSeconds: 30
+    tcpEstablishedTimeoutSeconds: 1200
+  logOptions:
+    enable: true
+    filter: ALL</code></pre>
+    </div>
+    <p style="font-size: 14px;">マネージドなリージョナル Cloud NAT ゲートウェイを宣言的に定義します。</p>
+
+    <h3><span class="step-number">3</span>TrafficSelector の作成と適用</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Bash</span>
+        <span class="code-title">カスタムリソースの適用</span>
+      </div>
+      <pre><code class="language-bash">kubectl apply -f cloud-nat-public.yaml -f traffic-selectors-public.yaml</code></pre>
+    </div>
+    <p style="font-size: 14px;">
+      各 Namespace を専用の NAT IP アドレスにマッピングする TrafficSelector を適用すると、
+      GKE が Cloud NAT ゲートウェイの変換ルールを自動的にプロビジョニングして予約済み外部 IP アドレスを割り当てます。
+    </p>
+
+    <div class="warning-box">
+      <strong>⚠️ クリーンアップ時の注意:</strong> 削除は必ず「<strong>TrafficSelector → CloudNATGateway → 機能の無効化 (<code>--no-enable-granular-nat</code>)</strong>」の順で行うこと。
+      カスタムリソースが残った状態で機能を無効化するとコントローラーが停止し、リソースが Terminating 状態でスタックして Cloud NAT ルールが削除されなくなります。
+      また、システム作成のセレクタ (<code>gnat-intra-cluster</code> や <code>gnat-default-internet</code>) を削除するとクラスタトラフィックが壊れるため、<code>--all</code> フラグは使用しないでください。
+    </div>
+  </div>
+
+  <!-- メリット -->
+  <div class="section">
+    <h2>💡 メリット</h2>
+    <h3>💼 ビジネス面</h3>
+    <div class="check-item"><span class="check-icon">✓</span><span><strong>パートナー連携のセキュリティ要件への対応</strong>: 外部パートナーのファイアウォール、ペイメントゲートウェイ、オンプレミスのエッジセキュリティデバイスが、クラスタ全体ではなく個別サービス単位でトラフィックを許可リスト登録できる</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span><strong>運用コストの削減</strong>: 中間プロキシ Pod やカスタム NAT アプライアンスのデプロイ・パッチ適用・スケーリングといった運用負荷が不要になる</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span><strong>チーム間の責務分離</strong>: ネットワーク管理者は IP アドレスとゲートウェイのライフサイクルを、クラスタオペレーターは Namespace とゲートウェイのマッピングを、それぞれ独立して管理できる</span></div>
+    <h3>⚙️ 技術面</h3>
+    <div class="check-item"><span class="check-icon">✓</span><span><strong>Kubernetes ネイティブな宣言的管理</strong>: kubectl と CRD (TrafficSelector / CloudNATGateway) だけで Egress ルーティングを定義・更新でき、標準的な Kubernetes ワークフローから離れる必要がない</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span><strong>決定論的な送信元 IP アドレス</strong>: Public NAT では静的外部 IP アドレス、Private NAT では専用サブネット範囲により、Egress の送信元 IP が予測可能になる</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span><strong>マルチクラスタでの IP プール共有</strong>: 同一 VPC・リージョン内の複数クラスタが共有 Cloud NAT ゲートウェイ経由で統一された Egress IP プールを利用できる</span></div>
+  </div>
+
+  <!-- デメリット・制約事項 -->
+  <div class="section">
+    <h2>⚠️ デメリット・制約事項</h2>
+    <h3>🚫 制限事項</h3>
+    <div class="check-item"><span class="cross-icon">✗</span><span><strong>Namespace 単位の粒度のみ</strong>: Preview リリースでは、Namespace 内の個別 Pod やサービスアカウントをラベルセレクタで選択することはできない</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span><strong>ゲートウェイあたりのルール上限</strong>: 各 Cloud NAT ゲートウェイは最大 <strong>128 個の NAT ルール</strong>をサポートし、1 ゲートウェイあたり最大 128 個の Namespace にポリシーを設定可能。それ以上は追加のゲートウェイが必要</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span><strong>Cloud NAT の標準的な制限</strong>: Public NAT / Private NAT の標準的な制限事項が Granular NAT の Egress トラフィックにも適用される</span></div>
+    <h3>🤔 考慮すべき点</h3>
+    <div class="warning-box">
+      <strong>🧪 Pre-GA (Preview) 機能:</strong> Pre-GA Offerings Terms が適用され、「現状有姿」で提供されます。サポートが限定的な場合があるため、本番環境への適用は慎重に判断してください。
+    </div>
+    <div class="check-item"><span class="cross-icon">✗</span><span><strong>VPC 内トラフィックは対象外</strong>: TrafficSelector の宛先 CIDR に、クラスタの VPC ネットワーク内または VPC ネットワークピアリングで接続された VPC のサブネット範囲を含めてはならない。Private NAT は NCC スポーク向け接続またはハイブリッド NAT 経由の接続のみを提供</span></div>
+    <div class="check-item"><span class="cross-icon">✗</span><span><strong>ファイアウォールルールの見直し</strong>: ノード向けの Egress/Ingress 許可ルールで送信元/宛先パラメータを指定している場合、Link-Local 範囲 (<code>169.254.32.0/20</code>) の追加が必要</span></div>
+  </div>
+
+  <!-- ユースケース -->
+  <div class="section">
+    <h2>🎯 ユースケース</h2>
+
+    <div class="usecase">
+      <h4>🏦 ユースケース 1: 外部パートナー API への特定ワークロードの許可リスト登録</h4>
+      <p><strong>シナリオ</strong>: 共有クラスタ上で複数のアプリケーションを運用しており、課金マイクロサービスのみが外部パートナーの API に接続する。パートナー側は厳格な送信元 IP 許可リストを適用している。</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">YAML</span>
+          <span class="code-title">課金 Namespace 専用の Egress IP を割り当てる TrafficSelector</span>
+        </div>
+        <pre><code class="language-yaml">kind: TrafficSelector
+apiVersion: networking.gke.io/v2
+metadata:
+  name: billing-egress
+  annotations:
+    cloud.google.com/cloud-nat: '{"nat-external-ips":"billing-nat-ip"}'
+spec:
+  action:
+    kind: CloudNATGateway
+    name: cloud-nat-public-managed
+  subject:
+    pods:
+      namespaceSelector:
+        matchLabels:
+          app: billing
+  egress:
+    to:
+      ipBlock:
+        cidrs:
+        - 0.0.0.0/0</code></pre>
+      </div>
+      <p><strong>効果</strong>: パートナーは課金サービス専用の静的外部 IP アドレスのみを許可リストに登録すればよく、クラスタ全体を許可する必要がなくなる。</p>
+    </div>
+
+    <div class="usecase">
+      <h4>🏢 ユースケース 2: IP アドレス競合のないオンプレミス接続</h4>
+      <p><strong>シナリオ</strong>: Cloud Interconnect や Network Connectivity Center のハブ &amp; スポークモデル経由でオンプレミスのネットワークやデータベースにアクセスするワークロードがあり、IP アドレスの重複や枯渇が課題となっている。</p>
+      <p><strong>効果</strong>: 専用のプライベート NAT サブネット範囲 (/29 CIDR など) を介して Egress をルーティングすることで、ワークロードが予測可能なプライベート IP アドレスを使用し、IP アドレスの重複・枯渇を回避できる。</p>
+    </div>
+
+    <div class="usecase">
+      <h4>🌐 ユースケース 3: 複数クラスタでの Egress IP プール共有</h4>
+      <p><strong>シナリオ</strong>: 同一 VPC ネットワーク・リージョン内で、セカンダリ Pod IP 範囲を共有する複数の GKE クラスタを運用している。</p>
+      <p><strong>効果</strong>: 複数クラスタの Namespace を共有 Cloud NAT ゲートウェイにリンクすることで、統一された外部 IP アドレスプールから Egress でき、外部の許可リスト管理とコンプライアンス監査が簡素化される。</p>
+    </div>
+  </div>
+
+  <!-- 料金・リージョン -->
+  <div class="section">
+    <h2>💰 料金・利用可能リージョン</h2>
+    <div class="note-box">
+      <strong>💵 料金:</strong> GKE Granular NAT 自体の追加料金に関する公式情報は確認できていませんが、基盤として
+      <strong>Cloud NAT ゲートウェイ</strong>、<strong>Cloud Router</strong>、<strong>予約済み静的外部 IP アドレス</strong>を使用するため、それぞれの標準料金が適用されます。
+      <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+        <li><a href="https://cloud.google.com/nat/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud NAT の料金</a></li>
+        <li><a href="https://cloud.google.com/vpc/network-pricing" target="_blank" rel="noopener noreferrer" class="gc-link">外部 IP アドレスの料金</a></li>
+      </ul>
+    </div>
+    <div class="note-box">
+      <strong>🗺️ リージョン:</strong> リージョン固有の制限は公式ドキュメントに記載されていません。
+      Cloud NAT ゲートウェイと Cloud Router は<strong>クラスタと同一リージョン・同一 VPC ネットワーク</strong>に配置する必要があります。
+    </div>
+  </div>
+
+  <!-- 関連サービス -->
+  <div class="section">
+    <h2>🔗 関連サービス・機能</h2>
+    <div class="related-grid">
+      <div class="related-item">
+        <strong>🌐 Cloud NAT</strong>
+        Granular NAT の基盤となるマネージド NAT サービス。Public NAT / Private NAT の変換ルールを GKE が自動的にプロビジョニング・同期
+      </div>
+      <div class="related-item">
+        <strong>🛰️ Cloud Router</strong>
+        Cloud NAT ゲートウェイに関連付けるリージョナルルーター。ユーザーが事前に作成する必要がある
+      </div>
+      <div class="related-item">
+        <strong>⚡ GKE Dataplane V2</strong>
+        eBPF ベースのデータプレーン。ノード上での TrafficSelector ルール評価と Link-Local SNAT を担う必須コンポーネント
+      </div>
+      <div class="related-item">
+        <strong>🕸️ Network Connectivity Center (NCC)</strong>
+        Private NAT と組み合わせ、ハブ &amp; スポークモデルでオンプレミスや他 VPC スポークへの接続に専用内部 IP 範囲を割り当て可能
+      </div>
+      <div class="related-item">
+        <strong>📊 Cloud Logging</strong>
+        Cloud NAT ログの <code>gke_workload_identity</code> フィールドで接続イベントを特定の GKE Namespace に関連付けてトラブルシューティング可能
+      </div>
+    </div>
+  </div>
+
+  <!-- まとめ -->
+  <div class="section">
+    <h2>📌 まとめ</h2>
+    <div class="success-box">
+      <p style="margin: 0 0 8px 0;">
+        GKE Granular NAT は、これまで<strong>クラスタ全体で単一</strong>だった NAT ポリシーを <span class="highlight">Namespace 単位</span>に細分化し、
+        カスタムプロキシなしで<strong>決定論的な Egress 送信元 IP アドレス</strong>を実現する重要なネットワーク機能です。
+      </p>
+      <p style="margin: 0;">
+        外部パートナーの IP 許可リスト要件やオンプレミス接続での IP 管理に課題を抱えるチームは、
+        <strong>GKE 1.37.1-gke.2611000 以降 + Dataplane V2</strong> のクラスタで Preview を検証し、
+        ファイアウォールルールへの Link-Local 範囲 (<code>169.254.32.0/20</code>) の追加要否を確認することを推奨します。
+      </p>
+    </div>
+    <div class="tags">
+      <span class="tag">#GKE</span>
+      <span class="tag">#CloudNAT</span>
+      <span class="tag">#Networking</span>
+      <span class="tag">#Egress</span>
+      <span class="tag">#Kubernetes</span>
+      <span class="tag">#DataplaneV2</span>
+      <span class="tag">#Preview</span>
+    </div>
+  </div>
+
+  <!-- フッター -->
+  <footer>
+    <p><strong>📎 出典・参考リンク</strong></p>
+    <ul>
+      <li><a href="https://docs.cloud.google.com/release-notes#November_18_2026" target="_blank" rel="noopener noreferrer" class="gc-link">Google Cloud 公式リリースノート (2026-11-18)</a></li>
+      <li><a href="https://docs.cloud.google.com/kubernetes-engine/docs/concepts/about-granular-nat" target="_blank" rel="noopener noreferrer" class="gc-link">About GKE Granular NAT</a></li>
+      <li><a href="https://docs.cloud.google.com/kubernetes-engine/docs/how-to/configure-granular-nat" target="_blank" rel="noopener noreferrer" class="gc-link">Configure GKE Granular NAT</a></li>
+      <li><a href="https://cloud.google.com/nat/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud NAT の料金</a></li>
+    </ul>
+    <p>ベースレポート: reports/2026/2026-11-18-gke-granular-nat-preview.md | 生成日: 2026-11-19</p>
+  </footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+    mermaid.initialize({
+        startOnLoad: true,
+        theme: 'base',
+        themeVariables: {
+            primaryColor: '#4285F4',
+            primaryTextColor: '#202124',
+            primaryBorderColor: '#4285F4',
+            lineColor: '#4285F4',
+            secondaryColor: '#F1F3F4',
+            tertiaryColor: '#FAFAFA',
+            background: '#FFFFFF',
+            mainBkg: '#E8F0FE',
+            nodeBorder: '#4285F4',
+            clusterBkg: '#E8F0FE',
+            clusterBorder: '#4285F4',
+            edgeLabelBackground: '#FFFFFF',
+            textColor: '#202124'
+        }
+    });
+</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cloud Run: ワーカープールの CPU オートスケーリング (Preview)</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+:root {
+  --gc-blue: #4285F4;
+  --gc-red: #EA4335;
+  --gc-yellow: #FBBC04;
+  --gc-green: #34A853;
+  --gc-blue-900: #174EA6;
+  --gc-blue-800: #185ABC;
+  --gc-blue-700: #1967D2;
+  --gc-blue-600: #1A73E8;
+  --gc-blue-500: #4285F4;
+  --gc-blue-300: #669DF6;
+  --gc-blue-200: #8AB4F8;
+  --gc-blue-100: #AECBFA;
+  --gc-blue-50: #E8F0FE;
+  --gc-on-surface: #202124;
+  --gc-on-surface-variant: #5F6368;
+  --gc-outline: #80868B;
+  --gc-surface: #FFFFFF;
+  --gc-surface-container-lowest: #F8F9FA;
+  --gc-surface-container-low: #F1F3F4;
+  --gc-surface-container: #E8EAED;
+  --gc-outline-variant: #DADCE0;
+  --gc-blue-tint: #E8F0FE;
+  --gc-green-tint: #E6F4EA;
+  --gc-red-tint: #FCE8E6;
+  --gc-yellow-tint: #FEF7E0;
+  --gc-purple-tint: #F3E8FD;
+  --gc-teal-tint: #E0F7FA;
+  --gc-purple: #A142F4;
+  --gc-teal: #00BCD4;
+  --gc-orange: #FF6D00;
+}
+
+body {
+  background-color: var(--gc-surface);
+  font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+  color: var(--gc-on-surface-variant);
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 20px;
+  margin: 0;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 16px;
+  border-bottom: 3px solid var(--gc-blue-600);
+}
+
+h1, .title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--gc-on-surface);
+  margin: 0;
+  line-height: 1.4;
+}
+
+h2, .section-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin-top: 0;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 20px 0 8px;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: var(--gc-outline);
+}
+
+.section {
+  background: var(--gc-surface-container-low);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid var(--gc-outline-variant);
+}
+
+.highlight {
+  background-color: var(--gc-blue-50);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--gc-blue-800);
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+.card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border-left: 4px solid var(--gc-blue-600);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+}
+
+.card h3 {
+  margin-top: 0;
+}
+
+.gc-link {
+  color: var(--gc-blue-600);
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.gc-link:hover {
+  color: var(--gc-blue-800);
+  text-decoration: underline;
+}
+
+/* サービスバッジ */
+.badge,
+.badge-ga,
+.badge-preview,
+.badge-deprecated {
+  display: inline-block;
+  color: #FFFFFF;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+  margin: 4px 8px 4px 0;
+}
+
+.badge { background: var(--gc-blue-600); }
+.badge-ga { background: var(--gc-green); color: #FFFFFF; }
+.badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+.badge-deprecated { background: var(--gc-red); color: #FFFFFF; }
+
+/* フロー図 */
+.flow-diagram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 24px 0;
+}
+
+.flow-step {
+  background: var(--gc-surface);
+  border: 2px solid var(--gc-blue-600);
+  border-radius: 12px;
+  padding: 12px 20px;
+  text-align: center;
+  min-width: 100px;
+  color: var(--gc-on-surface);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+  font-size: 14px;
+}
+
+.flow-arrow {
+  color: var(--gc-blue-600);
+  font-size: 24px;
+  font-weight: bold;
+}
+
+/* Before / After 比較 */
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.before-box, .after-box {
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.before-box {
+  background: var(--gc-red-tint);
+  border: 1px solid rgba(234, 67, 53, 0.3);
+}
+
+.after-box {
+  background: var(--gc-green-tint);
+  border: 1px solid rgba(52, 168, 83, 0.3);
+}
+
+.before-box h3, .after-box h3 {
+  margin-top: 0;
+  font-size: 16px;
+}
+
+.before-box h3 { color: var(--gc-red); }
+.after-box h3 { color: #188038; }
+
+.before-box ul, .after-box ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  font-size: 14px;
+}
+
+.before-box li, .after-box li { margin: 8px 0; }
+
+/* チェックリスト */
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 10px 0;
+  font-size: 15px;
+}
+
+.check-icon { color: var(--gc-green); font-size: 18px; flex-shrink: 0; }
+.cross-icon { color: var(--gc-red); font-size: 18px; flex-shrink: 0; }
+
+/* コードブロック */
+.code-block {
+  background: #1E1E1E;
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 16px 0;
+}
+
+.code-header {
+  background: #2D2D2D;
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.code-lang {
+  color: #9CDCFE;
+  font-weight: bold;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.code-title { color: #AAAAAA; }
+
+pre:not(.mermaid) {
+  background: #1E1E1E;
+  border-radius: 8px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: #E8E8E8;
+  margin: 16px 0;
+}
+
+.code-block pre {
+  margin: 0;
+  padding: 0;
+  border-radius: 0;
+}
+
+.code-block code {
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 16px !important;
+  display: block;
+}
+
+pre code {
+  background: none;
+  border: none;
+  font-size: inherit;
+}
+
+/* インラインコード */
+code:not(pre code) {
+  background: var(--gc-surface-container-lowest);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 0.88em;
+  color: var(--gc-blue-900);
+}
+
+/* テーブル */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--gc-outline-variant);
+  background: var(--gc-surface);
+}
+
+th {
+  background: var(--gc-blue-50);
+  color: var(--gc-blue-900);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 2px solid var(--gc-blue-200);
+}
+
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--gc-outline-variant);
+  font-size: 14px;
+}
+
+tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+tr:hover { background: var(--gc-blue-50); }
+
+/* 注意・警告ボックス */
+.note-box {
+  background: var(--gc-blue-tint);
+  border-left: 4px solid var(--gc-blue-600);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.warning-box {
+  background: var(--gc-yellow-tint);
+  border-left: 4px solid var(--gc-yellow);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.success-box {
+  background: var(--gc-green-tint);
+  border-left: 4px solid var(--gc-green);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+/* 統計カード */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin: 20px 0;
+}
+
+.stat-card {
+  background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+  color: var(--gc-surface);
+  border-radius: 12px;
+  padding: 24px 16px;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 34px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+/* ユースケース */
+.usecase {
+  background: var(--gc-blue-tint);
+  border: 1px solid var(--gc-blue-100);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 16px 0;
+}
+
+.usecase h3 {
+  margin-top: 0;
+  color: var(--gc-blue-800);
+}
+
+/* Mermaid コンテナ */
+.mermaid-container {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 20px 0;
+  border: 2px solid rgba(66, 133, 244, 0.3);
+  overflow-x: auto;
+}
+
+.mermaid {
+  display: flex;
+  justify-content: center;
+}
+
+/* ステップ番号 */
+.step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gc-blue-600);
+  color: #FFFFFF;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 15px;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.step-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  font-size: 16px;
+  margin: 20px 0 4px;
+}
+
+ul.compact {
+  margin: 8px 0;
+  padding-left: 22px;
+}
+
+ul.compact li { margin: 6px 0; font-size: 15px; }
+
+footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gc-outline-variant);
+  font-size: 13px;
+  color: var(--gc-outline);
+}
+
+footer ul { margin: 8px 0; padding-left: 20px; }
+footer li { margin: 4px 0; }
+
+@media (max-width: 700px) {
+  .before-after { grid-template-columns: 1fr; }
+  h1 { font-size: 24px; }
+  body { padding: 12px; }
+  .section { padding: 16px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ヘッダー -->
+  <div class="header">
+    <div>
+      <h1>⚡ Cloud Run ワーカープールの<br>CPU オートスケーリング</h1>
+      <div style="margin-top: 12px;">
+        <span class="badge">☁️ Cloud Run</span>
+        <span class="badge badge-preview">Preview</span>
+        <span class="badge" style="background: var(--gc-blue-800);">🏭 Worker Pools</span>
+      </div>
+    </div>
+    <div class="subtitle">📅 リリース日: 2026-11-18</div>
+  </div>
+
+  <!-- 概要 -->
+  <div class="section">
+    <h2>📋 概要</h2>
+    <p>
+      Cloud Run ワーカープールで、<span class="highlight">平均 CPU 使用率に基づくオートスケーリング</span>が
+      Preview として利用可能になりました。<code>--scaling=auto</code> フラグを指定するだけで、
+      デフォルトの CPU ターゲット (60%) で 1〜100 インスタンスの範囲を自動調整。
+      カスタムターゲット (10%〜90%) や最小・最大インスタンス数の指定にも対応します。
+    </p>
+    <p>
+      ワーカープールは HTTP リクエストを受け付けない<strong>バックグラウンド処理</strong>
+      (Pub/Sub の Pull 型コンシューマや Kafka コンシューマなど) 向けの Cloud Run リソースです。
+      リクエスト駆動のスケーリングが使えないため、これまで自動化には追加の仕組みが必要でしたが、
+      今回のアップデートで <strong>Cloud Run 本体のマネージド機能</strong>として実現できるようになりました。
+    </p>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value">60%</div>
+        <div class="stat-label">デフォルト CPU ターゲット</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">10〜90%</div>
+        <div class="stat-label">カスタムターゲット範囲</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">1〜100</div>
+        <div class="stat-label">デフォルトのインスタンス範囲</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">5 分</div>
+        <div class="stat-label">スケールダウン安定化ウィンドウ</div>
+      </div>
+    </div>
+
+    <div class="before-after">
+      <div class="before-box">
+        <h3>❌ Before: アップデート前の課題</h3>
+        <ul>
+          <li>手動スケーリング (固定インスタンス数) がデフォルト。<code>--instances</code> を人手やスクリプトで変更する必要があった</li>
+          <li>自動化には CREMA などの<strong>カスタムオートスケーラーを別途デプロイ・運用</strong>する必要があった</li>
+          <li>Prometheus クエリや KEDA ベースの YAML、専用サービスアカウントなどセットアップが煩雑で運用負荷が高かった</li>
+        </ul>
+      </div>
+      <div class="after-box">
+        <h3>✅ After: アップデート後の改善</h3>
+        <ul>
+          <li><code>--scaling=auto</code> を指定するだけで<strong>マネージドな CPU オートスケーリング</strong>が有効化</li>
+          <li>デフォルトで CPU 60% ターゲット・1〜100 インスタンス。<code>--scaling-cpu-target</code> / <code>--min</code> / <code>--max</code> でカスタマイズ可能</li>
+          <li>追加のオートスケーラー運用が不要。スケーリング設定の変更では<strong>新リビジョンも作成されない</strong></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- アーキテクチャ図 -->
+  <div class="section">
+    <h2>🏗️ アーキテクチャ図: オートスケーリングループ</h2>
+    <div class="mermaid-container">
+      <pre class="mermaid">
+flowchart TD
+    subgraph WP["🏭 Cloud Run ワーカープール"]
+        I1["📦 インスタンス 1"]
+        I2["📦 インスタンス 2"]
+        IN["📦 インスタンス N (最大 100)"]
+    end
+
+    Q[("📨 Pub/Sub / Kafka など<br/>ワークロードソース")] --> WP
+
+    WP -- "CPU 使用率メトリクス<br/>(container/cpu/utilizations)" --> M["📈 メトリクス収集<br/>(直近 1 分間の平均)"]
+    M --> C["🧮 必要インスタンス数を計算<br/>平均 CPU 使用率 ÷ CPU 数 ÷ ターゲット (既定 60%)"]
+    C --> D{"⚖️ ターゲットとの比較"}
+    D -- "使用率が高い" --> UP["⬆️ スケールアップ<br/>(切り上げで即時追加)"]
+    D -- "使用率が低い" --> DOWN["⬇️ スケールダウン<br/>(5 分間の安定化ウィンドウ)"]
+    UP --> WP
+    DOWN --> WP
+      </pre>
+    </div>
+    <p style="font-size: 14px;">
+      ワーカープールの全インスタンスの平均 CPU 使用率を <strong>1 分間隔</strong>で評価し、
+      ターゲット使用率との比から必要なインスタンス数を再計算するオートスケーリングループです。
+      スケールダウン時は <strong>5 分間の安定化ウィンドウ</strong>により、インスタンス数の頻繁な増減 (フラッピング) を防ぎます。
+    </p>
+  </div>
+
+  <!-- 主要機能 -->
+  <div class="section">
+    <h2>🚀 主要機能</h2>
+
+    <div class="card">
+      <h3>1️⃣ デフォルト CPU ターゲットによるオートスケーリング</h3>
+      <ul class="compact">
+        <li><code>--scaling=auto</code> の指定で、CPU 使用率 <strong>60%</strong> をターゲットに <strong>1〜100 インスタンス</strong>で自動スケール</li>
+        <li>デフォルトターゲットのまま、<code>--min</code> / <code>--max</code> のみのカスタマイズも可能</li>
+        <li>スケーリングモードやインスタンス上限の変更では<strong>新しいリビジョンは作成されない</strong></li>
+      </ul>
+    </div>
+
+    <div class="card" style="border-left-color: var(--gc-green);">
+      <h3>2️⃣ カスタム CPU ターゲットの設定</h3>
+      <ul class="compact">
+        <li><code>--scaling-cpu-target</code> で <strong>0.1〜0.90 (10%〜90%)</strong> の範囲を指定可能</li>
+        <li><strong>高めのターゲット (80〜90%)</strong>: 安定したバックグラウンド処理・バッチ処理向け。リソース効率とコストを最適化</li>
+        <li><strong>低めのターゲット (20〜40%)</strong>: スパイクの多いワークロードやレイテンシ要件が厳しい処理向け。余裕を持った先行プロビジョニング</li>
+      </ul>
+    </div>
+
+    <div class="card" style="border-left-color: var(--gc-yellow);">
+      <h3>3️⃣ スケーリング動作の制御</h3>
+      <ul class="compact">
+        <li>必要インスタンス数は「直近 1 分間の平均 CPU 使用量 ÷ インスタンスあたりの CPU 数 ÷ CPU ターゲット」を<strong>切り上げ</strong>て算出</li>
+        <li>プールレベルで計算し、インスタンススプリットの設定に応じてアクティブなリビジョンへ配分</li>
+        <li>スケールダウンには <strong>5 分間 (300 秒) の安定化ウィンドウ</strong>を使用し、直近 5 分間の最大推奨値を維持</li>
+      </ul>
+    </div>
+
+    <div class="card" style="border-left-color: var(--gc-purple);">
+      <h3>4️⃣ デフォルト設定への復元</h3>
+      <ul class="compact">
+        <li><code>--scaling-cpu-target=default</code> や <code>--min=default</code> / <code>--max=default</code> で、オートスケーリングを有効にしたままデフォルト値 (60%、1〜100 インスタンス) に戻せる</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 技術仕様 -->
+  <div class="section">
+    <h2>🔧 技術仕様</h2>
+
+    <h3>📐 スケーリングパラメータ</h3>
+    <table>
+      <tr><th>項目</th><th>詳細</th></tr>
+      <tr><td>スケーリング指標</td><td>平均 CPU 使用率 (<code>run.googleapis.com/container/cpu/utilizations</code>)</td></tr>
+      <tr><td>デフォルト CPU ターゲット</td><td>60%</td></tr>
+      <tr><td>カスタム CPU ターゲット範囲</td><td>10%〜90% (<code>0.1</code>〜<code>0.90</code>)</td></tr>
+      <tr><td>デフォルト最小インスタンス数</td><td>1 (1 以上を指定、0 にはできない)</td></tr>
+      <tr><td>デフォルト最大インスタンス数</td><td>100</td></tr>
+      <tr><td>計算式</td><td>Instances = ⌈(直近 1 分間の平均 CPU 使用量/秒 ÷ インスタンスあたり CPU 数) ÷ CPU ターゲット⌉</td></tr>
+      <tr><td>スケールダウン安定化</td><td>5 分間 (300 秒) のウィンドウで最大推奨値を維持</td></tr>
+      <tr><td>リビジョン作成</td><td>スケーリングモード・ターゲット・インスタンス上限の変更ではリビジョンを作成しない</td></tr>
+      <tr><td>ステータス</td><td>Preview (Pre-GA Offerings Terms が適用)</td></tr>
+    </table>
+
+    <h3>📄 YAML 設定例</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">YAML</span>
+        <span class="code-title">WorkerPool のオートスケーリング設定</span>
+      </div>
+      <pre><code class="language-yaml">apiVersion: run.googleapis.com/v1
+kind: WorkerPool
+metadata:
+  name: WORKER_POOL
+  annotations:
+    run.googleapis.com/launch-stage: BETA
+    run.googleapis.com/scalingMode: automatic
+    run.googleapis.com/scaling-cpu-target: 'CPU_TARGET'
+    run.googleapis.com/minScale: 'MIN_INSTANCES'
+    run.googleapis.com/maxScale: 'MAX_INSTANCES'</code></pre>
+    </div>
+    <div class="note-box">
+      💡 カスタムアノテーション (<code>scaling-cpu-target</code>、<code>minScale</code>、<code>maxScale</code>) は省略するとデフォルト値が使われます。
+      手動スケーリングから切り替える場合は <code>run.googleapis.com/manualInstanceCount</code> アノテーションを削除します。
+    </div>
+
+    <h3>🔑 必要な IAM ロール</h3>
+    <table>
+      <tr><th>ロール</th><th>対象</th></tr>
+      <tr><td>Cloud Run デベロッパー (<code>roles/run.developer</code>)</td><td>Cloud Run ワーカープール</td></tr>
+      <tr><td>サービス アカウント ユーザー (<code>roles/iam.serviceAccountUser</code>)</td><td>サービス ID</td></tr>
+    </table>
+  </div>
+
+  <!-- 設定方法 -->
+  <div class="section">
+    <h2>⚙️ 設定方法</h2>
+
+    <h3>✅ 前提条件</h3>
+    <ul class="compact">
+      <li>Cloud Run ワーカープールをデプロイできる環境 (Cloud Run Admin API が有効)</li>
+      <li>gcloud CLI の beta コンポーネント (<code>gcloud beta run worker-pools</code> コマンドを使用)</li>
+      <li>CREMA (Cloud Run External Metrics Autoscaling) を利用中の場合は、切り替え前に手動スケーリングへ戻すこと</li>
+    </ul>
+
+    <div class="flow-diagram">
+      <div class="flow-step">1️⃣ <code>--scaling=auto</code><br>で有効化</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">2️⃣ ターゲット・<br>上限をカスタマイズ</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">3️⃣ 必要に応じて<br>デフォルトに復元</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">4️⃣ モニタリング<br>と調整</div>
+    </div>
+
+    <div class="step-title"><span class="step-number">1</span>デフォルト CPU ターゲットでオートスケーリングを有効化</div>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Bash</span>
+        <span class="code-title">gcloud でオートスケーリングを有効化</span>
+      </div>
+      <pre><code class="language-bash"># 新規デプロイ時
+gcloud beta run worker-pools deploy WORKER_POOL \
+  --image=IMAGE_URL \
+  --scaling=auto
+
+# 既存ワーカープールの更新
+gcloud beta run worker-pools update WORKER_POOL \
+  --scaling=auto</code></pre>
+    </div>
+    <p style="font-size: 14px;">CPU 使用率 60% をターゲットに、1〜100 インスタンスの範囲で自動スケールします。</p>
+
+    <div class="step-title"><span class="step-number">2</span>カスタム CPU ターゲットとインスタンス上限を設定</div>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Bash</span>
+        <span class="code-title">カスタムターゲットと上限の指定</span>
+      </div>
+      <pre><code class="language-bash">gcloud beta run worker-pools update WORKER_POOL \
+  --scaling-cpu-target=0.75 \
+  --min=2 \
+  --max=50</code></pre>
+    </div>
+    <p style="font-size: 14px;">CPU ターゲットは <code>0.1</code>〜<code>0.90</code> の範囲で指定。省略した設定にはデフォルト値 (60%、最小 1、最大 100) が適用されます。</p>
+
+    <div class="step-title"><span class="step-number">3</span>(必要に応じて) デフォルト設定に戻す</div>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Bash</span>
+        <span class="code-title">デフォルト値への復元</span>
+      </div>
+      <pre><code class="language-bash">gcloud beta run worker-pools update WORKER_POOL \
+  --scaling-cpu-target=default \
+  --min=default \
+  --max=default</code></pre>
+    </div>
+
+    <div class="step-title"><span class="step-number">4</span>スケーリング動作をモニタリング</div>
+    <p style="font-size: 15px;">
+      Cloud Monitoring で <code>run.googleapis.com/container/instance_count</code> メトリクスを確認し、
+      負荷テストの結果に基づいてターゲットを調整します。<strong>まずはデフォルトターゲットから始めることが推奨</strong>されています。
+    </p>
+  </div>
+
+  <!-- メリット -->
+  <div class="section">
+    <h2>💪 メリット</h2>
+
+    <h3>💼 ビジネス面</h3>
+    <div class="check-item"><span class="check-icon">✅</span><span><strong>運用コストの削減</strong>: カスタムオートスケーラー (CREMA など) の構築・運用が不要になり、スケーリングの仕組みを Google のマネージド機能に任せられる</span></div>
+    <div class="check-item"><span class="check-icon">✅</span><span><strong>インフラコストの最適化</strong>: 負荷の低い時間帯はインスタンスを自動縮小し、ピーク時のみ拡張。固定インスタンス数運用に比べて無駄な稼働を削減</span></div>
+
+    <h3>🛠️ 技術面</h3>
+    <div class="check-item"><span class="check-icon">✅</span><span><strong>設定の簡素化</strong>: フラグ 1 つ (<code>--scaling=auto</code>) で有効化でき、gcloud / YAML / REST API のいずれからも設定可能</span></div>
+    <div class="check-item"><span class="check-icon">✅</span><span><strong>安定したスケーリング動作</strong>: 5 分間のスケールダウン安定化ウィンドウと切り上げ計算により、インスタンス数の振動 (フラッピング) を抑制</span></div>
+    <div class="check-item"><span class="check-icon">✅</span><span><strong>リビジョンを増やさない設定変更</strong>: スケーリングモードやターゲット、上限値の変更では新リビジョンが作成されず、変更の影響範囲が小さい</span></div>
+    <div class="check-item"><span class="check-icon">✅</span><span><strong>ワークロード特性に合わせた調整</strong>: CPU ターゲットを 10〜90% の範囲で調整でき、レイテンシ重視・コスト重視のどちらにも最適化できる</span></div>
+  </div>
+
+  <!-- デメリット・制約事項 -->
+  <div class="section">
+    <h2>⚠️ デメリット・制約事項</h2>
+
+    <h3>🚧 制限事項</h3>
+    <div class="check-item"><span class="cross-icon">❌</span><span><strong>Preview (Pre-GA) 機能</strong>であり、Pre-GA Offerings Terms が適用される。サポートが限定される可能性がある</span></div>
+    <div class="check-item"><span class="cross-icon">❌</span><span>最小インスタンス数は <strong>1 以上が必須で、ゼロへのスケールインはできない</strong> (停止するには手動スケーリングで 0 を指定)</span></div>
+    <div class="check-item"><span class="cross-icon">❌</span><span>スケーリング指標は <strong>CPU 使用率のみ</strong>。メモリ使用率やキューの深さ (未処理メッセージ数) ベースのスケーリングには対応しない</span></div>
+    <div class="check-item"><span class="cross-icon">❌</span><span><strong>CREMA によるスケーリングと併用不可</strong> (CREMA 利用中は手動スケーリングへの切り替えが必要)</span></div>
+
+    <h3>🤔 考慮すべき点</h3>
+    <div class="warning-box">
+      <ul class="compact" style="margin: 0;">
+        <li>CPU 使用率はキューのバックログを直接反映しないため、Pub/Sub や Kafka の未処理メッセージ数に厳密に追従させたい場合は、引き続き <strong>CREMA (KEDA ベース)</strong> などの外部メトリクスオートスケーリングが適する場合がある</li>
+        <li>単一スレッドのアプリをマルチ CPU インスタンスで動かすと平均 CPU 使用率が低く観測され、スケーリング判断に影響する可能性がある</li>
+        <li>スケールアップによりバックエンド (Cloud SQL など) への接続数が増えるため、<code>--max</code> で上限を適切に設定することが推奨される</li>
+        <li>スケールダウンは 5 分間の安定化ウィンドウの影響で緩やかに進むため、急激なコスト削減は期待しない</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ユースケース -->
+  <div class="section">
+    <h2>🎯 ユースケース</h2>
+
+    <div class="usecase">
+      <h3>📨 ユースケース 1: Pub/Sub Pull 型コンシューマの自動スケーリング</h3>
+      <p style="font-size: 15px;">
+        <strong>シナリオ</strong>: Pub/Sub サブスクリプションからメッセージを Pull して処理するワーカープールを運用。
+        日中はメッセージ流量が多く、夜間はほぼゼロになるため、固定インスタンス数では
+        <span class="highlight">ピーク時に処理遅延</span>が発生し、閑散時にはリソースが無駄になっていた。
+      </p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">実装例</span>
+        </div>
+        <pre><code class="language-bash">gcloud beta run worker-pools deploy pubsub-consumer \
+  --image=us-docker.pkg.dev/PROJECT_ID/repo/consumer:latest \
+  --scaling=auto \
+  --min=1 \
+  --max=30</code></pre>
+      </div>
+      <div class="success-box" style="margin-bottom: 0;">
+        <strong>✅ 効果</strong>: CPU 負荷の増減に応じてインスタンス数が 1〜30 の範囲で自動調整され、
+        ピーク時の処理遅延と閑散時の無駄な稼働コストの両方を削減できる。
+      </div>
+    </div>
+
+    <div class="usecase">
+      <h3>🔄 ユースケース 2: バッチ的なデータ変換ワーカーのコスト最適化</h3>
+      <p style="font-size: 15px;">
+        <strong>シナリオ</strong>: レイテンシ要件が緩いデータ変換処理をワーカープールで実行。
+        <span class="highlight">リソース効率を最大化</span>してコストを抑えたい。
+      </p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">実装例</span>
+        </div>
+        <pre><code class="language-bash">gcloud beta run worker-pools update batch-transformer \
+  --scaling-cpu-target=0.85 \
+  --max=20</code></pre>
+      </div>
+      <div class="success-box" style="margin-bottom: 0;">
+        <strong>✅ 効果</strong>: CPU ターゲットを 85% に引き上げることで各インスタンスを高い使用率で稼働させ、
+        必要なインスタンス数を最小化してインフラコストを削減できる。
+      </div>
+    </div>
+  </div>
+
+  <!-- 料金・リージョン -->
+  <div class="section">
+    <h2>💰 料金・利用可能リージョン</h2>
+    <div class="note-box">
+      <strong>💵 料金</strong>: CPU オートスケーリング自体に追加料金はなく、ワーカープールのインスタンスが稼働した分の
+      vCPU・メモリに対して Cloud Run の<strong>インスタンスベース課金</strong>が適用されます。
+      稼働インスタンス数が負荷に追従するため、固定インスタンス数での運用に比べて低負荷時のコストを抑えられます。
+      詳細は <a href="https://cloud.google.com/run/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud Run の料金ページ</a> を参照。
+    </div>
+    <div class="note-box">
+      <strong>🌍 利用可能リージョン</strong>: リリースノートおよびドキュメントにリージョン制限の記載はありません。
+      最新情報は <a href="https://docs.cloud.google.com/run/docs/configuring/workerpools/cpu-autoscaling" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud Run のドキュメント</a> を参照してください。
+    </div>
+  </div>
+
+  <!-- 関連サービス -->
+  <div class="section">
+    <h2>🔗 関連サービス・機能</h2>
+    <div class="card">
+      <h3>⚡ Cloud Run サービス (metrics-based scaling)</h3>
+      <p style="font-size: 14px; margin: 0;">リクエスト駆動のサービスでは従来から CPU 使用率とリクエスト同時実行数によるオートスケーリングが提供されており、今回ワーカープールにも CPU ベースの仕組みが拡張された。</p>
+    </div>
+    <div class="card" style="border-left-color: var(--gc-orange);">
+      <h3>🧩 Cloud Run External Metrics Autoscaling (CREMA)</h3>
+      <p style="font-size: 14px; margin: 0;">KEDA ベースで Kafka や Prometheus などの外部メトリクスによりワーカープールをスケールする仕組み。キュー長ベースのスケーリングが必要な場合の選択肢だが、CPU オートスケーリングとは併用不可。</p>
+    </div>
+    <div class="card" style="border-left-color: var(--gc-green);">
+      <h3>📈 Cloud Monitoring</h3>
+      <p style="font-size: 14px; margin: 0;"><code>run.googleapis.com/container/cpu/utilizations</code> (スケーリング指標) や <code>run.googleapis.com/container/instance_count</code> (インスタンス数) のメトリクスでスケーリング動作を監視し、ターゲット調整に活用。</p>
+    </div>
+    <div class="card" style="border-left-color: var(--gc-teal);">
+      <h3>📨 Pub/Sub / Managed Service for Apache Kafka</h3>
+      <p style="font-size: 14px; margin: 0;">ワーカープールの代表的なワークロードソース。メッセージ処理負荷が CPU 使用率としてスケーリングに反映される。</p>
+    </div>
+  </div>
+
+  <!-- まとめ -->
+  <div class="section" style="background: var(--gc-blue-tint); border-color: var(--gc-blue-100);">
+    <h2>📝 まとめ</h2>
+    <p>
+      Cloud Run ワーカープールに<span class="highlight">マネージドな CPU オートスケーリング</span>が追加され、
+      これまでカスタムオートスケーラーの構築・運用が必要だった負荷追従型のスケーリングが
+      <code>--scaling=auto</code> フラグ 1 つで実現できるようになりました。
+    </p>
+    <div class="check-item"><span class="check-icon">👉</span><span>Pub/Sub コンシューマやバックグラウンド処理をワーカープールで運用しているチームは、まず<strong>デフォルトターゲット (60%)</strong> で有効化</span></div>
+    <div class="check-item"><span class="check-icon">👉</span><span>Cloud Monitoring の<strong>インスタンス数メトリクス</strong>を観察しながら、ワークロード特性に合わせて CPU ターゲットと最小・最大インスタンス数を調整することを推奨</span></div>
+  </div>
+
+  <!-- フッター -->
+  <footer>
+    <p>📎 出典・参考リンク:</p>
+    <ul>
+      <li>レポート: <code>reports/2026/2026-11-18-cloud-run-worker-pools-cpu-autoscaling.md</code> (Google Cloud News Summary)</li>
+      <li>公式リリースノート: <a href="https://docs.cloud.google.com/release-notes#November_18_2026" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/release-notes#November_18_2026</a></li>
+      <li>ドキュメント (CPU autoscaling for worker pools): <a href="https://docs.cloud.google.com/run/docs/configuring/workerpools/cpu-autoscaling" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/run/docs/configuring/workerpools/cpu-autoscaling</a></li>
+      <li>ドキュメント (ワーカープールの手動スケーリング): <a href="https://docs.cloud.google.com/run/docs/configuring/workerpools/manual-scaling" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/run/docs/configuring/workerpools/manual-scaling</a></li>
+      <li>ドキュメント (CREMA によるオートスケーリング): <a href="https://docs.cloud.google.com/run/docs/configuring/workerpools/crema-autoscaling" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/run/docs/configuring/workerpools/crema-autoscaling</a></li>
+      <li>料金ページ: <a href="https://cloud.google.com/run/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">https://cloud.google.com/run/pricing</a></li>
+    </ul>
+    <p>タグ: #CloudRun #WorkerPools #Autoscaling #CPUAutoscaling #Serverless #Preview</p>
+  </footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#4285F4',
+      primaryTextColor: '#202124',
+      primaryBorderColor: '#4285F4',
+      lineColor: '#4285F4',
+      secondaryColor: '#F1F3F4',
+      tertiaryColor: '#FAFAFA',
+      background: '#FFFFFF',
+      mainBkg: '#E8F0FE',
+      nodeBorder: '#4285F4',
+      clusterBkg: '#E8F0FE',
+      clusterBorder: '#4285F4',
+      edgeLabelBackground: '#FFFFFF',
+      textColor: '#202124'
+    }
+  });
+</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

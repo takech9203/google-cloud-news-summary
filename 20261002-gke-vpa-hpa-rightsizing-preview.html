@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GKE: VPA と HPA の併用による HPA ワークロードのライトサイジング (Public Preview)</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 30px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h4 {
+      margin: 0 0 8px 0;
+      font-size: 16px;
+      color: var(--gc-on-surface);
+    }
+
+    .card p {
+      margin: 0;
+      font-size: 14px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .badge-deprecated {
+      background: var(--gc-red);
+      color: #FFFFFF;
+    }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 720px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid rgba(234, 67, 53, 0.3);
+      border-top: 4px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid rgba(52, 168, 83, 0.3);
+      border-top: 4px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+    }
+
+    .before-box h3 {
+      color: #C5221F;
+    }
+
+    .after-box h3 {
+      color: #188038;
+    }
+
+    .before-box ul, .after-box ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 8px 0;
+    }
+
+    /* チェックリストスタイル */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+    }
+
+    /* フロー図スタイル */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+      font-size: 14px;
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* コードブロック */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 0;
+      padding: 0;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      border-radius: 0;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-lowest);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* テーブルスタイル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* ステップ表示 */
+    .step-item {
+      display: flex;
+      gap: 16px;
+      margin: 16px 0;
+      align-items: flex-start;
+    }
+
+    .step-number {
+      background: var(--gc-blue-600);
+      color: #FFFFFF;
+      width: 36px;
+      height: 36px;
+      min-width: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 16px;
+    }
+
+    .step-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .step-content h4 {
+      margin: 4px 0 8px 0;
+      font-size: 16px;
+      color: var(--gc-on-surface);
+    }
+
+    .step-content p {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border: 1px solid var(--gc-blue-100);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+    }
+
+    .usecase p {
+      font-size: 14px;
+      margin: 8px 0;
+    }
+
+    /* 2 カラムグリッド */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 720px) {
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    ul {
+      padding-left: 24px;
+      margin: 8px 0;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      word-break: break-all;
+    }
+
+    .tags {
+      margin-top: 12px;
+    }
+
+    .tag {
+      display: inline-block;
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 16px;
+      padding: 2px 10px;
+      font-size: 12px;
+      color: var(--gc-on-surface-variant);
+      margin: 2px 4px 2px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <h1>⚖️ GKE: VPA と HPA の併用による<br>HPA ワークロードのライトサイジング</h1>
+        <div>
+          <span class="badge">Google Kubernetes Engine</span>
+          <span class="badge badge-preview">Public Preview</span>
+        </div>
+      </div>
+      <div class="subtitle">リリース日: 2026-10-02</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📌 概要</h2>
+      <p>
+        GKE で <span class="highlight">Vertical Pod Autoscaler (VPA)</span> と <span class="highlight">Horizontal Pod Autoscaler (HPA)</span> を同一ワークロードに対して協調動作させ、CPU 使用率ベースでスケールするワークロードの <span class="highlight">コンテナ CPU リクエストを自動最適化</span>できる「HPA Rightsizing with VPA」が Public Preview になりました。
+      </p>
+      <p>
+        HPA は<strong>短期的なトラフィックスパイクへのレプリカ数スケーリング</strong>を担当し続け、VPA は HPA の設定 (最小/最大レプリカ数、目標 CPU 使用率) を考慮したライトサイジングロジックで、<strong>長期的な集約リソース需要に基づいて CPU リクエストを調整</strong>します。低トラフィック時のコスト効率と高負荷時の回復力を両立できます。
+      </p>
+
+      <div class="flow-diagram">
+        <div class="flow-step">📈 HPA<br>短期スパイクに<br>レプリカ数で対応</div>
+        <span class="flow-arrow">＋</span>
+        <div class="flow-step">📉 VPA<br>長期需要に基づく<br>CPU リクエスト最適化</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">💰 コスト効率<br>×<br>🛡️ 回復力</div>
+      </div>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ アップデート前の課題</h3>
+          <ul>
+            <li>HPA と VPA を同一メトリクス (CPU) に併用すると、VPA の CPU リクエスト変更が HPA の使用率ベースラインを変化させ、<strong>スケーリング競合</strong>が発生するため併用は非推奨だった</li>
+            <li>CPU ベース HPA のワークロードでは、CPU リクエストの適正化を<strong>手動で分析・調整</strong>する必要があった</li>
+            <li>過大リクエストはノードリソースの無駄、過小リクエストは高負荷時の不安定化というトレードオフを<strong>人手で管理</strong>していた</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ アップデート後の改善</h3>
+          <ul>
+            <li>VPA が HPA の構成 (minReplicas、maxReplicas、目標 CPU 使用率) を考慮して動作し、<strong>HPA と競合せずに CPU リクエストを自動調整</strong></li>
+            <li>HPA は短期スパイクにレプリカ数で対応、VPA は長期需要傾向で CPU リクエストを最適化する<strong>役割分担</strong>が実現</li>
+            <li><code>InPlaceOrRecreate</code> モードにより、<strong>Pod を再起動せず</strong>に CPU リクエストを非破壊的に更新</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="note-box">
+        <strong>💡 対象ユーザー:</strong> CPU ベースの HPA を利用する Web アプリケーションや API サーバーなど、レプリカ数が動的に変化するワークロードを運用し、リソースリクエストのチューニングを手動で行ってきたプラットフォームチーム・SRE。
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Before["従来 (併用非推奨)"]
+        VPA1["📉 VPA"] -- "CPU リクエスト変更" --> POD1["📦 Pod"]
+        HPA1["📈 HPA"] -- "使用率ベースラインが変動 ⚠️" --> POD1
+        VPA1 <-. "スケーリング競合" .-> HPA1
+    end
+
+    subgraph After["HPA Rightsizing with VPA (Public Preview)"]
+        HPACFG["⚙️ HPA 設定<br/>(min/max レプリカ・目標 CPU 使用率)"] --> VPA2["📉 VPA<br/>(rightsizing アノテーション)"]
+        HIST[("📊 長期的なリソース需要履歴")] --> VPA2
+        VPA2 -- "CPU リクエストを自動最適化<br/>(InPlaceOrRecreate)" --> POD2["📦 Pod レプリカ群"]
+        HPA2["📈 HPA"] -- "短期スパイクに<br/>レプリカ数で対応" --> POD2
+    end
+
+    Before ==> After
+        </pre>
+      </div>
+      <p>
+        従来は VPA の CPU リクエスト変更が HPA のスケーリング判断を乱すため併用が非推奨でしたが、今回のアップデートで VPA が HPA 設定を考慮して協調動作し、レプリカスケーリングと CPU リクエスト最適化を同時に実現します。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚙️ 主要機能</h2>
+      <div class="card">
+        <h4>🧠 HPA 設定を考慮した VPA ライトサイジングロジック</h4>
+        <p>VPA が HPA の最小/最大レプリカ数・目標 CPU 使用率を考慮してコンテナの CPU リクエストを調整。長期的な集約リソース需要の履歴を分析し、低トラフィック時はコスト効率的に、高負荷時は回復力を維持するようサイジング。</p>
+      </div>
+      <div class="card">
+        <h4>🏷️ アノテーションによる有効化</h4>
+        <p>VerticalPodAutoscaler リソースに <code>gke.io/autoscaling-hpa-rightsizing-mode: "gke-hpa-rightsizing-mode-policy"</code> アノテーションを付与するだけで有効化。既存の VPA API (autoscaling.k8s.io/v1) をそのまま利用可能。</p>
+      </div>
+      <div class="card">
+        <h4>🔄 非破壊的なリソース更新 (InPlaceOrRecreate)</h4>
+        <p><code>updateMode: "InPlaceOrRecreate"</code> により、Pod を再起動せずに CPU リクエストをインプレース更新。メモリ変更に再起動が必要な場合は、コンテナの <code>resizePolicy</code> (restartPolicy: RestartContainer) の追加、または <code>updateMode: "Recreate"</code> で対応。</p>
+      </div>
+      <div class="card">
+        <h4>👀 段階的導入のための Off モード</h4>
+        <p><code>updateMode: "Off"</code> でデプロイすると、Pod を変更せずに推奨値 (Recommendation) のみを生成。数日間の観察で推奨値を確認してから自動適用に切り替える段階的デプロイが可能。</p>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔧 技術仕様 (要件と制限)</h2>
+      <table>
+        <tr><th>項目</th><th>詳細</th></tr>
+        <tr><td>GKE バージョン</td><td>1.36.3-gke.1630000 以降</td></tr>
+        <tr><td>リリースステージ</td><td>Public Preview (Pre-GA Offerings Terms が適用)</td></tr>
+        <tr><td>前提条件</td><td>クラスタで垂直 Pod 自動スケーリングが有効であること (Autopilot はデフォルト有効)</td></tr>
+        <tr><td>必要な IAM ロール</td><td><code>roles/container.admin</code>、<code>roles/container.developer</code></td></tr>
+        <tr><td>ライトサイジング対象リソース</td><td>CPU のみ (メモリを含めた場合、メモリは標準の VPA ロジックで調整)</td></tr>
+        <tr><td>クラスタあたりの上限</td><td>全ワークロード合計で最大 60,000 コンテナ</td></tr>
+        <tr><td>単一 VPA の上限</td><td>最大 1,000 コンテナをターゲット可能</td></tr>
+      </table>
+
+      <h3>📄 VerticalPodAutoscaler マニフェスト例</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">YAML</span>
+          <span class="code-title">rightsizing アノテーション付き VPA</span>
+        </div>
+        <pre><code class="language-yaml">apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: sample-app-vpa
+  annotations:
+    gke.io/autoscaling-hpa-rightsizing-mode: "gke-hpa-rightsizing-mode-policy"
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: sample-app
+  updatePolicy:
+    updateMode: "Off"   # 観察後に "InPlaceOrRecreate" へ変更
+  resourcePolicy:
+    containerPolicies:
+      - containerName: sample-app
+        controlledResources: ["cpu", "memory"]
+        minAllowed:
+          cpu: 100m
+          memory: 200Mi
+        maxAllowed:
+          cpu: 1000m
+          memory: 1024Mi</code></pre>
+      </div>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>GKE バージョン 1.36.3-gke.1630000 以降のクラスタを使用していること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>クラスタで垂直 Pod 自動スケーリングが有効であること (Autopilot クラスタではデフォルトで有効)</span></div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">Standard クラスタで垂直 Pod 自動スケーリングを有効化</span>
+        </div>
+        <pre><code class="language-bash"># Standard クラスタで垂直 Pod 自動スケーリングを有効化
+gcloud container clusters update CLUSTER_NAME \
+    --enable-vertical-pod-autoscaling \
+    --location=LOCATION</code></pre>
+      </div>
+
+      <div class="step-item">
+        <div class="step-number">1</div>
+        <div class="step-content">
+          <h4>ワークロードと HPA をデプロイ</h4>
+          <p>CPU 使用率をターゲットとする HorizontalPodAutoscaler を作成します。</p>
+          <div class="code-block">
+            <div class="code-header">
+              <span class="code-lang">YAML</span>
+              <span class="code-title">CPU 使用率 70% ターゲットの HPA</span>
+            </div>
+            <pre><code class="language-yaml">apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: sample-app-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: sample-app
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-item">
+        <div class="step-number">2</div>
+        <div class="step-content">
+          <h4>VPA を Off モードでデプロイし推奨値を観察</h4>
+          <p><code>gke.io/autoscaling-hpa-rightsizing-mode</code> アノテーション付きの VPA を <code>updateMode: "Off"</code> でデプロイし、推奨値 (Target、Lower Bound、Upper Bound) を確認します。初期推奨値は数分で生成されますが、トラフィックサイクル全体を捉えるため 24 時間〜数日の観察が推奨されます。新規ワークロードや本番クリティカルでないワークロードではこのステップを省略できます。</p>
+          <div class="code-block">
+            <div class="code-header">
+              <span class="code-lang">Bash</span>
+              <span class="code-title">VPA のデプロイと推奨値の確認</span>
+            </div>
+            <pre><code class="language-bash">kubectl apply -f sample-app-vpa.yaml
+kubectl describe vpa sample-app-vpa</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-item">
+        <div class="step-number">3</div>
+        <div class="step-content">
+          <h4>自動ライトサイジングを有効化</h4>
+          <p>推奨値を確認後、<code>updateMode</code> を <code>"InPlaceOrRecreate"</code> に変更して適用します。VPA がコンテナの CPU リクエストを需要に基づき最適レベルに自動調整し、HPA はレプリカ数のスケーリングを継続します。</p>
+          <div class="code-block">
+            <div class="code-header">
+              <span class="code-lang">YAML</span>
+              <span class="code-title">updateMode の変更</span>
+            </div>
+            <pre><code class="language-yaml">spec:
+  updatePolicy:
+    updateMode: "InPlaceOrRecreate"</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>✨ メリット</h2>
+      <div class="grid-2">
+        <div>
+          <h3>💼 ビジネス面</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>コスト最適化の自動化</strong>: 低トラフィック時に過剰な CPU リクエストを削減し、ノードリソースの無駄を抑制。手動チューニングの運用コストも削減</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>信頼性とコストの両立</strong>: HPA 設定を考慮したサイジングにより、高負荷時の回復力を維持しつつコスト効率を向上</span></div>
+        </div>
+        <div>
+          <h3>🔬 技術面</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>スケーリング競合の解消</strong>: 従来非推奨だった同一メトリクス (CPU) での HPA + VPA 併用が、協調動作により安全に実現</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>非破壊的な適用</strong>: InPlaceOrRecreate モードで Pod 再起動なしに CPU リクエストを更新でき、サービス影響を最小化</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>段階的導入が可能</strong>: Off モードで推奨値のみを観察してから自動適用へ移行できる</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <h3>制限事項</h3>
+      <div class="check-item"><span class="cross-icon">▲</span><span>Public Preview のため、Pre-GA Offerings Terms が適用され、サポートが限定される可能性がある</span></div>
+      <div class="check-item"><span class="cross-icon">▲</span><span>ライトサイジング計算は <strong>CPU のみ</strong>に適用される (メモリは標準 VPA ロジックで調整)</span></div>
+      <div class="check-item"><span class="cross-icon">▲</span><span>クラスタあたり最大 60,000 コンテナ、単一 VPA あたり最大 1,000 コンテナの上限がある</span></div>
+      <div class="check-item"><span class="cross-icon">▲</span><span>GKE 1.36.3-gke.1630000 以降が必要</span></div>
+
+      <h3>考慮すべき点</h3>
+      <div class="warning-box">
+        <strong>⚠️ GitOps ツールとの差分管理:</strong> Argo CD などの継続的デリバリーツールは VPA によるリソース変更をマニフェスト値に戻そうとする場合があるため、<code>ignoreDifferences</code> などの設定で差分を無視する構成が必要。
+      </div>
+      <div class="warning-box">
+        <strong>⚠️ 無効化の手順に注意:</strong> 無効化する際は VerticalPodAutoscaler の削除または <code>updateMode: "Off"</code> への変更で行うこと。アノテーションのみを削除して <code>updateMode</code> を残すと標準 VPA 動作に戻り、HPA と競合してスケーリングが不安定になる。
+      </div>
+      <div class="warning-box">
+        <strong>⚠️ マルチコンテナ Pod:</strong> サイドカー併用などの場合は、HPA を Pod 全体ではなく主要コンテナの CPU 使用率 (<code>ContainerResource</code> メトリクス) でスケールさせ、HPA と VPA が同じベースラインを評価するよう構成する必要がある。
+      </div>
+      <div class="note-box">
+        <strong>💡 起動時 CPU スパイク対策:</strong> 起動時に CPU スパイクが発生するワークロード (Java アプリなど) は、VPA CPU Startup Boost との併用が推奨される。
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>1️⃣ トラフィック変動の大きい Web API のコスト最適化</h3>
+        <p><strong>シナリオ:</strong> 日中はトラフィックが多く夜間は少ない Web API を、CPU 使用率 70% をターゲットとする HPA (2〜10 レプリカ) で運用。CPU リクエストは安全マージンを見込んで大きめに設定しており、夜間はノードリソースが大幅に余剰となっている。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">YAML</span>
+            <span class="code-title">HPA は既存のまま、rightsizing アノテーション付き VPA を追加</span>
+          </div>
+          <pre><code class="language-yaml"># HPA は既存のまま、rightsizing アノテーション付き VPA を追加
+metadata:
+  annotations:
+    gke.io/autoscaling-hpa-rightsizing-mode: "gke-hpa-rightsizing-mode-policy"
+spec:
+  updatePolicy:
+    updateMode: "InPlaceOrRecreate"</code></pre>
+        </div>
+        <p><strong>効果:</strong> VPA が履歴需要と HPA 設定に基づいて CPU リクエストを適正化し、夜間の過剰プロビジョニングを削減。日中のスパイクには HPA のレプリカスケーリングで対応し、可用性を維持したままノードコストを削減できる。</p>
+      </div>
+
+      <div class="usecase">
+        <h3>2️⃣ 多数のマイクロサービスの一括ライトサイジング</h3>
+        <p><strong>シナリオ:</strong> 数百のマイクロサービスを運用するプラットフォームチームが、各サービスの CPU リクエストを手動でチューニングしており、レビューが追いつかず過剰リクエストが常態化している。</p>
+        <p><strong>効果:</strong> 各ワークロードに rightsizing 対応 VPA を Off モードで展開して推奨値を収集し、確認後に InPlaceOrRecreate へ切り替えることで、クラスタ全体 (最大 60,000 コンテナ) のリクエスト適正化を段階的かつ自動的に実現できる。</p>
+      </div>
+    </div>
+
+    <!-- 料金・リージョン -->
+    <div class="section">
+      <h2>💰 料金・利用可能リージョン</h2>
+      <div class="grid-2">
+        <div class="card">
+          <h4>💵 料金</h4>
+          <p>本機能固有の追加料金の記載はなし。HPA / VPA は GKE の機能として提供され、通常の GKE クラスタ料金 (Autopilot は Pod リソース課金、Standard はノードの Compute Engine 料金とクラスタ管理手数料) が適用される。詳細は <a href="https://cloud.google.com/kubernetes-engine/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">GKE 料金ページ</a> を参照。</p>
+        </div>
+        <div class="card">
+          <h4>🌍 利用可能リージョン</h4>
+          <p>リージョン固有の制限は Release Notes に記載なし。GKE バージョン 1.36.3-gke.1630000 以降を実行するクラスタで利用可能。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 関連サービス -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <h4>📈 Horizontal Pod Autoscaler (HPA)</h4>
+        <p>CPU 使用率などのメトリクスに基づいてレプリカ数をスケール。本機能では短期的なトラフィックスパイク対応を担当。</p>
+      </div>
+      <div class="card">
+        <h4>📉 Vertical Pod Autoscaler (VPA)</h4>
+        <p>コンテナのリソースリクエスト/リミットを自動調整。本機能では HPA 設定を考慮したライトサイジングロジックで動作。</p>
+      </div>
+      <div class="card">
+        <h4>🚀 VPA CPU Startup Boost</h4>
+        <p>起動時に一時的に追加 CPU を割り当てる機能。定常状態のライトサイジング計算に影響を与えずに起動時スパイクへ対応可能。</p>
+      </div>
+      <div class="card">
+        <h4>📝 Cloud Logging</h4>
+        <p>VPA の判断ログ (decision logs) やイベントを確認でき、ライトサイジングの診断に活用できる。</p>
+      </div>
+      <div class="card">
+        <h4>🧩 Cluster Autoscaler / Node Auto-Provisioning</h4>
+        <p>Pod のリクエスト適正化と組み合わせることで、ノードレベルのリソース効率も向上。</p>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="success-box">
+        <p style="margin: 0 0 8px 0;">長らく「同一メトリクスでの HPA と VPA の併用は非推奨」とされてきた制約が、GKE の協調ライトサイジングロジックにより解消され、<strong>レプリカスケーリングと CPU リクエスト最適化を同時に自動化</strong>できるようになりました。</p>
+        <p style="margin: 0;">CPU ベースの HPA を使うワークロードを運用しているチームは、まず <strong>Off モードで VPA をデプロイして推奨値を観察</strong>し、効果を確認した上で <strong>InPlaceOrRecreate モードへの移行</strong>を検討することを推奨します。Public Preview のため、本番適用時は Pre-GA 条件とサポート範囲に留意してください。</p>
+      </div>
+      <div class="flow-diagram">
+        <div class="flow-step">1️⃣ GKE 1.36.3+<br>VPA 有効化</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">2️⃣ Off モードで<br>推奨値を観察</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">3️⃣ InPlaceOrRecreate<br>で自動適用</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">💰 継続的な<br>コスト最適化</div>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="padding-left: 20px; margin: 4px 0;">
+        <li><a href="https://docs.cloud.google.com/release-notes#October_02_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (October 02, 2026)</a></li>
+        <li><a href="https://docs.cloud.google.com/kubernetes-engine/docs/how-to/rightsize-hpa-workloads-with-vpa" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: Rightsize HPA workloads with VPA</a></li>
+        <li><a href="https://docs.cloud.google.com/kubernetes-engine/docs/concepts/horizontalpodautoscaler" target="_blank" rel="noopener noreferrer" class="gc-link">Horizontal Pod Autoscaler の概要</a></li>
+        <li><a href="https://docs.cloud.google.com/kubernetes-engine/docs/concepts/verticalpodautoscaler" target="_blank" rel="noopener noreferrer" class="gc-link">Vertical Pod Autoscaler の概要</a></li>
+        <li><a href="https://cloud.google.com/kubernetes-engine/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">GKE 料金ページ</a></li>
+      </ul>
+      <p>📄 ベースレポート: reports/2026/2026-10-02-gke-vpa-hpa-rightsizing-preview.md</p>
+      <div class="tags">
+        <span class="tag">#GKE</span>
+        <span class="tag">#Kubernetes</span>
+        <span class="tag">#VPA</span>
+        <span class="tag">#HPA</span>
+        <span class="tag">#Autoscaling</span>
+        <span class="tag">#CostOptimization</span>
+        <span class="tag">#Rightsizing</span>
+        <span class="tag">#PublicPreview</span>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

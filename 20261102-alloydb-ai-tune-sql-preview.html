@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AlloyDB for PostgreSQL: AI による SQL クエリチューニング (ai.tune_sql) Preview</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+      text-align: right;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-title {
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 4px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); color: #FFFFFF; }
+    .badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+    .badge-deprecated { background: var(--gc-red); color: #FFFFFF; }
+    .badge-ai { background: var(--gc-purple); }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box, .after-box {
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid rgba(234, 67, 53, 0.3);
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid rgba(52, 168, 83, 0.3);
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-box h3 { color: #C5221F; }
+    .after-box h3 { color: #188038; }
+
+    .before-box ul, .after-box ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li { margin: 8px 0; }
+
+    /* フロー図 */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      font-size: 14px;
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* チェックリスト */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon { color: var(--gc-green); font-size: 18px; }
+    .cross-icon { color: var(--gc-red); font-size: 18px; }
+
+    /* コードブロック */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang { color: #9CDCFE; font-weight: bold; }
+    .code-title { color: #AAAAAA; }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .ai-box {
+      background: var(--gc-purple-tint);
+      border-left: 4px solid var(--gc-purple);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* 統計カード */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label { font-size: 14px; opacity: 0.9; }
+
+    /* 機能カードグリッド */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+    }
+
+    .feature-grid .card { margin: 0; }
+    .feature-grid .card p { margin: 4px 0 0 0; font-size: 14px; }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+      border: 1px solid var(--gc-blue-100);
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* メリット・デメリット 2 カラム */
+    .pros-cons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a { word-break: break-all; }
+
+    ul { padding-left: 24px; }
+    li { margin: 6px 0; }
+
+    @media (max-width: 720px) {
+      .before-after, .pros-cons { grid-template-columns: 1fr; }
+      h1 { font-size: 26px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <div style="margin-bottom: 8px;">
+          <span class="badge">AlloyDB for PostgreSQL</span>
+          <span class="badge badge-ai">🤖 AI / Gemini</span>
+          <span class="badge badge-preview">Preview</span>
+        </div>
+        <h1>🛠️ AI による SQL クエリチューニング<br><span style="color: var(--gc-blue-600);">ai.tune_sql</span> 関数が Preview に</h1>
+      </div>
+      <div class="subtitle">
+        リリース日: 2026-11-02<br>
+        Google Cloud Release Notes
+      </div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📌 概要</h2>
+      <p>
+        AlloyDB for PostgreSQL で、AI を使って SQL クエリをチューニングできる <code>ai.tune_sql</code> 関数が <span class="highlight">Preview</span> として利用可能になりました。<code>google_ml_integration</code> 拡張機能 <span class="highlight">1.6.2 以降</span>で提供され、LLM (大規模言語モデル) が<span class="highlight">クエリ実行プラン・スキーマ・ランタイム統計</span>を分析して最適化の推奨事項を提示します。
+      </p>
+      <p>
+        パフォーマンスのボトルネックを特定し、<strong>クエリ書き換え / インデックス (式・GIN・ScaNN) / 統計収集 / GUC フラグ / ANALYZE・VACUUM</strong> に関する推奨を提供。SQL チューニングの専門知識がない開発者でも、<span class="highlight">SELECT 文 1 つ</span>で専門家レベルの包括的なチューニング分析を得られます。
+      </p>
+
+      <div class="flow-diagram">
+        <div class="flow-step">🐢 スロークエリ</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">💬 SELECT ai.tune_sql(...)</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🤖 LLM が分析<br>(2〜4 分)</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">💡 包括的な<br>最適化推奨</div>
+      </div>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before (アップデート前)</h3>
+          <ul>
+            <li><code>EXPLAIN ANALYZE</code> の出力を人間が読み解き、ボトルネックを手動で特定する必要があった</li>
+            <li>インデックス設計・統計収集・GUC 調整・VACUUM 戦略など、複数観点の最適化には PostgreSQL の深い専門知識が必要だった</li>
+            <li>既存の Index Advisor はインデックス推奨が中心で、クエリ書き換えやパラメータチューニングまでは得られなかった</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After (アップデート後)</h3>
+          <ul>
+            <li><code>SELECT ai.tune_sql(...)</code> を実行するだけで、LLM がボトルネック要約と最適化推奨を自動生成</li>
+            <li>クエリ書き換え、インデックス (式 / GIN / ScaNN)、ANALYZE、GUC フラグ、VACUUM まで複数領域の推奨を一度に取得</li>
+            <li><code>hypopg</code> による仮想インデックス評価で、実際に作成せずに推奨の妥当性を評価可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ (処理フロー)</h2>
+      <p><code>ai.tune_sql</code> を呼び出すと、AlloyDB がクエリの実行プランと関連スキーマを収集して Vertex AI に登録した Gemini モデルへ送信し、LLM が生成したボトルネック分析と最適化推奨を返します。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+sequenceDiagram
+    actor User as 👤 開発者 / DBA
+    participant DB as 🗄️ AlloyDB インスタンス<br/>(PostgreSQL 18+)
+    participant Ext as 🧩 google_ml_integration 1.6.2+<br/>google_db_advisor / hypopg
+    participant LLM as 🤖 Vertex AI<br/>Gemini モデル
+
+    User->>DB: SELECT ai.tune_sql(query => '...', explain_analyze => TRUE)
+    DB->>Ext: EXPLAIN ANALYZE 実行・実行プラン取得
+    Ext->>Ext: スキーマ・統計・システム情報を収集
+    Ext->>LLM: クエリ + 実行プラン + スキーマを送信
+    LLM-->>Ext: ボトルネック分析と最適化推奨
+    Ext-->>User: クエリ要約 / 書き換え / インデックス /<br/>統計収集 / GUC / VACUUM の推奨
+        </pre>
+      </div>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚡ 主要機能 — 1 回の呼び出しで 6 領域の推奨</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <div class="card-title">📝 クエリ要約 (Query summary)</div>
+          <p>パフォーマンスボトルネックを分析し、原因を自然言語で要約。例: 相関サブクエリ (NOT IN) によるネステッドループを特定し、アンチ結合 (NOT EXISTS) への変換を提案。</p>
+        </div>
+        <div class="card">
+          <div class="card-title">🔄 クエリ書き換え (Query rewrite)</div>
+          <p>元のクエリと等価で、より効率的なクエリへの書き換え手法を提案。</p>
+        </div>
+        <div class="card">
+          <div class="card-title">🗂️ インデックス推奨</div>
+          <p>式インデックス、GIN、ScaNN などのインデックスタイプを推奨。<code>hypopg</code> 拡張機能で推奨の評価・生成を実施。</p>
+        </div>
+        <div class="card">
+          <div class="card-title">📊 統計収集の推奨</div>
+          <p>実行プランに基づき、テーブルの <code>ANALYZE</code> と複数列に対する統計収集を推奨。</p>
+        </div>
+        <div class="card">
+          <div class="card-title">⚙️ GUC フラグチューニング</div>
+          <p>実行プランと、メモリ・バッファの使用量などのシステム情報を分析し、新しい GUC 値を推奨。</p>
+        </div>
+        <div class="card">
+          <div class="card-title">🧹 ANALYZE / VACUUM の推奨</div>
+          <p>ANALYZE / VACUUM の履歴と、ライブ・デッドタプル数に基づいてテーブルへの実行を推奨。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+      <h3>要件</h3>
+      <table>
+        <tr><th>項目</th><th>詳細</th></tr>
+        <tr><td>AlloyDB バージョン</td><td>PostgreSQL 18 以降のインスタンス</td></tr>
+        <tr><td>拡張機能</td><td><code>google_ml_integration</code> 1.6.2 以降、<code>google_db_advisor</code>、<code>hypopg</code></td></tr>
+        <tr><td>Vertex AI 連携</td><td>有効化が必要 (Gemini モデルのエンドポイント登録)</td></tr>
+        <tr><td>実行パラメータ</td><td><code>explain_analyze</code> (デフォルト: TRUE。TRUE で EXPLAIN ANALYZE を実行、FALSE で EXPLAIN のみ)</td></tr>
+        <tr><td>推奨生成時間</td><td>2〜4 分程度</td></tr>
+        <tr><td>提供ステータス</td><td>Preview (Pre-GA Offerings Terms が適用)</td></tr>
+      </table>
+
+      <h3>関連データベースフラグ</h3>
+      <table>
+        <tr><th>フラグ</th><th>用途</th></tr>
+        <tr><td><code>google_db_advisor.llm_model_id</code></td><td>SQL クエリチューニングに使用する登録済みモデル ID を指定</td></tr>
+        <tr><td><code>google_db_advisor.enable_ai_tune_sql</code></td><td>SQL クエリチューニングの有効化 (セッション単位の SET、または ALTER DATABASE / インスタンスのデータベースフラグで永続化)</td></tr>
+      </table>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🚀 設定方法 (3 ステップ)</h2>
+
+      <div class="note-box">
+        <strong>💡 前提条件:</strong>
+        ① PostgreSQL 18 以降の AlloyDB インスタンス /
+        ② psql または AlloyDB Studio へのアクセス /
+        ③ Vertex AI 連携の有効化 /
+        ④ <code>google_ml_integration</code> 1.6.2 以降と <code>google_db_advisor</code>、<code>hypopg</code> の有効化 (<code>CREATE EXTENSION IF NOT EXISTS hypopg;</code>)
+      </div>
+
+      <h3>ステップ 1: Gemini モデルのエンドポイントを登録</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">グローバルモデルエンドポイントの登録例 (gemini-3.5-flash)</span>
+        </div>
+        <pre><code class="language-sql">CALL google_ml.create_model(
+  model_id => 'gemini-3.5-flash-global',
+  model_request_url => 'https://aiplatform.googleapis.com/v1/projects/PROJECT_ID/locations/global/publishers/google/models/gemini-3.5-flash:generateContent',
+  model_qualified_name => 'gemini-3.5-flash',
+  model_provider => 'google',
+  model_type => 'llm',
+  model_auth_type => 'alloydb_service_agent_iam');</code></pre>
+      </div>
+      <p style="font-size: 14px;">→ インスタンスのリージョンでモデルが利用可能な場合は、リージョナルモデルエンドポイント (例: <code>gemini-2.5-pro</code>) も登録できます。</p>
+
+      <h3>ステップ 2: SQL チューニングを有効化</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">セッション単位での有効化</span>
+        </div>
+        <pre><code class="language-sql">SET google_db_advisor.llm_model_id = 'gemini-3.5-flash-global';
+SET google_db_advisor.enable_ai_tune_sql = on;</code></pre>
+      </div>
+      <p style="font-size: 14px;">→ <code>SET</code> は現在のセッションのみ有効。永続化するには <code>ALTER DATABASE データベース名 SET フラグ名 = 値;</code> を両フラグに実行するか、インスタンスのデータベースフラグとして構成します。</p>
+
+      <h3>ステップ 3: ai.tune_sql を実行</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">AI チューニングの実行</span>
+        </div>
+        <pre><code class="language-sql">SELECT ai.tune_sql(query => 'SQL_QUERY', explain_analyze => TRUE);</code></pre>
+      </div>
+      <p style="font-size: 14px;">→ 出力には、標準のクエリプランに続いて、クエリ要約、書き換え提案、統計収集・GUC フラグ・VACUUM に関する AI 生成の推奨事項が表示されます。</p>
+    </div>
+
+    <!-- メリット / デメリット -->
+    <div class="section">
+      <h2>⚖️ メリットと制約事項</h2>
+      <div class="pros-cons">
+        <div>
+          <h3 style="color: #188038;">👍 メリット</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>チューニング工数の削減</strong>: 専門家が手動で行っていた実行プラン分析と最適化検討を自動化し、解決までの時間を短縮</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>専門知識の民主化</strong>: PostgreSQL チューニングの深い知識がない開発者でも専門家レベルの推奨を取得</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>多面的な推奨</strong>: 書き換え・インデックス・統計・GUC・VACUUM を単一ツールでカバー</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>実行プランに基づく精度</strong>: <code>explain_analyze => TRUE</code> で実際の実行プランを取得し、より正確な推奨を実現</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>AI 向けインデックスにも対応</strong>: ScaNN インデックスの推奨で、ベクトル検索ワークロードの最適化にも活用可能</span></div>
+        </div>
+        <div>
+          <h3 style="color: #C5221F;">⚠️ 制限事項・考慮点</h3>
+          <div class="check-item"><span class="cross-icon">✗</span><span><strong>プリペアド / パラメータ化ステートメント</strong>: クエリ書き換え推奨は非対応 (その他の推奨は提供)。<code>$1</code> などのプレースホルダーは代表的なリテラル値に置換が必要</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span><strong>explain_analyze = TRUE では読み取り専用 SELECT のみ</strong>: <code>INSERT</code> / <code>UPDATE</code> / <code>DELETE</code> / <code>SELECT INTO</code> / <code>SELECT FOR UPDATE</code> はエラー</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span><strong>Preview ステータス</strong>: Pre-GA Offerings Terms が適用され、サポートが限定される場合あり</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span><strong>生成時間</strong>: 推奨の生成には 2〜4 分程度かかる</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span><strong>実行コスト</strong>: デフォルトではクエリが実際に実行されるため、重いクエリは注意 (FALSE で EXPLAIN のみに変更可能)</span></div>
+        </div>
+      </div>
+      <div class="warning-box">
+        <strong>⚠️ 注意:</strong> 推奨事項は LLM の支援により生成されるため不正確な内容が含まれる可能性があり、<strong>適用前に独立した検証が必要</strong>です (出力にもその旨の注記が表示されます)。
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>1️⃣ スロークエリのボトルネック特定と書き換え</h3>
+        <p><strong>シナリオ</strong>: Query Insights で特定したスロークエリ (相関サブクエリを含む NOT IN 条件) の原因を調査し、最適化したい。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">実装例</span>
+          </div>
+          <pre><code class="language-sql">SELECT ai.tune_sql(
+  'SELECT * FROM store_sales
+   WHERE ss_customer_sk NOT IN (
+     SELECT sr_customer_sk FROM store_returns
+     WHERE sr_item_sk = ss_item_sk)');</code></pre>
+        </div>
+        <p style="font-size: 14px;"><strong>効果</strong>: 公式ドキュメントの例では、約 288 万回のインデックススキャンを伴うネステッドループ実行 (103 秒超) がボトルネックと特定され、<span class="highlight">NOT EXISTS (アンチ結合) への変換</span>により Hash Anti Join を使って大幅に実行時間を削減できるという推奨が得られます。</p>
+      </div>
+
+      <div class="usecase">
+        <h3>2️⃣ インデックス・統計・VACUUM を含む包括的なチューニング</h3>
+        <p><strong>シナリオ</strong>: 複雑な分析クエリに対して、インデックス追加だけでなく統計収集やテーブルメンテナンスまで含めた最適化方針を検討したい。</p>
+        <p style="font-size: 14px;"><strong>効果</strong>: 単一の <code>ai.tune_sql</code> 呼び出しで、式 / GIN / ScaNN インデックスの推奨、複数列統計の ANALYZE 推奨、GUC フラグの調整案、ライブ / デッドタプル数に基づく VACUUM 推奨を一括で取得でき、チューニング方針の検討を効率化できます。</p>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>この機能自体の個別料金は Release Notes およびドキュメントに記載されていません。AlloyDB の料金と Vertex AI (Gemini モデル) の料金については、各料金ページを参照してください。</p>
+      <ul>
+        <li><a href="https://cloud.google.com/alloydb/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">AlloyDB の料金</a></li>
+        <li><a href="https://cloud.google.com/vertex-ai/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Vertex AI の料金</a></li>
+      </ul>
+    </div>
+
+    <!-- 関連サービス -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <div class="card-title">🤖 Vertex AI</div>
+          <p><code>ai.tune_sql</code> が分析に使用する Gemini モデルのエンドポイントを提供。AlloyDB の Vertex AI 連携の有効化が前提。</p>
+        </div>
+        <div class="card">
+          <div class="card-title">🧩 google_ml_integration 拡張機能</div>
+          <p>AlloyDB から Vertex AI のモデルを呼び出すための拡張機能。バージョン 1.6.2 以降で <code>ai.tune_sql</code> を提供。</p>
+        </div>
+        <div class="card">
+          <div class="card-title">🗂️ AlloyDB Index Advisor (google_db_advisor)</div>
+          <p>既存のインデックス推奨機能。<code>ai.tune_sql</code> は同じ拡張機能群と関連フラグを利用。</p>
+        </div>
+        <div class="card">
+          <div class="card-title">🧪 hypopg 拡張機能</div>
+          <p>仮想 (hypothetical) インデックスの評価に使用され、インデックス推奨の評価・生成を支える。</p>
+        </div>
+        <div class="card">
+          <div class="card-title">🔍 Query Insights / pg_stat_statements</div>
+          <p>チューニング対象のクエリ特定に併用。プレースホルダー付きクエリはリテラル値に置換してから <code>ai.tune_sql</code> に渡す。</p>
+        </div>
+        <div class="card">
+          <div class="card-title">🖥️ AlloyDB Studio</div>
+          <p>psql クライアントの代わりに、ブラウザから <code>ai.tune_sql</code> を実行可能。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>✅ まとめ</h2>
+      <div class="success-box">
+        <p style="margin: 0 0 8px 0;">AlloyDB の <code>ai.tune_sql</code> は、LLM を活用して<strong>クエリ書き換えからインデックス、統計、GUC フラグ、VACUUM まで包括的なチューニング推奨</strong>を提供する Preview 機能です。</p>
+        <p style="margin: 0;">PostgreSQL 18 以降のインスタンスと Vertex AI 連携を準備し、<span class="highlight">スロークエリに対してまず試してみる</span>ことを推奨します。ただし推奨事項は LLM 生成のため、<strong>適用前に必ず内容を検証</strong>してください。</p>
+      </div>
+      <div style="margin-top: 12px;">
+        <span class="badge">AlloyDB</span>
+        <span class="badge">PostgreSQL</span>
+        <span class="badge badge-ai">AI</span>
+        <span class="badge">SQL チューニング</span>
+        <span class="badge">クエリ最適化</span>
+        <span class="badge badge-ai">Gemini</span>
+        <span class="badge badge-ai">Vertex AI</span>
+        <span class="badge badge-preview">Preview</span>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p><strong>📎 出典 / 参考リンク</strong></p>
+      <ul style="padding-left: 20px; margin: 8px 0;">
+        <li>公式リリースノート: <a href="https://cloud.google.com/release-notes" target="_blank" rel="noopener noreferrer" class="gc-link">https://cloud.google.com/release-notes</a></li>
+        <li>ドキュメント: Tune SQL queries by using AI: <a href="https://cloud.google.com/alloydb/docs/tune-sql-queries-ai" target="_blank" rel="noopener noreferrer" class="gc-link">https://cloud.google.com/alloydb/docs/tune-sql-queries-ai</a></li>
+        <li>ドキュメント: Database advisor flags: <a href="https://cloud.google.com/alloydb/docs/reference/database-advisor-flags" target="_blank" rel="noopener noreferrer" class="gc-link">https://cloud.google.com/alloydb/docs/reference/database-advisor-flags</a></li>
+        <li>料金ページ (AlloyDB): <a href="https://cloud.google.com/alloydb/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">https://cloud.google.com/alloydb/pricing</a></li>
+      </ul>
+      <p>レポート: reports/2026/2026-11-02-alloydb-ai-tune-sql-preview.md | Google Cloud News Summary (2026-11-02)</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Memorystore for Valkey: メンテナンスウィンドウ &amp; セルフサービスメンテナンス GA</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      border-radius: 8px 8px 0 0;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      border-radius: 0 0 8px 8px;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 20px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .before h3 {
+      color: var(--gc-red);
+      margin-top: 0;
+    }
+
+    .after {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .after h3 {
+      color: var(--gc-green);
+      margin-top: 0;
+    }
+
+    .feature-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .feature-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .feature-card.green-border {
+      border-left-color: var(--gc-green);
+    }
+
+    .feature-card.orange-border {
+      border-left-color: var(--gc-orange);
+    }
+
+    .feature-card.teal-border {
+      border-left-color: var(--gc-teal);
+    }
+
+    .feature-card h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .feature-card p {
+      margin: 8px 0 0 0;
+      font-size: 14px;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+    }
+
+    .usecase-card h3 {
+      color: var(--gc-blue-800);
+      margin-top: 0;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .pricing-table {
+      margin: 16px 0;
+    }
+
+    .region-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    .region-badge {
+      display: inline-block;
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-800);
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .related-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .related-list li {
+      padding: 8px 0;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .related-list li:last-child {
+      border-bottom: none;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .before-after { grid-template-columns: 1fr; }
+      .feature-cards { grid-template-columns: 1fr; }
+      .stat-cards { grid-template-columns: 1fr; }
+      .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>🗄️ Memorystore for Valkey</h1>
+        <p style="margin: 8px 0 0 0; font-size: 20px; color: var(--gc-on-surface-variant);">メンテナンスウィンドウ & セルフサービスメンテナンスの Google Cloud コンソール対応</p>
+      </div>
+      <div style="text-align: right;">
+        <span class="badge badge-ga">GA</span>
+        <span class="badge">Memorystore</span>
+        <div class="subtitle" style="margin-top: 8px;">2026-03-18</div>
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>Memorystore for Valkey において、<span class="highlight">Google Cloud コンソール</span>からメンテナンスウィンドウの検索・設定、およびセルフサービスメンテナンスの実行が可能になりました。これまで gcloud CLI でのみ利用可能だったメンテナンス管理機能が、GUI ベースの操作で完結できるようになり、運用効率が大幅に向上します。</p>
+      <p>対象ユーザーは、Memorystore for Valkey を利用している<strong>インフラエンジニア</strong>、<strong>SRE</strong>、<strong>データベース管理者</strong>です。特に FedRAMP コンプライアンス要件に対応する必要がある組織にとって有用な機能です。</p>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before">
+          <h3>❌ Before</h3>
+          <div class="check-item"><span class="cross-icon">✕</span><span>メンテナンスウィンドウの設定・確認は gcloud CLI のみ</span></div>
+          <div class="check-item"><span class="cross-icon">✕</span><span>スケジュール確認にコマンドライン操作が必要で学習コストが高い</span></div>
+          <div class="check-item"><span class="cross-icon">✕</span><span>セルフサービスメンテナンスも CLI ベースに限定</span></div>
+        </div>
+        <div class="after">
+          <h3>✅ After</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span>コンソールからメンテナンスウィンドウの検索・設定・変更が可能</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>スケジュール確認や再スケジュールを GUI で直感的に操作</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>セルフサービスメンテナンスのバージョン確認・適用がコンソールで完結</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>Google Cloud コンソールからのメンテナンス管理操作がインスタンスに適用されるまでの全体フローです。メンテナンスは create-before-destroy 方式により、ゼロダウンタイムで実行されます。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Console["Google Cloud コンソール"]
+        direction TB
+        FindMaint["メンテナンス\nスケジュール確認"]
+        SetWindow["メンテナンス\nウィンドウ設定"]
+        SelfService["セルフサービス\nメンテナンス実行"]
+    end
+
+    subgraph Actions["メンテナンス操作"]
+        direction TB
+        Configure["曜日・時間帯を指定\n(例: 日曜 1:00 AM)"]
+        Reschedule["再スケジュール\n(最大 2 週間延期)"]
+        ApplyNow["即時適用\nまたは特定日時に適用"]
+    end
+
+    subgraph Instance["Memorystore for Valkey インスタンス"]
+        direction TB
+        ZeroDT["ゼロダウンタイム\nメンテナンス実行"]
+        Failover["協調フェイルオーバー"]
+        Drain["グレースフルノード\nドレイン"]
+    end
+
+    FindMaint --> Reschedule
+    SetWindow --> Configure
+    SelfService --> ApplyNow
+
+    Configure --> ZeroDT
+    Reschedule --> ZeroDT
+    ApplyNow --> ZeroDT
+    ZeroDT --> Failover --> Drain
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Stats -->
+    <div class="section">
+      <h2>📊 数字で見るポイント</h2>
+      <div class="stat-cards">
+        <div class="stat-card">
+          <div class="stat-value">1h</div>
+          <div class="stat-label">メンテナンスウィンドウ枠</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">2w</div>
+          <div class="stat-label">最大延期期間</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-green), #2E7D32);">
+          <div class="stat-value">0</div>
+          <div class="stat-label">ダウンタイム (ゼロ)</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-teal), #00838F);">
+          <div class="stat-value">$0</div>
+          <div class="stat-label">追加料金</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚙️ 主要機能</h2>
+      <div class="feature-cards">
+        <div class="feature-card">
+          <h3>📅 メンテナンスウィンドウの設定と検索</h3>
+          <p>インスタンスごとにメンテナンスの曜日と開始時刻を設定可能。1 時間の枠で、曜日 (月〜日) と開始時刻 (UTC 0-23 時) を指定。スケジュールされたメンテナンスの開始・終了時刻・期限を GUI で確認。</p>
+        </div>
+        <div class="feature-card green-border">
+          <h3>🔄 メンテナンスの再スケジュール</h3>
+          <p>スケジュールされたメンテナンスを最大 2 週間延期可能。即時実行 (IMMEDIATE) または特定日時への変更 (SPECIFIC_TIME) を選択。バッチサイズは 100 インスタンス以下を推奨。</p>
+        </div>
+        <div class="feature-card orange-border">
+          <h3>🛡️ セルフサービスメンテナンス</h3>
+          <p>利用可能なメンテナンスバージョンをコンソール上で確認。次回のスケジュールメンテナンスを待たずに新バージョンを即座に適用。FedRAMP コンプライアンスに必要な CVE パッチの迅速な適用に対応。</p>
+        </div>
+        <div class="feature-card teal-border">
+          <h3>🔔 メンテナンス通知</h3>
+          <p>Communication ページからメンテナンス通知をオンに設定可能。メンテナンス実施の少なくとも 1 週間前にメール通知を受信。プロジェクトレベルで設定し、各メールアドレスごとに個別にオプトイン。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3>メンテナンスウィンドウの設定</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>曜日</td><td>月曜日から日曜日まで選択可能</td></tr>
+          <tr><td>開始時刻</td><td>UTC 0-23 時から選択</td></tr>
+          <tr><td>ウィンドウ時間</td><td>1 時間 (超過する場合あり)</td></tr>
+          <tr><td>デフォルト (平日)</td><td>22:00 - 翌 6:00 (インスタンスのタイムゾーン)</td></tr>
+          <tr><td>デフォルト (週末)</td><td>金曜 22:00 - 月曜 6:00 (インスタンスのタイムゾーン)</td></tr>
+          <tr><td>再スケジュール猶予期間</td><td>最大 2 週間</td></tr>
+        </tbody>
+      </table>
+
+      <h3>ゼロダウンタイムメンテナンスの仕組み</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>デプロイ方式</td><td>Create-before-destroy ライフサイクル</td></tr>
+          <tr><td>フェイルオーバー</td><td>協調フェイルオーバー (通常ミリ秒単位)</td></tr>
+          <tr><td>ノード除去</td><td>グレースフルドレイン (数分間のドレイン期間)</td></tr>
+          <tr><td>可用性</td><td>HA 構成時、一度に 1 つのフォルトドメイン/ゾーンのみ更新</td></tr>
+          <tr><td>エンドポイント</td><td>Private Service Connect エンドポイントはメンテナンスの影響を受けない</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup Steps -->
+    <div class="section">
+      <h2>📝 設定方法</h2>
+
+      <div class="note-box">
+        <strong>💡 前提条件:</strong> Memorystore for Valkey API が有効化済み / IAM 権限の付与済み / インスタンスが作成済みであること
+      </div>
+
+      <h3>ステップ 1: メンテナンスウィンドウの設定</h3>
+      <p>コンソールのインスタンス詳細ページからメンテナンスセクションを開き、曜日と開始時刻を設定します。トラフィックが最も少ない時間帯 (例: 日曜深夜) を選択することを推奨します。</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">gcloud CLI でメンテナンスウィンドウを設定</span>
+        </div>
+        <pre><code class="language-bash"># 既存インスタンスにメンテナンスウィンドウを設定
+gcloud memorystore instances update my-instance \
+  --project=my-project \
+  --location=us-central1 \
+  --maintenance-policy-weekly-window=day=SUNDAY,startTime=hours=1</code></pre>
+      </div>
+
+      <h3>ステップ 2: メンテナンス通知の有効化</h3>
+      <p>Google Cloud コンソールの <a href="https://console.cloud.google.com/user-preferences/communication" target="_blank" class="gc-link">Communication</a> ページから、Memorystore のメール通知をオンに設定します。通知を受け取りたい各ユーザーが個別にオプトインする必要があります。</p>
+
+      <h3>ステップ 3: セルフサービスメンテナンスの適用 (任意)</h3>
+      <p>利用可能な新しいメンテナンスバージョンがある場合、コンソール上で確認して即座に適用できます。</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">gcloud CLI でメンテナンスバージョンを更新</span>
+        </div>
+        <pre><code class="language-bash"># セルフサービスメンテナンスのバージョン更新
+gcloud memorystore instances update my-instance \
+  --location=us-central1 \
+  --project=my-project \
+  --maintenance-version=MAINTENANCE_VERSION</code></pre>
+      </div>
+    </div>
+
+    <!-- Code Samples -->
+    <div class="section">
+      <h2>💻 gcloud CLI コマンド例</h2>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">インスタンス作成時にメンテナンスウィンドウを指定</span>
+        </div>
+        <pre><code class="language-bash"># インスタンス作成時にメンテナンスウィンドウを指定
+gcloud memorystore instances create my-instance \
+  --project=my-project \
+  --location=us-central1 \
+  --psc-auto-connections=network=projects/my-project/global/networks/default \
+  --shard-count=8 \
+  --maintenance-policy-weekly-window=day=SUNDAY,startTime=hours=1</code></pre>
+      </div>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">メンテナンスの再スケジュール (即時実行)</span>
+        </div>
+        <pre><code class="language-bash"># メンテナンスの再スケジュール (即時実行)
+gcloud memorystore instances reschedule-maintenance my-instance \
+  --project=my-project \
+  --location=us-central1 \
+  --reschedule-type=IMMEDIATE</code></pre>
+      </div>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">セルフサービスメンテナンスのバージョン確認</span>
+        </div>
+        <pre><code class="language-bash"># セルフサービスメンテナンスのバージョン確認
+gcloud memorystore instances describe my-instance \
+  --location=us-central1 \
+  --project=my-project</code></pre>
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div class="feature-cards">
+        <div class="feature-card">
+          <h3>💰 運用コスト削減</h3>
+          <p>GUI ベースの管理により、CLI スキルに依存せずにメンテナンス管理が可能。チーム全体の運用効率が向上。</p>
+        </div>
+        <div class="feature-card green-border">
+          <h3>⏱️ ダウンタイム最小化</h3>
+          <p>トラフィックの少ない時間帯にメンテナンスをスケジュールすることで、エンドユーザーへの影響を最小限に抑制。</p>
+        </div>
+        <div class="feature-card orange-border">
+          <h3>🛡️ コンプライアンス対応</h3>
+          <p>セルフサービスメンテナンスにより、FedRAMP 等のコンプライアンス要件に対応した迅速な脆弱性パッチ適用が可能。</p>
+        </div>
+        <div class="feature-card">
+          <h3>⚡ ゼロダウンタイム</h3>
+          <p>Create-before-destroy 方式と協調フェイルオーバーにより、メンテナンス中もサービス継続が可能。</p>
+        </div>
+        <div class="feature-card teal-border">
+          <h3>📅 柔軟なスケジューリング</h3>
+          <p>曜日・時間帯の指定に加え、最大 2 週間の延期が可能。本番環境の運用スケジュールに合わせた調整が容易。</p>
+        </div>
+        <div class="feature-card green-border">
+          <h3>🔄 段階的デプロイ</h3>
+          <p>メンテナンスはフリート全体で段階的にロールアウトされ、問題の早期検出と影響範囲の最小化を実現。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ 制約事項・注意点</h2>
+      <div class="warning-box">
+        <strong>制限事項</strong>
+        <div class="check-item" style="margin-top: 8px;"><span class="cross-icon">✕</span><span>メンテナンスウィンドウは 1 時間だが、メンテナンスがウィンドウ内に完了しない場合がある</span></div>
+        <div class="check-item"><span class="cross-icon">✕</span><span>メンテナンスのオプトアウトや、インスタンス間のメンテナンス順序の制御は不可</span></div>
+        <div class="check-item"><span class="cross-icon">✕</span><span>複数インスタンスの一括再スケジュール機能は未提供 (プログラマティックなバッチ処理は可能)</span></div>
+        <div class="check-item"><span class="cross-icon">✕</span><span>メンテナンス通知のメールは Google アカウントに紐づくアドレスにのみ送信 (カスタムエイリアス不可)</span></div>
+      </div>
+      <div class="note-box">
+        <strong>💡 考慮すべき点</strong>
+        <div class="check-item" style="margin-top: 8px;"><span class="arrow">→</span><span>メンテナンス通知はメンテナンスウィンドウが設定されているインスタンスに対してのみ送信</span></div>
+        <div class="check-item"><span class="arrow">→</span><span>再スケジュールの猶予は元のスケジュールから最大 2 週間であり、無期限の延期は不可</span></div>
+        <div class="check-item"><span class="arrow">→</span><span>インフライトデータの量やインスタンスサイズによって、フェイルオーバーのレイテンシが増加する可能性</span></div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+      <div class="usecase-card">
+        <h3>🛒 ユースケース 1: EC サイトのキャッシュ基盤メンテナンス管理</h3>
+        <p><strong>シナリオ:</strong> EC サイトでセッション管理やカート情報のキャッシュに Memorystore for Valkey を使用している運用チームが、売上への影響を最小限にメンテナンスを管理したい。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">日本時間の月曜早朝にメンテナンスを設定</span>
+          </div>
+          <pre><code class="language-bash"># 日曜深夜 1:00 (UTC) にメンテナンスウィンドウを設定
+# UTC 日曜 16:00 = JST 月曜 1:00
+gcloud memorystore instances update cart-cache-instance \
+  --project=ecommerce-prod \
+  --location=asia-northeast1 \
+  --maintenance-policy-weekly-window=day=SUNDAY,startTime=hours=16</code></pre>
+        </div>
+        <p><strong>効果:</strong> 日本時間の月曜早朝にメンテナンスがスケジュールされ、ピーク時間帯のサービス影響を回避。セールイベント前に再スケジュールで延期することも可能。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>🏦 ユースケース 2: セキュリティパッチの迅速適用</h3>
+        <p><strong>シナリオ:</strong> FedRAMP 対応が必要な金融系サービスで、CVE パッチが公開された際にスケジュールメンテナンスを待たずに即座に適用したい。</p>
+        <p><strong>効果:</strong> セルフサービスメンテナンスにより、まずテスト環境のインスタンスに新しいバージョンを適用して影響を確認し、問題がなければ本番環境にも即時適用。コンプライアンス監査への対応期間を短縮可能。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <div class="success-box">
+        <strong>✅ メンテナンスウィンドウの設定およびセルフサービスメンテナンスの利用に追加料金は発生しません。</strong>
+      </div>
+      <p>Memorystore for Valkey の料金はインスタンスのノード数、ノードタイプ、リージョンに基づいて課金されます。</p>
+      <h3>料金例 (us-central1 リージョン)</h3>
+      <table>
+        <thead>
+          <tr><th>構成</th><th>月額料金 (概算)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>highmem-medium / 3 シャード / レプリカなし (3 ノード)</td><td>約 $337</td></tr>
+          <tr><td>highmem-medium / 10 シャード / 2 レプリカ (30 ノード)</td><td>約 $3,370</td></tr>
+        </tbody>
+      </table>
+      <div class="note-box">
+        <strong>💡 コスト最適化:</strong> 確定使用割引 (CUD) を利用すると、1 年契約で <strong>20%</strong>、3 年契約で <strong>40%</strong> の割引が適用されます。
+      </div>
+    </div>
+
+    <!-- Regions -->
+    <div class="section">
+      <h2>🌐 利用可能リージョン</h2>
+      <p>Memorystore for Valkey がサポートする全リージョンでメンテナンスウィンドウとセルフサービスメンテナンスを利用可能です。主要リージョン:</p>
+      <div class="region-badges">
+        <span class="region-badge">asia-northeast1 (東京)</span>
+        <span class="region-badge">asia-northeast2 (大阪)</span>
+        <span class="region-badge">us-central1</span>
+        <span class="region-badge">us-east1</span>
+        <span class="region-badge">europe-west1</span>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <ul class="related-list">
+        <li>🗄️ <strong>Memorystore for Redis Cluster</strong> - 同様のメンテナンスウィンドウ機能とセルフサービスメンテナンスを提供</li>
+        <li>🗄️ <strong>Memorystore for Redis</strong> - Standard Tier ではフェイルオーバー方式、Basic Tier では短時間のサービス中断を伴うメンテナンスを提供</li>
+        <li>📊 <strong>Cloud Monitoring</strong> - メンテナンス前後のインスタンスのパフォーマンスメトリクスを監視</li>
+        <li>🔌 <strong>Private Service Connect</strong> - メンテナンス中も影響を受けないインスタンスエンドポイントを提供</li>
+      </ul>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>📎 出典:</strong></p>
+      <ul style="list-style: none; padding: 0; margin: 4px 0;">
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/release-notes#March_18_2026" target="_blank" rel="noopener noreferrer">https://cloud.google.com/release-notes#March_18_2026</a></li>
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/memorystore/docs/valkey/find-and-set-maintenance-windows" target="_blank" rel="noopener noreferrer">https://cloud.google.com/memorystore/docs/valkey/find-and-set-maintenance-windows</a></li>
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/memorystore/docs/valkey/about-maintenance" target="_blank" rel="noopener noreferrer">https://cloud.google.com/memorystore/docs/valkey/about-maintenance</a></li>
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/memorystore/docs/valkey/self-service-maintenance" target="_blank" rel="noopener noreferrer">https://cloud.google.com/memorystore/docs/valkey/self-service-maintenance</a></li>
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/memorystore/valkey/pricing" target="_blank" rel="noopener noreferrer">https://cloud.google.com/memorystore/valkey/pricing</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline);">Generated on 2026-03-18</p>
+    </footer>
+
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+    hljs.highlightAll();
+  </script>
+</body>
+</html>

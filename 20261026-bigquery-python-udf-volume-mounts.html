@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BigQuery: Python UDF のボリュームマウント対応 (Preview)</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+      text-align: right;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* バッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); color: #FFFFFF; }
+    .badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+    .badge-deprecated { background: var(--gc-red); color: #FFFFFF; }
+
+    /* Before / After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 720px) {
+      .before-after { grid-template-columns: 1fr; }
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border: 1px solid rgba(234, 67, 53, 0.3);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border: 1px solid rgba(52, 168, 83, 0.3);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-card h3 { color: #C5221F; margin-top: 0; }
+    .after-card h3 { color: #188038; margin-top: 0; }
+
+    .before-card ul, .after-card ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+    }
+
+    .before-card li, .after-card li {
+      margin: 8px 0;
+      font-size: 14.5px;
+    }
+
+    /* 統計カード */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px 16px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 34px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      line-height: 1.2;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    /* チェックリスト */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon { color: var(--gc-green); font-size: 18px; flex-shrink: 0; }
+    .cross-icon { color: var(--gc-red); font-size: 18px; flex-shrink: 0; }
+    .warn-icon { color: var(--gc-yellow); font-size: 18px; flex-shrink: 0; }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* コードブロック (pre:not(.mermaid) で Mermaid 図を除外) */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block {
+      overflow: hidden;
+      padding: 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-title { color: #AAAAAA; }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      border-radius: 0;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border: 1px solid var(--gc-blue-100);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+    }
+
+    /* ステップ */
+    .step {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .step-number {
+      background: var(--gc-blue-600);
+      color: #FFFFFF;
+      width: 36px;
+      height: 36px;
+      min-width: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 16px;
+    }
+
+    .step-content { flex: 1; min-width: 0; }
+
+    .step-content h3 { margin-top: 4px; }
+
+    /* 2 カラムグリッド */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 720px) {
+      .two-col { grid-template-columns: 1fr; }
+    }
+
+    ul { padding-left: 22px; }
+    li { margin: 6px 0; }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a { word-break: break-all; }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <div style="margin-bottom: 8px;">
+          <span class="badge">🔍 BigQuery</span>
+          <span class="badge badge-preview">Preview</span>
+        </div>
+        <h1>🐍 Python UDF のボリュームマウント対応</h1>
+        <p style="margin: 8px 0 0; font-size: 16px; color: var(--gc-on-surface-variant);">
+          Cloud Storage 上の依存ファイルを UDF コンテナに直接マウント
+        </p>
+      </div>
+      <div class="subtitle">
+        📅 リリース日: 2026-10-26<br>
+        ☁️ Google Cloud Release Notes
+      </div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📝 概要</h2>
+      <p>
+        BigQuery の Python ユーザー定義関数 (UDF) が<span class="highlight">ボリュームマウント</span>に対応しました (Preview)。
+        <code>CREATE FUNCTION</code> の <code>volume_mounts</code> オプションで Cloud Storage バケット (またはバケット内の特定フォルダ) を
+        コンテナのファイルシステムにマウントし、UDF の Python コードから<span class="highlight">依存ファイルに直接アクセス</span>できます。
+      </p>
+      <p>
+        Python UDF は BigQuery のマネージドリソース上のコンテナで実行され、これまでも PyPI パッケージのインストールや
+        <code>library</code> オプションによる Cloud Storage 上の Python ファイルのインポートが可能でした。
+        今回のアップデートにより、Cloud Storage 上の依存ファイル群を<span class="highlight">ローカルディレクトリのように扱える</span>ようになり、
+        共通ユーティリティやライブラリ群を複数の UDF から参照する構成が容易になります。
+      </p>
+
+      <div class="before-after">
+        <div class="before-card">
+          <h3>😣 Before: アップデート前の課題</h3>
+          <ul>
+            <li>Cloud Storage 上のファイルを利用するには <code>library</code> オプションで Python ファイルを<strong>個別に指定</strong>してモジュールとしてインポートする方式が中心で、ファイル名・フォルダ名が有効な Python 識別子である必要があった</li>
+            <li>バケットやフォルダ単位で依存ファイル群を<strong>まとめて UDF から参照する仕組みがなかった</strong></li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h3>😊 After: アップデート後の改善</h3>
+          <ul>
+            <li><code>volume_mounts</code> オプションで<strong>バケット全体</strong> (例: <code>gs://my-udf-deps-bucket</code>) または<strong>サブフォルダ</strong> (例: <code>gs://.../common-utils</code>) をコンテナ内の任意のマウントパス (例: <code>/mnt</code>) にマウント可能</li>
+            <li>マウントしたパスを <code>sys.path</code> に追加することで、共通ユーティリティを<strong>パッケージとしてインポート</strong>可能</li>
+            <li>1 つの UDF あたり<strong>最大 10 個</strong>のボリュームマウントを定義可能</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">10 個</div>
+          <div class="stat-label">1 UDF あたりの最大マウント数</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">読み取り専用</div>
+          <div class="stat-label">マウントしたファイルのアクセスモード</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">512 MiB / 1.0 vCPU</div>
+          <div class="stat-label">マウント定義時の最小コンテナリソース</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    U([👤 ユーザー]) -->|SQL クエリ| BQ[🔍 BigQuery&lt;br/&gt;クエリエンジン]
+    BQ -->|UDF 呼び出し| C[🐍 Python UDF&lt;br/&gt;コンテナ]
+    C -->|"import (/mnt)"| V["📁 ボリュームマウント&lt;br/&gt;mount_path: /mnt"]
+    V -->|読み取り専用| GCS[(🪣 Cloud Storage&lt;br/&gt;依存ファイル)]
+    CONN[🔗 Cloud リソース接続&lt;br/&gt;サービスアカウント] -->|Storage Object Viewer| GCS
+    C -.->|認証| CONN
+        </pre>
+      </div>
+      <p>
+        クエリから呼び出された Python UDF コンテナが、Cloud リソース接続のサービスアカウント権限で
+        Cloud Storage バケットを読み取り専用ボリュームとしてマウントし、依存ファイルへファイルシステム経由でアクセスします。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚙️ 主要機能</h2>
+
+      <div class="card">
+        <h3>📦 1. <code>volume_mounts</code> オプションによる Cloud Storage のマウント</h3>
+        <ul>
+          <li><code>CREATE FUNCTION</code> の OPTIONS に <code>source_path</code> (Cloud Storage パス) と <code>mount_path</code> (コンテナ内パス) を JSON 文字列の配列で指定</li>
+          <li>バケット全体または特定のサブフォルダをマウント可能</li>
+          <li><code>source_path</code> と <code>mount_path</code> は 1 対 1 で対応</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>📁 2. UDF コードからのファイルシステムアクセス</h3>
+        <ul>
+          <li>マウントしたファイルは読み取り専用でアクセス可能</li>
+          <li>マウントパスを <code>sys.path</code> に追加することで Python モジュールとしてインポート可能</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>🔐 3. Cloud リソース接続による認証</h3>
+        <ul>
+          <li>UDF と同じリージョンの Cloud リソース接続を使用</li>
+          <li>接続のサービスアカウントに Storage オブジェクト閲覧者ロールを付与してアクセスを制御</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔬 技術仕様</h2>
+
+      <h3>📋 volume_mounts オプションの仕様</h3>
+      <table>
+        <tr><th>項目</th><th>詳細</th></tr>
+        <tr><td>ソース</td><td>Cloud Storage バケットまたはサブフォルダ (<code>gs://...</code>)</td></tr>
+        <tr><td>マウント数の上限</td><td>1 UDF あたり最大 10 個</td></tr>
+        <tr><td>アクセスモード</td><td>読み取り専用</td></tr>
+        <tr><td>マウントパス</td><td><code>/</code> で開始、<code>/</code> で終了不可、最大 256 文字</td></tr>
+        <tr><td>使用不可パス</td><td><code>/dev</code>、<code>/opt</code>、<code>/proc</code>、<code>/root</code>、<code>/srv</code>、<code>/sys</code>、<code>/udf_modules</code>、<code>/user_site_packages</code>、<code>/usr</code> 配下</td></tr>
+        <tr><td>コンテナリソース要件</td><td>ボリュームマウント定義時はメモリ 512 MiB 以上、CPU 1.0 vCPU 以上</td></tr>
+        <tr><td>ランタイム</td><td>python-3.11 (Python UDF 共通)</td></tr>
+      </table>
+
+      <h3>🔑 必要な IAM 権限</h3>
+      <p>接続のサービスアカウントに対して、マウント対象の Cloud Storage フォルダへの以下の権限が必要です。</p>
+      <table>
+        <tr><th>権限</th><th>用途</th></tr>
+        <tr><td><code>storage.objects.get</code></td><td>オブジェクトの読み取り</td></tr>
+        <tr><td><code>storage.objects.list</code></td><td>オブジェクトの一覧取得</td></tr>
+      </table>
+      <div class="note-box">
+        <strong>💡 ベストプラクティス:</strong> 事前定義ロールでは <strong>Storage オブジェクト閲覧者</strong> (<code>roles/storage.objectViewer</code>) が対応します。
+        IAM 条件のプレフィックスマッチ (例: <code>resource.name.startsWith("projects/_/buckets/BUCKET_NAME/objects/SUBFOLDER_NAME/")</code>)
+        で付与範囲を限定することが推奨されています。
+      </div>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>✅ 前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>UDF と同じリージョンに Cloud リソース接続を作成していること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>接続のサービスアカウントに、マウント対象バケット (フォルダ) への Storage オブジェクト閲覧者ロールを付与していること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>依存ファイルを Cloud Storage バケットに配置していること</span></div>
+
+      <div class="step">
+        <div class="step-number">1</div>
+        <div class="step-content">
+          <h3>依存ファイルを Cloud Storage に配置</h3>
+          <div class="code-block">
+            <div class="code-header">
+              <span class="code-lang">Bash</span>
+              <span class="code-title">依存ファイルのアップロード</span>
+            </div>
+            <pre><code class="language-bash">gsutil cp -r ./common-utils gs://my-udf-deps-bucket/</code></pre>
+          </div>
+          <p>共通ユーティリティなどの依存ファイルをバケットに配置します。</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-number">2</div>
+        <div class="step-content">
+          <h3>volume_mounts を指定して UDF を作成</h3>
+          <div class="code-block">
+            <div class="code-header">
+              <span class="code-lang">SQL</span>
+              <span class="code-title">volume_mounts 付き Python UDF の作成</span>
+            </div>
+            <pre><code class="language-sql">CREATE OR REPLACE FUNCTION `my-project.my-dataset`.my_udf_name(x STRING)
+RETURNS STRING
+LANGUAGE python
+WITH CONNECTION `my-project`.us-central1.`my-connection`
+OPTIONS (
+  entry_point="python_func",
+  runtime_version="python-3.11",
+  volume_mounts=['{"source_path": "gs://my-udf-deps-bucket", "mount_path": "/mnt"}'])
+AS r"""
+# マウントパスを sys.path に追加する
+import sys
+sys.path.append('/mnt')
+
+# common-utils は gs://my-udf-deps-bucket 直下のサブフォルダ
+from common-utils import string_helpers
+
+def python_func(x):
+  suffix = string_helpers.functionA()
+  return x + suffix
+""";</code></pre>
+          </div>
+          <p>
+            <code>volume_mounts</code> に <code>source_path</code> と <code>mount_path</code> を JSON 文字列で指定します。
+            UDF コード内でマウントパスを <code>sys.path</code> に追加する必要があります。
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>👍 メリット</h2>
+      <div class="two-col">
+        <div class="card" style="border-left-color: var(--gc-green);">
+          <h3>💼 ビジネス面</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>依存管理の簡素化</strong>: 共通ライブラリやユーティリティを Cloud Storage で一元管理し、複数の UDF から参照できるため、コードの重複や配布の手間を削減</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>既存資産の活用</strong>: Cloud Storage に蓄積した既存の Python 資産を UDF からそのまま利用しやすくなる</span></div>
+        </div>
+        <div class="card" style="border-left-color: var(--gc-green);">
+          <h3>🔧 技術面</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>ファイルシステムベースのアクセス</strong>: ローカルディレクトリと同様にアクセスでき、<code>library</code> オプションの個別ファイル指定よりも柔軟にフォルダ構成を扱える</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>最小権限での制御</strong>: Cloud リソース接続のサービスアカウントと IAM 条件 (プレフィックスマッチ) により、マウント対象を細かく制御できる</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>🚧 制限事項</h3>
+      <div class="check-item"><span class="cross-icon">✗</span><span>Preview 機能であり、Pre-GA 利用規約が適用される</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>マネージドなバージョン管理はなく、Cloud Storage 上のファイル変更が (クエリ実行中であっても) UDF に自動的に反映され得る</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>マウントされたファイルは読み取り専用</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>ボリュームマウントは 1 UDF あたり最大 10 個</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>ボリュームマウントを定義する場合、コンテナメモリは 512 MiB 以上、CPU は 1.0 vCPU 以上が必要</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>Python UDF 共通の制限 (python-3.11 のみ、一時 UDF 不可、マテリアライズドビュー不可、結果キャッシュなし、<code>JSON</code>/<code>RANGE</code>/<code>INTERVAL</code>/<code>GEOGRAPHY</code> 型非対応、最大 4 vCPU / 16 GiB など) も適用される</span></div>
+
+      <h3>🤔 考慮すべき点</h3>
+      <div class="warning-box">
+        <strong>⚠️ 依存ファイルの変更統制:</strong> 依存ファイルの意図しない更新が UDF の挙動を変える可能性があるため、
+        本番用バケット (フォルダ) の書き込み権限を厳格に管理し、バージョン付きのフォルダ構成などで変更を統制することが望ましい。
+      </div>
+      <div class="warning-box">
+        <strong>⚠️ VPC Service Controls:</strong> クエリ実行プロジェクトとバケット所有プロジェクトの境界構成に応じて
+        <code>storage.googleapis.com</code> への egress / ingress ルールの追加が必要 (両者が同一境界内なら不要)。
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>📚 ユースケース 1: 共通ユーティリティライブラリの共有</h3>
+        <p><strong>シナリオ:</strong> データエンジニアリングチームが文字列正規化やバリデーションなどの共通 Python ユーティリティを複数の Python UDF で使い回したい。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">共通ユーティリティを参照する UDF</span>
+          </div>
+          <pre><code class="language-sql">CREATE OR REPLACE FUNCTION `my-project.my-dataset`.normalize_text(x STRING)
+RETURNS STRING
+LANGUAGE python
+WITH CONNECTION `my-project`.us-central1.`my-connection`
+OPTIONS (
+  entry_point="handler",
+  runtime_version="python-3.11",
+  volume_mounts=['{"source_path": "gs://my-udf-deps-bucket/common-utils", "mount_path": "/mnt/utils"}'])
+AS r"""
+import sys
+sys.path.append('/mnt/utils')
+import text_normalizer
+
+def handler(x):
+  return text_normalizer.normalize(x)
+""";</code></pre>
+        </div>
+        <div class="success-box">
+          <strong>✅ 効果:</strong> 共通ロジックを UDF 本体に埋め込まずに Cloud Storage で一元管理でき、更新時の展開コストを削減できる。
+        </div>
+      </div>
+
+      <div class="usecase">
+        <h3>🔒 ユースケース 2: サブフォルダ単位での最小権限アクセス</h3>
+        <p><strong>シナリオ:</strong> 1 つのバケットに複数チームの依存ファイルが同居しており、UDF からは自チームのフォルダのみ参照させたい。</p>
+        <div class="success-box">
+          <strong>✅ 効果:</strong> <code>source_path</code> にサブフォルダを指定し、IAM 条件のプレフィックスマッチで
+          接続サービスアカウントの権限をそのフォルダに限定することで、コンテナが許可されていないオブジェクトを読み取れない構成を実現できる。
+        </div>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>
+        ボリュームマウント固有の追加料金は公式ドキュメント上で確認できませんでした。
+        Python UDF 自体は <span class="highlight">BigQuery Services SKU</span> で課金され、以下が対象となります。
+      </p>
+      <table>
+        <tr><th>課金対象</th><th>SKU</th></tr>
+        <tr><td>コンテナイメージのビルド</td><td><code>MANAGED_ROUTINE_BUILD</code></td></tr>
+        <tr><td>UDF 実行時のコンピュート / メモリ</td><td><code>MANAGED_ROUTINE_EXECUTION</code></td></tr>
+      </table>
+      <div class="note-box">
+        <strong>💡 補足:</strong> 外部へのインターネット下り (egress) にはプレミアムティアの egress 料金が適用されます。
+        詳細は <a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">BigQuery の料金ページ</a> を参照してください。
+      </div>
+    </div>
+
+    <!-- 関連サービス・機能 -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card"><strong>🪣 Cloud Storage</strong>: 依存ファイルの格納先。バケットまたはサブフォルダ単位で UDF コンテナにマウントされる</div>
+      <div class="card"><strong>🔌 BigQuery Cloud リソース接続</strong>: ボリュームマウントの認証基盤。接続のサービスアカウントに Cloud Storage への読み取り権限を付与する</div>
+      <div class="card"><strong>🔑 IAM (Storage オブジェクト閲覧者)</strong>: <code>storage.objects.get</code> / <code>storage.objects.list</code> を含むロール。IAM 条件による範囲限定が推奨される</div>
+      <div class="card"><strong>🛡️ VPC Service Controls</strong>: Python UDF はサポート対象。境界をまたぐ構成では egress / ingress ルールの追加が必要</div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📌 まとめ</h2>
+      <div class="success-box">
+        <strong>✨ ポイント:</strong> Python UDF のボリュームマウント対応により、Cloud Storage 上の依存ファイル群を
+        ファイルシステムとして直接参照でき、<strong>共通ライブラリの管理と再利用が大幅に簡素化</strong>されます。
+      </div>
+      <div class="note-box">
+        <strong>🚀 次のアクション:</strong> Preview 段階のため Pre-GA 規約と制約 (読み取り専用、最大 10 マウント、バージョン管理なし等)
+        を確認したうえで、まずは開発環境の UDF で共通ユーティリティの共有構成を検証することをおすすめします。
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p><strong>📎 出典:</strong></p>
+      <ul style="padding-left: 20px; margin: 4px 0;">
+        <li><a href="https://docs.cloud.google.com/release-notes#October_26_2026" target="_blank" rel="noopener noreferrer" class="gc-link">Google Cloud 公式リリースノート (2026-10-26)</a></li>
+        <li><a href="https://docs.cloud.google.com/bigquery/docs/user-defined-functions-python#volume-mounts" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: Python UDF のボリュームマウント</a></li>
+        <li><a href="https://docs.cloud.google.com/bigquery/docs/user-defined-functions-python" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: Python でユーザー定義関数を操作する</a></li>
+        <li><a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">BigQuery 料金ページ</a></li>
+      </ul>
+      <p>🏷️ タグ: BigQuery / Python UDF / Cloud Storage / Volume Mounts / Preview / データ分析</p>
+      <p>本インフォグラフィックは Google Cloud News レポート (2026-10-26) をもとに生成されています。</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GKE Managed OpenTelemetry マルチモーダルプロンプト・レスポンス収集 (Preview)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--gc-outline);
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge-service { background: var(--gc-blue-600); }
+    .badge-preview { background: var(--gc-orange); }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-purple { border-left-color: var(--gc-purple); }
+    .card-green { border-left-color: var(--gc-green); }
+    .card-teal { border-left-color: var(--gc-teal); }
+    .card-orange { border-left-color: var(--gc-orange); }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h4, .after-box h4 {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .before-box h4 { color: var(--gc-red); }
+    .after-box h4 { color: var(--gc-green); }
+
+    .before-box ul, .after-box ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li { margin: 4px 0; }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .ai-box {
+      background: var(--gc-purple-tint);
+      border-left: 4px solid var(--gc-purple);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.purple { background: linear-gradient(135deg, var(--gc-purple), #7B1FA2); }
+    .stat-card.green { background: linear-gradient(135deg, var(--gc-green), #1B5E20); }
+    .stat-card.teal { background: linear-gradient(135deg, var(--gc-teal), #006064); }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre:not(.mermaid) code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid) {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-900);
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .usecase-card p {
+      margin: 0;
+      font-size: 14px;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    footer {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; }
+      .subtitle { text-align: left; margin-top: 8px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stat-grid { grid-template-columns: 1fr; }
+      .feature-grid { grid-template-columns: 1fr; }
+      .flow-diagram { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>☁️ GKE Managed OpenTelemetry<br>マルチモーダルプロンプト・レスポンス収集</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge badge-service">Google Kubernetes Engine</span>
+          <span class="badge badge-preview">Preview</span>
+          <span class="badge badge-service">OpenTelemetry</span>
+          <span class="badge badge-service">AI/ML</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-05-14</div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>GKE の Managed OpenTelemetry が、<span class="highlight">LangGraph ReAct エージェント</span>および<span class="highlight">Agent Development Kit (ADK)</span>フレームワークで構築された生成 AI エージェントからの<strong>マルチモーダルプロンプトとレスポンスの収集</strong>をサポートしました。</p>
+      <p>テキスト、画像、音声、動画、ドキュメントなど多様なメディアタイプのプロンプトとレスポンスを自動的にキャプチャし、Cloud Trace Explorer および BigQuery で可視化・分析できます。OpenTelemetry GenAI セマンティック規約 (v1.37.0 以降) に準拠し、<span class="highlight">アプリケーションコードの変更なし</span>でデータ収集を開始できる点が大きな特長です。</p>
+
+      <div class="ai-box">
+        <strong>🤖 ポイント:</strong> Instrumentation カスタムリソースの設定だけで、AI エージェントの入出力を全量記録。Cloud Storage に JSON Lines 形式で保存され、Trace Explorer と BigQuery で多角的に分析可能。
+      </div>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h4>❌ Before (従来)</h4>
+          <ul>
+            <li>AI エージェントのプロンプト/レスポンスを体系的に収集する仕組みがない</li>
+            <li>マルチモーダルデータの記録には独自ロギング実装が必要</li>
+            <li>BigQuery 等の分析基盤との連携に複雑なパイプライン構築が必要</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h4>✅ After (新機能)</h4>
+          <ul>
+            <li>Instrumentation CR 設定のみでマルチモーダルデータを自動収集</li>
+            <li>Trace Explorer でチャット形式の可視化・レンダリング/ソース切替</li>
+            <li>BigQuery 連携で AI.GENERATE による会話要約や高度な分析が可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="section">
+      <h2>📊 数字で見るアップデート</h2>
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">0 行</div>
+          <div class="stat-label">必要なコード変更</div>
+        </div>
+        <div class="stat-card purple">
+          <div class="stat-value">5 種類</div>
+          <div class="stat-label">対応メディアタイプ<br>(テキスト/画像/音声/動画/文書)</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-value">2 フレームワーク</div>
+          <div class="stat-label">対応 (LangGraph + ADK)</div>
+        </div>
+        <div class="stat-card teal">
+          <div class="stat-value">3 分析基盤</div>
+          <div class="stat-label">Trace Explorer / BigQuery / Vertex AI</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>LangGraph/ADK エージェントからのプロンプトとレスポンスが OpenTelemetry インストルメンテーションを経由して Cloud Storage (実データ)、Cloud Logging (参照ログ)、Cloud Trace (スパン) に振り分けられ、Trace Explorer や BigQuery で統合的に分析される流れです。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    subgraph GKE["GKE クラスタ"]
+        A1["LangGraph\nReAct Agent"]
+        A2["ADK Agent"]
+        OTel["OpenTelemetry\nInstrumentation"]
+        CR["Instrumentation\nCustom Resource"]
+    end
+
+    subgraph Storage["データストア"]
+        GCS["Cloud Storage\n(JSON Lines)"]
+        CL["Cloud Logging"]
+        CT["Cloud Trace"]
+    end
+
+    subgraph Analysis["分析プラットフォーム"]
+        TE["Trace Explorer\n(可視化)"]
+        BQ["BigQuery\n(分析)"]
+        VAI["Vertex AI SDK\n(評価)"]
+    end
+
+    A1 -->|"プロンプト/レスポンス"| OTel
+    A2 -->|"プロンプト/レスポンス"| OTel
+    CR -->|"設定注入"| OTel
+    OTel -->|"マルチモーダルデータ"| GCS
+    OTel -->|"ログ・オブジェクト参照"| CL
+    OTel -->|"トレース・スパン"| CT
+    CT --> TE
+    CL --> BQ
+    GCS --> BQ
+    GCS --> TE
+    GCS --> VAI
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="card card-purple">
+          <h3>🎨 マルチモーダルデータ収集</h3>
+          <ul style="margin: 8px 0; padding-left: 20px; font-size: 14px;">
+            <li>テキスト、画像、音声、動画、ドキュメント対応</li>
+            <li>プロンプト/レスポンス両方を自動キャプチャ</li>
+            <li>インラインコンテンツ&リンク (GCS/公開URL) サポート</li>
+            <li>OpenTelemetry GenAI セマンティック規約 v1.37.0+ 準拠</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>🔍 Trace Explorer 可視化</h3>
+          <ul style="margin: 8px 0; padding-left: 20px; font-size: 14px;">
+            <li>チャット形式でプロンプト/レスポンス表示</li>
+            <li>レンダリング表示/ソース形式の切替</li>
+            <li>個別スパンまたは会話全体の表示</li>
+            <li><code>generate_content</code> スパン名フィルタリング</li>
+          </ul>
+        </div>
+        <div class="card card-green">
+          <h3>📊 BigQuery 高度分析</h3>
+          <ul style="margin: 8px 0; padding-left: 20px; font-size: 14px;">
+            <li>Cloud Logging + Cloud Storage データ結合分析</li>
+            <li>AI.GENERATE 関数による会話自動要約</li>
+            <li>外部テーブルによるログバケット結合</li>
+            <li>大規模データの集計・統計分析</li>
+          </ul>
+        </div>
+        <div class="card card-teal">
+          <h3>🧪 Vertex AI SDK 評価</h3>
+          <ul style="margin: 8px 0; padding-left: 20px; font-size: 14px;">
+            <li>Google Colaboratory でのセンチメント分析</li>
+            <li>モデル出力の品質評価</li>
+            <li>カスタム評価メトリクスの適用</li>
+          </ul>
+        </div>
+        <div class="card card-orange">
+          <h3>🔧 GKE ネイティブ統合</h3>
+          <ul style="margin: 8px 0; padding-left: 20px; font-size: 14px;">
+            <li>Instrumentation CR による宣言的設定</li>
+            <li>ワークロード再起動時に環境変数自動注入</li>
+            <li>アプリケーションコード変更不要</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specs -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3>対応フレームワークと依存関係</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>フレームワーク</th>
+            <th>必要パッケージ</th>
+            <th>最小バージョン</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ADK</td>
+            <td><code>google-adk</code></td>
+            <td>>= 1.16.0</td>
+          </tr>
+          <tr>
+            <td>ADK</td>
+            <td><code>opentelemetry-instrumentation-google-genai</code></td>
+            <td>>= 0.4b0</td>
+          </tr>
+          <tr>
+            <td>ADK</td>
+            <td><code>fsspec[gcs]</code></td>
+            <td>== 2025.10.0</td>
+          </tr>
+          <tr>
+            <td>LangGraph</td>
+            <td><code>opentelemetry-instrumentation-vertexai</code></td>
+            <td>>= 2.2b0</td>
+          </tr>
+          <tr>
+            <td>LangGraph</td>
+            <td><code>opentelemetry-instrumentation-google-genai</code></td>
+            <td>>= 0.4b0</td>
+          </tr>
+          <tr>
+            <td>LangGraph</td>
+            <td><code>fsspec[gcs]</code></td>
+            <td>== 2025.10.0</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>環境変数設定</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>環境変数</th>
+            <th>値</th>
+            <th>説明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>OTEL_INSTRUMENTATION_GENAI_UPLOAD_FORMAT</code></td>
+            <td>jsonl</td>
+            <td>JSON Lines 形式で保存</td>
+          </tr>
+          <tr>
+            <td><code>OTEL_INSTRUMENTATION_GENAI_COMPLETION_HOOK</code></td>
+            <td>upload</td>
+            <td>データをアップロード (スパン非埋込)</td>
+          </tr>
+          <tr>
+            <td><code>OTEL_SEMCONV_STABILITY_OPT_IN</code></td>
+            <td>gen_ai_latest_experimental</td>
+            <td>最新 GenAI セマンティック規約使用</td>
+          </tr>
+          <tr>
+            <td><code>OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT</code></td>
+            <td>NO_CONTENT</td>
+            <td>スパン属性にメッセージ非付加 (推奨)</td>
+          </tr>
+          <tr>
+            <td><code>OTEL_INSTRUMENTATION_GENAI_UPLOAD_BASE_PATH</code></td>
+            <td>gs://BUCKET/PATH</td>
+            <td>Cloud Storage アップロード先</td>
+          </tr>
+          <tr>
+            <td><code>OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED</code></td>
+            <td>true</td>
+            <td>LangGraph 用: ログ自動キャプチャ</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>IAM ロール要件</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>操作</th>
+            <th>必要な IAM ロール</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Trace Explorer 閲覧</td>
+            <td><code>roles/cloudtrace.user</code></td>
+          </tr>
+          <tr>
+            <td>ログ参照</td>
+            <td><code>roles/logging.viewer</code></td>
+          </tr>
+          <tr>
+            <td>Cloud Storage 読み取り</td>
+            <td><code>roles/storage.objectViewer</code></td>
+          </tr>
+          <tr>
+            <td>Cloud Storage 書き込み</td>
+            <td><code>storage.objects.create</code></td>
+          </tr>
+          <tr>
+            <td>BigQuery 分析</td>
+            <td><code>roles/bigquery.dataViewer</code>, <code>roles/bigquery.studioUser</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup Guide -->
+    <div class="section">
+      <h2>🚀 設定方法</h2>
+
+      <div class="note-box">
+        <strong>📝 前提条件:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px; font-size: 14px;">
+          <li>GKE クラスタで Managed OpenTelemetry が有効化されていること</li>
+          <li>Cloud Storage バケットが作成済みであること</li>
+          <li>アプリケーション SA に <code>storage.objects.create</code> 権限が付与されていること</li>
+        </ul>
+      </div>
+
+      <h3>Step 1: Instrumentation カスタムリソースの作成</h3>
+      <span class="code-label">YAML</span>
+      <pre><code class="language-yaml">apiVersion: telemetry.googleapis.com/v1alpha1
+kind: Instrumentation
+metadata:
+  namespace: default
+  name: prompts-responses
+spec:
+  selector: {}
+  promptsResponses:
+    uploadBasePath: gs://BUCKET_NAME</code></pre>
+
+      <h3>Step 2: ADK エージェントの追加設定</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># CLI 経由で ADK を実行する場合
+adk web --otel_to_cloud
+
+# FastAPI アプリケーションの場合
+# get_fast_api_app(..., otel_to_cloud=True)</code></pre>
+
+      <h3>Step 3: ワークロードの再デプロイ</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># ワークロードを再起動して環境変数の注入を適用
+kubectl rollout restart deployment/&lt;YOUR_DEPLOYMENT&gt; -n default</code></pre>
+
+      <h3>Step 4: Trace Explorer での確認</h3>
+      <div class="flow-diagram">
+        <div class="flow-step">🔍 スパンフィルター<br><code>generate_content</code></div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">📋 スパン詳細<br>表示</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🎨 Inputs/Outputs<br>マルチモーダル閲覧</div>
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div class="feature-grid">
+        <div>
+          <h3>💼 ビジネス面</h3>
+          <div class="card card-green">
+            <p style="margin: 0; font-size: 14px;"><strong>AI エージェントの品質管理強化</strong><br>プロンプト/レスポンスの全量記録で出力品質を継続的にモニタリング・改善</p>
+          </div>
+          <div class="card card-green">
+            <p style="margin: 0; font-size: 14px;"><strong>コンプライアンス対応</strong><br>AI エージェントのやり取りを監査可能な形で保存、規制要件への対応が容易</p>
+          </div>
+          <div class="card card-green">
+            <p style="margin: 0; font-size: 14px;"><strong>開発コスト削減</strong><br>カスタムロギング基盤の構築が不要になり、AI アプリ開発に集中可能</p>
+          </div>
+        </div>
+        <div>
+          <h3>⚙️ 技術面</h3>
+          <div class="card">
+            <p style="margin: 0; font-size: 14px;"><strong>ゼロコード計装</strong><br>アプリケーションコード変更なしでデータ収集を開始、既存エージェントにも適用可能</p>
+          </div>
+          <div class="card">
+            <p style="margin: 0; font-size: 14px;"><strong>標準準拠</strong><br>OpenTelemetry GenAI セマンティック規約準拠、ベンダーロックイン回避</p>
+          </div>
+          <div class="card">
+            <p style="margin: 0; font-size: 14px;"><strong>統合分析基盤</strong><br>Trace Explorer、BigQuery、Vertex AI SDK との連携で多角的分析</p>
+          </div>
+          <div class="card">
+            <p style="margin: 0; font-size: 14px;"><strong>GKE ネイティブ</strong><br>Kubernetes CR 管理、GitOps ワークフローとの高い親和性</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <div class="warning-box">
+        <strong>制限事項:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px; font-size: 14px;">
+          <li>Preview 段階のため SLA 対象外 - 本番環境での利用には注意が必要</li>
+          <li>対応フレームワークは LangGraph ReAct エージェントと ADK に限定</li>
+          <li>fsspec のバージョン制約 (== 2025.10.0) があり全バージョン対応ではない</li>
+        </ul>
+      </div>
+      <div class="warning-box">
+        <strong>考慮すべき点:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px; font-size: 14px;">
+          <li>マルチモーダルデータの Cloud Storage 保存によりストレージコスト増加の可能性</li>
+          <li>大量プロンプト・レスポンスデータの保存はコスト面での検討が必要</li>
+          <li>Cloud Storage バケットのアクセス権限管理で機密データ漏洩防止が必要</li>
+          <li>BigQuery 分析には追加の API 有効化と IAM ロール設定が必要</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>🎧 ユースケース 1: AI カスタマーサポートエージェントのモニタリング</h4>
+        <p><strong>シナリオ:</strong> GKE 上で稼働する ADK ベースのカスタマーサポートエージェントが、製品不具合写真等のマルチモーダルなやり取りを処理。サポート品質の継続的な改善のため全やり取りを記録・分析。</p>
+        <p style="margin-top: 8px;"><strong>効果:</strong> 画像を含むユーザー問い合わせとエージェント回答を全量記録し、BigQuery で回答品質の傾向分析や AI.GENERATE による要約を実行、改善サイクルを確立。</p>
+      </div>
+
+      <span class="code-label">YAML</span>
+      <pre><code class="language-yaml">apiVersion: telemetry.googleapis.com/v1alpha1
+kind: Instrumentation
+metadata:
+  namespace: support-agents
+  name: support-prompts-collection
+spec:
+  selector:
+    matchLabels:
+      app: customer-support-agent
+  promptsResponses:
+    uploadBasePath: gs://support-agent-traces</code></pre>
+
+      <div class="usecase-card">
+        <h4>🔬 ユースケース 2: LangGraph マルチモーダル RAG パイプラインのデバッグ</h4>
+        <p><strong>シナリオ:</strong> LangGraph で構築されたマルチモーダル RAG パイプラインがドキュメント画像から情報抽出して回答生成。特定入力画像に対する不正確な回答の原因調査。</p>
+        <p style="margin-top: 8px;"><strong>効果:</strong> Trace Explorer で問題リクエストのスパンを特定し、入力画像とモデル出力を並べて確認、情報損失/誤解釈の発生ステップを迅速に特定。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>📈 ユースケース 3: エージェント出力の自動品質評価</h4>
+        <p><strong>シナリオ:</strong> 複数の ADK エージェントが本番環境で稼働しており、出力品質を自動的に評価して品質低下を検知したい。</p>
+        <p style="margin-top: 8px;"><strong>効果:</strong> BigQuery に蓄積されたデータに対し Vertex AI SDK を使用した自動評価 (センチメント分析、正確性チェック) を定期実行し、品質スコア低下をアラートとして検知。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金情報</h2>
+      <p>本機能に直接的な追加料金は明示されていませんが、以下のコンポーネントの使用量に応じた料金が発生します。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>コンポーネント</th>
+            <th>料金の発生要因</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Cloud Storage</td>
+            <td>マルチモーダルデータの保存量 (JSON Lines 形式)</td>
+          </tr>
+          <tr>
+            <td>Cloud Trace</td>
+            <td>トレーススパンの取り込み量</td>
+          </tr>
+          <tr>
+            <td>Cloud Logging</td>
+            <td>ログエントリの取り込み・保存量</td>
+          </tr>
+          <tr>
+            <td>BigQuery</td>
+            <td>クエリの処理データ量および保存量</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="note-box">
+        <strong>💡 ヒント:</strong> Preview 期間中の料金については、Google Cloud の料金ページを確認してください。
+      </div>
+    </div>
+
+    <!-- Region -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <p>GKE Managed OpenTelemetry が利用可能な<strong>全リージョン</strong>で使用可能です。Cloud Storage バケットのリージョンはワークロードと同一リージョンまたはマルチリージョンを推奨します。</p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <p style="margin: 0; font-size: 14px;"><strong>Cloud Trace</strong><br>トレースデータの保存と Trace Explorer による可視化</p>
+        </div>
+        <div class="card">
+          <p style="margin: 0; font-size: 14px;"><strong>Cloud Logging</strong><br>プロンプト/レスポンスへの参照を含むログエントリ管理</p>
+        </div>
+        <div class="card">
+          <p style="margin: 0; font-size: 14px;"><strong>Cloud Storage</strong><br>マルチモーダルデータを JSON Lines 形式で保存</p>
+        </div>
+        <div class="card">
+          <p style="margin: 0; font-size: 14px;"><strong>BigQuery</strong><br>大規模プロンプト/レスポンスデータの分析基盤</p>
+        </div>
+        <div class="card card-purple">
+          <p style="margin: 0; font-size: 14px;"><strong>Vertex AI SDK</strong><br>モデル出力の品質評価に使用</p>
+        </div>
+        <div class="card card-purple">
+          <p style="margin: 0; font-size: 14px;"><strong>Agent Development Kit (ADK)</strong><br>Google が提供する AI エージェント開発フレームワーク</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="ai-box">
+        <p style="margin: 0;">GKE Managed OpenTelemetry のマルチモーダルプロンプト・レスポンス収集機能は、GKE 上で稼働する AI エージェントのオブザーバビリティを根本的に変革するアップデートです。LangGraph や ADK で構築されたエージェントの入出力を、コード変更なしで自動収集し、Trace Explorer での可視化や BigQuery での高度な分析を可能にします。</p>
+        <p style="margin: 12px 0 0 0;"><strong>推奨アクション:</strong> AI エージェントを本番運用しているチームは、Preview 段階から検証を開始し、品質管理やデバッグのワークフローへの組み込みを検討することを推奨します。</p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>📎 出典:</strong></p>
+      <ul style="list-style: none; padding: 0; margin: 8px 0;">
+        <li style="margin: 4px 0;">- <a href="https://docs.cloud.google.com/release-notes#May_14_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li style="margin: 4px 0;">- <a href="https://docs.cloud.google.com/kubernetes-engine/docs/how-to/managed-otel-gke#multimodal-prompts-responses" target="_blank" rel="noopener noreferrer">ドキュメント: Collect multimodal prompts and responses data</a></li>
+        <li style="margin: 4px 0;">- <a href="https://docs.cloud.google.com/trace/docs/collect-view-multimodal-prompts-responses" target="_blank" rel="noopener noreferrer">ドキュメント: Collect and view multimodal prompts and responses</a></li>
+        <li style="margin: 4px 0;">- <a href="https://google.github.io/adk-docs/" target="_blank" rel="noopener noreferrer">Agent Development Kit (ADK)</a></li>
+        <li style="margin: 4px 0;">- <a href="https://github.com/open-telemetry/semantic-conventions/tree/v1.37.0/docs/gen-ai" target="_blank" rel="noopener noreferrer">OpenTelemetry GenAI Semantic Conventions</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline);">Generated: 2026-05-15</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

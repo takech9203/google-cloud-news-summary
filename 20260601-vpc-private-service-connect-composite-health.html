@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VPC: Private Service Connect Composite Health - 自動クロスリージョン フェイルオーバー</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-teal {
+      border-left-color: var(--gc-teal);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-green);
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid) {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 24px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.green {
+      background: linear-gradient(135deg, var(--gc-green), #1B8A3B);
+    }
+
+    .stat-card.teal {
+      background: linear-gradient(135deg, var(--gc-teal), #0097A7);
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .after {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .before h4, .after h4 {
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .before h4 {
+      color: var(--gc-red);
+    }
+
+    .after h4 {
+      color: var(--gc-green);
+    }
+
+    .before ul, .after ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before li, .after li {
+      margin: 4px 0;
+    }
+
+    .usecase-card {
+      background: var(--gc-teal-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid rgba(0, 188, 212, 0.3);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+    }
+
+    .usecase-card p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 24px;
+      }
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+      .stat-cards {
+        grid-template-columns: 1fr;
+      }
+      .feature-grid {
+        grid-template-columns: 1fr;
+      }
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>🌐 Private Service Connect<br>Composite Health</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">VPC</span>
+          <span class="badge-ga">GA</span>
+          <span class="badge">Networking</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-06-01</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        Private Service Connect (PSC) の <span class="highlight">Composite Health</span> 機能が一般提供 (GA) として正式リリースされました。
+        サービスプロデューサーが公開サービスのヘルスクライテリア (健全性基準) を定義し、PSC バックエンドを使用するコンシューマーに対して
+        <span class="highlight">自動クロスリージョン フェイルオーバー</span>を実現します。
+      </p>
+      <p>
+        従来の外れ値検出 (Outlier Detection) がレスポンスの失敗から健全性を推測するのに対し、Composite Health はプロデューサーが直接定義したヘルスシグナルに基づくため、より正確なフェイルオーバー判定を提供します。
+      </p>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before">
+          <h4>❌ Before (アップデート前)</h4>
+          <ul>
+            <li>外れ値検出 (レスポンス失敗の推測) のみでフェイルオーバー判定</li>
+            <li>バックエンドの実際の健全性状態をコンシューマーに伝達できなかった</li>
+            <li>リクエスト失敗するまでフェイルオーバー未発生</li>
+            <li>手動対応が必要で運用負荷が高い</li>
+          </ul>
+        </div>
+        <div class="after">
+          <h4>✅ After (アップデート後)</h4>
+          <ul>
+            <li>プロデューサー定義のヘルス基準による正確な判定</li>
+            <li>複合的な健全性状態をコンシューマーに自動伝播</li>
+            <li>コンシューマー側は追加設定不要で自動フェイルオーバー</li>
+            <li>GA 昇格で本番ワークロードを正式サポート</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stat-cards">
+      <div class="stat-card">
+        <div class="stat-value">60%</div>
+        <div class="stat-label">デフォルト健全エンドポイント閾値</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-value">1~10</div>
+        <div class="stat-label">Composite HC あたりのヘルスソース数</div>
+      </div>
+      <div class="stat-card teal">
+        <div class="stat-value">$0</div>
+        <div class="stat-label">Composite Health の追加料金</div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>サービスプロデューサーが各リージョンで Composite Health を構成し、その健全性状態がコンシューマーのグローバル ロードバランサに自動伝播される構成を示します。リージョン A が不健全と判定されると、コンシューマーのロードバランサは自動的にリージョン B にフェイルオーバーします。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TB
+    subgraph Producer["サービスプロデューサー VPC"]
+        subgraph RegionA["リージョン A"]
+            BE_A["バックエンド サービス A\n(VM / NEG)"]
+            HC_A["ヘルスチェック"]
+            HAP_A["Health Aggregation Policy\n(閾値: 60% 以上健全)"]
+            HS_A["Health Source"]
+            CHC_A["Composite Health Check"]
+            FR_A["フォワーディングルール\n(Health Destination)"]
+            SA_A["Service Attachment"]
+            HC_A --> BE_A
+            BE_A --> HAP_A
+            HAP_A --> HS_A
+            HS_A --> CHC_A
+            CHC_A --> FR_A
+            FR_A --> SA_A
+        end
+        subgraph RegionB["リージョン B"]
+            BE_B["バックエンド サービス B\n(VM / NEG)"]
+            HC_B["ヘルスチェック"]
+            HAP_B["Health Aggregation Policy\n(閾値: 60% 以上健全)"]
+            HS_B["Health Source"]
+            CHC_B["Composite Health Check"]
+            FR_B["フォワーディングルール\n(Health Destination)"]
+            SA_B["Service Attachment"]
+            HC_B --> BE_B
+            BE_B --> HAP_B
+            HAP_B --> HS_B
+            HS_B --> CHC_B
+            CHC_B --> FR_B
+            FR_B --> SA_B
+        end
+    end
+
+    subgraph Consumer["サービスコンシューマー VPC"]
+        GLB["グローバル ロードバランサ"]
+        GBS["グローバル バックエンドサービス"]
+        NEG_A["PSC NEG\n(リージョン A)"]
+        NEG_B["PSC NEG\n(リージョン B)"]
+        GLB --> GBS
+        GBS --> NEG_A
+        GBS --> NEG_B
+    end
+
+    NEG_A --> SA_A
+    NEG_B --> SA_B
+    CHC_A -.->|"健全性状態を伝播"| GBS
+    CHC_B -.->|"健全性状態を伝播"| GBS
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚙️ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h3>📊 Health Aggregation Policy</h3>
+          <p>バックエンド サービスが「健全」と見なされる条件を定義するリソース。</p>
+          <ul style="font-size: 14px; padding-left: 20px;">
+            <li>健全なエンドポイントの最小割合 (デフォルト 60%)</li>
+            <li>健全なエンドポイントの最小数 (デフォルト 1)</li>
+            <li>再利用可能で複数バックエンドサービスに適用可能</li>
+          </ul>
+        </div>
+        <div class="card card-teal">
+          <h3>🔗 Health Source</h3>
+          <p>単一のバックエンド サービスの健全性を Composite Health Check で利用可能にするリソース。</p>
+          <ul style="font-size: 14px; padding-left: 20px;">
+            <li>バックエンドサービスと Health Aggregation Policy をリンク</li>
+            <li>各ヘルスソースは正確に 1 つのバックエンドサービスを参照</li>
+          </ul>
+        </div>
+        <div class="card card-green">
+          <h3>🔍 Composite Health Check</h3>
+          <p>1 つ以上のヘルスソースの健全性状態を集約し、単一の複合ヘルス状態を生成。</p>
+          <ul style="font-size: 14px; padding-left: 20px;">
+            <li>全ヘルスソースが健全な場合のみ「健全」(AND ロジック)</li>
+            <li>1 ~ 10 のヘルスソースを参照可能</li>
+          </ul>
+        </div>
+        <div class="card card-purple">
+          <h3>📡 Health Destination</h3>
+          <p>Composite Health Check から最終的な複合ヘルス状態を受け取るリソース。</p>
+          <ul style="font-size: 14px; padding-left: 20px;">
+            <li>プロデューサーの LB フォワーディングルールがデスティネーション</li>
+            <li>コンシューマーの LB に自動伝播</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>📐 技術仕様</h2>
+
+      <h3>サポートされるロードバランサ (プロデューサー側)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>ロードバランサタイプ</th>
+            <th>対応状況</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Internal passthrough Network Load Balancer</td>
+            <td>✅ 対応</td>
+          </tr>
+          <tr>
+            <td>Regional internal Application Load Balancer</td>
+            <td>✅ 対応</td>
+          </tr>
+          <tr>
+            <td>Regional internal proxy Network Load Balancer</td>
+            <td>✅ 対応</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>サポートされるバックエンドタイプ</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>バックエンドタイプ</th>
+            <th>説明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>GCE_VM_IP_PORT NEG</td>
+            <td>ゾーン NEG (ネットワーク エンドポイント グループ)</td>
+          </tr>
+          <tr>
+            <td>GCE_VM_IP NEG</td>
+            <td>ゾーン NEG</td>
+          </tr>
+          <tr>
+            <td>インスタンス グループ</td>
+            <td>マネージド / アンマネージド インスタンス グループ</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>構成要件</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>要件</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ロードバランシング スキーム</td>
+            <td>INTERNAL または INTERNAL_MANAGED</td>
+          </tr>
+          <tr>
+            <td>リソースのスコープ</td>
+            <td>リージョナル (監視対象サービスと同一リージョン)</td>
+          </tr>
+          <tr>
+            <td>Composite HC あたりのヘルスソース数</td>
+            <td>1 ~ 10</td>
+          </tr>
+          <tr>
+            <td>フォワーディングルールあたりの Composite HC 数</td>
+            <td>1</td>
+          </tr>
+          <tr>
+            <td>プロジェクト要件</td>
+            <td>すべてのリソースが同一プロジェクト内</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Configuration Steps -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <div class="note-box">
+        <strong>💡 前提条件:</strong> 各リージョンにサポートされる内部 LB を使用したターゲットサービス作成済み / Service Attachment 公開済み / Compute Engine API 有効化 / Compute Network Admin ロール付与
+      </div>
+
+      <h3>ステップ 1: Health Aggregation Policy の作成</h3>
+      <p>バックエンドの 75% 以上が健全で、最低 3 つの健全なバックエンドが必要な条件を定義。</p>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud beta compute health-aggregation-policies create my-health-policy \
+    --region=us-central1 \
+    --healthy-percent-threshold=75 \
+    --min-healthy-threshold=3</code></pre>
+
+      <h3>ステップ 2: Health Source の作成</h3>
+      <p>特定のバックエンド サービスを Health Aggregation Policy にリンク。</p>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud beta compute health-sources create my-health-source \
+    --region=us-central1 \
+    --source-type=BACKEND_SERVICE \
+    --sources=my-backend-service \
+    --health-aggregation-policy=my-health-policy</code></pre>
+
+      <h3>ステップ 3: Composite Health Check の作成</h3>
+      <p>ヘルスソースを集約し、複合ヘルス状態をフォワーディングルールに適用。</p>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud beta compute composite-health-checks create my-composite-hc \
+    --region=us-central1 \
+    --health-sources=my-health-source \
+    --health-destination=projects/my-project/regions/us-central1/forwardingRules/my-forwarding-rule</code></pre>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+
+      <h3>ビジネス面</h3>
+      <div class="check-item">
+        <span class="check-icon">✓</span>
+        <span><strong>サービス可用性の向上</strong> - 正確なヘルス基準に基づく自動フェイルオーバーでサービス中断を最小化</span>
+      </div>
+      <div class="check-item">
+        <span class="check-icon">✓</span>
+        <span><strong>運用コストの削減</strong> - 手動フェイルオーバー不要、24/7 監視体制の負担軽減</span>
+      </div>
+      <div class="check-item">
+        <span class="check-icon">✓</span>
+        <span><strong>SLA の改善</strong> - マルチリージョン + 自動フェイルオーバーでより高い可用性 SLA を達成可能</span>
+      </div>
+
+      <h3>技術面</h3>
+      <div class="check-item">
+        <span class="check-icon">✓</span>
+        <span><strong>正確なヘルス判定</strong> - バックエンドの実際の健全性状態に基づき誤判定が少ない</span>
+      </div>
+      <div class="check-item">
+        <span class="check-icon">✓</span>
+        <span><strong>柔軟な閾値設定</strong> - サービスごとに異なる健全性基準を定義可能</span>
+      </div>
+      <div class="check-item">
+        <span class="check-icon">✓</span>
+        <span><strong>コンシューマー側の追加設定不要</strong> - マルチリージョン構成で自動的にフェイルオーバーの恩恵</span>
+      </div>
+      <div class="check-item">
+        <span class="check-icon">✓</span>
+        <span><strong>追加料金なし</strong> - コスト面のリスクなく可用性を強化</span>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ 制約事項・注意点</h2>
+
+      <div class="warning-box">
+        <strong>⚠️ 制限事項</strong>
+        <ul style="margin: 8px 0; padding-left: 20px; font-size: 14px;">
+          <li>健全性状態はコンシューマーの LB にのみ表示され、ログで確認不可</li>
+          <li>全 Composite Health リソースは同一プロジェクト内に存在する必要あり</li>
+          <li>Composite Health 状態を別サービスのヘルスソースとしてチェーン不可</li>
+          <li>テストモードがなく、構成即座にフェイルオーバーをトリガーする可能性あり</li>
+          <li>PSC バックエンドが公開サービスにアクセスする構成のみサポート</li>
+        </ul>
+      </div>
+
+      <div class="warning-box">
+        <strong>💡 考慮すべき点</strong>
+        <ul style="margin: 8px 0; padding-left: 20px; font-size: 14px;">
+          <li>プロデューサーとコンシューマー双方がマルチリージョン構成が必要 (単一リージョンでは利用不可)</li>
+          <li>閾値設計を適切に行わないと意図しないフェイルオーバーが発生する可能性</li>
+          <li>テストモードがないため、本番導入時は段階的な構成適用を推奨</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>🏢 マルチリージョン SaaS プラットフォーム</h4>
+        <p><strong>シナリオ:</strong> SaaS プロバイダーが PSC を通じてマネージドサービスを複数のエンタープライズ顧客に提供。リージョン障害時に顧客側で自動フェイルオーバーを実現。</p>
+        <p><strong>効果:</strong> コンシューマー (SaaS 利用企業) は追加設定なしにサービス中断を最小化。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>🏦 金融機関の高可用性 API ゲートウェイ</h4>
+        <p><strong>シナリオ:</strong> 金融機関が内部 API サービスを PSC 経由で提供。可用性 99.99% を満たすため、バックエンド 80% 以上が健全でなければフェイルオーバー発動。</p>
+        <p><strong>効果:</strong> 高閾値 (80%以上、最低 5 インスタンス) で部分障害でも早期フェイルオーバーを実行。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>🤝 パートナー企業間のサービス連携</h4>
+        <p><strong>シナリオ:</strong> パートナー企業が PSC を通じて互いのサービスを利用。プロデューサー企業がコンシューマー企業に正確なヘルス状態を伝達。</p>
+        <p><strong>効果:</strong> 手動の連絡・対応プロセスが不要。信頼性の高いフェイルオーバーを自動実行。</p>
+      </div>
+    </div>
+
+    <!-- IAM Permissions -->
+    <div class="section">
+      <h2>🔐 必要な IAM 権限</h2>
+      <p>事前定義ロール <code>roles/compute.networkAdmin</code> (Compute Network Admin) に以下の権限が含まれています。</p>
+      <span class="code-label">IAM Permissions</span>
+      <pre><code class="language-yaml">compute.regionHealthAggregationPolicies.list
+compute.regionHealthAggregationPolicies.get
+compute.regionHealthAggregationPolicies.create
+compute.regionHealthAggregationPolicies.update
+compute.regionHealthAggregationPolicies.delete
+compute.regionHealthSources.list
+compute.regionHealthSources.get
+compute.regionHealthSources.create
+compute.regionHealthSources.update
+compute.regionHealthSources.delete
+compute.regionCompositeHealthChecks.list
+compute.regionCompositeHealthChecks.get
+compute.regionCompositeHealthChecks.create
+compute.regionCompositeHealthChecks.update
+compute.regionCompositeHealthChecks.delete</code></pre>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <div class="success-box">
+        <strong>✅ 追加料金なし:</strong> Private Service Connect の Composite Health 機能自体に追加料金は発生しません。ただし、VPC ネットワーク内のリソースおよびネットワーク トラフィックに対しては通常の課金が適用されます。
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <div class="icon-text">
+          <span class="arrow">→</span>
+          <span><strong>Private Service Connect バックエンド</strong> - コンシューマーが LB 経由で公開サービスにアクセス。Composite Health のフェイルオーバーシグナルを受信する側。</span>
+        </div>
+      </div>
+      <div class="card card-teal">
+        <div class="icon-text">
+          <span class="arrow">→</span>
+          <span><strong>Cloud Load Balancing</strong> - プロデューサー側の内部 LB (Internal passthrough NLB、Regional internal ALB/proxy NLB) およびコンシューマー側のグローバル LB がフェイルオーバーを実行。</span>
+        </div>
+      </div>
+      <div class="card card-green">
+        <div class="icon-text">
+          <span class="arrow">→</span>
+          <span><strong>ヘルスチェック</strong> - 個々のバックエンド (VM / NEG) の健全性を判定する基礎となる標準ヘルスチェック機能。</span>
+        </div>
+      </div>
+      <div class="card card-orange">
+        <div class="icon-text">
+          <span class="arrow">→</span>
+          <span><strong>Service Attachment</strong> - PSC でサービスを公開するためのリソース。Composite Health のフォワーディングルールと関連付けられる。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <p>
+        Private Service Connect の Composite Health が GA となったことで、サービスプロデューサーはバックエンドの実際の健全性状態に基づいた正確なフェイルオーバーシグナルをコンシューマーに提供できるようになりました。
+      </p>
+      <div class="note-box">
+        <strong>💡 推奨アクション:</strong>
+        <ul style="margin: 8px 0; padding-left: 20px; font-size: 14px;">
+          <li>マルチリージョンで PSC 経由のサービス公開を行っている組織は導入を検討</li>
+          <li>Health Aggregation Policy の閾値設計を慎重に行う</li>
+          <li>テストモードがない点を考慮し、段階的に構成を適用</li>
+          <li>追加料金なしでサービスの可用性を大幅に向上可能</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="list-style: none; padding-left: 0; margin: 8px 0;">
+        <li><a href="https://cloud.google.com/release-notes#June_01_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li><a href="https://cloud.google.com/vpc/docs/about-private-service-connect-health" target="_blank" rel="noopener noreferrer">About Composite Health for Private Service Connect</a></li>
+        <li><a href="https://cloud.google.com/vpc/docs/configure-private-service-connect-health-failover" target="_blank" rel="noopener noreferrer">Configure Private Service Connect health for automatic cross-region failover</a></li>
+        <li><a href="https://cloud.google.com/vpc/docs/private-service-connect-backends" target="_blank" rel="noopener noreferrer">Private Service Connect backends</a></li>
+        <li><a href="https://cloud.google.com/vpc/pricing" target="_blank" rel="noopener noreferrer">VPC 料金</a></li>
+      </ul>
+      <p style="margin-top: 12px; font-size: 11px; color: var(--gc-outline);">#VPC #PrivateServiceConnect #CompositeHealth #CrossRegionFailover #HighAvailability #GA #Networking</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

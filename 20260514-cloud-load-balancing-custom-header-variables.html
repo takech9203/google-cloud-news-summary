@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Load Balancing: カスタムヘッダー変数の追加 (asn, cloud_trace_id, hostname)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card.teal {
+      border-left-color: var(--gc-teal);
+    }
+
+    .card.green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card.purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .card.orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-card h4 {
+      color: var(--gc-red);
+      margin: 0 0 12px 0;
+      font-size: 16px;
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-card h4 {
+      color: var(--gc-green);
+      margin: 0 0 12px 0;
+      font-size: 16px;
+    }
+
+    .before-card ul, .after-card ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+      line-height: 1.8;
+    }
+
+    .usecase-card {
+      background: var(--gc-teal-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid rgba(0, 188, 212, 0.3);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .usecase-card p {
+      margin: 0;
+      font-size: 14px;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .feature-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .feature-card h4 {
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .feature-card p {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .feature-card.networking {
+      border-left-color: var(--gc-teal);
+    }
+
+    .feature-card.observability {
+      border-left-color: var(--gc-purple);
+    }
+
+    .feature-card.routing {
+      border-left-color: var(--gc-orange);
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>🌐 Cloud Load Balancing: カスタムヘッダー変数の追加</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Cloud Load Balancing</span>
+          <span class="badge badge-ga">GA</span>
+          <span class="badge" style="background: var(--gc-teal);">Networking</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-05-14</div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        Google Cloud は Application Load Balancer のカスタムリクエスト/レスポンスヘッダーで使用できる新しい変数として
+        <code>{asn}</code>、<code>{cloud_trace_id}</code>、<code>{hostname}</code> の 3 つを追加しました。
+        これにより、ネットワーク識別情報、分散トレーシング ID、オリジナルのホスト名をヘッダーに自動的に埋め込むことが可能になります。
+      </p>
+
+      <div class="before-after">
+        <div class="before-card">
+          <h4>❌ Before (従来)</h4>
+          <ul>
+            <li>ASN を伝達するには外部ジオ IP データベースで IP から ASN を逆引きする必要あり</li>
+            <li>トレース ID のバックエンド伝達にはアプリ側で <code>X-Cloud-Trace-Context</code> をパースする必要あり</li>
+            <li>オリジナル Host ヘッダーの参照には <code>X-Forwarded-Host</code> を別途設定する必要あり</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>✅ After (新機能)</h4>
+          <ul>
+            <li><code>{asn}</code> 変数でロードバランサーが自動的にクライアント IP の ASN を解決</li>
+            <li><code>{cloud_trace_id}</code> 変数でトレース ID を自動抽出/生成しバックエンドへ伝達</li>
+            <li><code>{hostname}</code> 変数でオリジナルのホスト名を保持してバックエンドへ転送</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>ロードバランサーがクライアントからのリクエストを受信すると、設定されたカスタムヘッダー変数を展開し、バックエンドへの転送リクエストに自動的に付加します。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    Client["🌐 クライアント\nHost: app.example.com\nX-Cloud-Trace-Context: abc123..."]
+
+    subgraph GLB["Global External Application Load Balancer"]
+        FE["📡 フロントエンド\n(Forwarding Rule)"]
+        HV["⚙️ ヘッダー変数展開"]
+    end
+
+    subgraph Headers["カスタムヘッダー追加"]
+        H1["{asn} → AS15169"]
+        H2["{cloud_trace_id} → abc123..."]
+        H3["{hostname} → app.example.com"]
+    end
+
+    Backend["🖥️ バックエンドサービス\nX-Client-ASN: AS15169\nX-Trace-ID: abc123...\nX-Original-Host: app.example.com"]
+
+    Client -->|"HTTPS リクエスト"| FE
+    FE --> HV
+    HV --> Headers
+    Headers -->|"ヘッダー付きリクエスト"| Backend
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="feature-card networking">
+          <h4>🔗 asn (Autonomous System Number)</h4>
+          <p>クライアント IP に関連付けられた自律システム番号を提供。ISP やクラウドプロバイダー、組織のネットワークを識別可能。セキュリティポリシーの強化やトラフィック分析に活用できます。</p>
+          <p style="margin-top: 8px; color: var(--gc-outline); font-size: 13px;">例: <code>{asn}</code> → <code>AS15169</code> (Google)、<code>AS16509</code> (Amazon)</p>
+        </div>
+        <div class="feature-card observability">
+          <h4>🔍 cloud_trace_id (Cloud Trace ID)</h4>
+          <p>HTTP リクエストヘッダーからトレース ID を抽出、またはトレースコンテキストがない場合は新規生成。Cloud Trace との統合により、エンドツーエンドの分散トレーシングを実現。<code>X-Cloud-Trace-Context</code> および W3C <code>traceparent</code> ヘッダーとの互換性あり。</p>
+        </div>
+        <div class="feature-card routing">
+          <h4>🏷️ hostname (オリジナルホスト名)</h4>
+          <p>クライアントが Host ヘッダーで指定したオリジナルのホスト名を保持。<code>X-Forwarded-Host</code> と同等の機能を提供。マルチテナント環境やリバースプロキシ構成でオリジナルのホスト情報を保持する際に有用。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Statistics -->
+    <div class="section">
+      <h2>📊 数字で見るアップデート</h2>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value">3</div>
+          <div class="stat-label">新規追加変数</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-teal), #00838F);">
+          <div class="stat-value">16</div>
+          <div class="stat-label">カスタムヘッダー数上限 / バックエンドサービス</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, var(--gc-green), #1B5E20);">
+          <div class="stat-value">0 円</div>
+          <div class="stat-label">追加料金なし</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3>サポートされるロードバランサータイプ</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>ロードバランサータイプ</th>
+            <th>サポート状況</th>
+            <th>ネットワークティア</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>グローバル外部 Application Load Balancer</td>
+            <td><span class="check-icon">✅</span> 対応</td>
+            <td>Premium Tier のみ</td>
+          </tr>
+          <tr>
+            <td>クラシック Application Load Balancer</td>
+            <td><span class="check-icon">✅</span> 対応</td>
+            <td>Premium / Standard Tier</td>
+          </tr>
+          <tr>
+            <td>リージョン外部 Application Load Balancer</td>
+            <td><span style="color: var(--gc-outline);">未記載</span></td>
+            <td>-</td>
+          </tr>
+          <tr>
+            <td>内部 Application Load Balancer</td>
+            <td><span style="color: var(--gc-outline);">未記載</span></td>
+            <td>-</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>変数一覧と既存変数との比較</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>変数名</th>
+            <th>カテゴリ</th>
+            <th>用途</th>
+            <th>新規/既存</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>asn</code></td>
+            <td>ネットワーク識別</td>
+            <td>クライアント IP の ASN</td>
+            <td><span class="badge badge-ga" style="font-size: 11px; padding: 2px 8px;">新規</span></td>
+          </tr>
+          <tr>
+            <td><code>cloud_trace_id</code></td>
+            <td>オブザーバビリティ</td>
+            <td>分散トレーシング ID</td>
+            <td><span class="badge badge-ga" style="font-size: 11px; padding: 2px 8px;">新規</span></td>
+          </tr>
+          <tr>
+            <td><code>hostname</code></td>
+            <td>リクエスト情報</td>
+            <td>オリジナル Host ヘッダー</td>
+            <td><span class="badge badge-ga" style="font-size: 11px; padding: 2px 8px;">新規</span></td>
+          </tr>
+          <tr>
+            <td><code>client_region</code></td>
+            <td>地理情報</td>
+            <td>クライアントの国/地域</td>
+            <td><span style="color: var(--gc-outline); font-size: 12px;">既存</span></td>
+          </tr>
+          <tr>
+            <td><code>client_city</code></td>
+            <td>地理情報</td>
+            <td>クライアントの都市名</td>
+            <td><span style="color: var(--gc-outline); font-size: 12px;">既存</span></td>
+          </tr>
+          <tr>
+            <td><code>client_ip_address</code></td>
+            <td>ネットワーク識別</td>
+            <td>クライアント IP アドレス</td>
+            <td><span style="color: var(--gc-outline); font-size: 12px;">既存</span></td>
+          </tr>
+          <tr>
+            <td><code>tls_ja3_fingerprint</code></td>
+            <td>セキュリティ</td>
+            <td>TLS フィンガープリント</td>
+            <td><span style="color: var(--gc-outline); font-size: 12px;">既存</span></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>カスタムヘッダーの制限事項</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>制限値</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>カスタムリクエストヘッダー数上限</td>
+            <td><strong>16 ヘッダー</strong> / バックエンドサービス</td>
+          </tr>
+          <tr>
+            <td>カスタムレスポンスヘッダー数上限</td>
+            <td><strong>16 ヘッダー</strong> / バックエンドサービス</td>
+          </tr>
+          <tr>
+            <td>ヘッダーサイズ上限 (名前+値)</td>
+            <td><strong>8 KB</strong> / バックエンドサービス</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Configuration -->
+    <div class="section">
+      <h2>⚙️ 設定方法</h2>
+
+      <div class="note-box">
+        <strong>📋 前提条件:</strong> グローバル外部 Application Load Balancer またはクラシック Application Load Balancer が設定済みであること。gcloud CLI バージョン 309.0.0 以降が必要。
+      </div>
+
+      <h3>ステップ 1: バックエンドサービスにカスタムリクエストヘッダーを追加</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># ASN ヘッダーの追加
+gcloud compute backend-services update BACKEND_SERVICE_NAME \
+  --global \
+  --custom-request-header='X-Client-ASN:{asn}'
+
+# Cloud Trace ID ヘッダーの追加
+gcloud compute backend-services update BACKEND_SERVICE_NAME \
+  --global \
+  --custom-request-header='X-Trace-ID:{cloud_trace_id}'
+
+# オリジナルホスト名ヘッダーの追加
+gcloud compute backend-services update BACKEND_SERVICE_NAME \
+  --global \
+  --custom-request-header='X-Original-Host:{hostname}'</code></pre>
+
+      <h3>ステップ 2: 複数のヘッダーを一括設定</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># 複数のカスタムヘッダーを同時に設定
+gcloud compute backend-services update BACKEND_SERVICE_NAME \
+  --global \
+  --custom-request-header='X-Client-ASN:{asn}' \
+  --custom-request-header='X-Trace-ID:{cloud_trace_id}' \
+  --custom-request-header='X-Original-Host:{hostname}' \
+  --custom-request-header='X-Client-Geo:{client_region},{client_city}'</code></pre>
+
+      <h3>ステップ 3: カスタムレスポンスヘッダーとして設定 (デバッグ用)</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># レスポンスヘッダーにも追加 (デバッグやクライアント側トレーシングに有用)
+gcloud compute backend-services update BACKEND_SERVICE_NAME \
+  --global \
+  --custom-response-header='X-Trace-ID:{cloud_trace_id}' \
+  --custom-response-header='X-Served-By:{hostname}'</code></pre>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>🔒 ユースケース 1: ASN ベースのセキュリティフィルタリング</h4>
+        <p><strong>シナリオ:</strong> 金融サービス企業が、既知の VPN プロバイダーやホスティング業者の ASN からのアクセスに対して追加認証を要求したい場合。</p>
+        <div style="margin-top: 12px;">
+          <span class="code-label">Python</span>
+          <pre><code class="language-python"># バックエンド側での ASN チェック例
+SUSPICIOUS_ASNS = ['AS9009', 'AS16276', 'AS14061']  # 例: VPN/ホスティング
+
+def check_request(request):
+    client_asn = request.headers.get('X-Client-ASN', '')
+    if client_asn in SUSPICIOUS_ASNS:
+        return require_additional_auth(request)
+    return process_normally(request)</code></pre>
+        </div>
+        <p style="margin-top: 8px; font-size: 14px;"><strong>効果:</strong> 外部のジオ IP データベースを別途用意することなく、ロードバランサーが提供する正確な ASN 情報に基づいてリスクベースの認証を実装可能。</p>
+      </div>
+
+      <div class="usecase-card" style="background: var(--gc-purple-tint); border-color: rgba(161, 66, 244, 0.3);">
+        <h4>🔍 ユースケース 2: エンドツーエンド分散トレーシング</h4>
+        <p><strong>シナリオ:</strong> マイクロサービスアーキテクチャで、ロードバランサーからバックエンドの各サービスまでの処理フローを Cloud Trace で一貫して追跡したい場合。</p>
+        <div style="margin-top: 12px;">
+          <span class="code-label">Bash</span>
+          <pre><code class="language-bash"># トレース ID をバックエンドに伝播
+gcloud compute backend-services update api-gateway-backend \
+  --global \
+  --custom-request-header='X-Trace-ID:{cloud_trace_id}' \
+  --custom-response-header='X-Trace-ID:{cloud_trace_id}'</code></pre>
+        </div>
+        <p style="margin-top: 8px; font-size: 14px;"><strong>効果:</strong> ロードバランサー層で生成・抽出されたトレース ID がバックエンドに一貫して伝達され、サービス間のレイテンシ分析が容易に。クライアントがトレースヘッダーを送信しない場合でもロードバランサーが自動生成。</p>
+      </div>
+
+      <div class="usecase-card" style="background: var(--gc-yellow-tint); border-color: rgba(251, 188, 4, 0.3);">
+        <h4>🏢 ユースケース 3: マルチテナントルーティング</h4>
+        <p><strong>シナリオ:</strong> SaaS プラットフォームで、単一のロードバランサーの背後にある共有バックエンドが、クライアントのオリジナルホスト名に基づいてテナントを識別する場合。</p>
+        <div style="margin-top: 12px;">
+          <span class="code-label">Python</span>
+          <pre><code class="language-python"># バックエンド側でのテナント識別例
+TENANT_MAP = {
+    'tenant-a.example.com': 'tenant_a_db',
+    'tenant-b.example.com': 'tenant_b_db',
+}
+
+def route_to_tenant(request):
+    original_host = request.headers.get('X-Tenant-Host', '')
+    tenant_db = TENANT_MAP.get(original_host, 'default_db')
+    return connect_to_database(tenant_db)</code></pre>
+        </div>
+        <p style="margin-top: 8px; font-size: 14px;"><strong>効果:</strong> ロードバランサーが Host ヘッダーを書き換えた場合でも、オリジナルのホスト名がバックエンドに伝達されるため、テナント識別ロジックが確実に動作。</p>
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div>
+          <h3>ビジネス面</h3>
+          <div class="check-item">
+            <span class="check-icon">✓</span>
+            <span><strong>セキュリティ強化:</strong> ASN ベースのトラフィック分析で不正アクセスの検知精度向上</span>
+          </div>
+          <div class="check-item">
+            <span class="check-icon">✓</span>
+            <span><strong>運用コスト削減:</strong> 分散トレーシング設定がロードバランサー層で完結</span>
+          </div>
+          <div class="check-item">
+            <span class="check-icon">✓</span>
+            <span><strong>マルチテナント対応の簡素化:</strong> テナント識別がシンプルに</span>
+          </div>
+        </div>
+        <div>
+          <h3>技術面</h3>
+          <div class="check-item">
+            <span class="check-icon">✓</span>
+            <span><strong>オブザーバビリティ向上:</strong> ロードバランサーからバックエンドまで一貫したトレーシング</span>
+          </div>
+          <div class="check-item">
+            <span class="check-icon">✓</span>
+            <span><strong>ネットワークレベルの可視性:</strong> ASN 情報で送信元ネットワークを正確に識別</span>
+          </div>
+          <div class="check-item">
+            <span class="check-icon">✓</span>
+            <span><strong>ヘッダー管理の一元化:</strong> アプリケーションコードの変更が不要</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <div class="warning-box">
+        <strong>制限事項:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>リージョン外部 Application Load Balancer および内部 Application Load Balancer での利用可否は現時点で未記載</li>
+          <li>カスタムヘッダーはヘルスチェックプローブには追加されない (ヘッダーベースの認証に影響する可能性)</li>
+          <li>バックエンドサービスあたり最大 16 ヘッダー、合計 8 KB のサイズ制限</li>
+          <li>ASN の値は IP アドレスの所在が不明な場合、空文字列に展開される</li>
+        </ul>
+      </div>
+
+      <div class="note-box">
+        <strong>💡 考慮すべき点:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>URL マップとバックエンドサービスの両方にカスタムヘッダーが設定されている場合、同じヘッダー名では URL マップの設定が優先される</li>
+          <li>Cloud Armor のセキュリティポリシーで同名のカスタムヘッダーを設定した場合、ロードバランサーの値で上書きされる</li>
+          <li>ヘッダー名として <code>X-Google</code>、<code>X-Goog-</code>、<code>X-GFE</code>、<code>X-Amz-</code> で始まる名前は使用不可</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <div class="success-box">
+        <strong>✅ 追加料金なし:</strong> カスタムヘッダー変数の使用自体には追加料金は発生しません。通常の Cloud Load Balancing の料金体系が適用されます。
+      </div>
+      <p>詳細な料金情報は <a href="https://cloud.google.com/vpc/network-pricing#cloud-load-balancing" target="_blank" class="gc-link">Cloud Load Balancing の料金ページ</a> を参照してください。</p>
+    </div>
+
+    <!-- Region -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <p>グローバル外部 Application Load Balancer はグローバルリソースであり、<span class="highlight">すべての Google Cloud リージョン</span>で利用可能。クラシック Application Load Balancer も Premium Tier ではグローバルで利用可能です。</p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="feature-grid">
+        <div class="card purple">
+          <div class="icon-text">
+            <span style="font-size: 20px;">🔍</span>
+            <strong>Cloud Trace</strong>
+          </div>
+          <p style="margin: 4px 0 0 28px; font-size: 14px;"><code>cloud_trace_id</code> 変数と直接連携し、エンドツーエンドの分散トレーシングを実現。W3C <code>traceparent</code> および <code>X-Cloud-Trace-Context</code> に対応。</p>
+        </div>
+        <div class="card" style="border-left-color: var(--gc-red);">
+          <div class="icon-text">
+            <span style="font-size: 20px;">🛡️</span>
+            <strong>Cloud Armor</strong>
+          </div>
+          <p style="margin: 4px 0 0 28px; font-size: 14px;">カスタムヘッダーと組み合わせてセキュリティポリシーを構成可能。ASN 情報を活用した高度なアクセス制御に利用できる。</p>
+        </div>
+        <div class="card teal">
+          <div class="icon-text">
+            <span style="font-size: 20px;">⚡</span>
+            <strong>Cloud CDN</strong>
+          </div>
+          <p style="margin: 4px 0 0 28px; font-size: 14px;">バックエンドバケットでもカスタムレスポンスヘッダーが設定可能。CDN キャッシュステータスとトレース ID を組み合わせたデバッグに有用。</p>
+        </div>
+        <div class="card green">
+          <div class="icon-text">
+            <span style="font-size: 20px;">📝</span>
+            <strong>Cloud Logging</strong>
+          </div>
+          <p style="margin: 4px 0 0 28px; font-size: 14px;">ロードバランサーのアクセスログに記録されるフィールドと組み合わせることで、包括的なトラフィック分析が可能。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <p>
+        今回追加された 3 つのカスタムヘッダー変数 (<code>asn</code>, <code>cloud_trace_id</code>, <code>hostname</code>) は、Application Load Balancer のオブザーバビリティとセキュリティ機能を大幅に強化するアップデートです。特に、ASN ベースのトラフィック分析、ロードバランサー層での分散トレーシング ID の一元管理、マルチテナント環境でのホスト名保持は、エンタープライズ環境で頻繁に求められる要件であり、アプリケーション側の実装を簡素化しつつインフラストラクチャレベルでの制御を可能にします。
+      </p>
+      <p>
+        既存のカスタムヘッダー設定に追加する形で即座に利用可能であるため、該当する Load Balancer を使用している場合は早期の導入検討を推奨します。
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>出典:</strong></p>
+      <ul style="list-style: none; padding: 0; margin: 8px 0;">
+        <li>📎 <a href="https://cloud.google.com/release-notes#May_14_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li>📎 <a href="https://cloud.google.com/load-balancing/docs/https/custom-headers-global" target="_blank" rel="noopener noreferrer">カスタムヘッダーの作成 (バックエンドサービス)</a></li>
+        <li>📎 <a href="https://cloud.google.com/trace/docs/trace-context" target="_blank" rel="noopener noreferrer">Cloud Trace コンテキスト伝播</a></li>
+        <li>📎 <a href="https://cloud.google.com/vpc/network-pricing#cloud-load-balancing" target="_blank" rel="noopener noreferrer">Cloud Load Balancing の料金</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline);">Generated: 2026-05-15 | #CloudLoadBalancing #ApplicationLoadBalancer #CustomHeaders #ASN #DistributedTracing #CloudTrace #Networking #Security #Observability</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

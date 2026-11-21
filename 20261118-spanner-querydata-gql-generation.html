@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spanner: QueryData による自然言語からの GQL クエリ生成 (Preview)</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      margin-bottom: 32px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* バッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); color: #FFFFFF; }
+    .badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+    .badge-deprecated { background: var(--gc-red); color: #FFFFFF; }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 720px) {
+      .before-after { grid-template-columns: 1fr; }
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .before-box h3 { color: var(--gc-red); margin-top: 0; }
+    .after-box h3 { color: var(--gc-green); margin-top: 0; }
+
+    .before-box ul, .after-box ul {
+      margin: 8px 0 0 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 8px 0;
+    }
+
+    /* フロー図スタイル */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+      font-size: 14px;
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* チェックリスト */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 10px 0;
+    }
+
+    .check-icon { color: var(--gc-green); font-size: 18px; }
+    .cross-icon { color: var(--gc-red); font-size: 18px; }
+
+    /* コードブロック */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block {
+      overflow: hidden;
+      padding: 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+      font-family: 'Roboto Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-title { color: #AAAAAA; }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブル */
+    .table-wrapper { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .ai-box {
+      background: var(--gc-purple-tint);
+      border-left: 4px solid var(--gc-purple);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase h3 {
+      color: var(--gc-blue-800);
+      margin-top: 0;
+    }
+
+    .usecase p { margin: 8px 0; font-size: 14px; }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* 関連サービス */
+    .related-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .related-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 16px;
+      border: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    .related-card strong {
+      color: var(--gc-on-surface);
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    /* リンクリスト */
+    .link-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .link-list li {
+      margin: 8px 0;
+      padding-left: 24px;
+      position: relative;
+      font-size: 14px;
+    }
+
+    .link-list li::before {
+      content: "🔗";
+      position: absolute;
+      left: 0;
+    }
+
+    /* タグ */
+    .tag-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .tag {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-800);
+      border: 1px solid var(--gc-blue-200);
+      border-radius: 16px;
+      padding: 2px 12px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer ul {
+      padding-left: 20px;
+      margin: 8px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div class="header-top">
+        <div>
+          <span class="badge">Spanner</span>
+          <span class="badge-preview">Preview</span>
+        </div>
+        <div class="subtitle">📅 リリース日: 2026-11-18</div>
+      </div>
+      <h1>🧠 Spanner: QueryData による自然言語からの GQL クエリ生成</h1>
+      <div class="subtitle">AI エージェントが GQL を書かずに Spanner Graph を探索できるマネージド NL2GQL 基盤</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📝 概要</h2>
+      <p>
+        Spanner に、自然言語の質問から <span class="highlight">Graph Query Language (GQL)</span> クエリを自動生成する
+        <span class="highlight">QueryData</span> 機能が Preview として追加。QueryData は
+        <strong>Conversational Analytics API</strong> のエンドポイントとして提供されるエージェント向けツールで、
+        Spanner Graph のプロパティグラフに対する <span class="highlight">NL2GQL (自然言語 → GQL 変換)</span> をプログラマブルに実行できる。
+      </p>
+      <p>
+        リクエストの <code>graph_ids</code> フィールドに対象のプロパティグラフを指定すると GQL が生成される
+        (省略した場合は基盤テーブルに対する GoogleSQL が生成される)。さらに、オプションの
+        <strong>コンテキストセット</strong> (クエリテンプレート・クエリファセット・値検索の集合) を提供することで、
+        組織固有の用語やビジネスロジックを反映した高精度なクエリ生成が可能になる。
+      </p>
+      <div class="ai-box">
+        <strong>🎯 対象ユーザー:</strong> Spanner Graph 上に不正検知・リスク分析・ナレッジグラフなどのグラフデータを持ち、
+        会話型アシスタントや ADK / LangChain / MCP クライアントなどのエージェント基盤から接続データを活用したい開発者。
+      </div>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before (アップデート前)</h3>
+          <ul>
+            <li>Spanner Graph の探索には、マルチホップの GQL クエリを<strong>自分で記述</strong>する必要があった</li>
+            <li>AI エージェントからの利用には、スキーマ解釈とクエリ合成のロジックを<strong>アプリ側で独自実装</strong>する必要があった</li>
+            <li>汎用 LLM の知識だけでは「ハイリスク送金」のような<strong>組織固有の用語</strong>をグラフモデル上の正確な条件にマッピングすることが困難だった</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After (アップデート後)</h3>
+          <ul>
+            <li>自然言語の質問から、プロパティグラフのスキーマに基づいた GQL を QueryData が<strong>自動生成・実行</strong></li>
+            <li>コンテキストセット (テンプレート・ファセット・値検索) により<strong>ドメイン固有の用語やルールを反映</strong>した高精度なクエリ生成が可能に</li>
+            <li>曖昧な質問には<strong>曖昧性解消の確認質問</strong>を返せるため、エージェントが聞き返す対話フローを構築可能に</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>AI エージェントがユーザーの質問を QueryData エンドポイントに送信すると、<strong>値の解決 → 意図照合 (必要に応じて曖昧性解消) → GQL 合成 → Spanner Graph での実行</strong>という流れで結果が返される。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+sequenceDiagram
+    actor User as 👤 ユーザー
+    participant Agent as 🤖 AI エージェント<br/>(ADK / LangChain / MCP クライアント)
+    participant QD as 🧠 QueryData<br/>(Conversational Analytics API)
+    participant Graph as 🗄️ Spanner Graph<br/>(プロパティグラフ)
+
+    User->>Agent: 自然言語で質問<br/>「Dana の送金先は?」
+    Agent->>QD: QueryData リクエスト<br/>(prompt + graph_ids + context_set_id)
+    QD->>Graph: 値検索クエリ実行 (値の解決)
+    QD->>QD: テンプレート/ファセット照合<br/>+ GQL クエリ合成
+    alt 質問が曖昧な場合
+        QD-->>Agent: 曖昧性解消の質問を返却
+        Agent-->>User: 確認質問を提示
+    end
+    QD->>Graph: 生成した GQL を実行
+    Graph-->>QD: クエリ結果
+    QD-->>Agent: GQL + 結果 + 自然言語の回答
+    Agent-->>User: 回答を提示
+        </pre>
+      </div>
+      <div class="flow-diagram">
+        <div class="flow-step">🔍 値の解決<br/>(値検索クエリ実行)</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🎯 意図照合<br/>+ 曖昧性解消</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🧩 GQL クエリ合成</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">⚡ クエリ実行<br/>+ 結果返却</div>
+      </div>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚙️ 主要機能</h2>
+
+      <div class="card">
+        <h3>1️⃣ 自然言語からの GQL 生成 (NL2GQL)</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>プロパティグラフのスキーマに基づき、自然言語の質問から GQL クエリを生成</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>spanner_reference.database_reference</code> の <code>graph_ids</code> フィールドに対象グラフの指定が<strong>必須</strong>。省略するとリレーショナル SQL (GoogleSQL) の生成にフォールバック</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>「口座 7 から送金されたお金が 60 日以内に戻ってきたか?」のような<strong>マルチホップの質問</strong>にも、グラフ走査を含む GQL を生成して対応</span></div>
+      </div>
+
+      <div class="card">
+        <h3>2️⃣ コンテキストセットによる精度向上</h3>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>クエリテンプレート</strong>: 代表的な自然言語の質問と事前検証済み GQL のペア。ビジネス上の意図と GQL 文のマッピングを定義</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>クエリファセット</strong>: 再利用可能な GQL 句 (グラフパターン、フィルタ条件、日付範囲、金額しきい値など)。複数条件を動的に組み合わせ可能</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>値検索</strong>: <code>GRAPH_TABLE</code> への SELECT 文として記述するセマンティック/文字列一致検索。質問中の語句 (例:「rainy day」) を実際のプロパティ値 (例: <code>Rainy Day Fund</code>) に解決</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>コンテキストセットは <strong>Spanner Studio</strong> で作成・管理でき、コンテキストエンジニアリングエージェントによる自動作成も可能</span></div>
+      </div>
+
+      <div class="card">
+        <h3>3️⃣ クエリ生成の処理フロー</h3>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>値の解決</strong>: 値検索クエリを Spanner データベースに対して実行し、質問中の語句を具体的なプロパティ値にマッピング</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>意図照合と曖昧性解消</strong>: テンプレート・ファセットと照合し、質問が不明瞭な場合は確認質問を返却</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>クエリ合成</strong>: スキーマ・テンプレート構造・ファセット・解決済みの値から完全な GQL クエリを合成</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>クエリ実行</strong>: 生成した GQL を Spanner データベースに対して実行し結果を返却</span></div>
+      </div>
+
+      <div class="card">
+        <h3>4️⃣ 柔軟な出力オプション (<code>generation_options</code>)</h3>
+        <div class="icon-text"><span class="check-icon">✓</span><span><code>generate_query_result</code>: 生成した GQL を実行して結果を返す</span></div>
+        <div class="icon-text"><span class="check-icon">✓</span><span><code>generate_natural_language_answer</code>: 結果を要約した自然言語の回答を生成</span></div>
+        <div class="icon-text"><span class="check-icon">✓</span><span><code>generate_explanation</code>: 生成した GQL の説明を生成</span></div>
+        <div class="icon-text"><span class="check-icon">✓</span><span><code>generate_disambiguation_question</code>: 曖昧な質問に対する確認質問を生成</span></div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+      <h3>QueryData リクエストの主要フィールド</h3>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr><th>項目</th><th>詳細</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>API</strong></td><td>Conversational Analytics API (<code>POST /v1beta/projects/*/locations/*/conversations:queryData</code>)</td></tr>
+            <tr><td><code>prompt</code></td><td>エンドユーザーからの自然言語の質問</td></tr>
+            <tr><td><code>engine</code></td><td>データベースの方言。Spanner Graph では <code>GOOGLE_SQL</code> を指定</td></tr>
+            <tr><td><code>graph_ids</code></td><td>対象プロパティグラフ名のリスト。<strong>GQL 生成には必須</strong> (省略時はリレーショナル SQL を生成)</td></tr>
+            <tr><td><code>context_set_id</code></td><td>データベースに保存された事前作成コンテキストの完全な ID</td></tr>
+            <tr><td><code>generation_options</code></td><td>クエリ結果・自然言語回答・説明・曖昧性解消質問の生成を制御</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>リクエスト例 (FinGraph サンプルグラフ)</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">JSON</span>
+          <span class="code-title">QueryData リクエスト例</span>
+        </div>
+        <pre><code class="language-json">{
+  "parent": "projects/my-project/locations/global",
+  "prompt": "Find everyone that Dana transferred money to, along with the account IDs and transfer amounts.",
+  "context": {
+    "datasource_references": {
+      "spanner_reference": {
+        "database_reference": {
+          "engine": "GOOGLE_SQL",
+          "project_id": "my-project",
+          "instance_id": "my-instance",
+          "database_id": "fin-graph-db",
+          "graph_ids": ["FinGraph"]
+        },
+        "agent_context_reference": {
+          "context_set_id": "projects/my-project/locations/us-central1/contextSets/fingraph-assistant"
+        }
+      }
+    }
+  },
+  "generation_options": {
+    "generate_query_result": true,
+    "generate_natural_language_answer": true,
+    "generate_disambiguation_question": true,
+    "generate_explanation": true
+  }
+}</code></pre>
+      </div>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>💡 メリット</h2>
+      <h3>💼 ビジネス面</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>グラフデータの民主化</strong>: GQL を知らないアナリストやエンドユーザーが、会話型アシスタント経由で不正検知・リスク・コンプライアンスのグラフデータを探索できる</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>用語の一貫性</strong>: コンテキストセットにより「ハイリスク送金」などの組織固有の定義をすべての回答で一貫して適用できる</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>開発コスト削減</strong>: NL2GQL のスキーマ解釈・クエリ合成ロジックをマネージドなエンドポイントに委譲でき、独自実装が不要になる</span></div>
+
+      <h3>🛠️ 技術面</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>エージェント基盤との親和性</strong>: ADK、LangChain、MCP クライアント、Antigravity などのエージェントハーネスからツールとして呼び出す設計。会話履歴やユーザー状態の管理はハーネス側、スキーマ解釈とクエリ合成は QueryData 側という役割分担が明確</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>曖昧性解消のサポート</strong>: 質問が不十分な場合に確認質問を返すため、ロバストな対話フローを構築できる</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>事前検証済みクエリの活用</strong>: テンプレートとファセットにより、LLM の自由生成に頼らない再現性の高いクエリ生成が可能</span></div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <h3>🚫 制限事項</h3>
+      <div class="check-item"><span class="cross-icon">✗</span><span><strong>Preview 機能</strong>であり、Pre-GA Offerings Terms (および生成 AI Preview プロダクトの追加規約) が適用される。サポートは限定的な場合がある</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>GoogleSQL 方言のデータベースが対象で、<strong>PostgreSQL インターフェースはサポートされない</strong></span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span><code>graph_ids</code> を省略すると GQL ではなく基盤テーブルへの GoogleSQL が生成されるため、グラフクエリを意図する場合は<strong>指定が必須</strong></span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>Conversational Analytics API が公式にサポートする言語は<strong>英語のみ</strong></span></div>
+
+      <h3>🤔 考慮すべき点</h3>
+      <div class="warning-box">
+        <div class="check-item"><span>⚠️</span><span>Spanner Graph 自体が <strong>Enterprise / Enterprise Plus エディション</strong>の機能であるため、Standard エディションでは利用できない</span></div>
+        <div class="check-item"><span>⚠️</span><span>生成精度を高めるには、コンテキストセット (テンプレート・ファセット・値検索) の<strong>作成・メンテナンスという運用タスク</strong>が発生する</span></div>
+        <div class="check-item"><span>⚠️</span><span>生成されたクエリは Spanner 上で実行されるため、<strong>Spanner 側のコンピューティングコスト</strong>への影響を考慮する必要がある</span></div>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>💬 ユースケース 1: グラフデータに対する会話型アシスタント</h3>
+        <p><strong>シナリオ:</strong> 金融機関のサポート担当者やアナリストが、「口座 7 から送金されたお金は 60 日以内に戻ってきた?」といった質問を自然言語で行う。</p>
+        <p><strong>効果:</strong> QueryData がマルチホップの GQL クエリを生成・実行し、循環送金のような複雑なグラフパターンの回答を GQL の知識なしで得られる。</p>
+      </div>
+
+      <div class="usecase">
+        <h3>🕵️ ユースケース 2: 不正・リスク・コンプライアンス調査のコパイロット</h3>
+        <p><strong>シナリオ:</strong> アナリストが口座の所有関係や送金ネットワークを追加質問を重ねながら探索する。コンテキストセットで「ハイリスク送金」などの用語を定義しておく。</p>
+        <p><strong>効果:</strong> すべての回答で組織のビジネス定義が一貫して適用され、調査の精度とスピードが向上する。</p>
+      </div>
+
+      <div class="usecase">
+        <h3>🧠 ユースケース 3: ナレッジグラフ推論エージェント</h3>
+        <p><strong>シナリオ:</strong> ADK や MCP クライアントで構築したエージェントが、QueryData をツールとして呼び出し、「ある人物が中間エンティティを介して支配している口座はどれか」といった関係性の推論をグラフデータに接地 (グラウンディング) して行う。</p>
+        <p><strong>効果:</strong> LLM の推論を Spanner Graph に格納された実際の関係データに基づいて行えるため、ハルシネーションを抑えた信頼性の高いエージェントを構築できる。</p>
+      </div>
+    </div>
+
+    <!-- 料金・リージョン -->
+    <div class="section">
+      <h2>💰 料金・利用可能リージョン</h2>
+      <div class="note-box">
+        <strong>💳 料金:</strong> QueryData は Conversational Analytics API の機能として提供される。詳細は
+        <a href="https://cloud.google.com/products/data-agents/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Data Cloud Agent の料金ページ</a>を参照。
+        また、生成されたクエリの実行は Spanner 側のリソースを消費するため、
+        <a href="https://cloud.google.com/spanner/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Spanner の料金</a>も別途適用される。
+      </div>
+      <div class="note-box">
+        <strong>🌏 利用可能リージョン:</strong> Conversational Analytics API はデフォルトで<strong>グローバルエンドポイント</strong>を使用し、
+        データレジデンシー要件に応じてリージョナル/マルチリージョナルエンドポイントも指定できる。最新の対応ロケーションは
+        <a href="https://docs.cloud.google.com/gemini/data-agents/conversational-analytics-api/locations" target="_blank" rel="noopener noreferrer" class="gc-link">公式ドキュメント</a>を参照。
+      </div>
+    </div>
+
+    <!-- 関連サービス -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="related-grid">
+        <div class="related-card">
+          <strong>🗄️ Spanner Graph</strong>
+          QueryData の対象となるプロパティグラフ機能。Enterprise / Enterprise Plus エディションで利用可能。
+        </div>
+        <div class="related-card">
+          <strong>💬 Conversational Analytics API</strong>
+          QueryData エンドポイントを提供する API。AlloyDB、Cloud SQL (MySQL / PostgreSQL)、BigQuery などのデータソースにも対応。
+        </div>
+        <div class="related-card">
+          <strong>🤖 Agent Development Kit (ADK) / MCP</strong>
+          QueryData をツールとして呼び出すエージェントハーネス。知識グラフ推論エージェントの構築に利用。
+        </div>
+        <div class="related-card">
+          <strong>🖥️ Spanner Studio</strong>
+          コンテキストセットの作成・管理を行う管理画面。
+        </div>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📌 まとめ</h2>
+      <div class="success-box">
+        <p style="margin: 0 0 8px 0;">
+          QueryData の Spanner Graph 対応により、AI エージェントや LLM アプリケーションが
+          <strong>GQL を書かずにグラフデータを探索できる、マネージドな NL2GQL 基盤</strong>が利用可能になった。
+        </p>
+        <p style="margin: 0;">
+          不正検知やナレッジグラフなど Spanner Graph を活用中 (または検討中) のチームは、
+          <strong>FinGraph サンプルで動作を確認</strong>し、コンテキストセットの設計を通じて自社ドメインの用語を反映した
+          エージェント構築を検証することを推奨。<strong>Preview 段階のため、本番適用は GA を見据えた評価に留める</strong>のが望ましい。
+        </p>
+      </div>
+      <div class="tag-list">
+        <span class="tag">Spanner</span>
+        <span class="tag">Spanner Graph</span>
+        <span class="tag">GQL</span>
+        <span class="tag">QueryData</span>
+        <span class="tag">Conversational Analytics API</span>
+        <span class="tag">NL2GQL</span>
+        <span class="tag">AIエージェント</span>
+        <span class="tag">Preview</span>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p>📎 出典・参考リンク:</p>
+      <ul>
+        <li><a href="https://docs.cloud.google.com/release-notes#November_18_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026-11-18)</a></li>
+        <li><a href="https://docs.cloud.google.com/gemini/data-agents/querydata/spanner-graph/data-agent-overview" target="_blank" rel="noopener noreferrer" class="gc-link">QueryData for Spanner Graph の概要</a></li>
+        <li><a href="https://docs.cloud.google.com/gemini/data-agents/querydata/spanner-graph/context-sets-overview" target="_blank" rel="noopener noreferrer" class="gc-link">コンテキストセットの概要 (Spanner Graph)</a></li>
+        <li><a href="https://docs.cloud.google.com/gemini/data-agents/querydata/spanner-graph/inspect-data-agent" target="_blank" rel="noopener noreferrer" class="gc-link">QueryData for Spanner Graph のテスト</a></li>
+        <li><a href="https://docs.cloud.google.com/gemini/data-agents/querydata/spanner-graph/integrate-applications-data-agent" target="_blank" rel="noopener noreferrer" class="gc-link">アプリケーションへの QueryData の統合</a></li>
+        <li><a href="https://docs.cloud.google.com/spanner/docs/querydata" target="_blank" rel="noopener noreferrer" class="gc-link">Spanner の QueryData ドキュメント</a></li>
+        <li><a href="https://cloud.google.com/products/data-agents/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">料金ページ (Data Cloud Agent)</a></li>
+      </ul>
+      <p>このインフォグラフィックは Google Cloud News レポート (2026-11-18) をもとに生成されました。</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

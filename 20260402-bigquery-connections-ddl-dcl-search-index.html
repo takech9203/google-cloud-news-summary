@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BigQuery: DDL/DCL コネクション管理 & 検索インデックスのカラム粒度 GA</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; min-width: 280px; }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .badge-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+    }
+
+    .badge-service { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 8px;
+    }
+
+    .card p, .card ul {
+      color: var(--gc-on-surface-variant);
+      font-size: 15px;
+    }
+
+    .card ul { padding-left: 20px; margin-top: 8px; }
+    .card ul li { margin-bottom: 4px; }
+
+    /* Before/After */
+    .before-after { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+
+    @media (max-width: 640px) {
+      .before-after { grid-template-columns: 1fr; }
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h4, .after-box h4 {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .before-box h4 { color: var(--gc-red); }
+    .after-box h4 { color: var(--gc-green); }
+
+    .before-box ul, .after-box ul {
+      padding-left: 18px;
+      font-size: 14px;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .before-box ul li, .after-box ul li { margin-bottom: 4px; }
+
+    /* Stats */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin: 16px 0; }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value { font-size: 32px; font-weight: 700; margin-bottom: 4px; }
+    .stat-label { font-size: 14px; opacity: 0.9; }
+
+    /* Flow diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+      font-size: 14px;
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* Code blocks */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang { color: #9CDCFE; font-weight: bold; }
+    .code-title { color: #AAAAAA; }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      background: #1E1E1E;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Note/Warning boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Usecase cards */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+    }
+
+    .usecase-card h3 {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--gc-blue-900);
+      margin-bottom: 8px;
+    }
+
+    .usecase-card p {
+      font-size: 15px;
+      color: var(--gc-on-surface-variant);
+      margin-bottom: 8px;
+    }
+
+    /* Benefit grid */
+    .benefit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+
+    @media (max-width: 640px) {
+      .benefit-grid { grid-template-columns: 1fr; }
+    }
+
+    .benefit-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 16px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .benefit-card h4 {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 6px;
+    }
+
+    .benefit-card p {
+      font-size: 14px;
+      color: var(--gc-on-surface-variant);
+    }
+
+    /* Mermaid */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Links */
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* Related services */
+    .related-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 16px 0; }
+
+    .related-item {
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+      font-size: 14px;
+      color: var(--gc-on-surface);
+      font-weight: 500;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    footer ul { list-style: none; padding: 0; }
+    footer ul li { margin-bottom: 4px; }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>📊 BigQuery: DDL/DCL コネクション管理 & 検索インデックスのカラム粒度</h1>
+        <div class="badge-row">
+          <span class="badge badge-service">BigQuery</span>
+          <span class="badge badge-ga">GA</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-04-02</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>BigQuery に <span class="highlight">2 つの重要な機能強化</span> が GA として提供開始されました。</p>
+      <div class="stats-grid" style="margin-top: 16px;">
+        <div class="stat-card">
+          <div class="stat-value">DDL/DCL</div>
+          <div class="stat-label">コネクション管理を SQL で完結</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">COLUMN</div>
+          <div class="stat-label">検索インデックスのカラム粒度設定</div>
+        </div>
+      </div>
+      <p style="margin-top: 16px;">コネクション DDL/DCL 対応により、<code>CREATE CONNECTION</code>、<code>ALTER CONNECTION SET OPTIONS</code>、<code>DROP CONNECTION</code> の DDL ステートメントでコネクションのライフサイクルを SQL で完結できるようになりました。さらに、<code>GRANT</code> / <code>REVOKE</code> の DCL ステートメントでアクセス権限も SQL で管理可能に。検索インデックスのカラム粒度設定により、不要なファイルスキャンを回避してクエリパフォーマンスを最適化できます。</p>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>🔄 Before / After</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h4>❌ Before</h4>
+          <ul>
+            <li>コネクションの作成・変更・削除には Google Cloud コンソール、bq CLI、または REST API が必要</li>
+            <li>アクセス権限管理も SQL 外の IAM 操作が必要</li>
+            <li>検索インデックスはファイル単位のトークンマッピングのみで、不要なファイルスキャンが発生</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h4>✅ After</h4>
+          <ul>
+            <li>GoogleSQL の DDL で コネクションの作成・変更・削除が SQL で完結</li>
+            <li>DCL でコネクション/プロジェクトレベルのアクセス制御を SQL で直接設定</li>
+            <li>カラム粒度設定により特定カラムへの検索時に不要スキャンを削減</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid from source) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>DDL/DCL によるコネクション管理フローと、カラム粒度付き検索インデックスによるクエリ最適化の仕組みを示します。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph DDL_DCL["DDL/DCL によるコネクション管理"]
+        User["データエンジニア"]
+        BQ["BigQuery GoogleSQL"]
+
+        User -->|"CREATE CONNECTION"| BQ
+        User -->|"ALTER CONNECTION SET OPTIONS"| BQ
+        User -->|"DROP CONNECTION"| BQ
+        User -->|"GRANT / REVOKE"| BQ
+
+        BQ -->|"コネクション作成/変更/削除"| Conn["Cloud リソースコネクション"]
+        BQ -->|"アクセス権限管理"| IAM["IAM ポリシー"]
+
+        Conn --> GCS["Cloud Storage"]
+        Conn --> Vertex["Vertex AI"]
+        Conn --> Spanner["Spanner"]
+    end
+
+    subgraph SearchIndex["検索インデックスのカラム粒度"]
+        Query["SEARCH クエリ"]
+        Index["検索インデックス - カラム粒度あり"]
+        Files["データファイル"]
+
+        Query -->|"カラム情報でフィルタリング"| Index
+        Index -->|"対象カラムのファイルのみスキャン"| Files
+    end
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+
+      <div class="card">
+        <h3>1. コネクション管理用 DDL ステートメント</h3>
+        <ul>
+          <li><code>CREATE CONNECTION</code>: 新しい Cloud リソースコネクションを GoogleSQL で作成</li>
+          <li><code>ALTER CONNECTION SET OPTIONS</code>: 既存コネクションのオプションを SQL で変更</li>
+          <li><code>DROP CONNECTION</code>: 不要なコネクションを SQL で削除</li>
+          <li>これまでコンソール、bq CLI、REST API でのみ可能だった操作が SQL で完結</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>2. コネクション/プロジェクトアクセス管理用 DCL ステートメント</h3>
+        <ul>
+          <li><code>GRANT</code> ステートメントで "connection" ユーザータイプを使用してコネクションへのアクセスを付与</li>
+          <li><code>REVOKE</code> ステートメントでコネクションへのアクセスを取り消し</li>
+          <li>"PROJECT" リソースタイプによるプロジェクトレベルのアクセス制御</li>
+          <li><code>roles/bigquery.connectionUser</code> や <code>roles/bigquery.connectionAdmin</code> などのロールを SQL で付与・取り消し可能</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>3. 検索インデックスのカラム粒度設定</h3>
+        <ul>
+          <li><code>CREATE SEARCH INDEX</code> の <code>index_column_option_list</code> で <code>index_granularity</code> オプションを指定</li>
+          <li>カラム粒度を <code>'COLUMN'</code> に設定すると、追加カラム情報がインデックスに格納</li>
+          <li>特定カラムへの SEARCH クエリ実行時に、対象カラムにトークンが含まれるファイルのみをスキャン</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3 style="font-size: 17px; font-weight: 600; color: var(--gc-on-surface); margin: 16px 0 8px;">コネクション DDL/DCL</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>DDL ステートメント</td><td><code>CREATE CONNECTION</code>, <code>ALTER CONNECTION SET OPTIONS</code>, <code>DROP CONNECTION</code></td></tr>
+          <tr><td>DCL ステートメント</td><td><code>GRANT</code>, <code>REVOKE</code></td></tr>
+          <tr><td>DCL ユーザータイプ</td><td><code>connection</code></td></tr>
+          <tr><td>DCL リソースタイプ</td><td><code>PROJECT</code></td></tr>
+          <tr><td>対象コネクション</td><td>Cloud リソースコネクション</td></tr>
+          <tr><td>必要な権限</td><td><code>bigquery.connections.create</code>, <code>bigquery.connections.update</code>, <code>bigquery.connections.delete</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="font-size: 17px; font-weight: 600; color: var(--gc-on-surface); margin: 16px 0 8px;">検索インデックスのカラム粒度</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>オプション名</td><td><code>index_granularity</code></td></tr>
+          <tr><td>設定値</td><td><code>'COLUMN'</code></td></tr>
+          <tr><td>設定場所</td><td><code>CREATE SEARCH INDEX</code> の <code>index_column_option_list</code></td></tr>
+          <tr><td>確認方法</td><td><code>INFORMATION_SCHEMA.SEARCH_INDEX_COLUMN_OPTIONS</code> ビュー</td></tr>
+          <tr><td>制限事項</td><td>カラム粒度でインデックス可能なカラム数に上限あり (クォータ参照)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Code Samples -->
+    <div class="section">
+      <h2>💻 設定方法・コードサンプル</h2>
+
+      <h3 style="font-size: 17px; font-weight: 600; color: var(--gc-on-surface); margin: 0 0 12px;">コネクション DDL の使用例</h3>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">Step 1: コネクションの作成</span>
+        </div>
+        <pre><code class="language-sql">-- Cloud リソースコネクションを GoogleSQL で作成
+CREATE CONNECTION `my_project.us.my_connection`
+  OPTIONS (connection_type = 'CLOUD_RESOURCE');</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">Step 2: コネクションオプションの変更</span>
+        </div>
+        <pre><code class="language-sql">-- コネクションのオプションを変更
+ALTER CONNECTION `my_project.us.my_connection`
+  SET OPTIONS (friendly_name = 'My Updated Connection');</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">Step 3: アクセス権限付与</span>
+        </div>
+        <pre><code class="language-sql">-- connection ユーザータイプを使用してアクセスを付与
+GRANT `roles/bigquery.connectionUser`
+  ON CONNECTION `my_project.us.my_connection`
+  TO "user:analyst@example.com";</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">Step 4: コネクションの削除</span>
+        </div>
+        <pre><code class="language-sql">-- 不要なコネクションを削除
+DROP CONNECTION `my_project.us.my_connection`;</code></pre>
+      </div>
+
+      <h3 style="font-size: 17px; font-weight: 600; color: var(--gc-on-surface); margin: 24px 0 12px;">検索インデックスのカラム粒度設定</h3>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">カラム粒度付き検索インデックスの作成</span>
+        </div>
+        <pre><code class="language-sql">-- カラム粒度を設定して検索インデックスを作成
+CREATE SEARCH INDEX my_index
+ON my_dataset.job_postings (
+  company_name OPTIONS (index_granularity = 'COLUMN'),
+  job_description
+);</code></pre>
+      </div>
+
+      <div class="note-box">
+        <strong>💡 ポイント:</strong> <code>company_name</code> にカラム粒度を設定すると、<code>SEARCH(company_name, 'skills')</code> のようなクエリ実行時に <code>company_name</code> カラムにトークンが含まれるファイルのみをスキャンします。
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQL</span>
+          <span class="code-title">インデックスオプションの確認</span>
+        </div>
+        <pre><code class="language-sql">-- カラム粒度の設定状況を確認
+SELECT *
+FROM my_dataset.INFORMATION_SCHEMA.SEARCH_INDEX_COLUMN_OPTIONS;</code></pre>
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div class="benefit-grid">
+        <div class="benefit-card">
+          <h4>🏢 運用の一元化</h4>
+          <p>コネクション管理を SQL ワークフロー内で完結でき、ツールの切り替えが不要に</p>
+        </div>
+        <div class="benefit-card">
+          <h4>📝 監査の容易さ</h4>
+          <p>DDL/DCL はクエリジョブとして記録され、操作の監査証跡が自動的に残る</p>
+        </div>
+        <div class="benefit-card">
+          <h4>🔧 Infrastructure as Code</h4>
+          <p>SQL スクリプトやストアドプロシージャにコネクション管理を組み込み可能</p>
+        </div>
+        <div class="benefit-card">
+          <h4>⚡ クエリパフォーマンス向上</h4>
+          <p>カラム粒度により不要なファイルスキャンを削減、大規模テーブルでの検索が高速化</p>
+        </div>
+        <div class="benefit-card">
+          <h4>🤖 自動化の促進</h4>
+          <p>スケジュールクエリやワークフローでコネクションのプロビジョニングとアクセス制御を自動化</p>
+        </div>
+        <div class="benefit-card">
+          <h4>💰 コスト最適化</h4>
+          <p>検索インデックスのカラム粒度で不要スキャンを削減し、オンデマンド課金でのコスト削減</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+      <div class="warning-box">
+        <strong>制限事項</strong>
+        <ul style="padding-left: 20px; margin-top: 8px; font-size: 15px;">
+          <li>カラム粒度でインデックス可能なカラム数にはクォータ上の制限がある</li>
+          <li>検索インデックスはテーブルサイズが 10 GB 未満の場合はポピュレートされない</li>
+          <li>DDL/DCL で管理可能なコネクションタイプは Cloud リソースコネクションに限定</li>
+        </ul>
+      </div>
+      <div class="warning-box">
+        <strong>考慮すべき点</strong>
+        <ul style="padding-left: 20px; margin-top: 8px; font-size: 15px;">
+          <li>カラム粒度の設定により、インデックスのストレージ使用量が増加する可能性</li>
+          <li>既存の検索インデックスにカラム粒度を追加するには、インデックスの再作成が必要</li>
+          <li>コネクション DCL で使用する権限には、対象リソースに対する適切な IAM 権限が前提</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h3>1. SQL ベースのコネクション自動プロビジョニング</h3>
+        <p><strong>シナリオ:</strong> 新しいプロジェクトやチーム向けに、Cloud リソースコネクションとアクセス権限を SQL スクリプトで一括設定する。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">チーム向けコネクション一括設定</span>
+          </div>
+          <pre><code class="language-sql">-- コネクション作成
+CREATE CONNECTION `my_project.us-central1.team_a_connection`
+  OPTIONS (connection_type = 'CLOUD_RESOURCE');
+
+-- チームメンバーにアクセス権限付与
+GRANT `roles/bigquery.connectionUser`
+  ON CONNECTION `my_project.us-central1.team_a_connection`
+  TO "group:team-a@example.com";</code></pre>
+        </div>
+        <p>→ 手動コンソール操作が不要になり、環境構築の再現性と速度が向上</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>2. ログ分析における検索パフォーマンスの最適化</h3>
+        <p><strong>シナリオ:</strong> アプリケーションログテーブルに検索インデックスを作成し、特定カラム (例: <code>error_code</code>) に対する検索を高速化する。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQL</span>
+            <span class="code-title">ログ分析用インデックス設定</span>
+          </div>
+          <pre><code class="language-sql">CREATE SEARCH INDEX log_search_index
+ON my_dataset.application_logs (
+  error_code OPTIONS (index_granularity = 'COLUMN'),
+  log_message,
+  trace_id OPTIONS (index_granularity = 'COLUMN')
+);
+
+-- 特定のエラーコードを検索 (カラム粒度により最適化)
+SELECT *
+FROM my_dataset.application_logs
+WHERE SEARCH(error_code, 'TIMEOUT_ERROR');</code></pre>
+        </div>
+        <p>→ <code>error_code</code> カラムにカラム粒度を設定することで、対象カラムに該当トークンを含むファイルのみをスキャンし、レイテンシとコストを削減</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金情報</h2>
+      <div class="note-box">
+        <ul style="padding-left: 20px; font-size: 15px;">
+          <li>検索インデックスの管理処理は、組織内のインデックス対象テーブルの合計サイズがリージョンごとの上限以下であれば <span class="highlight">無料</span></li>
+          <li>上限を超える場合は専用のリザベーションが必要</li>
+          <li>インデックスがアクティブな場合、ストレージ料金が発生</li>
+          <li>コネクション DDL/DCL ステートメントの実行は通常の BigQuery ジョブとして課金</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="related-grid">
+        <div class="related-item">🔌 BigQuery Connections API</div>
+        <div class="related-item">🏔️ BigLake</div>
+        <div class="related-item">🪣 Cloud Storage</div>
+        <div class="related-item">🤖 Vertex AI</div>
+        <div class="related-item">🔍 BigQuery SEARCH 関数</div>
+      </div>
+      <p style="margin-top: 12px; font-size: 14px;">コネクション DDL は BigQuery Connections API の機能を SQL インターフェースで提供するもの。BigLake テーブルやオブジェクトテーブル、Vertex AI リモートモデルなど、Cloud リソースコネクションを利用するあらゆるワークフローで活用できます。</p>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p style="margin-bottom: 8px;"><strong>📎 出典・参考リンク:</strong></p>
+      <ul>
+        <li>📄 <a href="https://cloud.google.com/release-notes#April_02_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li>📄 <a href="https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language" target="_blank" rel="noopener noreferrer">DDL ステートメントのドキュメント</a></li>
+        <li>📄 <a href="https://cloud.google.com/bigquery/docs/reference/standard-sql/data-control-language" target="_blank" rel="noopener noreferrer">DCL ステートメントのドキュメント</a></li>
+        <li>📄 <a href="https://cloud.google.com/bigquery/docs/create-cloud-resource-connection" target="_blank" rel="noopener noreferrer">Cloud リソースコネクションの作成と設定</a></li>
+        <li>📄 <a href="https://cloud.google.com/bigquery/docs/search-index" target="_blank" rel="noopener noreferrer">検索インデックスの管理</a></li>
+        <li>📄 <a href="https://cloud.google.com/bigquery/docs/search-intro" target="_blank" rel="noopener noreferrer">BigQuery 検索の概要</a></li>
+        <li>📄 <a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer">BigQuery 料金ページ</a></li>
+      </ul>
+      <p style="margin-top: 12px; font-size: 11px; color: var(--gc-outline);">Generated: 2026-04-04 | Source: reports/2026/2026-04-02-bigquery-connections-ddl-dcl-search-index.md</p>
+    </footer>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

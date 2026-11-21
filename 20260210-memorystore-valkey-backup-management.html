@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Memorystore for Valkey: バックアップ管理が GA</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    /* Google Cloud Light Theme Base Styles */
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left { flex: 1; }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--gc-outline);
+      text-align: right;
+      white-space: nowrap;
+      padding-top: 4px;
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); color: #FFFFFF; }
+    .badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green { border-left-color: var(--gc-green); }
+    .card-orange { border-left-color: var(--gc-orange); }
+    .card-red { border-left-color: var(--gc-red); }
+    .card-purple { border-left-color: var(--gc-purple); }
+    .card-teal { border-left-color: var(--gc-teal); }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    /* Before/After comparison */
+    .comparison-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .comparison-before {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .comparison-after {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+    }
+
+    .comparison-label {
+      font-weight: 700;
+      font-size: 14px;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .comparison-before .comparison-label { color: var(--gc-red); }
+    .comparison-after .comparison-label { color: var(--gc-green); }
+
+    .comparison-before ul,
+    .comparison-after ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .comparison-before li,
+    .comparison-after li {
+      margin-bottom: 6px;
+    }
+
+    /* Stats grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.green {
+      background: linear-gradient(135deg, var(--gc-green), #2E7D32);
+    }
+
+    .stat-card.orange {
+      background: linear-gradient(135deg, var(--gc-orange), #E65100);
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    /* Feature cards grid */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .feature-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid var(--gc-outline-variant);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+      transition: box-shadow 0.2s;
+    }
+
+    .feature-card:hover {
+      box-shadow: 0 4px 12px rgba(60, 64, 67, 0.2);
+    }
+
+    .feature-card .feature-icon {
+      font-size: 28px;
+      margin-bottom: 8px;
+    }
+
+    .feature-card .feature-title {
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 8px;
+      font-size: 15px;
+    }
+
+    .feature-card .feature-desc {
+      font-size: 14px;
+      color: var(--gc-on-surface-variant);
+      line-height: 1.6;
+    }
+
+    /* Mermaid */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* Code blocks */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      background: #1E1E1E;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    /* Note/Warning boxes */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Use case cards */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-800);
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .usecase-card p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    /* Flow diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+      font-size: 14px;
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Related services */
+    .related-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .related-item {
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 8px;
+      padding: 16px;
+      font-size: 14px;
+    }
+
+    .related-item strong {
+      color: var(--gc-blue-800);
+    }
+
+    /* Region chips */
+    .region-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    .region-chip {
+      background: var(--gc-blue-50);
+      border: 1px solid var(--gc-blue-200);
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: 13px;
+      color: var(--gc-blue-900);
+    }
+
+    /* Footer */
+    footer {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    footer ul {
+      list-style: none;
+      padding: 0;
+      margin: 8px 0;
+    }
+
+    footer li {
+      margin-bottom: 4px;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .header { flex-direction: column; }
+      .subtitle { text-align: left; margin-top: 8px; }
+      .comparison-grid { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .feature-grid { grid-template-columns: 1fr; }
+      .related-grid { grid-template-columns: 1fr; }
+      .flow-diagram { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>⚡ Memorystore for Valkey: バックアップ管理が GA</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Memorystore for Valkey</span>
+          <span class="badge-ga">GA</span>
+          <span class="badge" style="background: var(--gc-blue-300);">Google Cloud Console</span>
+        </div>
+      </div>
+      <div class="subtitle">
+        リリース日: 2026-02-10
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        Memorystore for Valkey のバックアップ管理機能が <span class="highlight">GA (Generally Available)</span> となり、
+        Google Cloud コンソールからバックアップの<strong>作成</strong>、<strong>一覧表示</strong>、<strong>削除</strong>、<strong>エクスポート</strong>、および<strong>リストア</strong>の操作が正式にサポートされました。
+        gcloud CLI や REST API を使用せずに、GUI ベースで直感的にバックアップのライフサイクルを管理できます。
+      </p>
+      <p>
+        今回の GA 昇格により、本番環境での Google Cloud コンソールによるバックアップ管理が <span class="highlight">SLA の対象</span>として正式にサポートされ、
+        エンタープライズワークロードでの利用に適した信頼性が確保されました。
+      </p>
+
+      <!-- Before/After -->
+      <div class="comparison-grid">
+        <div class="comparison-before">
+          <div class="comparison-label">&#x274C; Before (アップデート前)</div>
+          <ul>
+            <li>コンソール操作は Preview 段階で SLA 適用外</li>
+            <li>安定性・機能の完全性が保証されず、gcloud CLI 依存</li>
+            <li>仕様変更の可能性があり、運用手順の確立が困難</li>
+          </ul>
+        </div>
+        <div class="comparison-after">
+          <div class="comparison-label">&#x2705; After (アップデート後)</div>
+          <ul>
+            <li>コンソールでのバックアップ管理が GA で SLA 対象</li>
+            <li>全操作 (作成・削除・エクスポート・リストア) がコンソールから実行可能</li>
+            <li>本番環境での安定した運用と効率化を実現</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value">6</div>
+        <div class="stat-label">コンソールから実行可能な<br>バックアップ操作</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-value">40+</div>
+        <div class="stat-label">利用可能リージョン</div>
+      </div>
+      <div class="stat-card orange">
+        <div class="stat-value">365 日</div>
+        <div class="stat-label">最大バックアップ保持期間</div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>Google Cloud コンソールから Memorystore for Valkey インスタンスのバックアップ操作を一元管理し、Cloud Storage へのエクスポートや Cloud Monitoring との連携が可能なアーキテクチャを示しています。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Console["&#9729;&#65039; Google Cloud Console"]
+        direction LR
+        Create["&#128221; オンデマンド&lt;br/&gt;バックアップ作成"]
+        Schedule["&#9200; 自動バックアップ&lt;br/&gt;スケジュール設定"]
+        List["&#128203; バックアップ&lt;br/&gt;一覧・詳細表示"]
+        Delete["&#128465;&#65039; バックアップ&lt;br/&gt;削除"]
+        Export["&#128228; Cloud Storage&lt;br/&gt;エクスポート"]
+        Restore["&#9851;&#65039; 新規インスタンス&lt;br/&gt;へのリストア"]
+        Create ~~~ Schedule ~~~ List
+        Delete ~~~ Export ~~~ Restore
+    end
+
+    subgraph Memorystore["&#9889; Memorystore for Valkey"]
+        Instance[("&#128452;&#65039; Valkey&lt;br/&gt;インスタンス")]
+        BackupCol[("&#128230; バックアップ&lt;br/&gt;コレクション")]
+    end
+
+    subgraph Storage["&#129717; Cloud Storage"]
+        Bucket[("&#128194; リージョナル&lt;br/&gt;バケット")]
+    end
+
+    subgraph Monitoring["&#128202; Cloud Monitoring"]
+        Metrics["&#128200; バックアップ&lt;br/&gt;メトリクス"]
+    end
+
+    Console --> Instance
+    Instance --> BackupCol
+    Export --> Bucket
+    Restore --> Instance
+    Instance -.-> Metrics
+
+    classDef console fill:#E8F1FF,stroke:#4A90E2,stroke-width:2px,color:#333333
+    classDef memorystore fill:#E9F7EC,stroke:#66BB6A,stroke-width:2px,color:#333333
+    classDef storage fill:#FFF3E0,stroke:#FF9800,stroke-width:2px,color:#333333
+    classDef monitoring fill:#F3E5F5,stroke:#7B61FF,stroke-width:2px,color:#333333
+    classDef ops fill:#FFFFFF,stroke:#4A90E2,stroke-width:2px,color:#333333
+
+    class Console console
+    class Memorystore memorystore
+    class Storage storage
+    class Monitoring monitoring
+    class Create,Schedule,List,Delete,Export,Restore ops
+    class Instance,BackupCol memorystore
+    class Bucket storage
+    class Metrics monitoring
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>&#128273; 主要機能</h2>
+      <p>GA となったバックアップ管理で利用できる 6 つの主要機能です。</p>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-icon">&#128221;</div>
+          <div class="feature-title">オンデマンドバックアップの作成</div>
+          <div class="feature-desc">コンソールの [Backups] パネルから [Create backup] をクリックするだけで即座にバックアップを作成可能。任意の名前を付与でき、省略時は日時スタンプが自動設定されます。</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#9200;</div>
+          <div class="feature-title">自動バックアップスケジュール</div>
+          <div class="feature-desc">日次の自動バックアップスケジュールをコンソールから設定可能。保持期間は 1 日から 365 日 (デフォルト 35 日)、開始時刻は 1 時間単位で UTC 指定。有効化・無効化も切り替え可能です。</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#128203;</div>
+          <div class="feature-title">バックアップの一覧・詳細確認</div>
+          <div class="feature-desc">サイドナビゲーションの [Backups] から、バックアップコレクションおよび個別バックアップの一覧を視覚的に確認・管理できます。</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#128465;&#65039;</div>
+          <div class="feature-title">バックアップの削除</div>
+          <div class="feature-desc">[More actions] > [Delete] から確認ダイアログで "delete" と入力して安全に削除可能。インスタンス削除後もバックアップは自動削除されないため手動管理が必要です。</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#128228;</div>
+          <div class="feature-title">Cloud Storage へのエクスポート</div>
+          <div class="feature-desc">[Export] から宛先の Cloud Storage バケットを指定してエクスポート可能。バケットはリージョナルで同一リージョンに存在する必要があります。サービスエージェントに Storage Admin ロールが必要です。</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#9851;&#65039;</div>
+          <div class="feature-title">バックアップからのリストア</div>
+          <div class="feature-desc">マネージドバックアップまたは Cloud Storage 上の RDB ファイルから新規インスタンスを作成可能。ノードタイプ、サイズ、レプリカ数は自動設定されます (増加は可能、減少は非推奨)。</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>&#128295; 技術仕様</h2>
+
+      <h3>バックアップの仕様</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>バックアップの種類</td><td>オンデマンドバックアップ、自動バックアップ (日次)</td></tr>
+          <tr><td>保持期間</td><td>1 日 ~ 365 日 (デフォルト: 35 日、TTL 未指定時: 100 年)</td></tr>
+          <tr><td>バックアップコレクション</td><td>インスタンスごとに 1 つのバックアップコレクションで管理</td></tr>
+          <tr><td>インスタンス削除時の動作</td><td>バックアップコレクションは自動削除されず、保持期間中は保持 (最大 365 日)</td></tr>
+          <tr><td>リストア先</td><td>新規インスタンスのみ (既存インスタンスへのインポートは不可)</td></tr>
+          <tr><td>エクスポート先</td><td>リージョナル Cloud Storage バケット (バックアップと同一リージョン)</td></tr>
+          <tr><td>サポートバージョン</td><td>Valkey 7.2、8.0、9.0 (Preview)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>必要な IAM ロール</h3>
+      <table>
+        <thead>
+          <tr><th>操作</th><th>必要なロール</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>全バックアップ操作 (作成・削除・エクスポートなど)</td><td>Memorystore Admin (<code>roles/memorystore.admin</code>)</td></tr>
+          <tr><td>全バックアップ操作 (作成・削除・エクスポートなど)</td><td>Memorystore Editor (<code>roles/memorystore.editor</code>)</td></tr>
+          <tr><td>バックアップの表示・エクスポート</td><td>Memorystore Viewer (<code>roles/memorystore.viewer</code>)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Cloud Storage エクスポートに必要なサービスエージェント権限</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">サービスエージェントに Storage Admin ロールを付与</span>
+        </div>
+        <pre><code class="language-bash"># Memorystore for Valkey サービスエージェントに Storage Admin ロールを付与
+gcloud storage buckets add-iam-policy-binding gs://BUCKET_NAME \
+  --member=serviceAccount:service-PROJECT_NUMBER@gcp-sa-memorystore.iam.gserviceaccount.com \
+  --role=roles/storage.admin</code></pre>
+      </div>
+    </div>
+
+    <!-- Setup Steps -->
+    <div class="section">
+      <h2>&#128736;&#65039; 設定方法</h2>
+
+      <h3>前提条件</h3>
+      <div class="note-box">
+        <strong>&#128161; 前提条件:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>Memorystore for Valkey インスタンスが作成済みであること</li>
+          <li>Memorystore Admin または Memorystore Editor ロールが付与されていること</li>
+          <li>エクスポートを行う場合は、同一リージョンのリージョナル Cloud Storage バケットが作成済みであること</li>
+        </ul>
+      </div>
+
+      <h3>ステップ 1: オンデマンドバックアップの作成</h3>
+      <p>Google Cloud コンソールから以下の手順でバックアップを作成できます。</p>
+      <div class="flow-diagram">
+        <div class="flow-step">&#128193; Memorystore<br>ページに移動</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">&#128073; インスタンス ID<br>をクリック</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">&#128194; [Backups]<br>をクリック</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">&#10133; [Create backup]<br>をクリック</div>
+      </div>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">gcloud CLI でのバックアップ作成</span>
+        </div>
+        <pre><code class="language-bash">gcloud memorystore instances backup INSTANCE_ID \
+  --backup-id=BACKUP_ID \
+  --ttl=TTL_PERIOD \
+  --project=PROJECT_ID \
+  --location=REGION_ID</code></pre>
+      </div>
+
+      <h3>ステップ 2: 自動バックアップスケジュールの有効化</h3>
+      <p>既存インスタンスに対して自動バックアップを有効化する手順です。</p>
+      <div class="flow-diagram">
+        <div class="flow-step">&#128194; [Backups] ><br>[Settings]</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">&#9998;&#65039; [Edit]<br>をクリック</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">&#9745; Automated daily<br>backups を選択</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">&#128190; 保持日数・時刻<br>を設定し [Save]</div>
+      </div>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">gcloud CLI での自動バックアップ有効化</span>
+        </div>
+        <pre><code class="language-bash">gcloud memorystore instances update INSTANCE_ID \
+  --automated-backup-config-mode=enabled \
+  --fixed-frequency-schedule-start-time-hours=START_TIME \
+  --automated-backup-config-retention=RETENTION_POLICY</code></pre>
+      </div>
+
+      <h3>ステップ 3: バックアップからのリストア</h3>
+      <p>バックアップから新規インスタンスを作成する手順です。</p>
+      <div class="flow-diagram">
+        <div class="flow-step">&#128194; [Backups]<br>をクリック</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">&#128073; [More actions] ><br>[Import into<br>new instance]</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">&#128295; インスタンス<br>構成を設定</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">&#10133; [Create<br>instance]</div>
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>&#128077; メリット</h2>
+
+      <h3>&#128188; ビジネス面</h3>
+      <div class="card card-green">
+        <div class="icon-text">
+          <span class="arrow">&rarr;</span>
+          <span><strong>運用効率の向上:</strong> GUI ベースの操作により、CLI に精通していないチームメンバーでもバックアップ運用が可能になり、運用の属人化を解消</span>
+        </div>
+        <div class="icon-text">
+          <span class="arrow">&rarr;</span>
+          <span><strong>SLA による信頼性保証:</strong> GA となったことで本番環境での利用が正式にサポートされ、エンタープライズワークロードに求められる信頼性を確保</span>
+        </div>
+        <div class="icon-text">
+          <span class="arrow">&rarr;</span>
+          <span><strong>コンプライアンス対応の簡素化:</strong> 定期的なバックアップの設定・確認・管理がコンソールから容易に行え、データ保持ポリシーの遵守が容易に</span>
+        </div>
+      </div>
+
+      <h3>&#128187; 技術面</h3>
+      <div class="card card-teal">
+        <div class="icon-text">
+          <span class="arrow">&rarr;</span>
+          <span><strong>直感的なバックアップライフサイクル管理:</strong> 全操作をコンソールから一元管理可能</span>
+        </div>
+        <div class="icon-text">
+          <span class="arrow">&rarr;</span>
+          <span><strong>Cloud Storage 連携:</strong> バックアップのエクスポートにより、長期保存やリージョン間のデータ移動が可能</span>
+        </div>
+        <div class="icon-text">
+          <span class="arrow">&rarr;</span>
+          <span><strong>Cloud Monitoring 連携:</strong> バックアップおよびインポート操作のメトリクスを監視可能</span>
+        </div>
+        <div class="icon-text">
+          <span class="arrow">&rarr;</span>
+          <span><strong>柔軟なリストアオプション:</strong> マネージドバックアップと Cloud Storage 上の RDB ファイルからの 2 つの方法をサポート</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>&#9888;&#65039; デメリット・制約事項</h2>
+
+      <h3>制限事項</h3>
+      <div class="error-box">
+        <ul style="margin: 0; padding-left: 20px; font-size: 14px;">
+          <li>既存インスタンスへのバックアップデータのインポートは<strong>非サポート</strong> (新規インスタンスの作成のみ)</li>
+          <li>Cluster Mode Enabled インスタンスは単一データベースのみサポートしており、複数データベースを含むバックアップのインポートは不可</li>
+          <li>エクスポート先 Cloud Storage バケットはリージョナルバケットであり、バックアップと<strong>同一リージョン</strong>に存在する必要がある</li>
+          <li>インスタンスの更新操作が進行中の場合、バックアップ操作は拒否される</li>
+          <li>メンテナンス操作とバックアップ操作が同時に発生した場合、バックアップがスキップされることがある</li>
+        </ul>
+      </div>
+
+      <h3>考慮すべき点</h3>
+      <div class="warning-box">
+        <ul style="margin: 0; padding-left: 20px; font-size: 14px;">
+          <li>バックアップにはサイズとリージョンに基づくストレージ料金が発生し、<strong>最低 24 時間の課金</strong>が適用される</li>
+          <li>インスタンスを削除してもバックアップコレクションは自動削除されないため、不要なバックアップは手動で削除する必要がある</li>
+          <li>リストア時にバックアップ元のノードタイプ・インスタンスサイズ・レプリカ数を減少させることは非推奨 (インポートの問題が発生する可能性がある)</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>&#127919; ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>&#128737;&#65039; ユースケース 1: ディザスタリカバリ計画の構築</h4>
+        <p><strong>シナリオ:</strong> ミッションクリティカルなキャッシュデータを保持する Memorystore for Valkey インスタンスに対して、日次の自動バックアップを設定し、障害発生時に迅速にデータを復元する。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">日次自動バックアップの有効化</span>
+          </div>
+          <pre><code class="language-bash"># 日次自動バックアップを有効化 (毎日 UTC 2:00、保持期間 30 日)
+gcloud memorystore instances update my-valkey-instance \
+  --automated-backup-config-mode=enabled \
+  --fixed-frequency-schedule-start-time-hours=2 \
+  --automated-backup-config-retention=30d</code></pre>
+        </div>
+        <p><strong>効果:</strong> 障害発生時にバックアップから新規インスタンスを作成し、データ損失を最小限に抑えた復旧が可能。保持期間内の任意の時点のバックアップからリストアできます。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>&#127758; ユースケース 2: リージョン間のデータマイグレーション</h4>
+        <p><strong>シナリオ:</strong> 東京リージョン (asia-northeast1) の Memorystore for Valkey インスタンスのデータを、大阪リージョン (asia-northeast2) に移行する。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">リージョン間データマイグレーション</span>
+          </div>
+          <pre><code class="language-bash"># 1. バックアップを Cloud Storage にエクスポート
+gcloud memorystore backup-collections backups export my-backup \
+  --backup-collection=my-collection \
+  --location=asia-northeast1 \
+  --gcs-bucket=my-migration-bucket
+
+# 2. エクスポートされた RDB ファイルを大阪リージョンのバケットにコピー
+gcloud storage cp gs://my-migration-bucket/backup-folder/* \
+  gs://my-osaka-bucket/
+
+# 3. 大阪リージョンで新規インスタンスを作成しデータをインポート
+gcloud memorystore instances create my-osaka-instance \
+  --gcs-source-uris=gs://my-osaka-bucket/backup.rdb \
+  --location=asia-northeast2 \
+  --shard-count=3</code></pre>
+        </div>
+        <p><strong>効果:</strong> Cloud Storage を介したリージョン間のデータ移行により、マルチリージョン構成の構築やリージョン移行を計画的に実施できます。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>&#128176; 料金</h2>
+      <p>Memorystore for Valkey のバックアップには、バックアップのサイズとリージョンに基づくストレージ料金が発生します。各バックアップには<span class="highlight">最低 24 時間の課金</span>が適用されます。</p>
+      <div class="success-box">
+        <strong>&#128178; Committed Use Discounts (CUDs):</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px; font-size: 14px;">
+          <li><strong>1 年契約:</strong> 20% 割引</li>
+          <li><strong>3 年契約:</strong> 40% 割引</li>
+          <li>Memorystore for Memcached、Redis、Redis Cluster を含むすべての Memorystore サービスで利用可能</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Available Regions -->
+    <div class="section">
+      <h2>&#127759; 利用可能リージョン</h2>
+      <p>Memorystore for Valkey は全世界 <span class="highlight">40 以上のリージョン</span>で利用可能です。主要なリージョンは以下の通りです。</p>
+      <div class="region-chips">
+        <span class="region-chip">&#127471;&#127477; asia-northeast1 (東京)</span>
+        <span class="region-chip">&#127471;&#127477; asia-northeast2 (大阪)</span>
+        <span class="region-chip">&#127472;&#127479; asia-northeast3 (ソウル)</span>
+        <span class="region-chip">&#127480;&#127468; asia-southeast1 (シンガポール)</span>
+        <span class="region-chip">&#127482;&#127480; us-central1 (アイオワ)</span>
+        <span class="region-chip">&#127482;&#127480; us-east1 (サウスカロライナ)</span>
+        <span class="region-chip">&#127482;&#127480; us-west1 (オレゴン)</span>
+        <span class="region-chip">&#127463;&#127466; europe-west1 (ベルギー)</span>
+        <span class="region-chip">&#127465;&#127466; europe-west3 (フランクフルト)</span>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#128279; 関連サービス・機能</h2>
+      <div class="related-grid">
+        <div class="related-item">
+          <strong>&#129717; Cloud Storage</strong><br>
+          バックアップのエクスポート先として使用。リージョナルバケットへの保存により、長期保存やクロスリージョン移行が可能。
+        </div>
+        <div class="related-item">
+          <strong>&#128202; Cloud Monitoring</strong><br>
+          バックアップおよびインポート操作のメトリクスを監視。成功・失敗を可視化し、運用の信頼性を向上。
+        </div>
+        <div class="related-item">
+          <strong>&#128272; Cloud KMS (CMEK)</strong><br>
+          Customer-Managed Encryption Keys を使用してバックアップデータを暗号化。コンプライアンス要件に対応。
+        </div>
+        <div class="related-item">
+          <strong>&#128274; IAM</strong><br>
+          Memorystore Admin、Editor、Viewer ロールによるバックアップ操作のアクセス制御。最小権限の原則に基づいた運用。
+        </div>
+        <div class="related-item">
+          <strong>&#128190; 永続化機能 (AOF/RDB)</strong><br>
+          バックアップとは別に、RDB スナップショットや AOF ログによるデータ永続化を提供。バックアップと併用してデータ保護を強化。
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>&#128221; まとめ</h2>
+      <div class="success-box">
+        <p style="margin: 0; font-size: 15px;">
+          Memorystore for Valkey のバックアップ管理が <strong>GA</strong> となり、Google Cloud コンソールからのバックアップ操作が本番環境で正式にサポートされました。
+          オンデマンドバックアップの作成、自動スケジュールの設定、Cloud Storage へのエクスポート、バックアップからのリストアなど、包括的なバックアップライフサイクル管理が GUI から実行可能です。
+        </p>
+        <p style="margin: 12px 0 0 0; font-size: 15px; font-weight: 600; color: var(--gc-green);">
+          &#128161; ディザスタリカバリ計画の構築やコンプライアンス対応を進めている場合は、自動バックアップスケジュールの設定と適切な保持期間の設定を推奨します。
+        </p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>&#128206; 出典・参考リンク:</strong></p>
+      <ul>
+        <li>&#128196; <a href="https://cloud.google.com/release-notes#February_10_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li>&#128214; <a href="https://cloud.google.com/memorystore/docs/valkey/manage-backups" target="_blank" rel="noopener noreferrer">バックアップの管理 - ドキュメント</a></li>
+        <li>&#128214; <a href="https://cloud.google.com/memorystore/docs/valkey/backups" target="_blank" rel="noopener noreferrer">バックアップの概要 - ドキュメント</a></li>
+        <li>&#128214; <a href="https://cloud.google.com/memorystore/docs/valkey/product-overview" target="_blank" rel="noopener noreferrer">Memorystore for Valkey 概要</a></li>
+        <li>&#128176; <a href="https://cloud.google.com/memorystore/valkey/pricing" target="_blank" rel="noopener noreferrer">料金ページ</a></li>
+        <li>&#128274; <a href="https://cloud.google.com/memorystore/docs/valkey/access-control" target="_blank" rel="noopener noreferrer">IAM アクセス制御</a></li>
+        <li>&#128295; <a href="https://cloud.google.com/memorystore/docs/valkey/reference/rest" target="_blank" rel="noopener noreferrer">REST API リファレンス</a></li>
+      </ul>
+      <p style="margin-top: 12px; font-size: 11px; color: var(--gc-outline);">
+        #Memorystore #Valkey #Backup #GA #DisasterRecovery #DataProtection #GoogleCloud
+      </p>
+    </footer>
+
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

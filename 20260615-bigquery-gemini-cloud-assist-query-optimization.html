@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BigQuery: Gemini Cloud Assist によるクエリ最適化とジョブパフォーマンストラブルシューティング</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-preview {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-orange);
+    }
+
+    .badge-service {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-green);
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h3 {
+      color: var(--gc-red);
+      margin-top: 0;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box h3 {
+      color: var(--gc-green);
+      margin-top: 0;
+    }
+
+    .before-box ul, .after-box ul {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .ai-box {
+      background: var(--gc-purple-tint);
+      border-left: 4px solid var(--gc-purple);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.purple {
+      background: linear-gradient(135deg, var(--gc-purple), #7B1FA2);
+    }
+
+    .stat-card.green {
+      background: linear-gradient(135deg, var(--gc-green), #1B5E20);
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid) {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-800);
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .usecase-card p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .pricing-table td:first-child {
+      font-weight: 600;
+    }
+
+    .links-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .links-list li {
+      margin: 8px 0;
+      padding: 8px 12px;
+      background: var(--gc-surface);
+      border-radius: 8px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .links-list li a {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      font-size: 14px;
+    }
+
+    .links-list li a:hover {
+      text-decoration: underline;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 24px;
+      }
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+      .stat-cards {
+        grid-template-columns: 1fr;
+      }
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>🤖 BigQuery: Gemini Cloud Assist<br>クエリ最適化 &amp; ジョブトラブルシューティング</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge-service">BigQuery</span>
+          <span class="badge-preview">Preview</span>
+          <span class="badge">Gemini Cloud Assist</span>
+          <span class="badge">Gemini Code Assist</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-06-15</div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>BigQuery における Gemini AI アシスタントの統合が大幅に強化されました。<span class="highlight">SQL クエリの最適化</span>と<span class="highlight">ジョブパフォーマンスのトラブルシューティング</span>を AI が支援する 2 つの新機能が Preview としてリリースされています。</p>
+
+      <div class="ai-box">
+        <strong>🤖 AI 統合のポイント:</strong> データエンジニアや BigQuery 管理者のクエリチューニング・ジョブ監視ワークフローが大幅に簡素化されます。深い BigQuery の専門知識がなくても、AI の支援で効率的なパフォーマンス改善が可能になります。
+      </div>
+    </div>
+
+    <!-- Before/After Section -->
+    <div class="section">
+      <h2>🔄 Before / After</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before</h3>
+          <ul>
+            <li>SQL 最適化に深い BigQuery 知識とクエリ実行計画の分析スキルが必要</li>
+            <li>INFORMATION_SCHEMA への複雑なクエリを手動で記述</li>
+            <li>キャパシティ管理とボトルネック特定に時間がかかる</li>
+            <li>複数のページやツールを横断した調査が必要</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After</h3>
+          <ul>
+            <li>Gemini がクエリ構造を分析し具体的な最適化提案を自動提供</li>
+            <li>Jobs Explorer から自然言語でジョブパフォーマンスを分析</li>
+            <li>ワンクリックで AI による予約パフォーマンス分析と改善提案</li>
+            <li>チャットインターフェースで一元的にトラブルシューティング完結</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>BigQuery の各ユーザーインターフェースから Gemini Cloud Assist / Code Assist がどのように連携し、最適化推奨事項やパフォーマンス診断を提供するかを示します。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TB
+    subgraph User["ユーザーインターフェース"]
+        QE["BigQuery クエリエディタ"]
+        JE["Jobs Explorer"]
+        JD["Job Details"]
+        JH["Job History"]
+        CM["Capacity Management"]
+    end
+
+    subgraph GeminiLayer["Gemini AI レイヤー"]
+        GCA["Gemini Cloud Assist\n(クエリ最適化)"]
+        GCode["Gemini Code Assist\n(ジョブトラブルシューティング)"]
+    end
+
+    subgraph BigQueryEngine["BigQuery エンジン"]
+        QP["クエリプロセッサ"]
+        IS["INFORMATION_SCHEMA"]
+        RM["リソースマネージャー"]
+        SLOT["スロット管理"]
+    end
+
+    subgraph Output["出力"]
+        OPT["最適化推奨事項"]
+        DIAG["パフォーマンス診断"]
+        ACT["アクション提案"]
+    end
+
+    QE -->|"Optimize ボタン"| GCA
+    JE -->|"Gemini アイコン"| GCode
+    JD -->|"Gemini アイコン"| GCode
+    JH -->|"Gemini アイコン"| GCode
+    CM -->|"Gemini アイコン"| GCode
+
+    GCA --> QP
+    GCA --> IS
+    GCode --> IS
+    GCode --> RM
+    GCode --> SLOT
+
+    GCA --> OPT
+    GCode --> DIAG
+    GCode --> ACT
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features Section -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="features-grid">
+        <div class="card">
+          <h3>🔍 Gemini Cloud Assist によるクエリ最適化</h3>
+          <div class="icon-text"><span class="arrow">→</span><span>クエリエディタで SQL 実行後、「Optimize」ボタンクリックで最適化分析を開始</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>クエリ構造を解析し、スロット時間の削減につながる具体的な改善提案を提示</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>BigQuery editions 顧客は「Optimize」ボタンを使用可能</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>Cloud Assist パネルから SQL コードを貼り付けて最適化を依頼可能 (全顧客)</span></div>
+        </div>
+
+        <div class="card card-purple">
+          <h3>🛠️ Gemini Code Assist によるジョブトラブルシューティング</h3>
+          <div class="icon-text"><span class="arrow">→</span><span>Jobs Explorer / Job Details / Job History / Capacity Management ページに統合</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>ジョブ行にホバーして Gemini アイコンをクリックするだけでコンテキスト対応の分析を開始</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>自然言語でジョブの遅延原因分析、統計解析、予約パフォーマンス分析が可能</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>Performance Insights レポートによるボトルネックの自動検出</span></div>
+        </div>
+
+        <div class="card card-green">
+          <h3>🤖 エージェント型パフォーマンストラブルシューティング</h3>
+          <div class="icon-text"><span class="arrow">→</span><span>組織レベルや予約レベルのしきい値違反時に自動的に Performance Insights レポートを生成</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>キューイング増加やプロジェクト並列性の急増を検知し、原因と対策を提示</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>Key Metrics Comparison テーブルによる数値ベースの詳細比較</span></div>
+          <div class="icon-text"><span class="arrow">→</span><span>アクション可能なハンドオフリンク (予約編集、ジョブパフォーマンス表示、ジョブ比較) を生成</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Workflow Flow Diagram -->
+    <div class="section">
+      <h2>🔧 利用フロー</h2>
+      <h3>クエリ最適化</h3>
+      <div class="flow-diagram">
+        <div class="flow-step">📝 SQL クエリ<br>入力・実行</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🔘 Optimize<br>ボタンクリック</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🤖 Gemini<br>構造解析</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">📊 最適化<br>推奨事項表示</div>
+      </div>
+      <h3>ジョブトラブルシューティング</h3>
+      <div class="flow-diagram">
+        <div class="flow-step">📋 Jobs Explorer<br>ページ移動</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">✨ Gemini アイコン<br>クリック</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">💬 自然言語<br>プロンプト入力</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🎯 インサイト &amp;<br>アクション提案</div>
+      </div>
+    </div>
+
+    <!-- Technical Specs -->
+    <div class="section">
+      <h2>📐 技術仕様</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>Gemini Cloud Assist クエリ最適化</th>
+            <th>Gemini Code Assist ジョブトラブルシューティング</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>対象エディション</td>
+            <td>BigQuery editions (Optimize ボタン)</td>
+            <td>全エディション</td>
+          </tr>
+          <tr>
+            <td>必要な API</td>
+            <td>Gemini Cloud Assist API</td>
+            <td>Gemini Code Assist API</td>
+          </tr>
+          <tr>
+            <td>必要な IAM ロール</td>
+            <td>Cloud AI Companion User</td>
+            <td>BigQuery Resource Viewer + Cloud AI Companion User</td>
+          </tr>
+          <tr>
+            <td>利用場所</td>
+            <td>クエリエディタ / Cloud Assist パネル</td>
+            <td>Jobs Explorer / Job Details / Job History / Capacity Management</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>必要な IAM 権限</h3>
+      <span class="code-label">IAM Roles</span>
+      <pre><code># Gemini Cloud Assist の利用に必要な基本ロール
+roles/cloudaicompanion.user
+
+# Jobs Explorer でのジョブ監視に必要なロール
+roles/bigquery.resourceViewer
+
+# 組織レベルでのジョブ表示
+bigquery.jobs.listAll (組織レベル)
+
+# 予約によるフィルタリング
+bigquery.reservations.list (組織レベル)</code></pre>
+    </div>
+
+    <!-- Setup Steps -->
+    <div class="section">
+      <h2>⚙️ 設定方法</h2>
+      <div class="note-box">
+        <strong>📋 前提条件:</strong>
+        <ul style="margin: 8px 0; padding-left: 20px;">
+          <li>Gemini in BigQuery がプロジェクトでセットアップ済み</li>
+          <li>Gemini Cloud Assist API が有効化済み</li>
+          <li>適切な IAM ロールが付与済み</li>
+          <li>BigQuery editions のいずれかを利用 (Optimize ボタン利用時)</li>
+        </ul>
+      </div>
+
+      <h3>Step 1: Gemini Cloud Assist の有効化</h3>
+      <p>Google Cloud コンソールで Gemini Cloud Assist を有効化します。</p>
+
+      <h3>Step 2: クエリ最適化の利用</h3>
+      <span class="code-label">手順</span>
+      <pre><code>1. Google Cloud コンソールで BigQuery ページに移動
+2. クエリエディタに SQL クエリを入力して実行
+3. クエリエディタツールバーの「Optimize」をクリック
+4. Cloud Assist パネルに表示される最適化推奨事項を確認</code></pre>
+
+      <h3>Step 3: ジョブトラブルシューティングの利用</h3>
+      <span class="code-label">手順</span>
+      <pre><code>1. BigQuery の Jobs Explorer ページに移動
+2. 分析したいジョブにホバーし、Gemini アイコンをクリック
+3. 自然言語でプロンプトを入力 (例: "Why is this job slow?")
+4. 生成されたインサイトとアクション提案を確認</code></pre>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+      <div class="usecase-card">
+        <h4>📦 ユースケース 1: 大規模 ETL パイプラインの最適化</h4>
+        <p><strong>シナリオ:</strong> 毎日実行される ETL ジョブのスロット使用量が増加傾向にあり、処理時間が延びている</p>
+        <span class="code-label">SQL</span>
+        <pre><code>-- クエリエディタで ETL クエリを実行後、Optimize ボタンをクリック
+-- Gemini が以下のような推奨事項を提示:
+-- 1. パーティションプルーニングの活用
+-- 2. 不要なカラムの除外
+-- 3. JOIN 順序の最適化</code></pre>
+        <p><strong>効果:</strong> スロット使用時間の削減により、同じ予約内で他のワークロードへのリソース確保が改善</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>🚨 ユースケース 2: 突発的なパフォーマンス低下の原因調査</h4>
+        <p><strong>シナリオ:</strong> 特定の時間帯に BigQuery ジョブのキューイング時間が急増し、ダッシュボードの更新が遅延</p>
+        <span class="code-label">プロンプト例</span>
+        <pre><code>Cloud Assist パネルで以下のプロンプトを入力:
+"Analyze my reservation performance for the last 24 hours.
+ Show the top projects consuming the most slots."</code></pre>
+        <p><strong>効果:</strong> 原因となっているプロジェクトやユーザーを即座に特定し、予約サイズの調整やワークロード管理の設定変更を迅速に実施</p>
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div>
+          <h3>💼 ビジネス面</h3>
+          <div class="icon-text"><span>💰</span><span><strong>コスト削減:</strong> スロット使用量削減で容量ベース課金の費用が低下</span></div>
+          <div class="icon-text"><span>⚡</span><span><strong>運用効率の向上:</strong> パフォーマンス問題の特定・解決時間が大幅に短縮</span></div>
+          <div class="icon-text"><span>🎓</span><span><strong>スキルギャップの解消:</strong> 深い専門知識なしで AI 支援によるクエリチューニングが可能</span></div>
+        </div>
+        <div>
+          <h3>🔧 技術面</h3>
+          <div class="icon-text"><span>🎯</span><span><strong>コンテキスト対応分析:</strong> 実行統計やメトリクスを自動ロードし的確な分析を実施</span></div>
+          <div class="icon-text"><span>🔔</span><span><strong>プロアクティブな検知:</strong> しきい値違反時の自動インサイト生成</span></div>
+          <div class="icon-text"><span>🔗</span><span><strong>統合的なトラブルシューティング:</strong> チャット UI から一元対応</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ 制限事項・注意点</h2>
+      <div class="warning-box">
+        <strong>⚠️ 制限事項:</strong>
+        <ul style="margin: 8px 0; padding-left: 20px;">
+          <li>「Optimize」ボタンは BigQuery editions 顧客のみ利用可能 (オンデマンド課金モデルでは Cloud Assist パネルからの利用に限定)</li>
+          <li>現在 Preview ステータスのため、SLA の対象外</li>
+          <li>最適化提案が必ずしもコスト削減に直結するとは限らない (最小課金しきい値の影響)</li>
+          <li>日次トークンクォータの設定機能が一時的に無効化されている</li>
+        </ul>
+      </div>
+      <div class="note-box">
+        <strong>💡 考慮すべき点:</strong>
+        <ul style="margin: 8px 0; padding-left: 20px;">
+          <li>AI による推奨事項は参考情報であり、本番環境への適用前にテスト環境での検証を推奨</li>
+          <li>組織レベルのインサイトを利用するには組織レベルの IAM 権限が必要</li>
+          <li>Gemini によるインサイトの品質は、利用可能なメタデータと権限レベルに依存</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金情報</h2>
+      <p>Gemini Cloud Assist / Code Assist の利用は BigQuery editions のスロット料金に含まれます。追加の直接的な課金は発生しません。</p>
+      <table class="pricing-table">
+        <thead>
+          <tr>
+            <th>エディション</th>
+            <th>スロット時間単価 (USD)</th>
+            <th>Gemini 機能</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Standard</td>
+            <td>$0.04/スロット時間</td>
+            <td>Cloud Assist パネルからの最適化</td>
+          </tr>
+          <tr>
+            <td>Enterprise</td>
+            <td>$0.06/スロット時間</td>
+            <td>全機能利用可能</td>
+          </tr>
+          <tr>
+            <td>Enterprise Plus</td>
+            <td>$0.10/スロット時間</td>
+            <td>全機能利用可能</td>
+          </tr>
+        </tbody>
+      </table>
+      <p style="font-size: 14px; color: var(--gc-outline);">Jobs Explorer 自体は追加コストなしで利用可能です。</p>
+    </div>
+
+    <!-- Known Issues -->
+    <div class="section">
+      <h2>🐛 既知の問題</h2>
+      <div class="warning-box">
+        <strong>⚠️ 日次トークンクォータ設定の一時無効化:</strong>
+        <p style="margin: 8px 0;">BigQuery 生成 AI 関数の日次トークンクォータ設定のサポートが一時的に無効化されています。<code>GenAiInputTokensPerDay</code> や <code>GenAiOutputTokensPerDay</code> などのクォータを通じたプロジェクトやユーザーごとの LLM トークン使用量の制御が影響を受けています。Google は可能な限り早急にこの機能の復旧に取り組んでいます。</p>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス</h2>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div class="card">
+          <strong>Gemini Cloud Assist</strong>
+          <p style="font-size: 14px; margin: 4px 0;">Google Cloud 全体で利用可能な AI アシスタント。設定支援やトラブルシューティングを提供</p>
+        </div>
+        <div class="card card-green">
+          <strong>BigQuery BI Engine</strong>
+          <p style="font-size: 14px; margin: 4px 0;">インメモリ分析サービスで、頻繁に利用されるデータをキャッシュしクエリを高速化</p>
+        </div>
+        <div class="card card-orange">
+          <strong>Cloud Monitoring</strong>
+          <p style="font-size: 14px; margin: 4px 0;">BigQuery ジョブのリソース消費をモニタリングするための基盤サービス</p>
+        </div>
+        <div class="card card-purple">
+          <strong>BigQuery Admin Resource Charts</strong>
+          <p style="font-size: 14px; margin: 4px 0;">予約の利用率や管理状態を視覚化するダッシュボード</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reference Links -->
+    <div class="section">
+      <h2>📚 参考リンク</h2>
+      <ul class="links-list">
+        <li><a href="https://docs.cloud.google.com/bigquery/docs/release-notes" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li><a href="https://docs.cloud.google.com/bigquery/docs/use-cloud-assist#optimize-query" target="_blank" rel="noopener noreferrer">Gemini Cloud Assist でクエリを最適化</a></li>
+        <li><a href="https://docs.cloud.google.com/bigquery/docs/admin-jobs-explorer#troubleshoot-with-ai" target="_blank" rel="noopener noreferrer">Jobs Explorer でジョブをトラブルシュート</a></li>
+        <li><a href="https://docs.cloud.google.com/bigquery/docs/best-practices-performance-overview" target="_blank" rel="noopener noreferrer">BigQuery パフォーマンス最適化ベストプラクティス</a></li>
+        <li><a href="https://docs.cloud.google.com/bigquery/docs/editions-intro" target="_blank" rel="noopener noreferrer">BigQuery editions の概要</a></li>
+        <li><a href="https://docs.cloud.google.com/cloud-assist/set-up-gemini" target="_blank" rel="noopener noreferrer">Gemini Cloud Assist のセットアップ</a></li>
+      </ul>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <p>今回のアップデートにより、BigQuery での SQL クエリ最適化とジョブパフォーマンスのトラブルシューティングが Gemini AI の支援で大幅に効率化されます。特に BigQuery editions を利用している組織は、クエリエディタの「Optimize」ボタンから即座に最適化提案を受け取れるようになり、データエンジニアリングチームの生産性向上が期待できます。</p>
+      <div class="ai-box">
+        <strong>🚀 推奨アクション:</strong> Preview 段階ですが、早期に試用してワークフローへの組み込みを検討することを推奨します。
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>📎 出典:</p>
+      <p><a href="https://docs.cloud.google.com/bigquery/docs/release-notes" target="_blank" rel="noopener noreferrer">https://docs.cloud.google.com/bigquery/docs/release-notes</a></p>
+      <p><a href="https://docs.cloud.google.com/bigquery/docs/use-cloud-assist#optimize-query" target="_blank" rel="noopener noreferrer">https://docs.cloud.google.com/bigquery/docs/use-cloud-assist#optimize-query</a></p>
+      <p><a href="https://docs.cloud.google.com/bigquery/docs/admin-jobs-explorer#troubleshoot-with-ai" target="_blank" rel="noopener noreferrer">https://docs.cloud.google.com/bigquery/docs/admin-jobs-explorer#troubleshoot-with-ai</a></p>
+      <p style="margin-top: 12px; font-size: 11px; color: var(--gc-outline);">Generated on 2026-06-16 | Google Cloud News Summary</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GKE: ノードあたり最大 512 Pod のサポート</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+      text-align: right;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    /* Before / After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box, .after-box {
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-box h3 { color: var(--gc-red); }
+    .after-box h3 { color: var(--gc-green); }
+
+    .before-box ul, .after-box ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 6px 0;
+    }
+
+    @media (max-width: 700px) {
+      .before-after { grid-template-columns: 1fr; }
+      .stat-grid { grid-template-columns: 1fr !important; }
+      h1 { font-size: 26px; }
+    }
+
+    /* 統計カード */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* チェックリスト */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    /* コードブロック (pre:not(.mermaid) で Mermaid を除外) */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block {
+      overflow: hidden;
+      padding: 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .new-row {
+      background: var(--gc-green-tint) !important;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+    }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* ユースケース */
+    .usecase-box {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-100);
+    }
+
+    .usecase-box h3 {
+      margin-top: 0;
+      color: var(--gc-blue-800);
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+      background: #FFFFFF;
+    }
+
+    ul {
+      padding-left: 24px;
+      margin: 8px 0;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <div style="margin-bottom: 8px;">
+          <span class="badge">Google Kubernetes Engine</span>
+          <span class="badge badge-ga">Feature</span>
+        </div>
+        <h1>☸️ GKE: ノードあたり最大 512 Pod のサポート</h1>
+      </div>
+      <div class="subtitle">
+        リリース日: 2026-09-25<br>
+        Google Cloud Release Notes
+      </div>
+    </div>
+
+    <!-- 数字で見るアップデート -->
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-value">256 → 512</div>
+        <div class="stat-label">ノードあたり最大 Pod 数 (2 倍)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">/22</div>
+        <div class="stat-label">257〜512 Pod 時の Pod CIDR<br>(1,024 IP アドレス)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">110</div>
+        <div class="stat-label">デフォルト値は従来どおり<br>(/24 CIDR)</div>
+      </div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📌 概要</h2>
+      <p>
+        GKE Standard クラスタで、<span class="highlight">ノードあたりの最大 Pod 数が 256 から 512 に拡大</span>されました。
+        257〜512 Pod に設定されたノードには <span class="highlight">/22 の Pod CIDR ブロック (1,024 IP アドレス)</span> が割り当てられます。
+      </p>
+      <p>
+        GKE ではノードごとに Pod 用の CIDR ブロックが割り当てられ、そのサイズは最大 Pod 数に対応します。
+        CIDR ブロックには常に最大 Pod 数の 2 倍以上のアドレスが含まれるため、Pod の追加・削除時の IP アドレス再利用を抑制できます。
+        今回のアップデートにより、大規模なノード (高 vCPU・大容量メモリ) 上でより高い Pod 密度を実現でき、
+        <strong>ノード数を抑えたクラスタ設計</strong>が可能になります。
+      </p>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>🔙 Before: アップデート前の課題</h3>
+          <ul>
+            <li>ノードあたり最大 Pod 数は <strong>256 が上限</strong> (割り当て CIDR は最大 /23 = 512 アドレス)</li>
+            <li>大型マシンタイプのノードでも、Pod 密度の上限により計算リソースを使い切れないケースがあった</li>
+            <li>多数の軽量 Pod を稼働させる場合、密度上限に達するとノード数を増やす必要があり、管理オーバーヘッドが増加</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✨ After: アップデート後の改善</h3>
+          <ul>
+            <li>ノードあたり<strong>最大 512 Pod</strong> まで設定可能になり、大型ノードへの Pod 集約度を最大 2 倍に</li>
+            <li>257〜512 Pod 設定のノードには <strong>/22 Pod CIDR (1,024 IP)</strong> が自動的に割り当て</li>
+            <li>同じワークロードをより少ないノードで稼働でき、クラスタ管理を簡素化</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Before["🔙 Before: 最大 256 Pod/ノード"]
+        N1["🖥️ ノード A<br/>最大 256 Pod<br/>Pod CIDR: /23 (512 IP)"]
+        N2["🖥️ ノード B<br/>最大 256 Pod<br/>Pod CIDR: /23 (512 IP)"]
+        W1["📦 512 Pod のワークロード"] --> N1
+        W1 --> N2
+    end
+
+    subgraph After["✨ After: 最大 512 Pod/ノード"]
+        N3["🖥️ ノード A (大型マシンタイプ)<br/>最大 512 Pod<br/>Pod CIDR: /22 (1,024 IP)"]
+        W2["📦 512 Pod のワークロード"] --> N3
+    end
+
+    Before -.->|"アップデート"| After
+        </pre>
+      </div>
+      <p style="font-size: 14px;">
+        従来は 512 Pod のワークロードに最大 Pod 数 256 のノードが 2 台必要だったのに対し、アップデート後は最大 Pod 数 512 (/22 Pod CIDR、1,024 IP アドレス) の大型ノード 1 台に集約できます。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+
+      <div class="card">
+        <h3>1️⃣ ノードあたり最大 Pod 数の上限拡大 (256 → 512)</h3>
+        <ul>
+          <li>クラスタ作成時 (<code>--default-max-pods-per-node</code>) またはノードプール作成時 (<code>--max-pods-per-node</code>) に最大 512 まで設定可能</li>
+          <li>デフォルト値は従来どおり <strong>110 Pod/ノード</strong> (この場合 /24 CIDR が割り当てられる)</li>
+          <li>ノードプールレベルの設定はクラスタレベルのデフォルト値をオーバーライドする</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>2️⃣ /22 Pod CIDR ブロックの割り当て</h3>
+        <ul>
+          <li>257〜512 Pod に設定されたノードには /22 CIDR ブロック (1,024 IP アドレス) が割り当てられる</li>
+          <li>CIDR ブロックは常に最大 Pod 数の 2 倍以上のアドレスを含み、Pod の入れ替わり時の IP アドレス再利用を抑制する</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>3️⃣ Pod 密度とノード数のトレードオフ設計</h3>
+        <ul>
+          <li>最大 Pod 数を大きくするとノードあたりの消費 IP アドレス空間が増えるため、Pod セカンダリ範囲内で確保できるノード数は減少する</li>
+          <li>Pod IP アドレスが不足した場合は、不連続マルチ Pod CIDR で Pod IP アドレス範囲を追加できる</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3>📊 最大 Pod 数と Pod CIDR 割り当ての対応表</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>ノードあたり最大 Pod 数</th>
+            <th>ノードあたり CIDR 範囲</th>
+            <th>IP アドレス数</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>8</td><td>/28</td><td>16</td></tr>
+          <tr><td>9 – 16</td><td>/27</td><td>32</td></tr>
+          <tr><td>17 – 32</td><td>/26</td><td>64</td></tr>
+          <tr><td>33 – 64</td><td>/25</td><td>128</td></tr>
+          <tr><td>65 – 128</td><td>/24</td><td>256</td></tr>
+          <tr><td>129 – 256</td><td>/23</td><td>512</td></tr>
+          <tr class="new-row"><td>🆕 257 – 512 (新規)</td><td>/22</td><td>1,024</td></tr>
+        </tbody>
+      </table>
+
+      <h3>📋 関連する制限・仕様</h3>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 30%;">項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>対象クラスタ</td><td>GKE Standard クラスタ (VPC ネイティブ)</td></tr>
+          <tr><td>デフォルト値</td><td>110 Pod/ノード</td></tr>
+          <tr><td>ハードリミット</td><td>512 Pod/ノード (システム Pod を含む)</td></tr>
+          <tr><td>Autopilot クラスタ</td><td>対象外 (ワークロードの Pod 密度に基づき 8〜256 の範囲で自動設定)</td></tr>
+          <tr><td>設定タイミング</td><td>クラスタ作成時またはノードプール作成時のみ (作成後は変更不可)</td></tr>
+          <tr><td>前提となる想定</td><td>512 Pod/ノードの上限は Pod あたり平均 2 コンテナ以下を想定。コンテナ数が多い場合は実質上限が下がる可能性がある</td></tr>
+          <tr><td>推奨リソース</td><td>Pod 10 個あたり 1 vCPU 以上のワーカーノードを推奨</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>✅ 前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>GKE Standard クラスタであること (Autopilot は対象外)</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>VPC ネイティブクラスタであること (エイリアス IP を使用)</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>最大 Pod 数はクラスタまたはノードプールの作成時にのみ設定可能 (作成後の変更は不可)</span></div>
+
+      <h3>ステップ 1: クラスタ作成時にデフォルト最大 Pod 数を設定</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">クラスタ作成 (最大 512 Pod/ノード)</span>
+        </div>
+        <pre><code class="language-bash">gcloud container clusters create CLUSTER_NAME \
+    --enable-ip-alias \
+    --default-max-pods-per-node=512 \
+    --location=COMPUTE_LOCATION</code></pre>
+      </div>
+      <p style="font-size: 14px;"><code>--default-max-pods-per-node</code> に最大 512 まで指定できます。省略した場合のデフォルトは 110 です。</p>
+
+      <h3>ステップ 2: 既存クラスタに新しいノードプールを作成して設定</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">ノードプール作成 (クラスタのデフォルト値をオーバーライド)</span>
+        </div>
+        <pre><code class="language-bash">gcloud container node-pools create POOL_NAME \
+    --cluster=CLUSTER_NAME \
+    --max-pods-per-node=512</code></pre>
+      </div>
+      <div class="note-box">
+        <strong>💡 ヒント:</strong> ノードプールレベルの <code>--max-pods-per-node</code> はクラスタレベルのデフォルト値をオーバーライドします。既存クラスタでは、新規ノードプールの作成によって高密度構成を導入できます。
+      </div>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>👍 メリット</h2>
+
+      <h3>💼 ビジネス面</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>ノード数の削減による運用効率化</strong>: 同じ Pod 数をより少ないノードで稼働できるため、ノードのアップグレードや監視などの管理オーバーヘッドを削減できる</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>大型マシンタイプの活用度向上</strong>: 高 vCPU・大容量メモリのノードで Pod 密度の上限がボトルネックになりにくくなり、リソース活用率を高められる</span></div>
+
+      <h3>⚙️ 技術面</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>Pod 密度の柔軟な設計</strong>: 軽量な Pod を多数稼働させるワークロードで、ノードあたり最大 512 Pod まで集約可能</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>一貫した IP 割り当て設計</strong>: 従来と同じ「最大 Pod 数の 2 倍以上の IP を割り当てる」設計が維持され、Pod の入れ替わり時の IP 再利用が抑制される</span></div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>🚫 制限事項</h3>
+      <div class="check-item"><span class="cross-icon">✗</span><span>最大 Pod 数はクラスタ・ノードプールの作成後に変更できない (既存ノードプールに適用するには新規ノードプールの作成が必要)</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>Autopilot クラスタは対象外 (最大 Pod 数は 8〜256 の範囲で自動設定され、変更不可)</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>512 Pod/ノードの上限にはシステム Pod (kube-proxy など kube-system 名前空間の Pod) も含まれる</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>ノードプールの Pod セカンダリ範囲には最低 /24 の CIDR ブロックが必要</span></div>
+
+      <h3>🤔 考慮すべき点</h3>
+      <div class="warning-box">
+        <strong>⚠️ IP アドレス計画の見直しが必要:</strong>
+        <ul style="margin-bottom: 0;">
+          <li>ノードあたりの CIDR が /22 (1,024 IP) と大きくなるため、Pod セカンダリ範囲の IP アドレス消費が増加。クラスタの最大ノード数は「Pod セカンダリ範囲のサイズ ÷ ノードあたり CIDR」で決まる</li>
+          <li>Pod セカンダリ範囲のサイズはクラスタ作成後に変更できないため、将来の成長を見込んだサイズ設計が重要 (不足時は不連続マルチ Pod CIDR で追加可能)</li>
+          <li>高密度ノードでは Pod あたりのリソース要求とノード容量のバランスに注意。大規模デプロイでは負荷テストの実施が推奨されている</li>
+          <li>ワーカーノードは Pod 10 個あたり 1 vCPU 以上が推奨される (512 Pod なら 52 vCPU 以上が目安)</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase-box">
+        <h3>💡 ユースケース 1: 大型マシンタイプへの軽量マイクロサービスの高密度集約</h3>
+        <p><strong>シナリオ</strong>: 多数の軽量なマイクロサービス Pod を稼働させており、従来は 256 Pod/ノードの上限のため大型マシンタイプの CPU・メモリを使い切れず、ノード数が増加していた。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">高密度ノードプールの作成例</span>
+          </div>
+          <pre><code class="language-bash"># 高密度ノードプールを作成 (最大 512 Pod/ノード)
+gcloud container node-pools create high-density-pool \
+    --cluster=my-cluster \
+    --machine-type=n2-standard-64 \
+    --max-pods-per-node=512</code></pre>
+        </div>
+        <p style="margin-bottom: 0;"><strong>効果</strong>: ノードあたりの Pod 集約度が最大 2 倍になり、同じワークロードをより少ないノードで稼働できる。ノード管理のオーバーヘッドとシステムコンポーネントの重複を削減できる。</p>
+      </div>
+
+      <div class="usecase-box">
+        <h3>💡 ユースケース 2: ノード数上限に近づいた大規模クラスタの密度向上</h3>
+        <p><strong>シナリオ</strong>: クラスタのノード数が増加し、ノードプールあたりのノード数上限や VPC の制約に近づいている。Pod 総数は維持しつつノード数を抑えたい。</p>
+        <p style="margin-bottom: 0;"><strong>効果</strong>: Pod 密度を上げることでノード数の増加を抑制し、クラスタのスケーラビリティ上の制約 (ノード数上限、ロードバランサのノード制限など) への到達を先送りできる。</p>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>
+        このアップデート自体に固有の追加料金はアナウンスされていません。GKE Standard クラスタの通常の料金体系 (クラスタ管理手数料 + ノードの Compute Engine リソース料金) が適用されます。
+      </p>
+      <div class="success-box">
+        <strong>✅ コスト効率:</strong> ノードあたりの Pod 密度を高めてノード数を削減できる場合、ノードのリソース活用率向上を通じてコスト効率の改善が期待できます。
+      </div>
+      <p style="font-size: 14px;">詳細は <a href="https://cloud.google.com/kubernetes-engine/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">GKE 料金ページ</a> を参照してください。</p>
+    </div>
+
+    <!-- 利用可能リージョン -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <p style="margin-bottom: 0;">
+        リリースノートにはリージョンの制限は記載されていません。詳細は <a href="https://docs.cloud.google.com/kubernetes-engine/docs/how-to/flexible-pod-cidr" target="_blank" rel="noopener noreferrer" class="gc-link">公式ドキュメント</a> を参照してください。
+      </p>
+    </div>
+
+    <!-- 関連サービス・機能 -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <h3>🌐 VPC (エイリアス IP / VPC ネイティブクラスタ)</h3>
+        <p style="margin-bottom: 0;">最大 Pod 数の設定は VPC ネイティブクラスタが前提。Pod セカンダリ範囲のサイズと最大 Pod 数の組み合わせでクラスタの最大ノード数が決まる。</p>
+      </div>
+      <div class="card">
+        <h3>➕ 不連続マルチ Pod CIDR</h3>
+        <p style="margin-bottom: 0;">Pod IP アドレスが不足した場合に、追加の Pod IP アドレス範囲をクラスタに追加できる機能。</p>
+      </div>
+      <div class="card">
+        <h3>📈 GKE クラスタオートスケーラー / ノードプール</h3>
+        <p style="margin-bottom: 0;">最大 Pod 数はノードプール単位で設定でき、ワークロード特性に応じた密度の異なるノードプールを使い分けられる。</p>
+      </div>
+      <div class="card">
+        <h3>🔍 Network Analyzer (GKE IP 使用状況インサイト)</h3>
+        <p style="margin-bottom: 0;">GKE の IP アドレス使用率を可視化し、IP アドレス計画の見直しに活用できる。</p>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="note-box">
+        <p style="margin-top: 0;">
+          GKE Standard クラスタのノードあたり最大 Pod 数が <span class="highlight">256 から 512 に倍増</span>し、大型マシンタイプへのワークロード集約とノード数削減が可能になりました。
+        </p>
+        <p style="margin-bottom: 0;">
+          高密度構成では /22 Pod CIDR (1,024 IP) が割り当てられるため IP アドレス消費が増加します。導入を検討する際は、<strong>Pod セカンダリ範囲のサイズ設計</strong>と<strong>「Pod 10 個あたり 1 vCPU 以上」の推奨を踏まえたノードサイジング</strong>を確認することをおすすめします。
+        </p>
+      </div>
+      <p style="font-size: 14px; margin-bottom: 0;">
+        <strong>タグ</strong>: #GoogleKubernetesEngine #GKE #Kubernetes #Networking #PodCIDR #Scalability #VPC
+      </p>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="padding-left: 20px;">
+        <li><a href="https://docs.cloud.google.com/release-notes#September_25_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026-09-25)</a></li>
+        <li><a href="https://docs.cloud.google.com/kubernetes-engine/docs/how-to/flexible-pod-cidr" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: ノードあたり最大 Pod 数の構成 (Flexible Pod CIDR)</a></li>
+        <li><a href="https://docs.cloud.google.com/kubernetes-engine/quotas" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: GKE のクォータと上限</a></li>
+        <li><a href="https://docs.cloud.google.com/kubernetes-engine/docs/concepts/planning-large-clusters" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: 大規模クラスタの計画</a></li>
+        <li><a href="https://cloud.google.com/kubernetes-engine/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">GKE 料金ページ</a></li>
+      </ul>
+      <p>このインフォグラフィックは Google Cloud News レポート (2026-09-25) を基に生成されました。</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

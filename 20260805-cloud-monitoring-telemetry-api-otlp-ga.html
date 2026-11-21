@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Monitoring: Telemetry API によるメトリクス取り込み (OTLP) が GA</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+      gap: 8px;
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .card p:last-child,
+    .card ul:last-child {
+      margin-bottom: 0;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 720px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid rgba(234, 67, 53, 0.3);
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid rgba(52, 168, 83, 0.3);
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .before-box h3,
+    .after-box h3 {
+      margin-top: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .before-box h3 { color: #C5221F; }
+    .after-box h3 { color: #188038; }
+
+    .before-box ul,
+    .after-box ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .before-box li,
+    .after-box li {
+      margin: 8px 0;
+    }
+
+    /* チェックリスト */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* コードブロック */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      border-radius: 8px;
+      color: #E8E8E8;
+    }
+
+    .code-block pre {
+      border-radius: 0;
+    }
+
+    .code-block code,
+    pre:not(.mermaid) code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code),
+    .card code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* 統計カード */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 30px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 4px;
+      color: var(--gc-on-surface);
+      font-size: 16px;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+      border: 1px solid var(--gc-blue-100);
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+    }
+
+    ul {
+      padding-left: 24px;
+      margin: 8px 0;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      word-break: break-all;
+    }
+
+    footer ul {
+      list-style: none;
+      padding-left: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div>
+        <div style="margin-bottom: 8px;">
+          <span class="badge">Cloud Monitoring</span>
+          <span class="badge badge-ga">GA (一般提供)</span>
+        </div>
+        <h1>📊 Telemetry API によるメトリクス取り込み (OTLP) が GA</h1>
+      </div>
+      <div class="subtitle">リリース日: 2026-08-05</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        Cloud Monitoring のメトリクス取り込み用 <span class="highlight">Telemetry API</span> が
+        <span class="highlight">一般提供 (GA)</span> になりました。OpenTelemetry Collector と
+        OTLP エクスポーター (<code>otlphttp</code> など) を組み合わせることで、
+        <strong>OTLP 形式のメトリクスをそのまま Cloud Monitoring に取り込めます</strong>。
+      </p>
+      <p>
+        Telemetry API (<code>telemetry.googleapis.com</code>) は OpenTelemetry Line Protocol (OTLP) を実装した
+        Google Cloud のネイティブエンドポイントで、<code>http/protobuf</code>・<code>http/json</code>・<code>grpc</code>
+        のすべての OTLP プロトコルをサポート。Collector 経由に加え、OpenTelemetry SDK を組み込んだアプリケーションからの
+        直接送信も可能です。取り込んだメトリクスは Metrics Explorer で表示・グラフ化できます。
+      </p>
+      <div class="note-box">
+        <strong>💡 ポイント:</strong> ベンダー中立な計装を採用する組織にとって、独自エクスポーターへの依存を減らしつつ
+        Google Cloud Observability にテレメトリーを送る<strong>標準的な経路</strong>が正式に利用可能になりました。
+      </div>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before (アップデート前)</h3>
+          <ul>
+            <li>Telemetry API は <strong>Preview (Pre-GA)</strong> 段階で「現状のまま」提供、サポートが限定される可能性</li>
+            <li><code>googlemanagedprometheus</code> エクスポーターが一般的だったが、メトリクス名の <code>.</code> や <code>/</code> が <code>_</code> に変換され、単位や <code>_total</code> サフィックスが付与されて <strong>OTLP の命名が保持されない</strong></li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After (アップデート後)</h3>
+          <ul>
+            <li><strong>GA として本番環境で正式サポート</strong>の下で利用可能に</li>
+            <li>OTLP メトリクス名を <strong>verbatim (そのまま) 取り込み</strong>。<code>_total</code> などのサフィックスも付与されず、セマンティック規約に沿った命名を維持</li>
+            <li><code>http/protobuf</code>・<code>http/json</code>・<code>grpc</code> 全対応、Collector 経由・SDK 直接送信の両対応</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    A([🧑‍💻 アプリケーション<br>OpenTelemetry SDK]) -->|OTLP| B[📡 OpenTelemetry Collector]
+    A -.->|OTLP 直接送信<br>gRPC 推奨| D
+    B -->|otlphttp エクスポーター<br>+ googleclientauth 認証| D[🌐 Telemetry API<br>telemetry.googleapis.com]
+    D --> E[(📊 Cloud Monitoring)]
+    E --> F[📈 Metrics Explorer<br>PromQL クエリ]
+    E --> G[🔔 アラート / ダッシュボード]
+        </pre>
+      </div>
+      <p>
+        アプリケーションの OTLP メトリクスは、OpenTelemetry Collector の <code>otlphttp</code> エクスポーター経由
+        (または SDK から直接) で Telemetry API に送信され、Cloud Monitoring に格納されて
+        Metrics Explorer や PromQL で分析できます。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚙️ 主要機能</h2>
+
+      <div class="card">
+        <h3>🌐 1. OTLP ネイティブなメトリクス取り込みエンドポイント</h3>
+        <ul>
+          <li><code>telemetry.googleapis.com</code> が OpenTelemetry Line Protocol を実装し、OTLP メトリクスをそのまま受け付ける</li>
+          <li><code>http/protobuf</code>・<code>http/json</code>・<code>grpc</code> のすべての OTLP プロトコルをサポート</li>
+          <li>Collector 設定ではルート URL (<code>https://telemetry.googleapis.com</code>) のみを指定すればよく、OpenTelemetry がデータ種別を検出して <code>/v1/metrics</code> などのパスを自動付与</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>📡 2. Collector 経由と SDK 直接送信の両対応</h3>
+        <ul>
+          <li>OpenTelemetry Collector + <code>otlphttp</code> エクスポーターによる送信 (推奨構成)</li>
+          <li>OpenTelemetry SDK からの直接送信にも対応。ただし多くの SDK エクスポーターは動的なトークン更新に非対応のため、直接送信では HTTP ではなく <strong>gRPC OTLP エクスポーターの使用を推奨</strong></li>
+          <li>GKE では Collector を手動デプロイする代わりに <strong>Managed OpenTelemetry for GKE</strong> を利用可能</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>🗺️ 3. グローバル / リージョナルエンドポイント</h3>
+        <ul>
+          <li>グローバル: <code>telemetry.googleapis.com</code></li>
+          <li>リージョナル: <code>telemetry.REGION.rep.googleapis.com</code>。データの <code>location</code> ラベルがエンドポイントのリージョン (またはリージョン内のゾーン) と一致する場合にのみ保存</li>
+          <li>Telemetry API は <strong>VPC Service Controls 対応サービス</strong></li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>🔤 4. googlemanagedprometheus エクスポーターとの命名の違い</h3>
+        <ul>
+          <li>メトリクス名にピリオド (<code>.</code>) とスラッシュ (<code>/</code>) を許可し、<strong>名前を変換せずに取り込む</strong> (<code>googlemanagedprometheus</code> はこれらを <code>_</code> に変換)</li>
+          <li>単位のサフィックスやカウンタの <code>_total</code>・<code>_ratio</code> サフィックスを付与しない</li>
+          <li>指数ヒストグラムから導出される分布値の <code>sum_of_squared_deviation</code> を合成</li>
+          <li>両方の取り込み経路を併用すると 2 系統のメトリクス記述子が作られ、クエリ時に手動で結合 (union) が必要</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔬 技術仕様</h2>
+
+      <h3>📐 命名規則と制約</h3>
+      <table>
+        <tr><th>項目</th><th>詳細</th></tr>
+        <tr>
+          <td>メトリクス名</td>
+          <td>正規表現 <code>[a-zA-Z][a-zA-Z0-9_:./-]*</code> に従う必要あり (使用可能な特殊文字は <code>_:./-</code> のみ)。従わない場合は拒否される</td>
+        </tr>
+        <tr>
+          <td>ラベルキー</td>
+          <td>正規表現 <code>[a-zA-Z_][a-zA-Z0-9_.]*</code> に従う必要あり (使用可能な特殊文字は <code>_.</code> のみ)。ラベル値にはすべての特殊文字を使用可能</td>
+        </tr>
+        <tr>
+          <td>特殊文字のクエリ</td>
+          <td><code>:</code> と <code>_</code> 以外の特殊文字を含む名前は、PromQL の UTF-8 仕様に従い <code>{"my.metric.name"}</code> のように波括弧と引用符で囲む</td>
+        </tr>
+        <tr>
+          <td>Collector バージョン</td>
+          <td>Prometheus メトリクスの OTLP 取り込みには OpenTelemetry Collector <strong>0.140.0 以降</strong>が必要</td>
+        </tr>
+        <tr>
+          <td>推奨バッチサイズ</td>
+          <td>1 リクエストあたり 200 データポイント</td>
+        </tr>
+      </table>
+
+      <h3>📊 クォータと制限</h3>
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">60,000</div>
+          <div class="stat-label">リクエスト/分 (デフォルトクォータ、引き上げ申請可能)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">約 200,000</div>
+          <div class="stat-label">サンプル/秒 (最大バッチサイズ 200 ポイント/リクエスト時の実効値)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">200</div>
+          <div class="stat-label">メトリクスあたり最大ラベル数 (Cloud Monitoring / GMP 標準制限)</div>
+        </div>
+      </div>
+
+      <h3>🔑 必要な IAM ロール</h3>
+      <div class="card">
+        <div class="check-item">
+          <span class="check-icon">✓</span>
+          <span>クォータプロジェクトの構成と、そのプロジェクトに対する <strong>Service Usage Consumer</strong> (<code>roles/serviceusage.serviceUsageConsumer</code>)</span>
+        </div>
+        <div class="check-item">
+          <span class="check-icon">✓</span>
+          <span>メトリクス送信先プロジェクトに対する <strong>Monitoring Metric Writer</strong> (<code>roles/monitoring.metricWriter</code>)<br>
+          (ログは <code>roles/logging.logWriter</code>、トレースは <code>roles/telemetry.tracesWriter</code>)</span>
+        </div>
+      </div>
+
+      <h3>🛠️ Collector 設定例 (otlphttp エクスポーター)</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">YAML</span>
+          <span class="code-title">OpenTelemetry Collector 設定</span>
+        </div>
+        <pre><code class="language-yaml">exporters:
+  otlphttp:
+    encoding: proto
+    endpoint: https://telemetry.googleapis.com
+    auth:
+      authenticator: googleclientauth
+
+extensions:
+  googleclientauth:
+
+processors:
+  batch:
+    send_batch_max_size: 200
+    send_batch_size: 200
+    timeout: 5s</code></pre>
+      </div>
+      <p>
+        <code>googleclientauth</code> 拡張により、Application Default Credentials (ADC) を使って
+        Google の認証情報がリクエストに付与されます。
+      </p>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>✨ メリット</h2>
+
+      <h3>💼 ビジネス面</h3>
+      <div class="success-box">
+        <div class="check-item">
+          <span class="check-icon">✓</span>
+          <span><strong>本番利用の正式サポート</strong>: Pre-GA 提供規約から GA に昇格し、本番ワークロードのメトリクスパイプラインとして安心して採用できる</span>
+        </div>
+        <div class="check-item">
+          <span class="check-icon">✓</span>
+          <span><strong>ベンダーロックインの低減</strong>: OTLP という業界標準プロトコルで送信でき、他のオブザーバビリティバックエンドとの併用や移行が容易に</span>
+        </div>
+      </div>
+
+      <h3>⚙️ 技術面</h3>
+      <div class="success-box">
+        <div class="check-item">
+          <span class="check-icon">✓</span>
+          <span><strong>OTLP セマンティクスの保持</strong>: メトリクス名がそのまま取り込まれ、OpenTelemetry の命名規約 (ピリオド区切りなど) を維持できる</span>
+        </div>
+        <div class="check-item">
+          <span class="check-icon">✓</span>
+          <span><strong>プロトコルの柔軟性</strong>: <code>http/protobuf</code>・<code>http/json</code>・<code>grpc</code> から環境に合わせて選択可能</span>
+        </div>
+        <div class="check-item">
+          <span class="check-icon">✓</span>
+          <span><strong>VPC Service Controls 対応</strong>: セキュリティ境界内でのテレメトリー取り込みが可能</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>🚧 制限事項</h3>
+      <div class="warning-box">
+        <div class="check-item">
+          <span class="cross-icon">•</span>
+          <span>メトリクス名・ラベルキーは完全な UTF-8 をサポートしない (正規表現に従わないデータは拒否。Collector の <code>replace_pattern</code> 関数による変換で回避可能)</span>
+        </div>
+        <div class="check-item">
+          <span class="cross-icon">•</span>
+          <span>Prometheus メトリクスの OTLP 取り込みには OpenTelemetry Collector <strong>0.140.0 以降</strong>が必要</span>
+        </div>
+        <div class="check-item">
+          <span class="cross-icon">•</span>
+          <span>非常にスパースなデルタメトリクスなど、一部の状況でデルタメトリクスが正しくクエリできない場合がある</span>
+        </div>
+        <div class="check-item">
+          <span class="cross-icon">•</span>
+          <span>指数ヒストグラムのクエリで <code>le</code> ラベルを保持すると予期しない結果になる可能性がある (<code>histogram_quantile(.99, sum by (le) (metric))</code> のような典型的なクエリは動作する)</span>
+        </div>
+      </div>
+
+      <h3>🤔 考慮すべき点</h3>
+      <div class="note-box">
+        <div class="check-item">
+          <span class="cross-icon">•</span>
+          <span>過去に <code>target_info</code> メトリクスを送信していた場合、<code>INT64</code> 型と <code>DOUBLE</code> 型の値型衝突が発生する可能性。その場合は <code>INT64</code> 型のメトリクス記述子の削除が必要</span>
+        </div>
+        <div class="check-item">
+          <span class="cross-icon">•</span>
+          <span><code>googlemanagedprometheus</code> エクスポーターと Telemetry API の併用は、命名変換の違いにより 2 系統のメトリクスが生成される。クエリ時に手動結合が必要になるため、移行時は経路の統一を計画すべき</span>
+        </div>
+        <div class="check-item">
+          <span class="cross-icon">•</span>
+          <span>SDK から直接送信する場合は、動的トークン更新の制約から gRPC OTLP エクスポーターの使用を推奨</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>📦 ユースケース 1: googlemanagedprometheus エクスポーターからの移行</h3>
+        <p>
+          <strong>シナリオ</strong>: 既存の OpenTelemetry Collector パイプラインで <code>googlemanagedprometheus</code>
+          エクスポーターを使用しており、OTLP のメトリクス名をそのまま保持したい。
+        </p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">YAML</span>
+            <span class="code-title">移行後のエクスポーター設定</span>
+          </div>
+          <pre><code class="language-yaml">exporters:
+  otlphttp:
+    encoding: proto
+    endpoint: https://telemetry.googleapis.com
+    auth:
+      authenticator: googleclientauth</code></pre>
+        </div>
+        <p>
+          <strong>効果</strong>: メトリクス名の変換 (<code>.</code>/<code>/</code> → <code>_</code>、<code>_total</code>
+          サフィックス付与) がなくなり、OpenTelemetry のセマンティック規約に沿った命名で Cloud Monitoring に格納される。
+          移行手順は公式ドキュメント「Migrate to the OTLP exporter」を参照。
+        </p>
+      </div>
+
+      <div class="usecase">
+        <h3>🔀 ユースケース 2: マルチベンダー構成での標準化された取り込み</h3>
+        <p>
+          <strong>シナリオ</strong>: 複数のオブザーバビリティバックエンドにテレメトリーを送信しており、Google Cloud
+          向けにも独自エクスポーターではなく標準の OTLP エクスポーターで統一したい。
+        </p>
+        <p>
+          <strong>効果</strong>: Collector の設定が OTLP エクスポーターに統一され、バックエンド固有のエクスポーター管理が不要に。
+          GKE では Managed OpenTelemetry for GKE によりさらに運用負荷を削減できる。
+        </p>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>
+        OTLP メトリクスの課金は、Google Cloud Managed Service for Prometheus と同じ
+        <span class="highlight">「Prometheus Samples Ingested」SKU</span> で計上されます。
+        取り込みサンプル数に基づく段階制料金です。
+      </p>
+
+      <h3>📈 料金例 (Prometheus 形式のモニタリングデータ)</h3>
+      <table>
+        <tr><th>月間取り込みサンプル数</th><th>料金</th></tr>
+        <tr><td>0〜500 億サンプル</td><td>$0.060 / 100 万サンプル</td></tr>
+        <tr><td>500 億〜2,500 億サンプル</td><td>$0.048 / 100 万サンプル</td></tr>
+        <tr><td>2,500 億〜5,000 億サンプル</td><td>$0.036 / 100 万サンプル</td></tr>
+        <tr><td>5,000 億サンプル超</td><td>$0.024 / 100 万サンプル</td></tr>
+      </table>
+
+      <div class="note-box">
+        <strong>💡 補足:</strong> 書き込み API 呼び出しは<strong>無料</strong>。読み取り API 呼び出しは返却された時系列
+        100 万件あたり $0.50 (請求先アカウントごとに最初の 100 万時系列は無料)。詳細は
+        <a href="https://cloud.google.com/products/observability/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Google Cloud Observability の料金ページ</a>
+        を参照。
+      </div>
+    </div>
+
+    <!-- 関連サービス・機能 -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <div class="icon-text"><strong>📊 Google Cloud Managed Service for Prometheus</strong></div>
+        <p>同じストレージと課金 SKU を使用する Prometheus メトリクスのマネージドサービス。Telemetry API とは命名変換の挙動が異なる。</p>
+      </div>
+      <div class="card">
+        <div class="icon-text"><strong>☸️ Managed OpenTelemetry for GKE</strong></div>
+        <p>GKE では Collector を手動デプロイせずにマネージドな OpenTelemetry 収集を利用可能。</p>
+      </div>
+      <div class="card">
+        <div class="icon-text"><strong>🧭 Cloud Trace / Cloud Logging</strong></div>
+        <p>Telemetry API はメトリクスに加えて OTLP 形式のトレース (<code>/v1/traces</code>) とログ (<code>/v1/logs</code>) の取り込みにも対応。</p>
+      </div>
+      <div class="card">
+        <div class="icon-text"><strong>🔒 VPC Service Controls</strong></div>
+        <p><code>telemetry.googleapis.com</code> はサービス境界による保護に対応。</p>
+      </div>
+      <div class="card">
+        <div class="icon-text"><strong>📈 Metrics Explorer</strong></div>
+        <p>Telemetry API 経由で取り込んだメトリクスの表示・グラフ化に使用。</p>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="success-box">
+        <p style="margin-top: 0;">
+          Telemetry API によるメトリクス取り込みの GA により、<strong>OTLP 標準プロトコルで Cloud Monitoring に
+          メトリクスを送信する経路が本番利用可能</strong>になりました。
+        </p>
+        <div class="check-item">
+          <span class="check-icon">✓</span>
+          <span>OpenTelemetry 採用組織は <code>googlemanagedprometheus</code> エクスポーターからの移行や新規パイプラインでの <code>otlphttp</code> エクスポーター採用を検討する価値あり</span>
+        </div>
+        <div class="check-item">
+          <span class="check-icon">✓</span>
+          <span>移行時は命名変換の違いによる<strong>メトリクスの二重化に注意</strong></span>
+        </div>
+        <div class="check-item">
+          <span class="check-icon">✓</span>
+          <span>OpenTelemetry Collector <strong>0.140.0 以降</strong>を使用すること</span>
+        </div>
+      </div>
+      <p>
+        <strong>タグ</strong>:
+        <span class="badge">Cloud Monitoring</span>
+        <span class="badge">OpenTelemetry</span>
+        <span class="badge">OTLP</span>
+        <span class="badge">Telemetry API</span>
+        <span class="badge">Observability</span>
+        <span class="badge badge-ga">GA</span>
+      </p>
+    </div>
+
+    <footer>
+      <p><strong>📎 出典・参考リンク</strong></p>
+      <ul>
+        <li>📰 <a href="https://docs.cloud.google.com/release-notes#August_05_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026-08-05)</a></li>
+        <li>📖 <a href="https://docs.cloud.google.com/stackdriver/docs/otlp-metrics/overview" target="_blank" rel="noopener noreferrer" class="gc-link">OTLP metric ingestion overview</a></li>
+        <li>📖 <a href="https://docs.cloud.google.com/stackdriver/docs/reference/telemetry/overview" target="_blank" rel="noopener noreferrer" class="gc-link">Telemetry (OTLP) API overview</a></li>
+        <li>📖 <a href="https://docs.cloud.google.com/stackdriver/docs/otlp-metrics/deploy-collector" target="_blank" rel="noopener noreferrer" class="gc-link">Deploy and use the collector</a></li>
+        <li>📖 <a href="https://docs.cloud.google.com/stackdriver/docs/otlp-metrics/use-sdks" target="_blank" rel="noopener noreferrer" class="gc-link">Use SDKs to send metrics from applications</a></li>
+        <li>📖 <a href="https://docs.cloud.google.com/stackdriver/docs/otlp-metrics/migrate-to-otlphttp" target="_blank" rel="noopener noreferrer" class="gc-link">Migrate to the OTLP exporter</a></li>
+        <li>💰 <a href="https://cloud.google.com/products/observability/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Google Cloud Observability 料金ページ</a></li>
+      </ul>
+      <p>本インフォグラフィックは Google Cloud News レポート (2026-08-05) を基に作成されました。</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

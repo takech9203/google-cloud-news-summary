@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bigtable: アクセスパターン分析 (Access patterns ページ) GA</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+:root {
+  --gc-blue: #4285F4;
+  --gc-red: #EA4335;
+  --gc-yellow: #FBBC04;
+  --gc-green: #34A853;
+  --gc-blue-900: #174EA6;
+  --gc-blue-800: #185ABC;
+  --gc-blue-700: #1967D2;
+  --gc-blue-600: #1A73E8;
+  --gc-blue-500: #4285F4;
+  --gc-blue-300: #669DF6;
+  --gc-blue-200: #8AB4F8;
+  --gc-blue-100: #AECBFA;
+  --gc-blue-50: #E8F0FE;
+  --gc-on-surface: #202124;
+  --gc-on-surface-variant: #5F6368;
+  --gc-outline: #80868B;
+  --gc-surface: #FFFFFF;
+  --gc-surface-container-lowest: #F8F9FA;
+  --gc-surface-container-low: #F1F3F4;
+  --gc-surface-container: #E8EAED;
+  --gc-outline-variant: #DADCE0;
+  --gc-blue-tint: #E8F0FE;
+  --gc-green-tint: #E6F4EA;
+  --gc-red-tint: #FCE8E6;
+  --gc-yellow-tint: #FEF7E0;
+  --gc-purple-tint: #F3E8FD;
+  --gc-teal-tint: #E0F7FA;
+  --gc-purple: #A142F4;
+  --gc-teal: #00BCD4;
+  --gc-orange: #FF6D00;
+  --gc-database: #F4B400;
+}
+
+body {
+  background-color: var(--gc-surface);
+  font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+  color: var(--gc-on-surface-variant);
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 20px;
+  margin: 0;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 16px;
+  border-bottom: 3px solid var(--gc-blue-600);
+}
+
+h1, .title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--gc-on-surface);
+  margin: 0;
+  line-height: 1.4;
+}
+
+h2, .section-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin-top: 0;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 20px 0 8px;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: var(--gc-outline);
+}
+
+.section {
+  background: var(--gc-surface-container-low);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid var(--gc-outline-variant);
+}
+
+.highlight {
+  background-color: var(--gc-blue-50);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--gc-blue-800);
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+.card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border-left: 4px solid var(--gc-blue-600);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+}
+
+.card h3 {
+  margin-top: 0;
+}
+
+.icon-text {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+  color: var(--gc-on-surface-variant);
+}
+
+.arrow {
+  color: var(--gc-blue-600);
+  font-size: 20px;
+}
+
+.gc-link {
+  color: var(--gc-blue-600);
+  text-decoration: none;
+}
+
+.gc-link:hover {
+  color: var(--gc-blue-800);
+  text-decoration: underline;
+}
+
+.badge,
+.badge-ga,
+.badge-preview,
+.badge-deprecated {
+  display: inline-block;
+  color: #FFFFFF;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+  margin: 4px 8px 4px 0;
+}
+
+.badge {
+  background: var(--gc-blue-600);
+}
+
+.badge-ga {
+  background: var(--gc-green);
+  color: #FFFFFF;
+}
+
+.badge-db {
+  background: var(--gc-database);
+  color: #FFFFFF;
+}
+
+/* Before/After 比較 */
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+@media (max-width: 720px) {
+  .before-after {
+    grid-template-columns: 1fr;
+  }
+}
+
+.before-box {
+  background: var(--gc-red-tint);
+  border: 1px solid rgba(234, 67, 53, 0.3);
+  border-radius: 12px;
+  padding: 16px 20px;
+}
+
+.after-box {
+  background: var(--gc-green-tint);
+  border: 1px solid rgba(52, 168, 83, 0.3);
+  border-radius: 12px;
+  padding: 16px 20px;
+}
+
+.before-box h3 {
+  color: var(--gc-red);
+  margin-top: 0;
+}
+
+.after-box h3 {
+  color: var(--gc-green);
+  margin-top: 0;
+}
+
+.before-box ul, .after-box ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  font-size: 14px;
+}
+
+.before-box li, .after-box li {
+  margin-bottom: 8px;
+}
+
+/* フロー図スタイル */
+.flow-diagram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 24px 0;
+}
+
+.flow-step {
+  background: var(--gc-surface);
+  border: 2px solid var(--gc-blue-600);
+  border-radius: 12px;
+  padding: 12px 20px;
+  text-align: center;
+  min-width: 100px;
+  color: var(--gc-on-surface);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+  font-size: 14px;
+}
+
+.flow-arrow {
+  color: var(--gc-blue-600);
+  font-size: 24px;
+  font-weight: bold;
+}
+
+/* チェックリスト */
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.check-icon {
+  color: var(--gc-green);
+  font-size: 18px;
+}
+
+.cross-icon {
+  color: var(--gc-red);
+  font-size: 18px;
+}
+
+/* コードブロック (pre:not(.mermaid) で Mermaid を除外) */
+.code-block,
+pre:not(.mermaid) {
+  background: #1E1E1E;
+  border-radius: 8px;
+  padding: 16px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: #E8E8E8;
+  margin: 16px 0;
+}
+
+pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
+}
+
+code:not(pre code) {
+  background: var(--gc-surface-container-low);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 0.85em;
+  color: var(--gc-blue-900);
+}
+
+.section code:not(pre code) {
+  background: var(--gc-surface);
+}
+
+/* テーブル */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--gc-outline-variant);
+  background: var(--gc-surface);
+}
+
+th {
+  background: var(--gc-blue-50);
+  color: var(--gc-blue-900);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 2px solid var(--gc-blue-200);
+}
+
+td {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--gc-outline-variant);
+  font-size: 14px;
+}
+
+tr:nth-child(even) {
+  background: var(--gc-surface-container-lowest);
+}
+
+tr:hover {
+  background: var(--gc-blue-50);
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+/* ボックス */
+.note-box {
+  background: var(--gc-blue-tint);
+  border-left: 4px solid var(--gc-blue-600);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.warning-box {
+  background: var(--gc-yellow-tint);
+  border-left: 4px solid var(--gc-yellow);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.error-box {
+  background: var(--gc-red-tint);
+  border-left: 4px solid var(--gc-red);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.success-box {
+  background: var(--gc-green-tint);
+  border-left: 4px solid var(--gc-green);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+/* 統計カード */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.stat-card {
+  background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+  color: var(--gc-surface);
+  border-radius: 12px;
+  padding: 24px 16px;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 34px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+/* ユースケース */
+.usecase {
+  background: var(--gc-blue-tint);
+  border: 1px solid var(--gc-blue-100);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 16px 0;
+}
+
+.usecase h3 {
+  margin-top: 0;
+  color: var(--gc-blue-800);
+}
+
+.usecase .scenario {
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.usecase .effect {
+  background: var(--gc-green-tint);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 14px;
+  margin-top: 12px;
+}
+
+/* ステップリスト */
+.step-list {
+  counter-reset: step;
+  list-style: none;
+  padding-left: 0;
+  margin: 12px 0;
+}
+
+.step-list li {
+  counter-increment: step;
+  position: relative;
+  padding-left: 44px;
+  margin-bottom: 12px;
+  font-size: 15px;
+}
+
+.step-list li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 28px;
+  height: 28px;
+  background: var(--gc-blue-600);
+  color: #FFFFFF;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+/* Mermaid コンテナ */
+.mermaid-container {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 20px 0;
+  border: 2px solid rgba(66, 133, 244, 0.3);
+  overflow-x: auto;
+}
+
+.mermaid {
+  display: flex;
+  justify-content: center;
+}
+
+/* 関連サービスグリッド */
+.related-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.related-card {
+  background: var(--gc-surface);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-size: 14px;
+}
+
+.related-card strong {
+  color: var(--gc-on-surface);
+  display: block;
+  margin-bottom: 4px;
+}
+
+footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gc-outline-variant);
+  font-size: 12px;
+  color: var(--gc-outline);
+}
+
+footer a {
+  word-break: break-all;
+}
+
+footer ul {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ヘッダー -->
+  <div class="header">
+    <div>
+      <div style="margin-bottom: 8px;">
+        <span class="badge badge-db">🗄️ Bigtable</span>
+        <span class="badge badge-ga">✅ GA (一般提供)</span>
+        <span class="badge">📊 可観測性</span>
+      </div>
+      <h1>📊 Bigtable アクセスパターン分析<br><span style="font-size: 22px; color: var(--gc-on-surface-variant);">「Access patterns」ページが GA に</span></h1>
+    </div>
+    <div class="subtitle">リリース日: 2026-11-13</div>
+  </div>
+
+  <!-- 概要 -->
+  <div class="section">
+    <h2>📝 概要</h2>
+    <p>
+      Google Cloud コンソールで Bigtable インスタンス/クラスタの読み取り・書き込みアクセスパターンを可視化できる
+      <span class="highlight">Access patterns ページが GA</span> になりました。
+      Bigtable がリクエストをサーバー側で自動的に <span class="highlight">10 種類のクエリタイプ</span>
+      (ポイントリード、ショートスキャン、スパースリードなど) に分類し、QPS・レイテンシ・帯域幅・行スキャンのメトリクスを
+      クエリタイプ別の内訳で表示します。
+    </p>
+    <p>
+      System insights (リソース使用率)、Key Visualizer (行キー分布) に続く
+      <strong>「クエリ中心」の第三の可観測性ツール</strong>として、非効率なクエリパターンの検出、レイテンシのトラブルシューティング、
+      in-memory tier や Data Boost の適用対象ワークロードの特定に役立ちます。
+      Cloud Monitoring API 経由のプログラマティックな取得も可能です。
+    </p>
+
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-value">10 種類</div>
+        <div class="stat-label">自動分類されるクエリタイプ</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">9 つ</div>
+        <div class="stat-label">チャート/メトリクス (QPS・レイテンシ・行・セル・バイト)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">3 レベル</div>
+        <div class="stat-label">クラスタ / テーブル / アプリプロファイル</div>
+      </div>
+    </div>
+
+    <div class="before-after">
+      <div class="before-box">
+        <h3>❌ Before: アップデート前の課題</h3>
+        <ul>
+          <li>ワークロードを<strong>クエリタイプ別に分解</strong>して分析する専用の可視化手段がなかった (System insights はリソース使用率、Key Visualizer は行キー分布のみ)</li>
+          <li>返却行数よりはるかに多くの行をスキャンする<strong>「スパースリード」</strong>のような非効率パターンをコンソール上で直接特定することが困難</li>
+          <li>in-memory tier や Data Boost の<strong>適用に向くテーブル/アプリプロファイルを判断するデータ</strong>が得にくかった</li>
+        </ul>
+      </div>
+      <div class="after-box">
+        <h3>✅ After: アップデート後の改善</h3>
+        <ul>
+          <li>クラスタ/テーブル/アプリプロファイル単位で <strong>QPS 分布・レイテンシ (p50/p95/p99)・スキャン行数・セル数・送信バイト数</strong>をクエリタイプ別に可視化</li>
+          <li><strong>Scanned rows vs Returned rows</strong>、<strong>Cells seen vs Sent cells</strong> の比較で読み取り効率の低下をコンソールで特定可能</li>
+          <li>ポイントリード中心 (<strong>in-memory tier 候補</strong>) や大規模スキャン (<strong>Data Boost 候補</strong>) をデータに基づいて特定</li>
+          <li><code>bigtable.googleapis.com/query_type/*</code> メトリクスとして Monitoring API からも利用可能</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- アーキテクチャ図 -->
+  <div class="section">
+    <h2>🏗️ アーキテクチャ図</h2>
+    <p>
+      Bigtable が Data API リクエストをサーバー側でクエリタイプに自動分類して Cloud Monitoring に記録し、
+      コンソールの Access patterns ページでクエリタイプ別に可視化・分析して最適化アクションにつなげる流れです。
+    </p>
+    <div class="mermaid-container">
+      <pre class="mermaid">
+flowchart TD
+    APP([🧑‍💻 アプリケーション]) -->|ReadRows / MutateRow など| API[📡 Bigtable Data API]
+    API --> BT[(🗄️ Bigtable クラスタ)]
+    BT -->|リクエスト完了後にサーバー側で分類| CLS{🏷️ クエリタイプ分類<br/>10 種類}
+    CLS -->|query_type/* メトリクス| MON[📊 Cloud Monitoring]
+    MON --> PAGE[🖥️ Access patterns ページ<br/>Google Cloud コンソール]
+    MON --> MEX[📈 Metrics Explorer /<br/>カスタムダッシュボード]
+    PAGE --> ACT1[⚡ in-memory tier 適用判断]
+    PAGE --> ACT2[🚀 Data Boost で<br/>スキャン分離]
+    PAGE --> ACT3[🔍 フィルタ / スキーマ改善]
+      </pre>
+    </div>
+  </div>
+
+  <!-- 主要機能 -->
+  <div class="section">
+    <h2>⚙️ 主要機能</h2>
+
+    <div class="card">
+      <h3>1️⃣ クエリタイプ別のワークロード可視化</h3>
+      <div class="icon-text"><span class="arrow">→</span><span>受信リクエストを自動的に <strong>10 種類のクエリタイプに分類</strong>し、クラスタごとの読み取り/書き込み/読み取り-書き込みクエリタイプの割合とレートを表示</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span><strong>Group by</strong> オプションでテーブル別またはアプリプロファイル別に内訳を表示可能</span></div>
+    </div>
+
+    <div class="card">
+      <h3>2️⃣ 非効率なクエリパターンの検出とレイテンシ分析</h3>
+      <div class="icon-text"><span class="arrow">→</span><span>選択的なフィルタやガベージコレクション待ちセルにより返却量を大幅に上回るスキャンを行う<strong>「スパースリード」を特定</strong></span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>フォワードスキャンより非効率な<strong>「リバーススキャン」をモニタリング</strong></span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>サーバー側レイテンシのパーセンタイル (<strong>p99/p95/p50</strong>) をスキャン行数・返却行数・セル数と並べて比較し、レイテンシスパイクの原因を特定</span></div>
+    </div>
+
+    <div class="card">
+      <h3>3️⃣ 機能適用対象ワークロードの特定</h3>
+      <div class="icon-text"><span class="arrow">→</span><span>ポイントリードが多いテーブル/アプリプロファイルを特定し、Enterprise Plus エディションの <strong>in-memory tier の適用候補</strong>を発見</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>大規模スキャンやバッチ読み取りワークロードを特定し、<strong>Data Boost</strong> サーバーレスコンピュートでサービングトラフィックから分離</span></div>
+    </div>
+
+    <div class="card">
+      <h3>4️⃣ Cloud Monitoring API によるプログラマティックアクセス</h3>
+      <div class="icon-text"><span class="arrow">→</span><span><code>bigtable.googleapis.com/query_type/*</code> メトリクス (モニタリング対象リソース: <code>bigtable_table</code>) を Monitoring API、Metrics Explorer、カスタムダッシュボードから利用可能</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>リソースラベル: <code>project_id</code>、<code>instance</code>、<code>cluster</code>、<code>table</code> / メトリクスラベル: <code>query_type</code>、<code>app_profile</code>、<code>method</code></span></div>
+    </div>
+  </div>
+
+  <!-- 技術仕様 -->
+  <div class="section">
+    <h2>🔬 技術仕様</h2>
+
+    <h3>📈 Access patterns ページのチャートとメトリクス</h3>
+    <div class="table-wrap">
+      <table>
+        <tr><th>メトリクス</th><th>説明</th></tr>
+        <tr><td><strong>QPS distribution</strong></td><td>選択した期間全体で集計した、クエリタイプ別のリクエスト割合と平均 QPS</td></tr>
+        <tr><td><strong>Latency</strong></td><td>クエリタイプ別のサーバー側レイテンシの推移 (p99 がデフォルト。p95、p50 に切り替え可能)</td></tr>
+        <tr><td><strong>QPS</strong></td><td>クエリタイプ別の毎秒リクエスト数の推移</td></tr>
+        <tr><td><strong>Returned rows</strong></td><td>フィルタ適用後にクライアントへ返却された行数/秒</td></tr>
+        <tr><td><strong>Scanned rows</strong></td><td>フィルタ適用前に Bigtable が読み取った行数/秒 (Returned rows との比較で非効率なフィルタを特定)</td></tr>
+        <tr><td><strong>Modified rows</strong></td><td>書き込みおよび読み取り-書き込みリクエストで変更された行数/秒</td></tr>
+        <tr><td><strong>Cells seen</strong></td><td>フィルタ適用前に検査されたセル数/秒 (フィルタ除外分やガベージコレクション待ちセルを含む)</td></tr>
+        <tr><td><strong>Sent cells</strong></td><td>フィルタ適用後にクライアントへ返却されたセル数/秒</td></tr>
+        <tr><td><strong>Sent bytes</strong></td><td>返却されたエンコード済み行データのバイト数/秒</td></tr>
+      </table>
+    </div>
+    <div class="note-box">
+      <strong>💡 ポイント:</strong> すべてのチャートは<strong>クラスタ、テーブル、アプリプロファイル</strong>の各レベルで利用できます。
+    </div>
+
+    <h3>🏷️ 10 種類のクエリタイプ</h3>
+    <div class="table-wrap">
+      <table>
+        <tr><th>クエリタイプ</th><th>メトリクスラベル</th><th>分類基準 (概要)</th></tr>
+        <tr><td><strong>ポイントリード</strong></td><td><code>QUERY_TYPE_POINT_READ</code></td><td>フィルタなしまたはシンプルフィルタの単一行キーのフォワード読み取りで、セル数・レスポンスサイズが小さい単一行の上限内</td></tr>
+        <tr><td><strong>ショートスキャン</strong></td><td><code>QUERY_TYPE_SHORT_SCAN</code></td><td>単一の連続行範囲のフォワードスキャンで、行数・セル数・バイト数が小さい上限内</td></tr>
+        <tr><td><strong>リバースショートスキャン</strong></td><td><code>QUERY_TYPE_REVERSE_SHORT_SCAN</code></td><td>ショートスキャンと同じ上限内のリバーススキャン</td></tr>
+        <tr><td><strong>リバーススキャン</strong></td><td><code>QUERY_TYPE_REVERSE_SCAN</code></td><td>リバースショートスキャンに該当しないすべてのリバース読み取り</td></tr>
+        <tr><td><strong>スパースリード</strong></td><td><code>QUERY_TYPE_SPARSE_READ</code></td><td>フィルタ除外や未回収セルにより、返却量を大幅に上回る行/セルをスキャンするフォワード読み取り</td></tr>
+        <tr><td><strong>バルクリード</strong></td><td><code>QUERY_TYPE_BULK_READ</code></td><td>複数行キー指定や大きな単一行の読み取りで、ポイントリードの上限を超えスパースリードに該当しないもの</td></tr>
+        <tr><td><strong>その他の読み取り</strong></td><td><code>QUERY_TYPE_OTHER_READ</code></td><td>大規模範囲スキャン、複数範囲スキャン、複雑なフィルタを使う読み取りなど、上記に該当しない ReadRows</td></tr>
+        <tr><td><strong>ポイントライト</strong></td><td><code>QUERY_TYPE_POINT_WRITE</code></td><td>単一行の MutateRow または小規模な MutateRows バッチ</td></tr>
+        <tr><td><strong>その他の書き込み</strong></td><td><code>QUERY_TYPE_OTHER_WRITE</code></td><td>ポイントライトの上限を超える大規模なバッチ書き込みなど</td></tr>
+        <tr><td><strong>読み取り-書き込み</strong></td><td><code>QUERY_TYPE_READ_WRITE</code></td><td>条件付き書き込み (CheckAndMutateRow) やアトミックな増分/追記 (ReadModifyWriteRow)</td></tr>
+      </table>
+    </div>
+
+    <h3>🔄 読み取りクエリの評価順序</h3>
+    <p style="font-size: 14px;">分類はメソッド名ではなく、リクエストパラメータ (行キー/範囲、<code>reversed</code>、フィルタ) と実行統計 (スキャン/返却した行数・セル数・バイト数) に基づき、リクエスト完了後にサーバー側で行われます。最初に一致したパターンが割り当てられます。</p>
+    <div class="flow-diagram">
+      <div class="flow-step">🎯 ポイント<br>リード</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">📏 ショートスキャン /<br>リバースショートスキャン</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">◀️ リバース<br>スキャン</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">🕳️ スパース<br>リード</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">📦 バルク<br>リード</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">📚 その他の<br>読み取り</div>
+    </div>
+
+    <h3>🔐 必要な IAM ロール</h3>
+    <div class="table-wrap">
+      <table>
+        <tr><th>目的</th><th>ロール</th></tr>
+        <tr><td>Bigtable リソースの表示</td><td>Bigtable Viewer (<code>roles/bigtable.viewer</code>) または Bigtable Reader (<code>roles/bigtable.reader</code>)</td></tr>
+        <tr><td>Monitoring 時系列データの表示</td><td>Monitoring Viewer (<code>roles/monitoring.viewer</code>)</td></tr>
+      </table>
+    </div>
+    <p style="font-size: 14px;">必要な権限: <code>bigtable.instances.get</code>、<code>bigtable.clusters.list</code>、<code>bigtable.appProfiles.list</code>、<code>bigtable.tables.list</code>、<code>monitoring.timeSeries.list</code></p>
+  </div>
+
+  <!-- 設定方法 -->
+  <div class="section">
+    <h2>🛠️ 設定方法</h2>
+
+    <h3>✅ 前提条件</h3>
+    <div class="check-item"><span class="check-icon">✓</span><span>プロジェクトに対して Bigtable Viewer (または Bigtable Reader) と Monitoring Viewer の IAM ロールが付与されていること</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span>分析対象の Bigtable インスタンスが存在すること</span></div>
+
+    <h3>📍 ステップ 1: Access patterns ページを開く (インスタンスレベル)</h3>
+    <ol class="step-list">
+      <li>Google Cloud コンソールで Bigtable インスタンスの一覧を開く</li>
+      <li>メトリクスを表示するインスタンスをクリックする</li>
+      <li>ナビゲーションペインの <strong>Observability</strong> の下にある <strong>Access patterns</strong> をクリックする</li>
+      <li><strong>Cluster</strong> リストで分析対象のクラスタを選択する (デフォルトでは最初のクラスタが選択される)</li>
+    </ol>
+    <div class="note-box">
+      <strong>💡 クラスタレベルで表示する場合:</strong> インスタンスの概要ページでクラスタ ID をクリックし、ナビゲーションペインの <strong>Access patterns</strong> をクリックします。
+    </div>
+
+    <h3>📍 ステップ 2: 内訳の切り替えと期間の調整</h3>
+    <ol class="step-list">
+      <li><strong>Group by</strong> リストで内訳方法を選択する — <strong>None</strong>: クエリタイプのみで内訳表示 (デフォルト) / <strong>App profile</strong>: アプリプロファイル ID とアクセスパターンで内訳表示 / <strong>Table</strong>: テーブル ID とアクセスパターンで内訳表示</li>
+      <li>必要に応じて時間範囲セレクタで期間の変更や自動更新の切り替えを行う</li>
+    </ol>
+  </div>
+
+  <!-- メリット -->
+  <div class="section">
+    <h2>💪 メリット</h2>
+
+    <h3>💼 ビジネス面</h3>
+    <div class="card" style="border-left-color: var(--gc-green);">
+      <div class="icon-text"><span class="check-icon">✓</span><span><strong>運用コストの最適化</strong>: スキャン過多な非効率クエリの特定・改善により、ノード CPU の無駄遣いを削減し、必要ノード数の抑制につなげられる</span></div>
+      <div class="icon-text"><span class="check-icon">✓</span><span><strong>データドリブンな機能採用判断</strong>: in-memory tier や Data Boost の採用を、実測のアクセスパターンデータに基づいて判断できる</span></div>
+    </div>
+
+    <h3>⚙️ 技術面</h3>
+    <div class="card" style="border-left-color: var(--gc-green);">
+      <div class="icon-text"><span class="check-icon">✓</span><span><strong>クエリ中心の可観測性</strong>: System insights (リソース使用率)、Key Visualizer (行キー分布) に加え、クエリタイプ別の分析軸が追加され、Bigtable の可観測性が向上</span></div>
+      <div class="icon-text"><span class="check-icon">✓</span><span><strong>レイテンシトラブルシューティングの効率化</strong>: レイテンシパーセンタイルとスキャン/返却メトリクスを突き合わせ、レイテンシスパイクの原因となるアクセスパターンを素早く特定可能</span></div>
+      <div class="icon-text"><span class="check-icon">✓</span><span><strong>自動化・連携が容易</strong>: 標準の Cloud Monitoring メトリクスとして提供されるため、既存のダッシュボードやアラートに組み込める</span></div>
+    </div>
+  </div>
+
+  <!-- デメリット・制約事項 -->
+  <div class="section">
+    <h2>⚠️ デメリット・制約事項</h2>
+
+    <h3>🚫 制限事項</h3>
+    <div class="error-box">
+      <strong>❗ SQL クエリは分類対象外:</strong> GoogleSQL for Bigtable のクエリはアクセスパターンとして分類されず、行・セル・バイトのアクセスパターンメトリクスに含まれません。QPS distribution、QPS、Latency チャートでは SQL クエリやその他の未分類リクエストは <code>QUERY_TYPE_UNKNOWN</code> として表示されます。
+    </div>
+
+    <h3>🤔 考慮すべき点</h3>
+    <div class="warning-box">
+      <strong>⚠️ 分類はパラメータと実行統計に基づく:</strong> メソッド名ではなくリクエストパラメータと実行統計で分類されるため、単一行読み取りでも複雑なフィルタや大量セルのスキャンがあるとスパースリード/バルクリード/その他の読み取りに分類されることがあります。
+    </div>
+    <div class="warning-box">
+      <strong>⚠️ 「シンプルフィルタ」が条件:</strong> ポイントリード、ショートスキャン、リバースショートスキャン、バルクリードに分類されるには、シンプルフィルタ (フィルタなし、<code>column_range_filter</code>、<code>timestamp_range_filter</code>、<code>cells_per_column_limit_filter</code> など) の使用が条件です。<code>value_regex_filter</code>、<code>row_key_regex_filter</code>、<code>interleave</code>、<code>condition</code> などは複雑なフィルタとして扱われます。
+    </div>
+  </div>
+
+  <!-- ユースケース -->
+  <div class="section">
+    <h2>🎯 ユースケース</h2>
+
+    <div class="usecase">
+      <h3>⚡ ユースケース 1: in-memory tier の適用候補の特定</h3>
+      <p class="scenario"><strong>シナリオ:</strong> 読み取りレイテンシの厳しい目標を持つサービングワークロードで、QPS distribution、QPS、Latency チャートに <code>QUERY_TYPE_POINT_READ</code> の高いリクエスト量が表示されている。</p>
+      <div class="flow-diagram">
+        <div class="flow-step">1. Group by を<br>「Table」/「App profile」に設定</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">2. ポイントリードの多い<br>テーブル/プロファイルを特定</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">3. Enterprise Plus の<br>in-memory tier を有効化</div>
+      </div>
+      <div class="effect"><strong>✅ 効果:</strong> 低レイテンシが求められるポイントリード中心のワークロードを特定し、in-memory tier の恩恵を最も受けるテーブルに絞って適用できる。</div>
+    </div>
+
+    <div class="usecase">
+      <h3>🚀 ユースケース 2: Data Boost による大規模スキャンの分離</h3>
+      <p class="scenario"><strong>シナリオ:</strong> レイテンシセンシティブなサービングトラフィックと同一クラスタ上で、<code>QUERY_TYPE_BULK_READ</code> や <code>QUERY_TYPE_OTHER_READ</code> の高いボリュームや周期的なスパイクが観測される。</p>
+      <div class="flow-diagram">
+        <div class="flow-step">1. Group by を<br>「App profile」に設定し<br>スキャン発生元を特定</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">2. バッチ/分析用読み取りを<br>専用アプリプロファイルに分離</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">3. そのプロファイルで<br>Data Boost を使用するよう構成</div>
+      </div>
+      <div class="effect"><strong>✅ 効果:</strong> 大規模スキャンがサービングノードの CPU リソースを奪わなくなり、サービングトラフィックのレイテンシを安定化できる。</div>
+    </div>
+
+    <div class="usecase">
+      <h3>🔍 ユースケース 3: フィルタオーバーヘッドの削減とガベージコレクション調整</h3>
+      <p class="scenario"><strong>シナリオ:</strong> <code>QUERY_TYPE_SPARSE_READ</code> の割合が高い、または Scanned rows が Returned rows を、Cells seen が Sent cells を大幅に上回っている。</p>
+      <div class="flow-diagram">
+        <div class="flow-step">1. 値/正規表現フィルタに頼らず<br>行キー範囲・プレフィックスを絞る</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">2. 最新セルのみ必要なら<br>cells_per_column_limit_filter<br>を追加</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">3. ガベージコレクション<br>ポリシーを見直す</div>
+      </div>
+      <div class="effect"><strong>✅ 効果:</strong> クライアントに返却されないデータのスキャンを削減し、読み取り効率とレイテンシを改善できる。</div>
+    </div>
+  </div>
+
+  <!-- 料金 -->
+  <div class="section">
+    <h2>💰 料金</h2>
+    <div class="success-box">
+      <strong>✅ 追加料金の記載なし:</strong> リリースノートおよびドキュメントに本機能固有の追加料金に関する記載はありません。アクセスパターンメトリクスは Cloud Monitoring のメトリクスとして提供されます。
+    </div>
+    <p>最新の料金は公式ページを参照してください。</p>
+    <div class="icon-text"><span class="arrow">→</span><a class="gc-link" href="https://cloud.google.com/bigtable/pricing" target="_blank" rel="noopener noreferrer">Bigtable の料金</a></div>
+    <div class="icon-text"><span class="arrow">→</span><a class="gc-link" href="https://cloud.google.com/stackdriver/pricing" target="_blank" rel="noopener noreferrer">Cloud Monitoring の料金</a></div>
+  </div>
+
+  <!-- 関連サービス・機能 -->
+  <div class="section">
+    <h2>🔗 関連サービス・機能</h2>
+    <div class="related-grid">
+      <div class="related-card">
+        <strong>📊 Cloud Monitoring</strong>
+        アクセスパターンメトリクス (<code>bigtable.googleapis.com/query_type/*</code>) の基盤。Metrics Explorer やカスタムダッシュボード、API 経由での利用が可能。
+      </div>
+      <div class="related-card">
+        <strong>🖥️ System insights</strong>
+        クラスタ全体のリソース使用率 (CPU、ノード数、スループットなど) を表示する既存のモニタリングページ。Access patterns ページと補完関係。
+      </div>
+      <div class="related-card">
+        <strong>🗺️ Key Visualizer</strong>
+        行キー範囲ごとのトラフィック分布を可視化し、ホットスポット検出に利用。クエリタイプ別分析と組み合わせて使用。
+      </div>
+      <div class="related-card">
+        <strong>⚡ in-memory tier (Enterprise Plus)</strong>
+        ポイントリード中心のワークロードの低レイテンシ化。Access patterns ページで適用候補を特定可能。
+      </div>
+      <div class="related-card">
+        <strong>🚀 Data Boost</strong>
+        大規模スキャン/バッチ読み取りをサービングノードから分離するサーバーレスコンピュート。適用対象ワークロードの特定に活用。
+      </div>
+      <div class="related-card">
+        <strong>📐 クエリ統計 (query stats)</strong>
+        個々の読み取りリクエストにおける rows seen / rows returned の比率を確認でき、Access patterns ページと併用して効率を評価。
+      </div>
+    </div>
+  </div>
+
+  <!-- まとめ -->
+  <div class="section">
+    <h2>🎁 まとめ</h2>
+    <div class="note-box">
+      <p style="margin: 0 0 8px;">
+        Bigtable のワークロードを<span class="highlight">クエリタイプ別に分析できる Access patterns ページが GA</span> となり、
+        System insights、Key Visualizer と並ぶ<strong>第三の可観測性ツール</strong>として追加コストの記載なく利用できるようになりました。
+      </p>
+      <p style="margin: 0;">
+        <strong>推奨アクション:</strong> まず Access patterns ページで<strong>スパースリードやリバーススキャンの有無</strong>を確認し、
+        非効率なフィルタ/スキーマの改善や、<strong>in-memory tier・Data Boost の適用判断</strong>に活用しましょう。
+      </p>
+    </div>
+    <div class="flow-diagram">
+      <div class="flow-step">🖥️ Access patterns<br>ページを開く</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">🕳️ スパースリード /<br>リバーススキャンを確認</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">🔍 フィルタ / スキーマ<br>を改善</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">⚡ in-memory tier /<br>🚀 Data Boost を判断</div>
+    </div>
+  </div>
+
+  <!-- フッター -->
+  <footer>
+    <p><strong>📎 出典・参考リンク</strong></p>
+    <ul>
+      <li>公式リリースノート: <a href="https://docs.cloud.google.com/release-notes#November_13_2026" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/release-notes#November_13_2026</a></li>
+      <li>ドキュメント: Analyze access patterns: <a href="https://docs.cloud.google.com/bigtable/docs/access-patterns" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/bigtable/docs/access-patterns</a></li>
+      <li>ドキュメント: Monitor instance performance (System insights): <a href="https://docs.cloud.google.com/bigtable/docs/monitoring-instance" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/bigtable/docs/monitoring-instance</a></li>
+      <li>ドキュメント: Key Visualizer overview: <a href="https://docs.cloud.google.com/bigtable/docs/keyvis-overview" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/bigtable/docs/keyvis-overview</a></li>
+      <li>ドキュメント: Troubleshoot latency: <a href="https://docs.cloud.google.com/bigtable/docs/latency" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/bigtable/docs/latency</a></li>
+      <li>料金ページ: <a href="https://cloud.google.com/bigtable/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">https://cloud.google.com/bigtable/pricing</a></li>
+    </ul>
+    <p>タグ: Bigtable / Cloud Monitoring / 可観測性 / アクセスパターン / パフォーマンス / GA ・ レポート: reports/2026/2026-11-13-bigtable-access-patterns-analysis-ga.md (2026-11-13)</p>
+  </footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+    mermaid.initialize({
+        startOnLoad: true,
+        theme: 'base',
+        themeVariables: {
+            primaryColor: '#4285F4',
+            primaryTextColor: '#202124',
+            primaryBorderColor: '#4285F4',
+            lineColor: '#4285F4',
+            secondaryColor: '#F1F3F4',
+            tertiaryColor: '#FAFAFA',
+            background: '#FFFFFF',
+            mainBkg: '#E8F0FE',
+            nodeBorder: '#4285F4',
+            clusterBkg: '#E8F0FE',
+            clusterBorder: '#4285F4',
+            edgeLabelBackground: '#FFFFFF',
+            textColor: '#202124'
+        }
+    });
+</script>
+</body>
+</html>
