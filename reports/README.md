@@ -5,10 +5,14 @@
 
 ## 2026 年
 
+- [2026-11-21 - Cloud SDK: gcloud CLI 594.0.1 パッチリリース (General bug fixes)](2026/2026-11-21-cloud-sdk-594-0-1.md)
+- [2026-11-21 - App Engine / Cloud Run / Buildpacks: PHP ランタイムセキュリティアップデート (GCP-2026-090 / CVE-2026-126714 対応)](2026/2026-11-21-serverless-php-runtime-security-gcp-2026-090.md)
 - [2026-11-20 - Managed Service for Apache Airflow: CVE-2026-114938 修正版リリースと新バージョン提供](2026/2026-11-20-managed-airflow-cve-2026-114938-fixed-versions.md)
+- [2026-11-20 - Apigee hybrid: v1.17.5 パッチリリース (apigee-hybrid-cassandra のセキュリティ修正)](2026/2026-11-20-apigee-hybrid-v1-17-5.md)
 - [2026-11-20 - Cloud Scheduler: 顧客管理の暗号鍵 (CMEK) サポートが GA](2026/2026-11-20-cloud-scheduler-cmek-ga.md)
 - [2026-11-20 - Dataflow: Java ワーカーセキュリティアップデート (GCP-2026-082 / CVE-2026-114938 対応)](2026/2026-11-20-dataflow-java-security-gcp-2026-082.md)
 - [2026-11-20 - Cloud Storage: 階層型名前空間バケットでのフォルダ再帰削除 (folders.deleteRecursive)](2026/2026-11-20-cloud-storage-hns-recursive-folder-delete.md)
+- [2026-11-20 - Google SecOps Marketplace: 4 統合のセキュリティ強化アップデート (EmailV2 / SSH / Google Threat Intelligence / Salesforce)](2026/2026-11-20-google-secops-marketplace-integration-updates.md)
 - [2026-11-20 - Looker: コンパクト数値表示と基本値フォーマットが GA](2026/2026-11-20-looker-compact-numbers-value-formatting-ga.md)
 - [2026-11-20 - App Engine / Cloud Run / Buildpacks: Java ランタイムセキュリティアップデート (GCP-2026-082 / CVE-2026-114938 対応)](2026/2026-11-20-serverless-java-runtime-security-gcp-2026-082.md)
 - [2026-11-20 - Container-Optimized OS: cos-133-19999-44-261 リリース (Linux カーネルの CVE 2 件を修正)](2026/2026-11-20-container-optimized-os-cos-133-kernel-cve-fixes.md)
