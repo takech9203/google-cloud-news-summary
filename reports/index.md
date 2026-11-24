@@ -5,6 +5,12 @@
 
 ## 2026 年
 
+- [2026-11-23 - Filestore: ゾーナルサービスティアの小容量インスタンスが GA](2026/2026-11-23-filestore-zonal-small-capacity-instances-ga.md)
+- [2026-11-23 - Looker: カスタマーホスト型インスタンスから Looker (Google Cloud core) へのシングルホップ・セルフサービス移行 (Preview)](2026/2026-11-23-looker-core-self-service-migration-preview.md)
+- [2026-11-23 - Google Kubernetes Engine: Policy Controller の非推奨化](2026/2026-11-23-gke-policy-controller-deprecation.md)
+- [2026-11-23 - Google Cloud NetApp Volumes: Unified Maintenance 統合](2026/2026-11-23-netapp-volumes-unified-maintenance-integration.md)
+- [2026-11-23 - BigQuery: 予約・課金制御オプション reservation_override_mode / disable_on_demand_billing が GA](2026/2026-11-23-bigquery-reservation-billing-controls-ga.md)
+- [2026-11-23 - App Engine / Cloud Run / Cloud Run functions: Node.js 26 と Python 3.15 ランタイムが GA](2026/2026-11-23-serverless-nodejs-26-python-3-15-runtimes-ga.md)
 - [2026-11-21 - Cloud SDK: gcloud CLI 594.0.1 パッチリリース (General bug fixes)](2026/2026-11-21-cloud-sdk-594-0-1.md)
 - [2026-11-21 - App Engine / Cloud Run / Buildpacks: PHP ランタイムセキュリティアップデート (GCP-2026-090 / CVE-2026-126714 対応)](2026/2026-11-21-serverless-php-runtime-security-gcp-2026-090.md)
 - [2026-11-20 - Managed Service for Apache Airflow: CVE-2026-114938 修正版リリースと新バージョン提供](2026/2026-11-20-managed-airflow-cve-2026-114938-fixed-versions.md)
