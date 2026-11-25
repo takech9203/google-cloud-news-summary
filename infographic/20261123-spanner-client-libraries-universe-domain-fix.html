@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spanner クライアントライブラリ: メトリクスエクスポーターが universe domain を尊重するよう修正</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Google Brand Colors */
+  --gc-blue: #4285F4;
+  --gc-red: #EA4335;
+  --gc-yellow: #FBBC04;
+  --gc-green: #34A853;
+
+  /* Google Cloud UI Blue Scale */
+  --gc-blue-900: #174EA6;
+  --gc-blue-800: #185ABC;
+  --gc-blue-700: #1967D2;
+  --gc-blue-600: #1A73E8;
+  --gc-blue-500: #4285F4;
+  --gc-blue-300: #669DF6;
+  --gc-blue-200: #8AB4F8;
+  --gc-blue-100: #AECBFA;
+  --gc-blue-50: #E8F0FE;
+
+  /* Text Colors */
+  --gc-on-surface: #202124;
+  --gc-on-surface-variant: #5F6368;
+  --gc-outline: #80868B;
+
+  /* Surface Colors */
+  --gc-surface: #FFFFFF;
+  --gc-surface-container-lowest: #F8F9FA;
+  --gc-surface-container-low: #F1F3F4;
+  --gc-surface-container: #E8EAED;
+  --gc-outline-variant: #DADCE0;
+
+  /* Semantic Tints */
+  --gc-blue-tint: #E8F0FE;
+  --gc-green-tint: #E6F4EA;
+  --gc-red-tint: #FCE8E6;
+  --gc-yellow-tint: #FEF7E0;
+  --gc-purple-tint: #F3E8FD;
+  --gc-teal-tint: #E0F7FA;
+
+  /* Extended Colors */
+  --gc-purple: #A142F4;
+  --gc-teal: #00BCD4;
+  --gc-orange: #FF6D00;
+  --gc-database: #F4B400;
+}
+
+body {
+  background-color: var(--gc-surface);
+  font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+  color: var(--gc-on-surface-variant);
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 20px;
+  margin: 0;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 16px;
+  border-bottom: 3px solid var(--gc-blue-600);
+}
+
+h1, .title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--gc-on-surface);
+  margin: 0;
+  line-height: 1.4;
+}
+
+h2, .section-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin-top: 0;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 20px 0 8px;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: var(--gc-outline);
+}
+
+.meta-badges {
+  margin-bottom: 32px;
+}
+
+.section {
+  background: var(--gc-surface-container-low);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid var(--gc-outline-variant);
+}
+
+.highlight {
+  background-color: var(--gc-blue-50);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--gc-blue-800);
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+.card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border-left: 4px solid var(--gc-blue-600);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+}
+
+.card.card-python { border-left-color: var(--gc-green); }
+.card.card-go { border-left-color: var(--gc-teal); }
+
+.card-title {
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin-bottom: 8px;
+  font-size: 16px;
+}
+
+.icon-text {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+  color: var(--gc-on-surface-variant);
+}
+
+.arrow {
+  color: var(--gc-blue-600);
+  font-size: 20px;
+}
+
+.gc-link {
+  color: var(--gc-blue-600);
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.gc-link:hover {
+  color: var(--gc-blue-800);
+  text-decoration: underline;
+}
+
+/* サービスバッジ */
+.badge,
+.badge-ga,
+.badge-preview,
+.badge-deprecated {
+  display: inline-block;
+  color: #FFFFFF;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+  margin: 4px 8px 4px 0;
+}
+
+.badge { background: var(--gc-blue-600); }
+.badge-ga { background: var(--gc-green); color: #FFFFFF; }
+.badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+.badge-deprecated { background: var(--gc-red); color: #FFFFFF; }
+.badge-database { background: var(--gc-database); color: #FFFFFF; }
+
+/* Before/After 比較 */
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+@media (max-width: 720px) {
+  .before-after { grid-template-columns: 1fr; }
+}
+
+.before-box, .after-box {
+  border-radius: 12px;
+  padding: 16px 20px;
+}
+
+.before-box {
+  background: var(--gc-red-tint);
+  border: 1px solid rgba(234, 67, 53, 0.35);
+}
+
+.after-box {
+  background: var(--gc-green-tint);
+  border: 1px solid rgba(52, 168, 83, 0.35);
+}
+
+.before-box .ba-title { color: var(--gc-red); }
+.after-box .ba-title { color: var(--gc-green); }
+
+.ba-title {
+  font-weight: 700;
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+
+.before-box ul, .after-box ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.before-box li, .after-box li {
+  margin: 6px 0;
+  font-size: 14px;
+}
+
+/* チェックリストスタイル */
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.check-icon { color: var(--gc-green); font-size: 18px; }
+.cross-icon { color: var(--gc-red); font-size: 18px; }
+
+/* コードブロック (pre:not(.mermaid) で Mermaid を除外) */
+.code-block,
+pre:not(.mermaid) {
+  background: #1E1E1E;
+  border-radius: 8px;
+  padding: 16px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 15px;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: #E8E8E8;
+  margin: 16px 0;
+}
+
+pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
+}
+
+.code-label {
+  display: inline-block;
+  background: #2D2D2D;
+  color: #9CDCFE;
+  padding: 4px 12px;
+  border-radius: 8px 8px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.code-label + pre:not(.mermaid),
+.code-label + .code-block {
+  border-top-left-radius: 0;
+  margin-top: 0;
+}
+
+/* インラインコード */
+code:not(pre code) {
+  background: var(--gc-surface-container-low);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 0.9em;
+  color: var(--gc-blue-900);
+}
+
+.section code:not(pre code) {
+  background: var(--gc-surface);
+}
+
+/* テーブルスタイル */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--gc-outline-variant);
+  background: var(--gc-surface);
+}
+
+th {
+  background: var(--gc-blue-50);
+  color: var(--gc-blue-900);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 2px solid var(--gc-blue-200);
+}
+
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--gc-outline-variant);
+  font-size: 14px;
+}
+
+tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+tr:hover { background: var(--gc-blue-50); }
+
+/* 注意・警告ボックス */
+.note-box {
+  background: var(--gc-blue-tint);
+  border-left: 4px solid var(--gc-blue-600);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.warning-box {
+  background: var(--gc-yellow-tint);
+  border-left: 4px solid var(--gc-yellow);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.success-box {
+  background: var(--gc-green-tint);
+  border-left: 4px solid var(--gc-green);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+/* Mermaid コンテナ */
+.mermaid-container {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 20px 0;
+  border: 2px solid rgba(66, 133, 244, 0.3);
+  overflow-x: auto;
+}
+
+.mermaid {
+  display: flex;
+  justify-content: center;
+  background: #FFFFFF;
+}
+
+/* ユースケースボックス */
+.usecase-box {
+  background: var(--gc-blue-tint);
+  border: 1px solid var(--gc-blue-200);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+}
+
+.usecase-title {
+  font-weight: 700;
+  color: var(--gc-blue-900);
+  margin-bottom: 8px;
+  font-size: 16px;
+}
+
+/* 2 カラムグリッド */
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 720px) {
+  .grid-2 { grid-template-columns: 1fr; }
+}
+
+/* 関連サービスカード */
+.related-card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin: 10px 0;
+  border: 1px solid var(--gc-outline-variant);
+  box-shadow: 0 1px 2px rgba(60, 64, 67, 0.08);
+}
+
+ul.link-list {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+ul.link-list li { margin: 6px 0; font-size: 14px; }
+
+footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gc-outline-variant);
+  font-size: 12px;
+  color: var(--gc-outline);
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ヘッダー -->
+  <div class="header">
+    <h1>🗄️ Spanner クライアントライブラリ<br>メトリクスエクスポーターが universe domain を尊重するよう修正</h1>
+    <div class="subtitle">📅 2026-11-23 掲載<br>(ライブラリリリース日: 2026-11-22)</div>
+  </div>
+  <div class="meta-badges">
+    <span class="badge badge-database">Spanner (クライアントライブラリ)</span>
+    <span class="badge">Python google-cloud-spanner 3.72.1</span>
+    <span class="badge">Go cloud.google.com/go/spanner v1.96.2</span>
+    <span class="badge badge-ga">GA (ライブラリリリース)</span>
+    <span class="badge badge-deprecated">Bug Fixes</span>
+  </div>
+
+  <!-- 概要 -->
+  <div class="section">
+    <h2>📝 概要</h2>
+    <p>
+      Spanner の Python クライアントライブラリ <code>google-cloud-spanner</code> <strong>3.72.1</strong> と
+      Go クライアントライブラリ <code>cloud.google.com/go/spanner</code> <strong>v1.96.2</strong> が
+      2026 年 11 月 22 日にリリースされ、11 月 23 日付の Google Cloud Release Notes に掲載されました。
+      いずれも新機能を含まない小規模なバグ修正リリースで、修正内容は共通して
+      <span class="highlight">組み込みメトリクスのエクスポーターが universe domain などのクライアント設定を尊重する</span> ことです。
+    </p>
+    <p>
+      Spanner クライアントライブラリには、RPC のレイテンシなどを自動的に Cloud Monitoring にエクスポートする
+      組み込みのクライアントサイドメトリクス機能があります (Go 1.71.0 以降、Python 3.60.0 以降)。
+      一方、Google Cloud には標準の <code>googleapis.com</code> とは別の「ユニバース」
+      (独立した自己完結型クラウド環境。universe domain で識別) が存在します。
+      今回の修正により、標準以外の universe domain やカスタムの <code>client_options</code> を設定しているクライアントでも、
+      メトリクスエクスポーターがその設定に従って動作するようになりました。
+    </p>
+
+    <div class="before-after">
+      <div class="before-box">
+        <div class="ba-title">❌ Before: アップデート前の課題</div>
+        <ul>
+          <li><strong>Python</strong>: メトリクスエクスポーターが、Spanner クライアントに設定した <code>universe_domain</code> と <code>client_options</code> を尊重していなかった</li>
+          <li><strong>Go</strong>: メトリクスエクスポーターが、設定した universe domain (<code>GOOGLE_CLOUD_UNIVERSE_DOMAIN</code>) を尊重していなかった</li>
+          <li>標準以外のユニバースで利用する場合、メトリクスエクスポートがクライアント本体と異なる設定で動作する可能性があった</li>
+        </ul>
+      </div>
+      <div class="after-box">
+        <div class="ba-title">✅ After: アップデート後の改善</div>
+        <ul>
+          <li><strong>Python 3.72.1</strong>: エクスポーターが <code>universe_domain</code> と <code>client_options</code> を尊重 (<a class="gc-link" href="https://github.com/googleapis/google-cloud-python/pull/19172" target="_blank" rel="noopener noreferrer">#19172</a>)</li>
+          <li><strong>Go v1.96.2</strong>: エクスポーターが universe domain (<code>GOOGLE_CLOUD_UNIVERSE_DOMAIN</code>) を尊重 (<a class="gc-link" href="https://github.com/googleapis/google-cloud-go/pull/20953" target="_blank" rel="noopener noreferrer">#20953</a> / <a class="gc-link" href="https://github.com/googleapis/google-cloud-go/pull/20956" target="_blank" rel="noopener noreferrer">#20956</a>)</li>
+          <li>universe domain 利用環境でも、データアクセスとメトリクスエクスポートが一貫した設定で動作</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="note-box">
+      <strong>💡 ポイント:</strong> 標準の Google Cloud (<code>googleapis.com</code>) のみを利用しているユーザーへの影響は限定的ですが、
+      universe domain を設定して利用している環境や、<code>client_options</code> でエンドポイント等をカスタマイズしている
+      Python ユーザーにとっては重要な修正です。
+    </div>
+  </div>
+
+  <!-- アーキテクチャ図 -->
+  <div class="section">
+    <h2>🏗️ アーキテクチャ図</h2>
+    <div class="mermaid-container">
+      <pre class="mermaid">
+flowchart LR
+    APP([👨‍💻 アプリケーション]) --> CLIENT["📦 Spanner クライアントライブラリ<br/>Python 3.72.1 / Go v1.96.2<br/>(universe_domain / client_options 設定)"]
+    CLIENT -->|データアクセス| SPANNER[("🗄️ Spanner")]
+    CLIENT -->|組み込みメトリクス<br/>spanner.googleapis.com/client/*| EXPORTER["🔧 メトリクスエクスポーター<br/>✅ 修正: universe domain /<br/>client_options を尊重"]
+    EXPORTER --> MON["📈 Cloud Monitoring"]
+      </pre>
+    </div>
+    <p>
+      Spanner クライアントライブラリはデータアクセスと並行して組み込みメトリクスを Cloud Monitoring にエクスポートします。
+      今回の修正で、このエクスポート経路もクライアントに設定した universe domain / <code>client_options</code> に従うようになりました。
+    </p>
+  </div>
+
+  <!-- サービスアップデートの詳細 -->
+  <div class="section">
+    <h2>🔧 サービスアップデートの詳細</h2>
+
+    <h3>修正内容</h3>
+    <div class="card card-python">
+      <div class="card-title">🐍 Python <code>google-cloud-spanner</code> 3.72.1 (2026-11-22)</div>
+      <div class="icon-text"><span class="arrow">→</span><span>メトリクスエクスポーターで <code>universe_domain</code> と <code>client_options</code> を尊重するよう修正 (<a class="gc-link" href="https://github.com/googleapis/google-cloud-python/pull/19172" target="_blank" rel="noopener noreferrer">#19172</a>)</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>本バージョンに含まれる変更はこの 1 件のみ</span></div>
+    </div>
+    <div class="card card-go">
+      <div class="card-title">🐹 Go <code>cloud.google.com/go/spanner</code> v1.96.2 (2026-11-22)</div>
+      <div class="icon-text"><span class="arrow">→</span><span>組み込みメトリクスエクスポーターで universe domain を尊重するよう修正 (<a class="gc-link" href="https://github.com/googleapis/google-cloud-go/pull/20953" target="_blank" rel="noopener noreferrer">#20953</a>、リリースブランチへのチェリーピック <a class="gc-link" href="https://github.com/googleapis/google-cloud-go/pull/20956" target="_blank" rel="noopener noreferrer">#20956</a>)</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span><code>GOOGLE_CLOUD_UNIVERSE_DOMAIN</code> の設定がメトリクスエクスポートに引き継がれるようになった</span></div>
+    </div>
+
+    <h3>背景: 組み込みクライアントサイドメトリクスと universe domain</h3>
+    <div class="card">
+      <div class="card-title">📊 クライアントサイドメトリクス</div>
+      <p style="margin: 0; font-size: 14px;">
+        Spanner クライアントライブラリは、リクエストがアプリケーションを出てからレスポンスを受け取るまでのレイテンシ情報
+        (operation_latencies、attempt_latencies、GFE/AFE レイテンシなど) を
+        <code>spanner.googleapis.com/client/*</code> という名前空間で Cloud Monitoring に自動エクスポートします。
+        Go は 1.71.0 以降、Python は 3.60.0 以降でサポートされています。
+      </p>
+    </div>
+    <div class="card">
+      <div class="card-title">🌐 ユニバース (universe)</div>
+      <p style="margin: 0; font-size: 14px;">
+        Google Cloud のリソース階層の最上位概念で、独自のネットワークを持つ自己完結型クラウドです。
+        標準の Google Cloud に加え、同じ技術を基盤としつつ単一の管轄区域内・パートナー運営のデータセンターで稼働するユニバース
+        (Google Cloud Dedicated プログラム) が存在し、強力なデータ主権・運用主権の保証を提供します。
+        クライアントライブラリでは universe domain の設定によって接続先ユニバースを切り替えます。
+      </p>
+    </div>
+  </div>
+
+  <!-- 技術仕様 -->
+  <div class="section">
+    <h2>📋 技術仕様</h2>
+
+    <h3>リリース情報</h3>
+    <table>
+      <thead>
+        <tr><th>項目</th><th>Python</th><th>Go</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>パッケージ</td><td><code>google-cloud-spanner</code></td><td><code>cloud.google.com/go/spanner</code></td></tr>
+        <tr><td>バージョン</td><td>3.72.1</td><td>v1.96.2</td></tr>
+        <tr><td>リリース日</td><td>2026-11-22</td><td>2026-11-22</td></tr>
+        <tr><td>変更の種類</td><td>Bug Fix 1 件</td><td>Bug Fix 1 件</td></tr>
+        <tr><td>破壊的変更</td><td>なし (パッチリリース)</td><td>なし (パッチリリース)</td></tr>
+        <tr><td>ソースコード</td><td><a class="gc-link" href="https://github.com/googleapis/google-cloud-python" target="_blank" rel="noopener noreferrer">googleapis/google-cloud-python</a></td><td><a class="gc-link" href="https://github.com/googleapis/google-cloud-go" target="_blank" rel="noopener noreferrer">googleapis/google-cloud-go</a></td></tr>
+      </tbody>
+    </table>
+
+    <h3>組み込みメトリクスの前提条件とオプトアウト</h3>
+    <p style="font-size: 14px;">
+      組み込みメトリクスの利用には Cloud Monitoring API の有効化と、サービスアカウントへの
+      Monitoring Metric Writer (<code>roles/monitoring.metricWriter</code>) ロールの付与が必要です。
+      OpenTelemetry で独自にメトリクスを収集している場合などは、以下のようにオプトアウトできます。
+    </p>
+    <span class="code-label">Python</span>
+    <pre><code class="language-python"># Python
+spanner_client = spanner.Client(disable_builtin_metrics=True)</code></pre>
+    <span class="code-label">Go</span>
+    <pre><code class="language-go">// Go
+client, err := spanner.NewClientWithConfig(ctx, database, spanner.ClientConfig{
+    DisableNativeMetrics: true,
+})</code></pre>
+  </div>
+
+  <!-- 設定方法 -->
+  <div class="section">
+    <h2>⚙️ 設定方法 (アップデート手順)</h2>
+
+    <div class="flow-diagram" style="display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; margin: 16px 0 24px;">
+      <div style="background: var(--gc-surface); border: 2px solid var(--gc-blue-600); border-radius: 12px; padding: 12px 20px; text-align: center; color: var(--gc-on-surface);">📦 ライブラリを更新<br><span style="font-size: 12px; color: var(--gc-outline);">pip / go get</span></div>
+      <span style="color: var(--gc-blue-600); font-size: 24px; font-weight: bold;">→</span>
+      <div style="background: var(--gc-surface); border: 2px solid var(--gc-blue-600); border-radius: 12px; padding: 12px 20px; text-align: center; color: var(--gc-on-surface);">🚀 アプリを再デプロイ</div>
+      <span style="color: var(--gc-blue-600); font-size: 24px; font-weight: bold;">→</span>
+      <div style="background: var(--gc-surface); border: 2px solid var(--gc-green); border-radius: 12px; padding: 12px 20px; text-align: center; color: var(--gc-on-surface);">📈 Metrics Explorer で<br>エクスポートを確認</div>
+    </div>
+
+    <h3>ステップ 1: Python ライブラリの更新</h3>
+    <span class="code-label">Bash</span>
+    <pre><code class="language-bash">pip install --upgrade "google-cloud-spanner&gt;=3.72.1"</code></pre>
+
+    <h3>ステップ 2: Go ライブラリの更新</h3>
+    <span class="code-label">Bash</span>
+    <pre><code class="language-bash">go get cloud.google.com/go/spanner@v1.96.2
+go mod tidy</code></pre>
+
+    <div class="note-box">
+      <strong>🔍 確認:</strong> 更新後、特に universe domain や <code>client_options</code> を設定している環境では、
+      Cloud Monitoring の Metrics Explorer で <code>spanner.googleapis.com/client</code> を検索し、
+      メトリクスが意図どおりエクスポートされていることを確認してください。
+    </div>
+  </div>
+
+  <!-- メリット -->
+  <div class="section">
+    <h2>✨ メリット</h2>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">💼 ビジネス面</div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>ソブリンクラウド環境での可観測性</strong>: universe domain を利用する環境 (データ主権要件のある環境など) でも、標準環境と同様にクライアントサイドメトリクスによるレイテンシ分析・トラブルシューティングが行える</span></div>
+      </div>
+      <div class="card">
+        <div class="card-title">🛠️ 技術面</div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>設定の一貫性</strong>: データアクセスとメトリクスエクスポートが同一の universe domain / <code>client_options</code> 設定で動作し、挙動が予測可能になる</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>Python のカスタム設定への対応</strong>: <code>client_options</code> によるエンドポイント等のカスタマイズがメトリクスエクスポーターにも反映される</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- デメリット・制約事項 -->
+  <div class="section">
+    <h2>⚠️ デメリット・制約事項</h2>
+    <div class="warning-box">
+      <strong>考慮すべき点</strong>
+      <div class="check-item"><span class="cross-icon">•</span><span>バグ修正のみのリリースであり、新機能は含まれない</span></div>
+      <div class="check-item"><span class="cross-icon">•</span><span>標準の Google Cloud (<code>googleapis.com</code>) のみを既定設定で利用している場合、実質的な挙動の変化はほぼない</span></div>
+      <div class="check-item"><span class="cross-icon">•</span><span>組み込みメトリクスのエクスポートには <code>roles/monitoring.metricWriter</code> の付与が必要 (ユーザーアカウントではなくサービスアカウントに付与する)</span></div>
+    </div>
+  </div>
+
+  <!-- ユースケース -->
+  <div class="section">
+    <h2>🎯 ユースケース</h2>
+    <div class="usecase-box">
+      <div class="usecase-title">🌐 universe domain を利用する環境での Spanner レイテンシ分析</div>
+      <p style="margin: 0 0 8px; font-size: 14px;">
+        <strong>シナリオ:</strong> データ主権要件により、標準の Google Cloud とは別のユニバース上で Spanner を利用している。
+        クライアントサイドメトリクス (operation_latencies、attempt_latencies など) を使って
+        アプリケーションから見たレイテンシを分析したい。
+      </p>
+      <p style="margin: 0; font-size: 14px;">
+        <strong>効果:</strong> 本修正により、クライアントに設定した universe domain がメトリクスエクスポーターにも適用され、
+        該当環境で一貫した設定のもとクライアントサイドメトリクスを収集・分析できる。
+      </p>
+    </div>
+  </div>
+
+  <!-- 料金 -->
+  <div class="section">
+    <h2>💰 料金</h2>
+    <p style="font-size: 14px;">
+      クライアントライブラリ自体は<span class="highlight">無料</span>で利用できます。
+      クライアントサイドメトリクスの Cloud Monitoring での閲覧は無料ですが、Monitoring API の利用には料金が発生する場合があります。
+      詳細は <a class="gc-link" href="https://cloud.google.com/stackdriver/pricing" target="_blank" rel="noopener noreferrer">Google Cloud Observability の料金</a> および
+      <a class="gc-link" href="https://cloud.google.com/spanner/pricing" target="_blank" rel="noopener noreferrer">Spanner の料金ページ</a> を参照してください。
+    </p>
+  </div>
+
+  <!-- 関連サービス・機能 -->
+  <div class="section">
+    <h2>🔗 関連サービス・機能</h2>
+    <div class="related-card">
+      <strong>🗄️ Spanner</strong> — 本ライブラリがアクセスするグローバル分散リレーショナルデータベース本体
+    </div>
+    <div class="related-card">
+      <strong>📈 Cloud Monitoring</strong> — 組み込みクライアントサイドメトリクス (<code>spanner.googleapis.com/client/*</code>) のエクスポート先。Metrics Explorer で可視化できる
+    </div>
+    <div class="related-card">
+      <strong>🔭 OpenTelemetry</strong> — カスタムのクライアントメトリクス・トレースを収集する場合の代替手段 (Java / Go クライアントでサポート)
+    </div>
+  </div>
+
+  <!-- まとめ -->
+  <div class="section">
+    <h2>📌 まとめ</h2>
+    <div class="success-box">
+      <p style="margin: 0;">
+        Spanner の <strong>Python 3.72.1 / Go v1.96.2</strong> クライアントライブラリは、
+        組み込みメトリクスエクスポーターが <span class="highlight">universe domain と client_options を尊重する</span>ようにする、
+        小規模かつ対象の明確なバグ修正リリースです。
+        universe domain を利用する環境や <code>client_options</code> でクライアント設定をカスタマイズしている環境では、
+        本バージョンへのアップデートを推奨します。
+      </p>
+    </div>
+    <p style="font-size: 13px; color: var(--gc-outline);">
+      <strong>タグ:</strong> Spanner / クライアントライブラリ / Python / Go / バグ修正 / universe domain / クライアントサイドメトリクス / Cloud Monitoring
+    </p>
+  </div>
+
+  <!-- 参考リンク・フッター -->
+  <footer>
+    <p><strong>📎 出典・参考リンク</strong></p>
+    <ul class="link-list">
+      <li><a class="gc-link" href="https://docs.cloud.google.com/release-notes#November_23_2026" target="_blank" rel="noopener noreferrer">公式リリースノート (2026-11-23)</a></li>
+      <li><a class="gc-link" href="https://github.com/googleapis/google-cloud-python/compare/google-cloud-spanner-v3.72.0...google-cloud-spanner-v3.72.1" target="_blank" rel="noopener noreferrer">Python 3.72.0 → 3.72.1 の変更差分</a></li>
+      <li><a class="gc-link" href="https://github.com/googleapis/google-cloud-go/compare/spanner/v1.96.1...spanner/v1.96.2" target="_blank" rel="noopener noreferrer">Go spanner/v1.96.1 → v1.96.2 の変更差分</a></li>
+      <li><a class="gc-link" href="https://docs.cloud.google.com/spanner/docs/view-manage-client-side-metrics" target="_blank" rel="noopener noreferrer">クライアントサイドメトリクスの表示と管理</a></li>
+      <li><a class="gc-link" href="https://docs.cloud.google.com/spanner/docs/client-side-metrics-descriptions" target="_blank" rel="noopener noreferrer">クライアントサイドメトリクスの説明</a></li>
+      <li><a class="gc-link" href="https://docs.cloud.google.com/docs/overview" target="_blank" rel="noopener noreferrer">Google Cloud の概要 (ユニバース・リージョン・ゾーン)</a></li>
+      <li><a class="gc-link" href="https://cloud.google.com/spanner/pricing" target="_blank" rel="noopener noreferrer">Spanner 料金ページ</a></li>
+    </ul>
+    <p>このインフォグラフィックは Google Cloud Release Notes (2026-11-23) のレポートを基に生成されました。</p>
+  </footer>
+
+</div>
+
+<!-- Mermaid.js -->
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+    mermaid.initialize({
+        startOnLoad: true,
+        theme: 'base',
+        themeVariables: {
+            primaryColor: '#4285F4',
+            primaryTextColor: '#202124',
+            primaryBorderColor: '#4285F4',
+            lineColor: '#4285F4',
+            secondaryColor: '#F1F3F4',
+            tertiaryColor: '#FAFAFA',
+            background: '#FFFFFF',
+            mainBkg: '#E8F0FE',
+            nodeBorder: '#4285F4',
+            clusterBkg: '#E8F0FE',
+            clusterBorder: '#4285F4',
+            edgeLabelBackground: '#FFFFFF',
+            textColor: '#202124'
+        }
+    });
+</script>
+
+<!-- highlight.js -->
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>
