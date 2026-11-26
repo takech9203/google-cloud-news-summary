@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Google SecOps Marketplace: Snowflake 統合 v12.0 — Execute Simple Query の SQL インジェクション対策</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Google Brand Colors */
+  --gc-blue: #4285F4;
+  --gc-red: #EA4335;
+  --gc-yellow: #FBBC04;
+  --gc-green: #34A853;
+
+  /* Google Cloud UI Blue Scale */
+  --gc-blue-900: #174EA6;
+  --gc-blue-800: #185ABC;
+  --gc-blue-700: #1967D2;
+  --gc-blue-600: #1A73E8;
+  --gc-blue-500: #4285F4;
+  --gc-blue-300: #669DF6;
+  --gc-blue-200: #8AB4F8;
+  --gc-blue-100: #AECBFA;
+  --gc-blue-50: #E8F0FE;
+
+  /* Text Colors */
+  --gc-on-surface: #202124;
+  --gc-on-surface-variant: #5F6368;
+  --gc-outline: #80868B;
+
+  /* Surface Colors */
+  --gc-surface: #FFFFFF;
+  --gc-surface-container-lowest: #F8F9FA;
+  --gc-surface-container-low: #F1F3F4;
+  --gc-surface-container: #E8EAED;
+  --gc-outline-variant: #DADCE0;
+
+  /* Semantic Tints */
+  --gc-blue-tint: #E8F0FE;
+  --gc-green-tint: #E6F4EA;
+  --gc-red-tint: #FCE8E6;
+  --gc-yellow-tint: #FEF7E0;
+  --gc-purple-tint: #F3E8FD;
+  --gc-teal-tint: #E0F7FA;
+
+  /* Extended Colors */
+  --gc-purple: #A142F4;
+  --gc-teal: #00BCD4;
+  --gc-orange: #FF6D00;
+}
+
+body {
+  background-color: var(--gc-surface);
+  font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+  color: var(--gc-on-surface-variant);
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 20px;
+  margin: 0;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.header {
+  margin-bottom: 32px;
+  padding-bottom: 16px;
+  border-bottom: 3px solid var(--gc-blue-600);
+}
+
+h1, .title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--gc-on-surface);
+  margin: 8px 0;
+  line-height: 1.4;
+}
+
+h2, .section-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin-top: 0;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 20px 0 8px;
+}
+
+.subtitle {
+  font-size: 15px;
+  color: var(--gc-outline);
+}
+
+.section {
+  background: var(--gc-surface-container-low);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid var(--gc-outline-variant);
+}
+
+.highlight {
+  background-color: var(--gc-blue-50);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--gc-blue-800);
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+.card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border-left: 4px solid var(--gc-blue-600);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+}
+
+.card h3 {
+  margin-top: 0;
+}
+
+.gc-link {
+  color: var(--gc-blue-600);
+  text-decoration: none;
+}
+
+.gc-link:hover {
+  color: var(--gc-blue-800);
+  text-decoration: underline;
+}
+
+/* バッジ */
+.badge,
+.badge-ga,
+.badge-security {
+  display: inline-block;
+  color: #FFFFFF;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+  margin: 4px 8px 4px 0;
+}
+
+.badge {
+  background: var(--gc-blue-600);
+}
+
+.badge-ga {
+  background: var(--gc-green);
+  color: #FFFFFF;
+}
+
+.badge-security {
+  background: var(--gc-red);
+  color: #FFFFFF;
+}
+
+/* Before/After 比較 */
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+@media (max-width: 768px) {
+  .before-after {
+    grid-template-columns: 1fr;
+  }
+}
+
+.before-box, .after-box {
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.before-box {
+  background: var(--gc-red-tint);
+  border: 1px solid rgba(234, 67, 53, 0.3);
+}
+
+.after-box {
+  background: var(--gc-green-tint);
+  border: 1px solid rgba(52, 168, 83, 0.3);
+}
+
+.before-box h3, .after-box h3 {
+  margin-top: 0;
+  font-size: 16px;
+}
+
+.before-box h3 { color: #C5221F; }
+.after-box h3 { color: #188038; }
+
+.before-box ul, .after-box ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  font-size: 14px;
+}
+
+.before-box li, .after-box li {
+  margin: 6px 0;
+}
+
+/* 拒否パターングリッド */
+.reject-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.reject-item {
+  background: var(--gc-surface);
+  border: 2px solid var(--gc-red);
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-size: 14px;
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+}
+
+.reject-item .reject-title {
+  font-weight: 700;
+  color: #C5221F;
+  display: block;
+  margin-bottom: 4px;
+}
+
+/* チェックリスト */
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.check-icon {
+  color: var(--gc-green);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.cross-icon {
+  color: var(--gc-red);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+/* フロー図 */
+.flow-diagram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 24px 0;
+}
+
+.flow-step {
+  background: var(--gc-surface);
+  border: 2px solid var(--gc-blue-600);
+  border-radius: 12px;
+  padding: 12px 20px;
+  text-align: center;
+  min-width: 100px;
+  color: var(--gc-on-surface);
+  font-size: 14px;
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+}
+
+.flow-arrow {
+  color: var(--gc-blue-600);
+  font-size: 24px;
+  font-weight: bold;
+}
+
+/* コードブロック */
+.code-block,
+pre:not(.mermaid) {
+  background: #1E1E1E;
+  border-radius: 8px;
+  padding: 16px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: #E8E8E8;
+  margin: 16px 0;
+}
+
+pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
+}
+
+/* インラインコード */
+code:not(pre code) {
+  background: var(--gc-surface-container-lowest);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 0.9em;
+  color: var(--gc-blue-900);
+}
+
+/* テーブル */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--gc-outline-variant);
+  background: var(--gc-surface);
+}
+
+th {
+  background: var(--gc-blue-50);
+  color: var(--gc-blue-900);
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 2px solid var(--gc-blue-200);
+}
+
+td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--gc-outline-variant);
+  font-size: 14px;
+}
+
+tr:nth-child(even) {
+  background: var(--gc-surface-container-lowest);
+}
+
+tr:hover {
+  background: var(--gc-blue-50);
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+/* 注意・警告ボックス */
+.note-box {
+  background: var(--gc-blue-tint);
+  border-left: 4px solid var(--gc-blue-600);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.warning-box {
+  background: var(--gc-yellow-tint);
+  border-left: 4px solid var(--gc-yellow);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.success-box {
+  background: var(--gc-green-tint);
+  border-left: 4px solid var(--gc-green);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+/* ステップ */
+.step-item {
+  display: flex;
+  gap: 14px;
+  margin: 14px 0;
+  align-items: flex-start;
+}
+
+.step-number {
+  background: var(--gc-blue-600);
+  color: #FFFFFF;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.step-content {
+  flex: 1;
+}
+
+.step-content strong {
+  color: var(--gc-on-surface);
+}
+
+/* ユースケース */
+.usecase {
+  background: var(--gc-blue-tint);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border: 1px solid var(--gc-blue-100);
+}
+
+.usecase h3 {
+  margin-top: 0;
+  color: var(--gc-blue-900);
+}
+
+/* Mermaid コンテナ */
+.mermaid-container {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 20px 0;
+  border: 2px solid rgba(66, 133, 244, 0.3);
+  overflow-x: auto;
+}
+
+.mermaid {
+  display: flex;
+  justify-content: center;
+  background: #FFFFFF;
+}
+
+footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gc-outline-variant);
+  font-size: 13px;
+  color: var(--gc-outline);
+}
+
+footer ul {
+  padding-left: 20px;
+  margin: 8px 0;
+}
+
+footer a {
+  word-break: break-all;
+}
+
+ul.compact {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+ul.compact li {
+  margin: 6px 0;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ヘッダー -->
+  <div class="header">
+    <div>
+      <span class="badge">🛡️ Google SecOps Marketplace</span>
+      <span class="badge">❄️ Snowflake 統合 v12.0</span>
+      <span class="badge badge-ga">GA</span>
+      <span class="badge badge-security">セキュリティ強化</span>
+    </div>
+    <h1>❄️ Snowflake 統合 v12.0<br>Execute Simple Query の SQL インジェクション対策</h1>
+    <div class="subtitle">📅 リリース日: 2026-11-24 ｜ サービス: Google SecOps Marketplace (Response Integrations) ｜ 機能: Execute Simple Query アクションの入力検証強化</div>
+  </div>
+
+  <!-- 概要 -->
+  <div class="section">
+    <h2>📝 概要</h2>
+    <p>
+      2026 年 11 月 24 日、Google SecOps Marketplace の <span class="highlight">Snowflake 統合が Version 12.0 に更新</span>されました。
+      今回の更新は新機能の追加ではなく、SOAR プレイブックから Snowflake にクエリを実行する
+      <span class="highlight">Execute Simple Query アクションのセキュリティ強化 (SQL インジェクション対策)</span> です。
+    </p>
+    <p>
+      <code>Table</code>、<code>Fields To Return</code>、<code>Where Filter</code>、<code>Sort Field</code>、<code>Sort Order</code> の
+      <strong>5 つのパラメータに入力検証 (input validation)</strong> が追加され、ステートメント区切り文字・コメントマーカー・ドル引用文字列・対応の取れていない引用符や括弧を含む入力が拒否されます。
+      あわせて <span class="highlight">1 回のリクエストで実行できる SQL ステートメントは 1 つに制限</span>されます。
+    </p>
+    <div class="note-box">
+      <strong>💡 なぜ重要か:</strong> SOAR の統合アクションは、アラートやケースに含まれる<strong>攻撃者由来のデータ</strong> (エンティティ値、プレースホルダ展開された文字列など) をパラメータとして受け取ることが多く、SQL クエリの組み立てに使われる場合は SQL インジェクションの温床になり得ます。Snowflake はログイン履歴やクエリ履歴などの調査に有用なデータを保持しているため、SecOps から Snowflake を照会するプレイブックを運用している環境では<strong>早期アップデートを推奨</strong>します。
+    </div>
+
+    <div class="before-after">
+      <div class="before-box">
+        <h3>❌ Before (アップデート前の課題)</h3>
+        <ul>
+          <li><code>Table</code> や <code>Where Filter</code> などのパラメータ値をもとに SQL を組み立てるが、<strong>構文レベルの検証なし</strong></li>
+          <li>プレースホルダ経由で攻撃者が影響を与え得る値が渡ると、区切り文字 (<code>;</code>) やコメントマーカーで<strong>意図しない SQL を注入・連結されるリスク</strong></li>
+          <li>1 リクエストに<strong>複数の SQL ステートメント</strong>が含まれることを防ぐ仕組みがなかった</li>
+        </ul>
+      </div>
+      <div class="after-box">
+        <h3>✅ After (アップデート後の改善)</h3>
+        <ul>
+          <li>5 つのパラメータに<strong>入力検証を追加</strong>し、危険な構文要素を含む入力を拒否</li>
+          <li>ステートメント区切り文字 / コメントマーカー / ドル引用文字列 / 不対応の引用符・括弧を<strong>クエリ実行前に遮断</strong></li>
+          <li>1 リクエスト = <strong>単一 SQL ステートメント</strong>に制限し、連結による多段実行を防止</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- アーキテクチャ図 -->
+  <div class="section">
+    <h2>🏗️ アーキテクチャ図</h2>
+    <p>Version 12.0 では、プレイブックから渡されたパラメータが Snowflake SQL API に送られる前に<strong>入力検証レイヤー</strong>を通過するようになり、SQL インジェクションにつながる構文要素を含む入力はクエリ実行前に拒否されます。</p>
+    <div class="mermaid-container">
+      <pre class="mermaid">
+sequenceDiagram
+    participant PB as 📘 SOAR プレイブック
+    participant ACT as 🔌 Snowflake 統合 v12.0<br>Execute Simple Query
+    participant VAL as 🛡️ 入力検証レイヤー (新規)
+    participant SF as ❄️ Snowflake SQL API<br>/api/statements
+
+    PB->>ACT: パラメータ (Table / Fields To Return /<br>Where Filter / Sort Field / Sort Order)
+    ACT->>VAL: パラメータを検証
+    alt 不正な入力を検出
+        VAL-->>ACT: 拒否 (区切り文字 / コメント /<br>ドル引用 / 不対応の引用符・括弧)
+        ACT-->>PB: アクション失敗 (エラー)
+    else 検証 OK
+        VAL-->>ACT: 単一 SQL ステートメントとして確定
+        ACT->>SF: クエリ実行 (非同期)
+        SF-->>ACT: クエリ結果
+        ACT-->>PB: JSON 結果
+    end
+      </pre>
+    </div>
+  </div>
+
+  <!-- 主要機能 -->
+  <div class="section">
+    <h2>⚙️ 主要機能</h2>
+
+    <div class="card">
+      <h3>1️⃣ 5 パラメータへの入力検証の追加</h3>
+      <p>対象パラメータ: <code>Table</code>、<code>Fields To Return</code>、<code>Where Filter</code>、<code>Sort Field</code>、<code>Sort Order</code>。SQL インジェクションに悪用される代表的な構文要素を検出し、リクエストを拒否します。</p>
+    </div>
+
+    <div class="card">
+      <h3>2️⃣ 拒否される入力パターン</h3>
+      <div class="reject-grid">
+        <div class="reject-item">
+          <span class="reject-title">🚫 ステートメント区切り文字</span>
+          複数ステートメントの連結 (例: <code>... ; DROP TABLE ...</code> のような注入) を防止
+        </div>
+        <div class="reject-item">
+          <span class="reject-title">🚫 コメントマーカー</span>
+          クエリ後半を無効化してフィルタ条件を迂回する手口を防止
+        </div>
+        <div class="reject-item">
+          <span class="reject-title">🚫 ドル引用文字列</span>
+          Snowflake がサポートするドル引用 (<code>$$...$$</code>) を使ったエスケープ回避を防止
+        </div>
+        <div class="reject-item">
+          <span class="reject-title">🚫 不対応の引用符・括弧</span>
+          文字列リテラルやサブクエリの構造を壊してクエリ構文を改変する手口を防止
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>3️⃣ 単一 SQL ステートメントへの制限</h3>
+      <p>Execute Simple Query の 1 回のリクエストで実行できる SQL ステートメントは <strong>1 つのみ</strong>に制限されました。クエリの連結による多段実行 (データ抽出 + 改ざんの同時実行など) を構造的に防止します。</p>
+    </div>
+  </div>
+
+  <!-- 技術仕様 -->
+  <div class="section">
+    <h2>🔬 技術仕様</h2>
+
+    <h3>📋 Execute Simple Query アクションのパラメータ</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>パラメータ</th><th>必須</th><th>説明</th><th>今回の検証対象</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>Database</code></td><td>必須</td><td>クエリ対象のデータベース名</td><td>-</td></tr>
+          <tr><td><code>Table</code></td><td>必須</td><td>クエリ対象のテーブル名</td><td>✅</td></tr>
+          <tr><td><code>Schema</code></td><td>任意</td><td>クエリ対象のスキーマ名</td><td>-</td></tr>
+          <tr><td><code>Where Filter</code></td><td>任意</td><td>結果をフィルタする WHERE 句 (<code>LIMIT</code>/<code>SORT</code> キーワードは使用不可、単一引用符のみサポート)</td><td>✅</td></tr>
+          <tr><td><code>Fields To Return</code></td><td>任意</td><td>返すフィールドのカンマ区切りリスト (デフォルト: <code>*</code>)</td><td>✅</td></tr>
+          <tr><td><code>Sort Field</code></td><td>任意</td><td>ソートに使用するフィールド</td><td>✅</td></tr>
+          <tr><td><code>Sort Order</code></td><td>任意</td><td>ソート順 (<code>ASC</code> / <code>DESC</code>、デフォルト: <code>ASC</code>)</td><td>✅</td></tr>
+          <tr><td><code>Max Results To Return</code></td><td>任意</td><td>1 回の実行で返す最大結果数 (デフォルト: 50)</td><td>-</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>🔌 統合の接続仕様</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>項目</th><th>詳細</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>認証方式</td><td>キーペア認証 (base64 エンコードした秘密鍵を使用)</td></tr>
+          <tr><td>使用エンドポイント</td><td><code>/api/statements?async=false</code> (接続テスト)、<code>/api/statements?async=true</code> (クエリ送信)、<code>/api/statements/QUERY_ID</code> (結果取得)</td></tr>
+          <tr><td>実行方式</td><td>非同期 (大きな結果セットでも SecOps プラットフォームをブロックしない)</td></tr>
+          <tr><td>エンティティ連携</td><td>Execute Simple Query は Google SecOps エンティティ上では動作しない</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 設定方法 -->
+  <div class="section">
+    <h2>🛠️ 設定方法</h2>
+
+    <h3>✅ 前提条件</h3>
+    <div class="check-item"><span class="check-icon">✓</span><span>Google SecOps (SOAR) 環境で Snowflake 統合を使用していること</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span>Snowflake 側でキーペア認証用の秘密鍵が設定済みであること (SnowSQL で生成し base64 エンコード)</span></div>
+
+    <h3>📌 手順</h3>
+    <div class="step-item">
+      <div class="step-number">1</div>
+      <div class="step-content">
+        <strong>統合バージョンの更新</strong><br>
+        Google SecOps の Content Hub (Marketplace) から Snowflake 統合を Version 12.0 に更新します。
+      </div>
+    </div>
+    <div class="step-item">
+      <div class="step-number">2</div>
+      <div class="step-content">
+        <strong>既存プレイブックの動作確認</strong><br>
+        Execute Simple Query アクションを使用している既存のプレイブックについて、パラメータに今回拒否対象となる構文要素 (セミコロン、コメントマーカー、ドル引用、不対応の引用符・括弧) を含む値を渡していないか確認します。正当な用途でこれらを含む値を渡していた場合、更新後はアクションが失敗するため、パラメータの見直しが必要です。
+      </div>
+    </div>
+
+    <div class="flow-diagram">
+      <div class="flow-step">🏪 Content Hub で<br>v12.0 に更新</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">🔍 既存プレイブックの<br>パラメータを確認</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">🧪 Execute Simple Query<br>の動作テスト</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">✅ 安全な運用開始</div>
+    </div>
+  </div>
+
+  <!-- メリット・デメリット -->
+  <div class="section">
+    <h2>⚖️ メリットと制約事項</h2>
+
+    <h3>💼 ビジネス面のメリット</h3>
+    <div class="success-box">
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>SOAR プラットフォーム経由のデータ侵害リスクの低減</strong>: Snowflake に格納された業務データ・セキュリティデータへの不正クエリ実行の攻撃経路が塞がれ、コンプライアンス・監査面での安全性が向上</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>運用変更なしで適用可能</strong>: 検証は統合内部で行われるため、正当なパラメータを使う既存プレイブックは原則そのまま動作</span></div>
+    </div>
+
+    <h3>🔧 技術面のメリット</h3>
+    <div class="success-box">
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>多層防御の強化</strong>: プレースホルダ展開で攻撃者由来の値が混入しても、クエリ実行前の検証レイヤーで遮断</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>単一ステートメント制限</strong>: ステートメント連結による多段攻撃 (データ抽出 + 改ざんの同時実行など) を構造的に防止</span></div>
+    </div>
+
+    <h3>⚠️ デメリット・制約事項</h3>
+    <div class="warning-box">
+      <div class="check-item"><span class="cross-icon">⚠</span><span>拒否対象の文字列 (セミコロン、コメント、ドル引用、不対応の引用符・括弧) を<strong>正当な用途で <code>Where Filter</code> などに含めていたプレイブックは、更新後にアクションが失敗する可能性</strong></span></div>
+      <div class="check-item"><span class="cross-icon">⚠</span><span><code>Where Filter</code> は従来から <code>LIMIT</code>/<code>SORT</code> キーワード不可・単一引用符のみサポートという制約があり、今回の検証強化と合わせて書き方に注意が必要</span></div>
+      <div class="check-item"><span class="cross-icon">⚠</span><span>自由度の高いクエリが必要な場合は Execute Custom Query アクションがあるが、SQL 文字列をそのまま渡す設計のため、<strong>信頼できない値の埋め込みは引き続き避けるべき</strong></span></div>
+    </div>
+  </div>
+
+  <!-- ユースケース -->
+  <div class="section">
+    <h2>🎯 ユースケース</h2>
+
+    <div class="usecase">
+      <h3>🎣 ユースケース 1: アラートエンティティを使った Snowflake 照会の安全化</h3>
+      <p><strong>シナリオ</strong>: フィッシングアラートの調査プレイブックで、アラートから抽出したユーザー名をプレースホルダとして <code>Where Filter</code> に埋め込み、Snowflake 上のログインイベントテーブルを照会している。</p>
+      <p><strong>効果</strong>: 攻撃者がエンティティ値に SQL 構文 (例: <code>' OR 1=1 --</code>) を仕込んでも、コメントマーカーや不対応の引用符が検証で拒否され、意図しないデータ抽出やフィルタ迂回が防止される。</p>
+    </div>
+
+    <div class="usecase">
+      <h3>🧑‍💻 ユースケース 2: SOC のセルフサービスクエリの統制</h3>
+      <p><strong>シナリオ</strong>: SOC アナリストが手動アクションとして Execute Simple Query を実行し、Snowflake 上の調査用データセットを照会する運用をしている。</p>
+      <p><strong>効果</strong>: 入力ミスや意図的な複数ステートメントの実行 (照会に加えた更新・削除操作の混入など) が単一ステートメント制限により防止され、照会用途に限定した統制が利く。</p>
+    </div>
+  </div>
+
+  <!-- 関連サービス・機能 -->
+  <div class="section">
+    <h2>🔗 関連サービス・機能</h2>
+    <div class="card">
+      <h3>🧾 Execute Custom Query アクション (同統合)</h3>
+      <p>任意の SQL を実行するアクション。<code>LIMIT</code> が自動付与されるが、クエリ文字列自体を渡す設計のため、今回の Simple Query のようなパラメータ単位の検証とは性質が異なる。</p>
+    </div>
+    <div class="card">
+      <h3>📥 Google SecOps Snowflake ログ取り込み (SNOWFLAKE パーサー)</h3>
+      <p>Snowflake の <code>LOGIN_HISTORY</code> / <code>QUERY_HISTORY</code> を Cloud Storage または Amazon S3 経由で SecOps に取り込む機能。統合アクションによる照会と組み合わせて Snowflake 環境の監視・調査が可能。</p>
+    </div>
+    <div class="card">
+      <h3>📘 Google SecOps SOAR プレイブック</h3>
+      <p>本アクションの主な実行主体。プレースホルダ展開によりアラート由来の値がパラメータに入るため、今回の検証強化の恩恵を直接受ける。</p>
+    </div>
+  </div>
+
+  <!-- 関連レポート -->
+  <div class="section">
+    <h2>📰 関連レポート</h2>
+    <div class="note-box">
+      <strong>🛡️ マーケットプレイス統合ハードニングの流れ:</strong>
+      <a href="https://takech9203.github.io/google-cloud-news-summary/20261120-google-secops-marketplace-integration-updates.html" target="_blank" rel="noopener noreferrer" class="gc-link">Google SecOps Marketplace: 4 統合のセキュリティ強化アップデート (2026-11-20)</a> — EmailV2 / SSH / Google Threat Intelligence / Salesforce に対する同様の入力検証・インジェクション対策。今回の Snowflake v12.0 は、この一連のマーケットプレイス統合ハードニングの流れに位置付けられる。
+    </div>
+  </div>
+
+  <!-- まとめ -->
+  <div class="section">
+    <h2>✨ まとめ</h2>
+    <p>
+      Snowflake 統合 v12.0 は、SOAR プレイブックから Snowflake へのクエリ実行経路における
+      <span class="highlight">SQL インジェクション対策を統合レベルで組み込む防御的アップデート</span>です。
+      11 月 20 日の 4 統合 (EmailV2 / SSH / GTI / Salesforce) に続くマーケットプレイス統合の一連のハードニングであり、
+      Execute Simple Query を使用している環境では、拒否対象の構文を含むパラメータがないことを確認のうえ、
+      <strong>早期に v12.0 へ更新することを推奨</strong>します。
+    </p>
+    <div>
+      <span class="badge">Google SecOps</span>
+      <span class="badge">SOAR</span>
+      <span class="badge">Marketplace</span>
+      <span class="badge">Snowflake</span>
+      <span class="badge badge-security">SQL インジェクション対策</span>
+      <span class="badge badge-security">入力検証</span>
+      <span class="badge">Response Integrations</span>
+    </div>
+  </div>
+
+  <!-- フッター -->
+  <footer>
+    <p>📎 出典:</p>
+    <ul>
+      <li><a href="https://docs.cloud.google.com/release-notes#November_24_2026" target="_blank" rel="noopener noreferrer" class="gc-link">Google Cloud 公式リリースノート (2026-11-24)</a></li>
+      <li><a href="https://docs.cloud.google.com/chronicle/docs/soar/marketplace-integrations/snowflake" target="_blank" rel="noopener noreferrer" class="gc-link">Snowflake 統合ドキュメント (Integrate Snowflake with Google SecOps)</a></li>
+      <li><a href="https://docs.cloud.google.com/chronicle/docs/ingestion/default-parsers/snowflake" target="_blank" rel="noopener noreferrer" class="gc-link">Snowflake ログの取り込み</a></li>
+    </ul>
+    <p>本インフォグラフィックは Google Cloud News レポート (2026-11-24: Google SecOps Marketplace Snowflake 統合 v12.0) をもとに作成されました。</p>
+  </footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#4285F4',
+      primaryTextColor: '#202124',
+      primaryBorderColor: '#4285F4',
+      lineColor: '#4285F4',
+      secondaryColor: '#F1F3F4',
+      tertiaryColor: '#FAFAFA',
+      background: '#FFFFFF',
+      mainBkg: '#E8F0FE',
+      nodeBorder: '#4285F4',
+      clusterBkg: '#E8F0FE',
+      clusterBorder: '#4285F4',
+      edgeLabelBackground: '#FFFFFF',
+      textColor: '#202124'
+    }
+  });
+</script>
+</body>
+</html>

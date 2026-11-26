@@ -5,11 +5,17 @@
 
 ## 2026 年
 
+- [2026-11-25 - BigQuery: クロスクラウド接続 (Cross-cloud connections) が GA](2026/2026-11-25-bigquery-cross-cloud-connections-ga.md)
+- [2026-11-25 - BigQuery: Storage API v1beta1 の非推奨化と 2027 年 8 月 31 日のシャットダウン](2026/2026-11-25-bigquery-storage-api-v1beta1-deprecation.md)
+- [2026-11-24 - Apigee hybrid: v1.15.11 パッチリリース (Valkey 移行の既定化と多数のセキュリティ修正)](2026/2026-11-24-apigee-hybrid-v1-15-11.md)
 - [2026-11-24 - BigQuery: データ分析支援テーブル値関数 (ML.TREND / ML.SEASONALITY / ML.DETECT_CHANGE_POINTS / ML.CORRELATION) が GA](2026/2026-11-24-bigquery-ml-analysis-tvf-ga.md)
 - [2026-11-24 - Managed Service for Apache Airflow: 2026 年 12 月のランタイム変更 (Ray の ray_dist.jar プリインストール廃止 / Python 3.12 移行) 事前発表](2026/2026-11-24-managed-airflow-december-2026-runtime-changes.md)
 - [2026-11-24 - BigQuery: 組み込みテキスト埋め込みモデル embeddinggemma-300m が AI.EMBED / AI.SIMILARITY で GA に](2026/2026-11-24-bigquery-embeddinggemma-300m-ga.md)
+- [2026-11-24 - Google SecOps Marketplace: Snowflake 統合 v12.0 — Execute Simple Query の SQL インジェクション対策 (入力検証強化)](2026/2026-11-24-secops-marketplace-snowflake-v12.md)
 - [2026-11-24 - Google Cloud NetApp Volumes: Flex File サービスレベルの提供リージョン縮小](2026/2026-11-24-netapp-volumes-flex-file-region-reduction.md)
+- [2026-11-24 - Knowledge Catalog: Data Agent Kit の curate-context スキルによるコンテキストセットのローカルキュレーション (Preview)](2026/2026-11-24-knowledge-catalog-curate-context-data-agent-kit.md)
 - [2026-11-24 - BigQuery: BigQuery Migration Service が Databricks SQL / Apache Spark SQL 変換をサポート (Preview)](2026/2026-11-24-bigquery-migration-databricks-sql-translation.md)
+- [2026-11-24 - Google Cloud Contact Center as a Service (CCaaS): バージョン 6.36 リリース (バグ修正)](2026/2026-11-24-ccaas-6-36.md)
 - [2026-11-23 - Gemini Enterprise Agent Platform: Gemini 4 Neon for cyber (gemini-4-neon-cyber-permissive) が GA](2026/2026-11-23-gemini-4-neon-cyber-ga.md)
 - [2026-11-23 - Spanner: クライアントライブラリのメトリクスエクスポーターが universe domain を尊重するよう修正 (Python 3.72.1 / Go 1.96.2)](2026/2026-11-23-spanner-client-libraries-universe-domain-fix.md)
 - [2026-11-23 - Gemini Enterprise Agent Platform: CodeMender が Gemini 4 Neon をサポート (Preview)](2026/2026-11-23-codemender-gemini-4-neon-support.md)
@@ -23,6 +29,7 @@
 - [2026-11-23 - Google Cloud NetApp Volumes: Unified Maintenance 統合](2026/2026-11-23-netapp-volumes-unified-maintenance-integration.md)
 - [2026-11-23 - BigQuery: 予約・課金制御オプション reservation_override_mode / disable_on_demand_billing が GA](2026/2026-11-23-bigquery-reservation-billing-controls-ga.md)
 - [2026-11-23 - Google Kubernetes Engine (GKE): 2026-R49 バージョンおよびセキュリティアップデート](2026/2026-11-23-gke-version-security-updates-2026-r49.md)
+- [2026-11-23 - Looker Studio (Data Studio): MySQL コネクタの MySQL 5.6/5.7 サポート終了日が前倒し](2026/2026-11-23-looker-studio-mysql-5-6-5-7-end-of-support.md)
 - [2026-11-23 - Cloud Load Balancing: IPv6-only バックエンドのサポート (Preview)](2026/2026-11-23-cloud-load-balancing-ipv6-only-backends-preview.md)
 - [2026-11-23 - Managed Service for Apache Spark: Java4Shell (CVE-2026-114938) 対応のパッチ済みランタイム / クラスタイメージをリリース](2026/2026-11-23-managed-spark-java4shell-cve-2026-114938.md)
 - [2026-11-23 - App Engine / Cloud Run / Cloud Run functions: Node.js 26 と Python 3.15 ランタイムが GA](2026/2026-11-23-serverless-nodejs-26-python-3-15-runtimes-ga.md)
