@@ -5,11 +5,16 @@
 
 ## 2026 年
 
+- [2026-11-26 - Managed Service for Apache Airflow: Agentic アップグレードチェックの提供開始](2026/2026-11-26-managed-airflow-agentic-upgrade-check.md)
+- [2026-11-25 - Google Cloud Contact Center as a Service (CCaaS): 高度なレポート機能が全リージョンで利用可能に (+ 6.38 プレリリースノート公開・バグ修正)](2026/2026-11-25-ccaas-advanced-reporting-all-regions.md)
+- [2026-11-25 - Compute Engine: 予約作成時の確約利用割引 (CUD) 同時購入が GA](2026/2026-11-25-compute-engine-cud-purchase-with-reservation-ga.md)
 - [2026-11-25 - BigQuery: クロスクラウド接続 (Cross-cloud connections) が GA](2026/2026-11-25-bigquery-cross-cloud-connections-ga.md)
+- [2026-11-25 - Container-Optimized OS: 4 つの LTS マイルストーンで新イメージをリリース (TCP 輻輳制御の修正と多数の CVE 対応)](2026/2026-11-25-container-optimized-os-image-updates.md)
 - [2026-11-25 - BigQuery: Storage API v1beta1 の非推奨化と 2027 年 8 月 31 日のシャットダウン](2026/2026-11-25-bigquery-storage-api-v1beta1-deprecation.md)
 - [2026-11-24 - Apigee hybrid: v1.15.11 パッチリリース (Valkey 移行の既定化と多数のセキュリティ修正)](2026/2026-11-24-apigee-hybrid-v1-15-11.md)
 - [2026-11-24 - BigQuery: データ分析支援テーブル値関数 (ML.TREND / ML.SEASONALITY / ML.DETECT_CHANGE_POINTS / ML.CORRELATION) が GA](2026/2026-11-24-bigquery-ml-analysis-tvf-ga.md)
 - [2026-11-24 - Managed Service for Apache Airflow: 2026 年 12 月のランタイム変更 (Ray の ray_dist.jar プリインストール廃止 / Python 3.12 移行) 事前発表](2026/2026-11-24-managed-airflow-december-2026-runtime-changes.md)
+- [2026-11-24 - Google Cloud VMware Engine: 2027 年 6 月 30 日をもって BYOL (Bring Your Own License) モデルへ完全移行](2026/2026-11-24-vmware-engine-mandatory-byol.md)
 - [2026-11-24 - BigQuery: 組み込みテキスト埋め込みモデル embeddinggemma-300m が AI.EMBED / AI.SIMILARITY で GA に](2026/2026-11-24-bigquery-embeddinggemma-300m-ga.md)
 - [2026-11-24 - Google SecOps Marketplace: Snowflake 統合 v12.0 — Execute Simple Query の SQL インジェクション対策 (入力検証強化)](2026/2026-11-24-secops-marketplace-snowflake-v12.md)
 - [2026-11-24 - Google Cloud NetApp Volumes: Flex File サービスレベルの提供リージョン縮小](2026/2026-11-24-netapp-volumes-flex-file-region-reduction.md)
