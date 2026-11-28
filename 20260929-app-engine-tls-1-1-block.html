@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>App Engine: TLS 1.1 以前の非セキュアなトラフィックを恒久的にブロック</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .badges {
+      margin-bottom: 24px;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .badge-deprecated {
+      background: var(--gc-red);
+      color: #FFFFFF;
+    }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 720px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .before-box, .after-box {
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid rgba(234, 67, 53, 0.3);
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid rgba(52, 168, 83, 0.3);
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-box h3 { color: #C5221F; }
+    .after-box h3 { color: #188038; }
+
+    .before-box ul, .after-box ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 6px 0;
+    }
+
+    /* フロー図スタイル */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+      font-size: 14px;
+    }
+
+    .flow-step .flow-date {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--gc-blue-700);
+      margin-bottom: 4px;
+    }
+
+    .flow-step.flow-final {
+      background: var(--gc-red-tint);
+      border-color: var(--gc-red);
+    }
+
+    .flow-step.flow-final .flow-date {
+      color: #C5221F;
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* チェックリストスタイル */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* コードブロック */
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブルスタイル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .table-scroll {
+      overflow-x: auto;
+    }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border: 1px solid var(--gc-blue-100);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+    }
+
+    /* 2 カラムグリッド */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 720px) {
+      .two-col {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    ul {
+      padding-left: 22px;
+      margin: 8px 0;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer ul {
+      list-style: none;
+      padding-left: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <h1>🔒 App Engine: TLS 1.1 以前の非セキュアなトラフィックを恒久的にブロック</h1>
+      <div class="subtitle">リリース日: 2026-09-29</div>
+    </div>
+
+    <div class="badges">
+      <span class="badge">☁️ App Engine</span>
+      <span class="badge badge-deprecated">⛔ TLS 1.0 / 1.1 恒久ブロック</span>
+      <span class="badge badge-ga">Feature (セキュリティ強制適用)</span>
+      <span class="badge">スタンダード / フレキシブル 全ランタイム</span>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📌 概要</h2>
+      <p>
+        App Engine は、TLS バージョン 1.1 以前を使用する非セキュアなトラフィックを<span class="highlight">恒久的にブロック</span>するようになりました。
+        スタンダード環境 (Go、Java、Node.js、PHP、Python、Ruby) とフレキシブル環境 (.NET、Go、Java、Node.js、PHP、Python、Ruby、カスタムランタイム) の<strong>すべてのランタイム</strong>に同一に適用されます。
+      </p>
+      <p>
+        ブロックの挙動はドメイン種別で異なります。<code>appspot.com</code> ドメインでは<strong>接続レベル (TLS ハンドシェイク自体)</strong> でブロックされる一方、カスタムドメインではハンドシェイクは成功する場合があり、その後の<strong>リクエストがブロック</strong>されます。
+      </p>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before (アップデート前の課題)</h3>
+          <ul>
+            <li>既知の脆弱性を持つ TLS 1.0 / 1.1 が App Engine への接続に使用できる状態が残っていた</li>
+            <li>2026 年 8 月の自動オプトイン後も 8 月末までオプトアウト可能で、非セキュアなトラフィックを受け入れる余地があった</li>
+            <li>TLS バージョンの強制には管理者による明示的な設定 (<code>--ssl-policy</code>) が必要だった</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After (アップデート後の改善)</h3>
+          <ul>
+            <li>TLS 1.1 以前のトラフィックが恒久的にブロックされ、全アプリで<strong>最低 TLS 1.2</strong> が保証される</li>
+            <li><code>appspot.com</code> ではハンドシェイク時点で接続を拒否し、非セキュアな接続の確立自体を防止</li>
+            <li>古い TLS バージョンには設定で戻せなくなり、組織全体のセキュリティベースラインを強制 (移行に追加時間が必要な場合はサポートへ問い合わせ)</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>🗓️ 段階的なセキュリティ強化の最終ステップ</h3>
+      <div class="flow-diagram">
+        <div class="flow-step"><span class="flow-date">2025-08</span>📢 廃止発表<br>(Preview)</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step"><span class="flow-date">2025-10</span>✅ TLS 1.2 強制設定<br>GA</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step"><span class="flow-date">2026-08</span>🔄 自動オプトイン<br>(8 月末まで解除可)</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step flow-final"><span class="flow-date">2026-09-29</span>⛔ 恒久ブロック<br>(本アップデート)</div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    Client([👤 クライアント]) --> TLS{🔐 TLS バージョン判定}
+    TLS -->|TLS 1.2 / 1.3| OK[✅ 接続・リクエストとも許可]
+    TLS -->|TLS 1.0 / 1.1| Domain{🌐 ドメイン種別}
+    Domain -->|appspot.com| Handshake[⛔ 接続レベルでブロック<br/>TLS ハンドシェイク自体を拒否]
+    Domain -->|カスタムドメイン| Request[⚠️ ハンドシェイクは成功する場合あり<br/>リクエストは 400 Bad Request でブロック]
+    OK --> GAE[🚀 App Engine アプリ<br/>スタンダード / フレキシブル 全ランタイム]
+    Handshake -.->|到達しない| GAE
+    Request -.->|到達しない| GAE
+        </pre>
+      </div>
+      <p>
+        TLS 1.2 以降のトラフィックのみが App Engine アプリケーションに到達します。TLS 1.1 以前のトラフィックは、<code>appspot.com</code> ドメインでは<strong>接続レベル</strong>で、カスタムドメインでは<strong>リクエストレベル</strong>でブロックされます。
+      </p>
+      <div class="warning-box">
+        <strong>⚠️ 注意:</strong> カスタムドメインでは TLS ハンドシェイクが成功する場合があるため、外部の SSL チェックサイトが「TLS 1.1 以前がまだサポートされている」と<strong>誤って判定</strong>する可能性があります。
+      </div>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚙️ 主要機能</h2>
+
+      <div class="card">
+        <h3>1️⃣ TLS 1.1 以前のトラフィックの恒久的ブロック</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>TLS 1.1 以前を使用する非セキュアなトラフィックを恒久的にブロック</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>スタンダード環境・フレキシブル環境のすべてのランタイム (カスタムランタイム含む) に適用</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>恒久的にブロックされたプロジェクトでは、設定変更で古い TLS バージョンに戻すことは不可</span></div>
+      </div>
+
+      <div class="card">
+        <h3>2️⃣ ドメイン種別ごとのブロック挙動</h3>
+        <div class="icon-text"><span class="arrow">→</span><span><code>appspot.com</code> ドメイン: TLS ハンドシェイク自体が拒否され、<strong>接続レベル</strong>でブロック</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>カスタムドメイン: ハンドシェイクは成功する場合があるが、リクエストが <code>400 Bad Request - The request was malformed</code> エラーでブロック (接続は確立されるがリクエストは拒否)</span></div>
+      </div>
+
+      <div class="card">
+        <h3>3️⃣ 新規アプリケーションのデフォルト動作</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>新規アプリでは、デフォルトで TLS 1.2 以降とサポート対象の暗号スイートによるセキュアなトラフィックのみ許可</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>デフォルトの暗号スイートで十分な場合、外部アプリケーションロードバランサの構成は不要</span></div>
+      </div>
+
+      <div class="card">
+        <h3>4️⃣ 移行猶予のためのサポート窓口</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>恒久的にブロックされ、TLS 1.2 以降への切り替えに追加時間が必要な場合は、Google Cloud サポートへの問い合わせが必要</span></div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔬 技術仕様</h2>
+
+      <h3>🔐 サポートされる TLS バージョンと暗号スイート</h3>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr><th>TLS バージョン</th><th>IANA 値</th><th>暗号スイート</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>TLS v1.3</td><td><code>0x1301</code></td><td>TLS_AES_128_GCM_SHA256</td></tr>
+            <tr><td>TLS v1.3</td><td><code>0x1302</code></td><td>TLS_AES_256_GCM_SHA384</td></tr>
+            <tr><td>TLS v1.3</td><td><code>0x1303</code></td><td>TLS_CHACHA20_POLY1305_SHA256</td></tr>
+            <tr><td>TLS v1.2</td><td><code>0xCCA9</code></td><td>TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256</td></tr>
+            <tr><td>TLS v1.2</td><td><code>0xCCA8</code></td><td>TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256</td></tr>
+            <tr><td>TLS v1.2</td><td><code>0xC02B</code></td><td>TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256</td></tr>
+            <tr><td>TLS v1.2</td><td><code>0xC02F</code></td><td>TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256</td></tr>
+            <tr><td>TLS v1.2</td><td><code>0xC02C</code></td><td>TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384</td></tr>
+            <tr><td>TLS v1.2</td><td><code>0xC030</code></td><td>TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384</td></tr>
+            <tr><td>TLS v1.2</td><td><code>0xC009</code></td><td>TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA</td></tr>
+            <tr><td>TLS v1.2</td><td><code>0xC013</code></td><td>TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA</td></tr>
+            <tr><td>TLS v1.2</td><td><code>0xC00A</code></td><td>TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA</td></tr>
+            <tr><td>TLS v1.2</td><td><code>0xC014</code></td><td>TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>📅 これまでの経緯 (リリースノートより)</h3>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr><th>時期</th><th>内容</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>2025-08-07</td><td>TLS 1.1 以前のサポート廃止を発表。TLS 1.2 以降を使用するようアプリケーション設定の更新を案内 (Preview)</td></tr>
+            <tr><td>2025-10-20</td><td>TLS 1.2 以降とセキュアな暗号スイートのサポートが GA</td></tr>
+            <tr><td>2026-08-14</td><td>App Engine がアプリケーションを TLS 1.2 以降に自動オプトイン (2026 年 8 月末までオプトアウト可能)。2026 年 9 月以降に恒久ブロックの可能性を告知</td></tr>
+            <tr><td><strong>2026-09-29</strong></td><td><strong>TLS 1.1 以前の非セキュアなトラフィックを恒久的にブロック (本アップデート)</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>📋 前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>Google Cloud CLI (<code>gcloud</code>) がインストールされていること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>対象の App Engine アプリケーションに対する更新権限があること</span></div>
+
+      <h3>ステップ 1: 最低 TLS バージョンの明示的な設定</h3>
+      <p><code>--ssl-policy</code> フラグで最低許可 TLS バージョンを指定します。</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">gcloud による最低 TLS バージョン設定</span>
+        </div>
+        <pre><code class="language-bash"># アプリ作成時に最低 TLS バージョンを設定
+gcloud app create --ssl-policy=TLS_VERSION_1_2
+
+# 既存アプリの最低 TLS バージョンを更新
+gcloud app update --ssl-policy=TLS_VERSION_1_2</code></pre>
+      </div>
+      <div class="note-box">
+        <strong>💡 ポイント:</strong> <code>TLS_VERSION_1_2</code> を指定すると、TLS 1.2 以降とモダンな暗号スイートのみが許可されます。恒久的にブロックされたプロジェクトでは、この設定を使用して古い TLS バージョンに戻すことはできません。
+      </div>
+
+      <h3>ステップ 2 (任意): ロードバランサによる TLS 制御の強化</h3>
+      <p>
+        カスタムドメインで接続レベル (ハンドシェイク) での拒否が必要な場合や、異なる暗号スイートセットが必要な場合は、<span class="highlight">グローバル外部アプリケーションロードバランサ + サーバーレス NEG</span> を構成し、SSL ポリシーで TLS バージョンや暗号スイートを制御します。
+      </p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">SSL ポリシーの作成例 (最低 TLS 1.2、MODERN プロファイル)</span>
+        </div>
+        <pre><code class="language-bash"># 例: SSL ポリシーの作成 (最低 TLS 1.2、MODERN プロファイル)
+gcloud compute ssl-policies create my-ssl-policy \
+    --profile=MODERN \
+    --min-tls-version=1.2</code></pre>
+      </div>
+    </div>
+
+    <!-- メリット / デメリット -->
+    <div class="section">
+      <h2>⚖️ メリットと制約事項</h2>
+      <div class="two-col">
+        <div>
+          <h3>💼 ビジネス面のメリット</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>コンプライアンス対応</strong>: 既知の脆弱性を持つ TLS 1.0 / 1.1 が排除され、PCI DSS などモダンな TLS を要求するセキュリティ基準への準拠が容易に</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>運用負荷ゼロのセキュリティ強化</strong>: プラットフォーム側で強制されるため、アプリごとの個別対応や監視が不要</span></div>
+          <h3>🔧 技術面のメリット</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>セキュリティベースラインの保証</strong>: 全 App Engine アプリで最低 TLS 1.2 とセキュアな暗号スイートを保証</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>接続レベルの防御 (appspot.com)</strong>: 非セキュアな接続はハンドシェイク段階で拒否され、アプリに到達しない</span></div>
+        </div>
+        <div>
+          <h3>🚧 制限事項</h3>
+          <div class="check-item"><span class="cross-icon">✗</span><span>恒久ブロック後は <code>--ssl-policy</code> で古い TLS バージョンに戻せない (追加の移行時間が必要な場合はサポートへ問い合わせ)</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>カスタムドメインで接続レベル (ハンドシェイク) の拒否が必要な場合は、グローバル外部アプリケーションロードバランサの構成が必要</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>デフォルトと異なる暗号スイートセットが必要な場合も、ロードバランサと SSL ポリシーの利用を推奨</span></div>
+          <h3>🤔 考慮すべき点</h3>
+          <div class="check-item"><span class="cross-icon">!</span><span>TLS 1.0 / 1.1 のみ対応の古いクライアント (レガシー組み込み機器、古い OS / ブラウザ、古い HTTP ライブラリなど) はアクセスが失敗するため、クライアント側の TLS 対応状況の確認が必要</span></div>
+          <div class="check-item"><span class="cross-icon">!</span><span>カスタムドメインでは <code>400 Bad Request</code> で失敗し、TLS エラーではなく <strong>HTTP エラーとして観測</strong>される</span></div>
+          <div class="check-item"><span class="cross-icon">!</span><span>外部 SSL チェックサイトはハンドシェイク成功のみを検証し、「TLS 1.1 以前がサポートされている」と誤報告する可能性</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>💡 ユースケース 1: レガシークライアントの影響調査と移行</h3>
+        <p>
+          <strong>シナリオ</strong>: カスタムドメインで公開している App Engine アプリに、古い組み込み機器やレガシーシステムからのアクセスがある。TLS 1.1 以前のクライアントは <code>400 Bad Request</code> で失敗するようになるため、影響範囲を特定し、クライアント側を TLS 1.2 以降へ更新する。
+        </p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">TLS バージョンごとの接続確認</span>
+          </div>
+          <pre><code class="language-bash"># TLS 1.2 での接続確認 (成功するはず)
+curl -v --tls-max 1.2 --tlsv1.2 https://YOUR_APP.appspot.com/
+
+# TLS 1.1 での接続確認 (appspot.com ではハンドシェイクが失敗するはず)
+curl -v --tls-max 1.1 https://YOUR_APP.appspot.com/</code></pre>
+        </div>
+        <p><strong>効果</strong>: 恒久ブロックによる影響を事前に把握し、レガシークライアントの計画的な更新につなげられる。</p>
+      </div>
+
+      <div class="usecase">
+        <h3>💡 ユースケース 2: カスタムドメインでの接続レベル拒否の実現</h3>
+        <p>
+          <strong>シナリオ</strong>: セキュリティ要件として、カスタムドメインでも TLS 1.1 以前をハンドシェイク段階で拒否したい (リクエストレベルの 400 エラーでは不十分)。
+        </p>
+        <p>
+          <strong>実装例</strong>: グローバル外部アプリケーションロードバランサ + サーバーレス NEG で App Engine にルーティングし、SSL ポリシー (<code>--min-tls-version=1.2</code>) を適用する。
+        </p>
+        <div class="flow-diagram">
+          <div class="flow-step">👤 クライアント</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">🔌 外部アプリケーション LB<br>(SSL ポリシーで TLS 1.2 強制)</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">🔗 サーバーレス NEG</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">🚀 App Engine</div>
+        </div>
+        <p><strong>効果</strong>: カスタムドメインでも接続レベルで非セキュアな TLS バージョンを拒否でき、暗号スイートの細かな制御も可能になる。</p>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <div class="success-box">
+        <strong>✅ 追加料金なし:</strong> このアップデート自体に追加料金はありません。App Engine の料金体系に変更はありません。
+      </div>
+      <div class="note-box">
+        <strong>💡 補足:</strong> カスタムドメインで接続レベルの拒否や暗号スイートのカスタマイズのためにグローバル外部アプリケーションロードバランサを構成する場合は、Cloud Load Balancing の料金が別途発生します。
+      </div>
+      <ul>
+        <li><a class="gc-link" href="https://cloud.google.com/appengine/pricing" target="_blank" rel="noopener noreferrer">App Engine の料金</a></li>
+        <li><a class="gc-link" href="https://cloud.google.com/vpc/network-pricing" target="_blank" rel="noopener noreferrer">Cloud Load Balancing の料金</a></li>
+      </ul>
+    </div>
+
+    <!-- 利用可能リージョン -->
+    <div class="section">
+      <h2>🌍 適用範囲</h2>
+      <p>
+        <span class="highlight">すべての App Engine アプリケーション</span> (スタンダード環境・フレキシブル環境の全ランタイム) に適用されます。
+      </p>
+    </div>
+
+    <!-- 関連サービス -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <h3>🔌 Cloud Load Balancing (グローバル外部アプリケーションロードバランサ)</h3>
+        <p>サーバーレス NEG 経由で App Engine にルーティングし、SSL ポリシーで TLS バージョン・暗号スイートを接続レベルで制御できる。</p>
+      </div>
+      <div class="card">
+        <h3>📜 SSL ポリシー</h3>
+        <p>ロードバランサで許可する TLS バージョンと暗号スイートのプロファイルを定義する機能。</p>
+      </div>
+      <div class="card">
+        <h3>🔏 App Engine カスタムドメインの SSL 証明書</h3>
+        <p>カスタムドメインの SSL 証明書の検証・管理。Cloud Load Balancing への移行ガイドも提供されている。</p>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="note-box">
+        <p style="margin-top: 0;">
+          App Engine は 2025 年からの段階的な移行プロセスを経て、TLS 1.1 以前の非セキュアなトラフィックを<strong>恒久的にブロック</strong>しました。
+        </p>
+        <div class="check-item"><span class="check-icon">✓</span><span>ほとんどのモダンなクライアントには影響なし</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>レガシークライアントからのアクセスがある場合は、クライアント側の TLS 1.2 以降への対応状況を早急に確認</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>カスタムドメインではブロックが 400 エラーとして観測される点に留意</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>接続レベルでの拒否が必要な場合はロードバランサの構成が必要</span></div>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p>📎 出典・参考リンク:</p>
+      <ul>
+        <li>📰 <a class="gc-link" href="https://docs.cloud.google.com/release-notes#September_29_2026" target="_blank" rel="noopener noreferrer">公式リリースノート (2026-09-29)</a></li>
+        <li>📖 <a class="gc-link" href="https://docs.cloud.google.com/appengine/docs/standard/secure-minimum-tls" target="_blank" rel="noopener noreferrer">Secure minimum TLS (スタンダード環境)</a></li>
+        <li>📖 <a class="gc-link" href="https://docs.cloud.google.com/appengine/docs/flexible/secure-minimum-tls" target="_blank" rel="noopener noreferrer">Secure minimum TLS (フレキシブル環境)</a></li>
+        <li>📖 <a class="gc-link" href="https://docs.cloud.google.com/load-balancing/docs/ssl-policies-concepts" target="_blank" rel="noopener noreferrer">SSL ポリシーの概要 (Cloud Load Balancing)</a></li>
+        <li>📖 <a class="gc-link" href="https://docs.cloud.google.com/load-balancing/docs/https/setting-up-https-serverless" target="_blank" rel="noopener noreferrer">App Engine と外部アプリケーションロードバランサの構成</a></li>
+        <li>💰 <a class="gc-link" href="https://cloud.google.com/appengine/pricing" target="_blank" rel="noopener noreferrer">App Engine の料金</a></li>
+      </ul>
+      <p>本インフォグラフィックは Google Cloud News レポート (2026-09-29) を基に生成されています。</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

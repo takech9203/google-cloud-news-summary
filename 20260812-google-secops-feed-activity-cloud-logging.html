@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Google SecOps: Cloud Logging によるフィードアクティビティ分析 (Public Preview)</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+    }
+
+    .badge-deprecated {
+      background: var(--gc-red);
+    }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 720px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid rgba(234, 67, 53, 0.3);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid rgba(52, 168, 83, 0.3);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-box h3 { color: var(--gc-red); }
+    .after-box h3 { color: var(--gc-green); }
+
+    .before-box ul, .after-box ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 6px 0;
+    }
+
+    /* チェックリスト */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+    }
+
+    /* コードブロック (Mermaid の pre を除外) */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .ai-box {
+      background: var(--gc-purple-tint);
+      border-left: 4px solid var(--gc-purple);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+      border: 1px solid var(--gc-blue-100);
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-800);
+    }
+
+    /* ステップリスト */
+    .step-list {
+      counter-reset: step;
+      list-style: none;
+      padding-left: 0;
+      margin: 16px 0;
+    }
+
+    .step-list li {
+      counter-increment: step;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin: 12px 0;
+    }
+
+    .step-list li::before {
+      content: counter(step);
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      background: var(--gc-blue-600);
+      color: #FFFFFF;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div>
+        <div style="margin-bottom: 8px;">
+          <span class="badge">🛡️ Google SecOps</span>
+          <span class="badge">Google SecOps SIEM</span>
+          <span class="badge badge-preview">Public Preview</span>
+        </div>
+        <h1>📡 Cloud Logging によるフィードアクティビティ分析</h1>
+        <div class="subtitle">[Spotlight Feature] Analyze feed activity with Cloud Logging</div>
+      </div>
+      <div class="subtitle">リリース日: 2026-08-12</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📌 概要</h2>
+      <p>
+        Google SecOps (および Google SecOps SIEM) において、<span class="highlight">インジェスションパイプラインとフィードのアクティビティログを Cloud Logging に送信</span>し、Logs Explorer で表示・クエリできる機能が Public Preview として発表されました。
+      </p>
+      <p>
+        ログの<strong>欠損・遅延・失敗</strong>といったログ配信の問題を診断し、インジェスション異常の解決にかかる時間を短縮できます。<span class="highlight">Push 型・Pull 型両方</span>のインジェスションメカニズムに対する可視性が提供され、セキュリティエンジニアや管理者がデータ取り込みの健全性をモニタリング、デバッグ、トラブルシューティングできるようになります。
+      </p>
+      <div class="note-box">
+        <strong>💡 前提:</strong> 本機能の利用には、Google SecOps インスタンスが <strong>Bring Your Own Project (BYOP)</strong> の Google Cloud プロジェクトで構成されている必要があります。なお、本リリースノートは「Google SecOps」と「Google SecOps SIEM」の両方のエントリとして掲載されていますが、内容は実質的に同一です。
+      </div>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before (アップデート前の課題)</h3>
+          <ul>
+            <li>フィードやインジェスションパイプラインの詳細なアクティビティログを Cloud Logging (Logs Explorer) で直接クエリして調査する手段がなかった</li>
+            <li>ログの欠損・遅延・失敗が発生した際に、原因の切り分けと解決に時間を要していた</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After (アップデート後の改善)</h3>
+          <ul>
+            <li>インジェスション・フィードアクティビティログを Cloud Logging に送信し、Logs Explorer で表示・クエリ可能に</li>
+            <li>Feed management ページの「Debug with logs」からフィード ID でフィルタ済みの Logs Explorer をワンクリックで開ける</li>
+            <li>Gemini Cloud Assist でコンソールからロギング・メトリクスのテレメトリを直接調査可能に</li>
+            <li>Log Router の除外フィルタで STS ログなど特定ログのルーティングを除外し、コストとノイズを制御可能に</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    subgraph Sources["📡 ログソース"]
+        PUSH["Push 型インジェスション"]
+        PULL["Pull 型フィード<br>(API / ファイル)"]
+    end
+
+    subgraph SecOps["🛡️ Google SecOps"]
+        PIPE["インジェスション<br>パイプライン"]
+        FEED["Feed management<br>(Debug with logs)"]
+        GCA["✨ Gemini Cloud Assist"]
+    end
+
+    subgraph BYOP["☁️ BYOP Google Cloud プロジェクト"]
+        ROUTER{"Log Router<br>(除外フィルタ)"}
+        CL[("Cloud Logging<br>ingestion_activity")]
+        LE["🔍 Logs Explorer"]
+    end
+
+    PUSH --> PIPE
+    PULL --> PIPE
+    PIPE -- "フィードアクティビティログ" --> ROUTER
+    ROUTER --> CL
+    CL --> LE
+    FEED -- "フィード ID でフィルタ済み表示" --> LE
+    GCA -- "テレメトリ調査" --> CL
+        </pre>
+      </div>
+      <p>
+        Push 型・Pull 型のインジェスションアクティビティが BYOP プロジェクトの Cloud Logging にルーティングされ、Logs Explorer や Gemini Cloud Assist から調査できます。Log Router の除外フィルタで不要なログのルーティングを制御できます。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+
+      <div class="card" style="border-left-color: var(--gc-purple);">
+        <h3>✨ 1. テレメトリの調査 (Investigate telemetry)</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>Gemini Cloud Assist を使用して、Google SecOps コンソールから直接ロギング・メトリクスのテレメトリを調査可能</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>Feeds ページで「Ask Gemini Cloud Assist」を選択してチャットペインを開き、フィードのボリュームやエラーについて質問できる</span></div>
+      </div>
+
+      <div class="card">
+        <h3>🐛 2. フィードのデバッグ (Debug feeds)</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>Feed management ページで特定フィードのアクションメニューから「Debug with logs」を選択</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>選択したフィード ID で事前フィルタされた Logs Explorer が新しいタブで開く (View feed ページからも利用可能)</span></div>
+      </div>
+
+      <div class="card" style="border-left-color: var(--gc-teal);">
+        <h3>🚦 3. ルーティングされるログのフィルタ (Filter routed logs)</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>Log Router に除外フィルタを構成し、Storage Transfer Service (STS) ログなど特定のログが Cloud Logging にルーティングされないよう制御可能</span></div>
+      </div>
+
+      <div class="card" style="border-left-color: var(--gc-green);">
+        <h3>🔍 4. ログのクエリ</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>Logs Explorer で名前空間、ログ ID、インジェスションメカニズム、フィード ID、コレクタ ID などによるフィルタリングが可能</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>成功・失敗を含むインジェスションアクティビティの詳細 (転送バイト数、レコード数、HTTP ステータスコード、エラー詳細など) を確認できる</span></div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3>📖 主要な用語とログ識別子</h3>
+      <table>
+        <tr><th>項目</th><th>詳細</th></tr>
+        <tr><td><code>chronicle-siem</code></td><td>Google SecOps エコシステムに関連するログの名前空間ラベル</td></tr>
+        <tr><td><code>chronicle.googleapis.com/ingestion_activity</code></td><td>Google SecOps データインジェスションパイプラインに関するログストリームのログ ID</td></tr>
+        <tr><td><code>storage_transfer_job</code></td><td>Storage Transfer Service (STS) を使用する静的フィードのログのリソースタイプ</td></tr>
+        <tr><td><code>storagetransfer.googleapis.com/transfer_activity</code></td><td>STS アクティビティログのログ ID</td></tr>
+      </table>
+
+      <h3>💻 代表的なクエリ例</h3>
+      <span class="code-label">Logging Query</span>
+      <pre><code class="language-text"># Google SecOps エコシステム全体のログを取得
+labels.namespace="chronicle-siem"
+
+# インジェスションアクティビティログストリームに絞り込み
+log_id("chronicle.googleapis.com/ingestion_activity")
+
+# インジェスションメカニズムで絞り込み (例: サードパーティ API)
+labels.ingestion_mechanism="Third Party API"
+
+# フィード ID / コレクタ ID で絞り込み
+labels.feed_id="FEED_ID"
+labels.collector_id="COLLECTOR_ID"
+
+# STS を使用する静的フィードのログ
+resource.type="storage_transfer_job" AND log_id("storagetransfer.googleapis.com/transfer_activity")</code></pre>
+
+      <h3>📋 インジェスションアクティビティログの主なフィールド</h3>
+      <table>
+        <tr><th>フィールド</th><th>データ型</th><th>説明</th></tr>
+        <tr><td><code>request_start_time</code></td><td>string</td><td>アクティビティ開始時刻 (RFC 3339)</td></tr>
+        <tr><td><code>activity_duration</code></td><td>string</td><td>アクティビティの合計経過時間 (例: "1.500s")</td></tr>
+        <tr><td><code>transfer_id</code></td><td>string</td><td>ファイル/データ転送オペレーションの一意識別子</td></tr>
+        <tr><td><code>feed_id</code></td><td>string</td><td>Google SecOps インジェスションフィードの一意識別子</td></tr>
+        <tr><td><code>collector_id</code></td><td>string</td><td>インジェスションを実行するコレクタの一意識別子</td></tr>
+        <tr><td><code>log_type</code></td><td>string</td><td>取り込むログのフォーマット (例: <code>DUO</code>、<code>OFFICE_365</code>)</td></tr>
+        <tr><td><code>http_status_code</code></td><td>integer</td><td>API フェッチ操作で受信した HTTP ステータスコード</td></tr>
+        <tr><td><code>bytes_transferred</code></td><td>integer</td><td>正常に転送された生バイト数</td></tr>
+        <tr><td><code>record_count</code></td><td>integer</td><td>処理・取得・パースされたログエントリ数</td></tr>
+        <tr><td><code>error_details</code></td><td>object</td><td>失敗時の詳細エラー情報 (<code>error_message</code>、<code>error_code</code>、<code>error_type</code>、<code>is_retriable</code>)</td></tr>
+      </table>
+
+      <h3>🚨 失敗時のログペイロード例</h3>
+      <span class="code-label">JSON</span>
+      <pre><code class="language-json">{
+  "request_start_time": "2026-06-30T19:05:00Z",
+  "activity_duration": "1.200s",
+  "feed_id": "feed-998877",
+  "collector_id": "collector-abcd",
+  "log_type": "WORKDAY_AUDIT",
+  "http_status_code": 401,
+  "bytes_transferred": 0,
+  "record_count": 0,
+  "activity": "File Transfer",
+  "details": "Authorization failure during API request.",
+  "error_details": {
+    "error_message": "Invalid API token or credential expired.",
+    "error_code": "401",
+    "error_type": "AUTHORIZATION_ERROR",
+    "is_retriable": true
+  }
+}</code></pre>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>⚙️ 設定方法</h2>
+
+      <h3>✅ 前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>Google SecOps インスタンスが <strong>Bring Your Own Project (BYOP)</strong> の Google Cloud プロジェクトで構成されていること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>ログ表示のため、プロジェクトに <strong>Logs Viewer</strong> (<code>roles/logging.viewer</code>) または <strong>Private Logs Viewer</strong> (<code>roles/logging.privateLogViewer</code>) のいずれかの IAM ロールが付与されていること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>コストへの影響を理解しておくこと (Cloud Logging は課金対象サービス。Google Cloud 無料プログラムの一部として無料枠あり)</span></div>
+
+      <h3>🔍 ステップ 1: Logs Explorer でフィードアクティビティログを表示・クエリする</h3>
+      <ol class="step-list">
+        <li><span>Google Cloud コンソールで Logs Explorer ページに移動する</span></li>
+        <li><span>Google SecOps インスタンスに関連付けられた Google Cloud プロジェクトを選択する</span></li>
+        <li><span>Query ペインにクエリ式を入力してログをフィルタする (例: <code>labels.namespace="chronicle-siem"</code>)</span></li>
+        <li><span>「Run query」をクリックする</span></li>
+      </ol>
+
+      <h3>🐛 ステップ 2: コンソールツールでフィードをデバッグする</h3>
+      <div class="card">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Debug with logs</strong>: Feed management ページで対象フィードのアクションメニューから「Debug with logs」を選択すると、そのフィード ID で事前フィルタされた Logs Explorer が開く</span></div>
+      </div>
+      <div class="ai-box">
+        <strong>🤖 Ask Gemini Cloud Assist:</strong> Feeds ページで「Ask Gemini Cloud Assist」を選択し、フィードのボリュームやエラーについて自然言語で質問できます。
+      </div>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>💡 メリット</h2>
+
+      <h3>💼 ビジネス面</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>インシデント解決時間の短縮</strong>: ログの欠損・遅延・失敗といったインジェスション異常の診断が容易になり、解決までの時間を短縮できる</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>SIEM の信頼性向上</strong>: データ取り込みの健全性を継続的に可視化することで、検知の土台となるログ収集の欠落リスクを低減できる</span></div>
+
+      <h3>🔧 技術面</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>標準ツールでの調査</strong>: Cloud Logging / Logs Explorer という Google Cloud 標準のツールとクエリ言語で、フィード単位・コレクタ単位の詳細な調査が可能</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>Push/Pull 双方の可視性</strong>: Push 型・Pull 型両方のインジェスションメカニズムのアクティビティを統一的な JSON ペイロードで確認できる</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>AI 支援の調査</strong>: Gemini Cloud Assist により、コンソールから対話的にテレメトリを調査できる</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>コスト制御</strong>: Log Router の除外フィルタで不要なログ (STS ログなど) のルーティングを抑制できる</span></div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>🚧 制限事項</h3>
+      <div class="check-item"><span class="cross-icon">✗</span><span><strong>Public Preview</strong> (Pre-GA Offerings Terms の対象) であり、サポートが限定される場合や、他の Pre-GA バージョンと互換性のない変更が入る可能性がある</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span><strong>BYOP 構成</strong>の Google SecOps インスタンスでのみ利用可能</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span>STS を使用する静的フィードのログは、<code>chronicle.googleapis.com/ingestion_activity</code> ではなく、リソースタイプ <code>storage_transfer_job</code>・ログ ID <code>storagetransfer.googleapis.com/transfer_activity</code> を使用するため、標準クエリでは表示されない</span></div>
+      <div class="check-item"><span class="cross-icon">✗</span><span><code>feed_id</code> などの高カーディナリティフィールドは、モニタリング対象リソース定義のリソースラベルではなくメタデータラベルとしてログに含まれる。メタデータラベルを使用した Gemini Cloud Assist の相関機能は継続評価中</span></div>
+
+      <h3>🤔 考慮すべき点</h3>
+      <div class="warning-box">
+        <strong>⚠️ コストに注意:</strong> Cloud Logging は課金対象サービスのため、フィード数やログ量が多い環境ではコスト影響を試算しておく必要があります。不要なログは Log Router の除外フィルタで制御し、ログ量とコストを最適化することが望ましいです。
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>🕵️ ユースケース 1: フィードのログ欠損・遅延の切り分け</h3>
+        <p><strong>シナリオ</strong>: 特定のログソース (例: Workday 監査ログ) が Google SecOps に届いていない、または遅延している。原因が認証エラーなのか、ソース側の問題なのかを迅速に切り分けたい。</p>
+        <span class="code-label">Logging Query</span>
+        <pre><code class="language-text">log_id("chronicle.googleapis.com/ingestion_activity") AND labels.feed_id="FEED_ID"</code></pre>
+        <p><strong>効果</strong>: <code>http_status_code</code> (例: 401) や <code>error_details</code> (<code>error_type: AUTHORIZATION_ERROR</code>、<code>is_retriable: true</code> など) から失敗原因を即座に特定し、認証情報の更新などの対処を迅速に実施できる。</p>
+      </div>
+
+      <div class="usecase">
+        <h3>🖱️ ユースケース 2: Feed management からのワンクリックデバッグ</h3>
+        <p><strong>シナリオ</strong>: SOC 運用者がフィードの異常に気付いた際、クエリを手書きせずにすぐログを確認したい。</p>
+        <p><strong>効果</strong>: Feed management ページの「Debug with logs」から、対象フィード ID で事前フィルタされた Logs Explorer が開き、調査開始までの手間を大幅に削減できる。Gemini Cloud Assist に自然言語でフィードのボリュームやエラーについて質問することも可能。</p>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>
+        Google SecOps の本機能自体に関する追加料金の記載はありませんが、<span class="highlight">Cloud Logging は課金対象サービス</span>です。Google Cloud 無料プログラムの一部として無料枠が利用できます。
+      </p>
+      <h3>📊 Cloud Logging の料金 (参考)</h3>
+      <table>
+        <tr><th>項目</th><th>料金</th></tr>
+        <tr><td>Logging ストレージ</td><td>$0.50/GiB (最初の 50 GiB/プロジェクト/月は無料、ログバケットへの 30 日までの保存を含む)</td></tr>
+        <tr><td>Logging 保持 (30 日超)</td><td>$0.01/GiB/月 (デフォルト保持期間内は無料)</td></tr>
+        <tr><td>Log Router</td><td>追加料金なし</td></tr>
+        <tr><td>Log Analytics</td><td>追加料金なし</td></tr>
+      </table>
+      <p>詳細は <a href="https://cloud.google.com/stackdriver/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Google Cloud Observability の料金ページ</a> を参照してください。</p>
+    </div>
+
+    <!-- 関連サービス・機能 -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="icon-text"><span class="arrow">→</span><span><strong>Cloud Logging / Logs Explorer</strong>: フィードアクティビティログの保存・表示・クエリ基盤</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span><strong>Log Router</strong>: 除外フィルタによるログルーティングの制御 (STS ログの除外など)</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span><strong>Gemini Cloud Assist</strong>: Google SecOps コンソールからのロギング・メトリクステレメトリの対話的調査</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span><strong>Storage Transfer Service (STS)</strong>: 静的フィードのデータ転送に使用され、専用のリソースタイプ・ログ ID でログが記録される</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span><strong>Cloud Monitoring</strong>: BYOP プロジェクトでのインジェスション停止アラートのカスタム設定に利用可能</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span><strong>IAM</strong>: ログ閲覧に必要なロール (<code>roles/logging.viewer</code>、<code>roles/logging.privateLogViewer</code>) の管理</span></div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="success-box">
+        <p style="margin: 0 0 8px;">
+          Google SecOps のインジェスションパイプラインとフィードの可視性が Cloud Logging に統合され、ログ配信の問題を<strong>標準ツールと AI 支援で迅速に診断</strong>できるようになりました。
+        </p>
+        <p style="margin: 0;">
+          BYOP 構成の Google SecOps を運用している場合は、必要な IAM ロールを付与して Logs Explorer でのフィードアクティビティ調査を試し、あわせて Log Router の除外フィルタでログ量とコストの最適化を検討することをお勧めします。
+        </p>
+      </div>
+    </div>
+
+    <!-- 参考リンク -->
+    <div class="section">
+      <h2>📚 参考リンク</h2>
+      <div class="icon-text"><span class="arrow">→</span><a href="https://docs.cloud.google.com/release-notes#August_12_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026-08-12)</a></div>
+      <div class="icon-text"><span class="arrow">→</span><a href="https://docs.cloud.google.com/chronicle/docs/ingestion/analyze-feed-activity-with-cloud-logging" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: Analyze feed activity with Cloud Logging</a></div>
+      <div class="icon-text"><span class="arrow">→</span><a href="https://docs.cloud.google.com/chronicle/docs/onboard/configure-cloud-project" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: Configure a Google Cloud project for Google SecOps</a></div>
+      <div class="icon-text"><span class="arrow">→</span><a href="https://cloud.google.com/stackdriver/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">料金ページ: Google Cloud Observability pricing</a></div>
+    </div>
+
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="margin: 4px 0; padding-left: 20px;">
+        <li><a href="https://docs.cloud.google.com/release-notes#August_12_2026" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/release-notes#August_12_2026</a></li>
+        <li><a href="https://docs.cloud.google.com/chronicle/docs/ingestion/analyze-feed-activity-with-cloud-logging" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/chronicle/docs/ingestion/analyze-feed-activity-with-cloud-logging</a></li>
+      </ul>
+      <p>本インフォグラフィックは Google Cloud News レポート (2026-08-12) を基に生成されました。</p>
+      <p>🏷️ タグ: Google SecOps / Google SecOps SIEM / Cloud Logging / Logs Explorer / Log Router / Gemini Cloud Assist / BYOP / Public Preview / セキュリティ / インジェスション</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

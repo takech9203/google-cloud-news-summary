@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gemini Enterprise: エージェント・MCP サーバーのガバナンスと新コネクタ</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .card-red {
+      border-left-color: var(--gc-red);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .ai-box {
+      background: var(--gc-purple-tint);
+      border-left: 4px solid var(--gc-purple);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.green {
+      background: linear-gradient(135deg, var(--gc-green), #1B5E20);
+    }
+
+    .stat-card.purple {
+      background: linear-gradient(135deg, var(--gc-purple), #6A1B9A);
+    }
+
+    .stat-card.orange {
+      background: linear-gradient(135deg, var(--gc-orange), #E65100);
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border: 1px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-card h4 {
+      color: var(--gc-red);
+      margin: 0 0 12px 0;
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border: 1px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-card h4 {
+      color: var(--gc-green);
+      margin: 0 0 12px 0;
+    }
+
+    .before-card ul, .after-card ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .before-card li, .after-card li {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-800);
+      margin: 0 0 8px 0;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .tag-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    .tag {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-800);
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stat-cards { grid-template-columns: 1fr; }
+      .feature-grid { grid-template-columns: 1fr; }
+      .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>🛡️ Gemini Enterprise: エージェント・MCP サーバーのガバナンスと新コネクタ</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Gemini Enterprise</span>
+          <span class="badge-ga">GA</span>
+          <span class="badge-preview">Public Preview</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-06-25</div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>Gemini Enterprise において、エージェントと MCP サーバーのガバナンス管理を強化する複数の機能が GA および Public Preview としてリリースされた。<span class="highlight">Agent Registry</span> を通じた A2A エージェントやカスタム MCP サーバーのカタログ管理、<span class="highlight">Agent Gateway</span> による Egress ポリシーの適用、そして<span class="highlight">エージェント ID (SPIFFE ID)</span> の可視化が可能となり、エンタープライズ環境におけるエージェントの統制・管理が大幅に改善される。</p>
+      <p>加えて、Lovable データストアが Public Preview で利用可能になり、Airtable、Freshservice、Google Stitch、Zoho Desk、Zoho Projects への新しいアクション対応も追加された。</p>
+
+      <div class="ai-box">
+        <strong>🎯 対象ユーザー:</strong> AI エージェントの導入が進む中で、セキュリティとガバナンスを確保しながらエージェント活用を拡大したい企業の IT 管理者、セキュリティ担当者、および業務効率化を推進するチーム。
+      </div>
+    </div>
+
+    <!-- Statistics -->
+    <div class="stat-cards">
+      <div class="stat-card">
+        <div class="stat-value">3</div>
+        <div class="stat-label">ガバナンスの柱<br/>(Registry / Gateway / Identity)</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-value">5</div>
+        <div class="stat-label">新規サードパーティ<br/>コネクタ</div>
+      </div>
+      <div class="stat-card purple">
+        <div class="stat-value">SPIFFE</div>
+        <div class="stat-label">ゼロトラスト<br/>ID 基盤</div>
+      </div>
+      <div class="stat-card orange">
+        <div class="stat-value">3</div>
+        <div class="stat-label">対応リージョン<br/>(Global / US / EU)</div>
+      </div>
+    </div>
+
+    <!-- Before/After -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-card">
+          <h4>❌ Before (アップデート前)</h4>
+          <ul>
+            <li>エージェントや MCP サーバーを一元的に管理・発見する仕組みがなかった</li>
+            <li>外部サービスへの通信に対するきめ細かいアクセス制御が限定的</li>
+            <li>エージェントの SPIFFE ID を管理コンソールから確認する方法がなかった</li>
+            <li>Lovable や一部サードパーティサービスとの連携が未対応</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h4>✅ After (アップデート後)</h4>
+          <ul>
+            <li>Agent Registry からエージェント/MCP サーバーを検索・インポート可能</li>
+            <li>Agent Gateway の Egress ポリシーで Allow/Deny ルールを設定</li>
+            <li>管理者がエージェント詳細ページから SPIFFE ID を確認可能</li>
+            <li>Lovable + 5 つの新コネクタがアクション対応</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>Gemini Enterprise アプリから Agent Registry を通じてエージェントと MCP サーバーを一元管理し、Agent Gateway の Egress ポリシーで通信を制御するアーキテクチャを示す。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph GE["Gemini Enterprise App"]
+        Admin["Admin"]
+        EndUser["End User"]
+    end
+
+    subgraph Govern["Agent Platform - Govern"]
+        AR["Agent Registry - Catalog"]
+        AG["Agent Gateway - Policy"]
+        AI["Agent Identity - SPIFFE ID"]
+    end
+
+    subgraph External["External Resources"]
+        A2A["A2A Agent"]
+        MCP["MCP Server"]
+        DS["Datastore - Lovable, Airtable etc"]
+    end
+
+    Admin -->|"Import and Manage"| AR
+    Admin -->|"Check ID"| AI
+    AR -->|"Register Agent/MCP"| AG
+    AG -->|"Egress Policy Allow/Deny"| A2A
+    AG -->|"Egress Policy Allow/Deny"| MCP
+    EndUser -->|"Natural Language Query"| DS
+    AI -->|"Assign SPIFFE ID"| A2A
+    AI -->|"Assign SPIFFE ID"| MCP
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="section">
+      <h2>⚙️ 主要機能</h2>
+
+      <div class="card">
+        <h3>1. Agent Registry からのエージェント・MCP サーバーのインポートとガバナンス <span class="badge-ga">GA</span></h3>
+        <div class="icon-text"><span class="arrow">→</span><span>A2A エージェント、エンドポイント、MCP サーバーを一元的に管理するカタログ</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>Google 製・カスタム製の MCP サーバーを Registry から発見し、Gemini Enterprise アプリに追加可能</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>A2A プロトコル対応エージェントも同様にインポート可能</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>Agent Gateway による Egress ポリシーで、IAM 制御やセマンティックガバナンスポリシーを適用</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>リージョン整合性の厳格な適用 (App / Gateway / Registry)</span></div>
+      </div>
+
+      <div class="card card-orange">
+        <h3>2. 新データストア・新アクション対応 <span class="badge-preview">Public Preview</span></h3>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Lovable データストア</strong>: プロジェクトの検索・閲覧、自然言語によるアクション実行</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Lovable 対応アクション</strong>: コネクタ追加、プロジェクト Remix、ナレッジ設定、公開レベル設定</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>新規コネクタ</strong>: Airtable、Freshservice、Google Stitch、Zoho Desk、Zoho Projects</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>Google マネージド OAuth を使用 (OAuth アプリケーションの個別作成は不要)</span></div>
+      </div>
+
+      <div class="card card-green">
+        <h3>3. エージェント ID の表示 <span class="badge-ga">GA</span></h3>
+        <div class="icon-text"><span class="arrow">→</span><span>管理者がエージェント詳細ページから SPIFFE ID を確認可能</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>パブリッシャーが SPIFFE ID を未公開の場合は Agent Registry リソース ID がフォールバック表示</span></div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3>リージョン整合性要件</h3>
+      <p>Agent Registry、Agent Gateway、Gemini Enterprise アプリの 3 コンポーネントはリージョン整合性が必須。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Gemini Enterprise アプリ</th>
+            <th>Agent Gateway</th>
+            <th>Agent Registry</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>global</td>
+            <td>us-central1</td>
+            <td>us-central1、us、または global</td>
+          </tr>
+          <tr>
+            <td>us</td>
+            <td>us-central1</td>
+            <td>us-central1 または us</td>
+          </tr>
+          <tr>
+            <td>eu</td>
+            <td>europe-west1</td>
+            <td>europe-west1 または eu</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Agent Identity (SPIFFE ID) フォーマット</h3>
+      <span class="code-label">SPIFFE ID Format</span>
+      <pre><code>spiffe://&lt;TRUST_DOMAIN&gt;/resources/&lt;SERVICE&gt;/&lt;RESOURCE_PATH&gt;
+
+Example:
+spiffe://agents.global.org-123456789012.system.id.goog/resources/discoveryengine/projects/9876543210/locations/global/collections/default_collection/engines/my-agent</code></pre>
+
+      <p>Gemini Enterprise の場合:</p>
+      <span class="code-label">Gemini Enterprise SPIFFE ID</span>
+      <pre><code>principal://agents.global.org-{ORG_ID}.system.id.goog/resources/discoveryengine/projects/{PROJECT}/locations/global/collections/default_collection/engines/{AGENT}</code></pre>
+
+      <h3>Lovable コネクタ仕様</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>認証方式</td>
+            <td>Google マネージド OAuth</td>
+          </tr>
+          <tr>
+            <td>対応リージョン</td>
+            <td>global、us、eu</td>
+          </tr>
+          <tr>
+            <td>検索対象エンティティ</td>
+            <td>Projects</td>
+          </tr>
+          <tr>
+            <td>対応アクション</td>
+            <td>コネクタ追加、プロジェクト Remix、ナレッジ設定、公開レベル設定</td>
+          </tr>
+          <tr>
+            <td>データ処理方式</td>
+            <td>フェデレーション (データは Lovable 側に保持)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup Guide -->
+    <div class="section">
+      <h2>📝 設定方法</h2>
+
+      <div class="note-box">
+        <strong>📌 前提条件:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>Gemini Enterprise Admin ロール (<code>roles/discoveryengine.agentspaceAdmin</code>) を保有</li>
+          <li>Agent Gateway がセットアップ済みで同一リージョンに配置</li>
+          <li>Agent Registry が Agent Gateway に関連付け済み</li>
+        </ul>
+      </div>
+
+      <h3>ステップ 1: Agent Registry からエージェントをインポート</h3>
+      <div class="flow-diagram">
+        <div class="flow-step">📋 Gemini<br/>Enterprise</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">➕ Add<br/>Agents</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🔍 Registry<br/>から選択</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🔑 認証情報<br/>入力</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">✅ 完了</div>
+      </div>
+
+      <h3>ステップ 2: MCP サーバーをインポート</h3>
+      <div class="card">
+        <div class="icon-text"><span class="arrow">→</span><span>Agent Gateway セットアップ完了後、関連付けされた Registry 内の MCP サーバーが自動的に利用可能</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>MCP サーバーはデータストアとして追加</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>Google 製/カスタム MCP サーバーのいずれも選択可能</span></div>
+      </div>
+
+      <h3>ステップ 3: Egress ポリシーの設定</h3>
+      <div class="feature-grid">
+        <div class="card">
+          <h4 style="margin-top:0;">🔐 IAM エージェントポリシー</h4>
+          <p style="font-size:14px;">エージェントの SPIFFE ID に基づき、特定のツールやメソッドへのアクセスを制限</p>
+        </div>
+        <div class="card card-purple">
+          <h4 style="margin-top:0;">🧠 セマンティックガバナンスポリシー</h4>
+          <p style="font-size:14px;">自然言語ベースのコンテキスト認識制御でエージェント実行を管理</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+
+      <h3>ビジネス面</h3>
+      <div class="feature-grid">
+        <div class="card card-green">
+          <h4 style="margin-top:0;">🏢 エージェント活用の統制</h4>
+          <p style="font-size:14px;">企業全体でのエージェント・MCP サーバーの利用を一元的に可視化・管理し、シャドー AI のリスクを低減</p>
+        </div>
+        <div class="card card-green">
+          <h4 style="margin-top:0;">🔗 サードパーティ連携の拡大</h4>
+          <p style="font-size:14px;">Lovable、Airtable、Zoho 等への自然言語アクセスにより、業務プロセスの自動化を推進</p>
+        </div>
+        <div class="card card-green">
+          <h4 style="margin-top:0;">📜 コンプライアンス対応</h4>
+          <p style="font-size:14px;">データレジデンシー要件に対応したリージョン整合性の強制適用</p>
+        </div>
+      </div>
+
+      <h3>技術面</h3>
+      <div class="feature-grid">
+        <div class="card">
+          <h4 style="margin-top:0;">🔒 ゼロトラストセキュリティ</h4>
+          <p style="font-size:14px;">SPIFFE ベースの強固な ID 割り当てにより、エージェントごとの最小権限原則を実現</p>
+        </div>
+        <div class="card">
+          <h4 style="margin-top:0;">🎛️ きめ細かいアクセス制御</h4>
+          <p style="font-size:14px;">IAM + セマンティックポリシーの組み合わせで、ツールレベル・メソッドレベルの制御が可能</p>
+        </div>
+        <div class="card">
+          <h4 style="margin-top:0;">📊 監査可能性の向上</h4>
+          <p style="font-size:14px;">エージェント ID の可視化により、誰が何にアクセスしたかの追跡が容易に</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <div class="warning-box">
+        <strong>制限事項:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>Agent Registry からのインポートは、同一リージョンの Agent Gateway に関連付けられた Registry からのみ可能</li>
+          <li>Gemini Enterprise エージェント間の直接通信や、エージェントとデータコネクタ間の直接通信は Agent Gateway のポリシー適用対象外</li>
+          <li>ガバナンスポリシーは Agent Gateway に関連付けられた単一の Registry 内のエージェント/MCP サーバーにのみ適用可能</li>
+          <li>Lovable データストアは global、us、eu ロケーションのみ対応</li>
+          <li>VPC Service Controls ペリメータを既存の Lovable データストアに適用する場合、データストアの再作成が必要</li>
+        </ul>
+      </div>
+
+      <div class="error-box">
+        <strong>考慮すべき点:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>Agent Gateway のセットアップが前提条件 (未導入環境では事前準備が必要)</li>
+          <li>リージョン整合性要件により、コンポーネントの分散配置は不可</li>
+          <li>新データストアのコネクタは Public Preview のため、Pre-GA 利用条件が適用</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>🏢 ユースケース 1: 全社的なエージェント統制</h4>
+        <p><strong>シナリオ:</strong> 大企業で複数チームが独自に AI エージェントや MCP サーバーを構築・利用。セキュリティチームはすべてのエージェントの利用状況を把握し、不正なデータアクセスを防止したい。</p>
+        <p><strong>効果:</strong> Agent Registry でエージェント・MCP サーバーを一元カタログ化し、Agent Gateway の Egress ポリシーで許可リソースのみアクセス許可。SPIFFE ID による個別権限管理。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>🔧 ユースケース 2: マルチツール業務自動化</h4>
+        <p><strong>シナリオ:</strong> プロジェクト管理チームが Lovable でプロトタイピング、Airtable でデータ管理、Zoho Projects でタスク管理。統一インターフェースから自然言語で操作したい。</p>
+        <p><strong>効果:</strong> 「Lovable の新しいプロジェクトを Remix して」「Airtable のレコードを更新して」「Zoho Projects のタスクステータスを変更して」といった命令で複数ツールを横断操作。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>Gemini Enterprise はサブスクリプションベースのライセンスモデル。4 エディション (Business、Standard、Plus、Frontline) が存在。</p>
+      <div class="card">
+        <div class="icon-text"><span class="arrow">→</span><span>Agent Registry からのインポートやガバナンス機能は <strong>Standard 以上</strong>のエディションで利用可能</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>30 日間の無料トライアルが Business / Standard / Plus エディションで利用可能</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>Standard、Plus、Frontline エディションの購入は Google Cloud セールスへの問い合わせが必要</span></div>
+      </div>
+    </div>
+
+    <!-- Available Regions -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>ロケーション</th>
+            <th>対応リージョン</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>グローバル</td>
+            <td>us-central1 (Gateway) + us-central1/us/global (Registry)</td>
+          </tr>
+          <tr>
+            <td>US</td>
+            <td>us-central1 (Gateway) + us-central1/us (Registry)</td>
+          </tr>
+          <tr>
+            <td>EU</td>
+            <td>europe-west1 (Gateway) + europe-west1/eu (Registry)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h4 style="margin-top:0;">🏗️ Agent Platform</h4>
+          <p style="font-size:14px;">Agent Registry、Agent Gateway、Agent Identity を含む統合ガバナンスプラットフォーム</p>
+        </div>
+        <div class="card">
+          <h4 style="margin-top:0;">🛡️ Agent Gateway</h4>
+          <p style="font-size:14px;">エージェントトラフィックの制御とランタイムポリシー適用を担うネットワークコンポーネント</p>
+        </div>
+        <div class="card">
+          <h4 style="margin-top:0;">🔑 Agent Identity</h4>
+          <p style="font-size:14px;">SPIFFE 標準に基づくエージェント認証・認可基盤</p>
+        </div>
+        <div class="card">
+          <h4 style="margin-top:0;">🌐 Identity-Aware Proxy (IAP)</h4>
+          <p style="font-size:14px;">Agent Gateway のデフォルト認証レイヤー</p>
+        </div>
+        <div class="card">
+          <h4 style="margin-top:0;">🛡️ Model Armor</h4>
+          <p style="font-size:14px;">プロンプトインジェクション等からの保護を提供するセキュリティガードレール</p>
+        </div>
+        <div class="card">
+          <h4 style="margin-top:0;">🤖 Vertex AI Agent Engine</h4>
+          <p style="font-size:14px;">Agent Runtime 上でのエージェントデプロイ環境</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>📌 まとめ</h2>
+      <div class="success-box">
+        <p>本アップデートにより、Gemini Enterprise は <strong>Agent Registry・Agent Gateway・Agent Identity</strong> の 3 本柱でエージェントと MCP サーバーの統制を実現する本格的なエンタープライズガバナンス機能を GA として提供開始した。</p>
+        <p style="margin-top:12px;">AI エージェントの導入を検討している組織は、まず Agent Gateway のセットアップと Agent Registry の構築を行い、ガバナンスポリシーを定義した上でエージェント・MCP サーバーの段階的な展開を進めることが推奨される。</p>
+      </div>
+
+      <div class="tag-list">
+        <span class="tag">#GeminiEnterprise</span>
+        <span class="tag">#AgentRegistry</span>
+        <span class="tag">#AgentGateway</span>
+        <span class="tag">#MCP</span>
+        <span class="tag">#A2A</span>
+        <span class="tag">#SPIFFE</span>
+        <span class="tag">#ガバナンス</span>
+        <span class="tag">#エージェント</span>
+        <span class="tag">#Lovable</span>
+        <span class="tag">#コネクタ</span>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>📎 出典:</strong></p>
+      <ul style="list-style: none; padding: 0; margin: 8px 0;">
+        <li style="margin: 4px 0;">- <a href="https://docs.cloud.google.com/release-notes#June_25_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a></li>
+        <li style="margin: 4px 0;">- <a href="https://docs.cloud.google.com/gemini/enterprise/docs/import-govern-agent-registry" target="_blank" rel="noopener noreferrer">Agent Registry からエージェントをインポート</a></li>
+        <li style="margin: 4px 0;">- <a href="https://docs.cloud.google.com/gemini/enterprise/docs/connectors/custom-mcp-server/import-govern-mcp-server-agent-registry" target="_blank" rel="noopener noreferrer">Agent Registry からカスタム MCP サーバーをインポート</a></li>
+        <li style="margin: 4px 0;">- <a href="https://docs.cloud.google.com/gemini/enterprise/docs/connectors/connect-third-party-data-source" target="_blank" rel="noopener noreferrer">サードパーティデータソースの接続</a></li>
+        <li style="margin: 4px 0;">- <a href="https://docs.cloud.google.com/gemini/enterprise/docs/connectors/lovable" target="_blank" rel="noopener noreferrer">Lovable コネクタ</a></li>
+        <li style="margin: 4px 0;">- <a href="https://docs.cloud.google.com/gemini-enterprise-agent-platform/govern/gateways/agent-gateway-overview" target="_blank" rel="noopener noreferrer">Agent Gateway 概要</a></li>
+        <li style="margin: 4px 0;">- <a href="https://docs.cloud.google.com/gemini-enterprise-agent-platform/govern/agent-identity-overview" target="_blank" rel="noopener noreferrer">Agent Identity 概要</a></li>
+        <li style="margin: 4px 0;">- <a href="https://docs.cloud.google.com/gemini/enterprise/docs/editions" target="_blank" rel="noopener noreferrer">Gemini Enterprise エディション比較</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: #80868B;">Generated on 2026-06-26 | Google Cloud News Infographic</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+</body>
+</html>

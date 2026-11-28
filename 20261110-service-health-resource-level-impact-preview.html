@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Personalized Service Health: リソースレベル影響の特定 (Preview)</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+      text-align: right;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .badge-deprecated {
+      background: var(--gc-red);
+      color: #FFFFFF;
+    }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 760px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid rgba(234, 67, 53, 0.3);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid rgba(52, 168, 83, 0.3);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-box h3,
+    .after-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-box h3 { color: #C5221F; }
+    .after-box h3 { color: #188038; }
+
+    .before-box ul,
+    .after-box ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+    }
+
+    .before-box li,
+    .after-box li {
+      margin: 8px 0;
+      font-size: 14px;
+    }
+
+    /* フロー図スタイル */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+      font-size: 14px;
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* チェックリストスタイル */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+    }
+
+    /* コードブロック */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+      word-break: break-all;
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブルスタイル */
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* 統計カード */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-100);
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+      background: #FFFFFF;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      word-break: break-all;
+    }
+
+    footer ul {
+      padding-left: 20px;
+      margin: 8px 0;
+    }
+
+    footer li {
+      margin: 4px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <h1>🩺 Personalized Service Health<br>リソースレベル影響の特定</h1>
+        <div style="margin-top: 12px;">
+          <span class="badge">Personalized Service Health</span>
+          <span class="badge badge-preview">Preview</span>
+          <span class="badge" style="background: var(--gc-purple);">v1beta API</span>
+          <span class="badge" style="background: var(--gc-teal);">gcloud beta CLI</span>
+        </div>
+      </div>
+      <div class="subtitle">
+        📅 リリース日: 2026-11-10<br>
+        ☁️ Google Cloud Release Notes
+      </div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        Personalized Service Health が、対応プロダクトを対象に <span class="highlight">リソースレベル影響 (resource-level impact)</span> を Preview でサポートしました。
+        Service Health v1beta API (<code>projects.locations.impacts</code>) と gcloud beta CLI (<code>gcloud beta service-health impacts</code>) を通じて利用できます。
+      </p>
+      <p>
+        これまではプロジェクト単位の「関連度 (Relevance)」までしか分かりませんでしたが、関連度が <code>IMPACTED</code> (影響確認済み) の場合に、
+        <strong>プロジェクト内のどのリソースが影響を受けているか</strong> (例: 特定の Cloud SQL インスタンス、GKE クラスタ、Pub/Sub トピック) を、
+        完全リソース名 (<code>assetName</code>) と Cloud Asset Inventory のリソースタイプ (<code>assetType</code>) で特定できるようになりました。
+      </p>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before: アップデート前の課題</h3>
+          <ul>
+            <li>イベントは「プロジェクトが <code>IMPACTED</code>」というプロジェクト・プロダクト・ロケーション単位の情報まで。<strong>個別リソースは特定不可</strong></li>
+            <li>影響リソースの特定には Cloud Monitoring のメトリクスやエラーログを<strong>手動で突き合わせる調査</strong>が必要</li>
+            <li>大規模プロジェクトでは、多数のインスタンスから影響範囲を切り分けるのに<strong>時間がかかっていた</strong></li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After: アップデート後の改善</h3>
+          <ul>
+            <li>関連度が <code>IMPACTED</code> なら、影響リソースを <code>Impact</code> リソースとして API から取得可能 (<code>assetName</code> / <code>assetType</code>)</li>
+            <li><code>gcloud beta service-health impacts list / describe</code> で CLI からも影響リソースを一覧・詳細取得</li>
+            <li><code>--filter</code> でイベントや特定リソースタイプ (例: <code>sqladmin.googleapis.com/Instance</code>) に絞り込み可能</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="note-box">
+        <strong>💡 ポイント:</strong> インシデント対応を行う SRE・運用チームは、「Google 側の障害が自社のどのワークロードに波及しているか」を即座にスコープでき、影響調査の<strong>初動時間を大幅に短縮</strong>できます。
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>Google 側のインシデント発生時に Personalized Service Health が影響リソースを <code>Impact</code> リソースとして生成し、運用チームが v1beta API または gcloud beta CLI でプロジェクト内の影響リソースを即座に特定するフローです。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+sequenceDiagram
+    participant Ops as 👨‍💻 SRE / 運用チーム
+    participant CLI as 🖥️ gcloud beta CLI
+    participant SH as 🩺 Service Health v1beta API
+    participant PSH as ☁️ Personalized Service Health
+    participant Res as 🗄️ プロジェクト内リソース<br/>(Cloud SQL / GKE / Pub/Sub)
+
+    Note over PSH: Google Cloud 側で<br/>インシデント発生
+    PSH->>PSH: プロジェクトへの関連度を評価<br/>(relevance = IMPACTED)
+    PSH->>Res: 影響を受けたリソースを特定
+    PSH->>SH: Impact リソースを生成<br/>(assetName / assetType / events)
+    Ops->>CLI: gcloud beta service-health impacts list
+    CLI->>SH: GET /v1beta/projects/{id}/locations/global/impacts
+    SH-->>CLI: Impact のリスト<br/>(影響リソースの完全リソース名)
+    CLI-->>Ops: 影響範囲を即座にスコープ
+        </pre>
+      </div>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚙️ 主要機能</h2>
+
+      <div class="card">
+        <h3>1️⃣ Impact リソースによる影響リソースの表現</h3>
+        <p>影響を受けた各リソースは <code>projects/{PROJECT_ID}/locations/global/impacts/{IMPACT_ID}</code> という <code>Impact</code> リソースで表現されます。</p>
+        <div class="icon-text"><span class="arrow">→</span><span><code>events</code>: 紐づくプロジェクトレベルの Service Health イベント名 (1 つ以上)</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>asset.assetName</code>: 影響リソースの完全リソース名 (例: <code>//cloudsql.googleapis.com/projects/123456789/instances/my-db-instance</code>)</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>asset.assetType</code>: Cloud Asset Inventory のリソースタイプ (例: <code>sqladmin.googleapis.com/Instance</code>)</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>description</code>: リソースへの影響に関する追加コンテキスト (利用可能な場合)</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>createTime</code> / <code>updateTime</code>: 影響レコードの作成・更新時刻</span></div>
+      </div>
+
+      <div class="card">
+        <h3>2️⃣ v1beta API のエンドポイント</h3>
+        <div class="icon-text"><span class="arrow">→</span><span><code>impacts.list</code>: プロジェクト内の影響リソースを一覧取得 (<code>GET /v1beta/projects/{PROJECT_ID}/locations/global/impacts</code>)</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>impacts.get</code>: 特定の <code>IMPACT_ID</code> の詳細を取得</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>filter</code> パラメータでイベント・リソースタイプ・更新時刻による絞り込みが可能</span></div>
+      </div>
+
+      <div class="card">
+        <h3>3️⃣ gcloud beta CLI サポート</h3>
+        <div class="icon-text"><span class="arrow">→</span><span><code>gcloud beta service-health impacts list --project=PROJECT_ID --location=global</code></span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>gcloud beta service-health impacts describe IMPACT_ID --project=PROJECT_ID --location=global</code></span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>組織レベルでは <code>gcloud beta service-health organization-impacts list</code> で、影響を受けたプロジェクト (コンテナアセット) を組織横断で集約可能</span></div>
+      </div>
+
+      <div class="card">
+        <h3>4️⃣ プロジェクト影響と組織影響の使い分け</h3>
+        <div class="table-wrap">
+          <table>
+            <tr>
+              <th>API</th>
+              <th>スコープ</th>
+              <th>返却対象</th>
+            </tr>
+            <tr>
+              <td><code>projects.locations.impacts</code></td>
+              <td>単一プロジェクト</td>
+              <td>関連度が <code>IMPACTED</code> で確認済み、かつプロダクトが対応している場合に<strong>非コンテナリソース (個別リソース)</strong> を返す</td>
+            </tr>
+            <tr>
+              <td><code>organizations.locations.organizationImpacts</code></td>
+              <td>組織横断</td>
+              <td>非ゼロの関連度 (<code>PARTIALLY_RELATED</code> / <code>RELATED</code> / <code>IMPACTED</code>) を持つ<strong>コンテナアセット (プロジェクト)</strong> を返す</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔬 技術仕様</h2>
+
+      <h3>📦 対応プロダクトとリソースタイプ (Preview)</h3>
+      <div class="table-wrap">
+        <table>
+          <tr>
+            <th>Google Cloud プロダクト</th>
+            <th>リソースタイプ (<code>asset.assetType</code>)</th>
+            <th>完全リソース名の形式 (<code>asset.assetName</code>)</th>
+          </tr>
+          <tr>
+            <td>🗄️ Cloud SQL</td>
+            <td><code>sqladmin.googleapis.com/Instance</code></td>
+            <td><code>//cloudsql.googleapis.com/projects/PROJECT_NUMBER/instances/INSTANCE_ID</code></td>
+          </tr>
+          <tr>
+            <td>⚓ GKE</td>
+            <td><code>container.googleapis.com/Cluster</code>, <code>container.googleapis.com/NodePool</code></td>
+            <td><code>//container.googleapis.com/projects/PROJECT_NUMBER/locations/LOCATION/clusters/CLUSTER_NAME</code> など</td>
+          </tr>
+          <tr>
+            <td>📨 Pub/Sub</td>
+            <td><code>pubsub.googleapis.com/Topic</code>, <code>pubsub.googleapis.com/Subscription</code></td>
+            <td><code>//pubsub.googleapis.com/projects/PROJECT_NUMBER/topics/TOPIC_NAME</code> など</td>
+          </tr>
+        </table>
+      </div>
+
+      <h3>📄 Impact リソースのレスポンス例</h3>
+      <span class="code-label">JSON</span>
+      <pre><code class="language-json">{
+  "impacts": [
+    {
+      "name": "projects/my-project/locations/global/impacts/f9a8b7c6-d5e4-4f3a-9b2c-1d0e9f8a7b6c",
+      "events": [
+        "projects/my-project/locations/global/events/1234567890abcdef"
+      ],
+      "asset": {
+        "assetName": "//cloudsql.googleapis.com/projects/9876543210/instances/prod-orders-db",
+        "assetType": "sqladmin.googleapis.com/Instance"
+      },
+      "description": "Instance experienced elevated connection errors during regional network disruption.",
+      "createTime": "2026-10-08T14:12:05.120450Z",
+      "updateTime": "2026-10-08T14:12:05.120450Z"
+    }
+  ]
+}</code></pre>
+
+      <h3>🔐 必要な IAM 権限</h3>
+      <div class="table-wrap">
+        <table>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+          <tr>
+            <td>必要な権限</td>
+            <td><code>servicehealth.impacts.list</code>, <code>servicehealth.impacts.get</code></td>
+          </tr>
+          <tr>
+            <td>事前定義ロール</td>
+            <td>Personalized Service Health Viewer (<code>roles/servicehealth.viewer</code>)。基本ロール (<code>roles/viewer</code> / <code>roles/editor</code> / <code>roles/owner</code>) にも含まれる</td>
+          </tr>
+          <tr>
+            <td>アクセス制限</td>
+            <td>イベントは見せたいがリソース名は見せたくない場合、<code>servicehealth.impacts.*</code> を除いたカスタムロールを作成する</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>✅ 前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>プロジェクトで Service Health API (<code>servicehealth.googleapis.com</code>) を<strong>イベント開始の 24 時間以上前に</strong>有効化しておく (イベント開始後に有効化した場合、過去 90 日分のプロジェクトレベルイベントはバックフィルされるが、<strong>リソースレベル影響はバックフィルされない</strong>)</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>操作するプリンシパルに <code>servicehealth.impacts.list</code> 権限 (<code>roles/servicehealth.viewer</code> に含まれる) が付与されていること</span></div>
+
+      <div class="flow-diagram">
+        <div class="flow-step">1️⃣ API 有効化<br>+ 権限付与</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">2️⃣ 影響リソースの<br>一覧取得</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">3️⃣ 影響レコードの<br>詳細取得</div>
+      </div>
+
+      <h3>ステップ 1: Service Health API の有効化と権限付与</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># Service Health API を有効化
+gcloud services enable servicehealth.googleapis.com --project=PROJECT_ID
+
+# Service Health Viewer ロールを付与
+gcloud projects add-iam-policy-binding PROJECT_ID \
+  --member="user:USER_EMAIL" \
+  --role="roles/servicehealth.viewer"</code></pre>
+
+      <h3>ステップ 2: 影響リソースの一覧取得</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># プロジェクト内の影響リソースを一覧取得
+gcloud beta service-health impacts list \
+  --project=PROJECT_ID \
+  --location=global
+
+# 特定イベントに紐づく影響リソースのみに絞り込み
+gcloud beta service-health impacts list \
+  --project=PROJECT_ID \
+  --location=global \
+  --filter="events:projects/PROJECT_ID/locations/global/events/EVENT_ID"</code></pre>
+
+      <p>REST API を直接呼び出す場合は次のとおりです。</p>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">curl -X GET \
+  -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Content-Type: application/json; charset=utf-8" \
+  "https://servicehealth.googleapis.com/v1beta/projects/PROJECT_ID/locations/global/impacts"</code></pre>
+
+      <h3>ステップ 3: 特定の影響レコードの詳細取得</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud beta service-health impacts describe IMPACT_ID \
+  --project=PROJECT_ID \
+  --location=global</code></pre>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>🚀 メリット</h2>
+
+      <h3>💼 ビジネス面</h3>
+      <div class="success-box">
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>インシデント対応の初動短縮 (MTTR 改善)</strong>: Google 側障害の影響範囲 (どの DB、どのクラスタか) を即座に特定でき、影響調査から復旧アクションへの移行が速くなる</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>正確なステークホルダー報告</strong>: 影響を受けたリソースを具体的に示せるため、社内外への影響報告の精度が向上する</span></div>
+      </div>
+
+      <h3>⚙️ 技術面</h3>
+      <div class="success-box">
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>自動化との親和性</strong>: API/CLI で影響リソースの完全リソース名が取得できるため、インシデント対応の Runbook 自動化 (フェイルオーバー、トラフィック切り替えなど) に組み込める</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>Cloud Asset Inventory との整合性</strong>: <code>assetType</code> が Cloud Asset Inventory のリソースタイプと一致しており、既存の資産管理・CMDB との突き合わせが容易</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>柔軟なフィルタリング</strong>: イベント、リソースタイプ、更新時刻によるフィルタで必要な影響情報だけを抽出できる</span></div>
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>🚧 制限事項</h3>
+      <div class="warning-box">
+        <div class="check-item"><span class="cross-icon">✗</span><span><strong>Preview 段階</strong>: Pre-GA Offerings Terms の対象であり、サポートが限定される可能性がある。v1beta API と gcloud beta CLI でのみ利用可能</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span><strong>対応プロダクトが限定的</strong>: 現時点でリソースレベル影響に対応するのは Cloud SQL、GKE、Pub/Sub の 3 プロダクト</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span><strong>API の事前有効化が必須</strong>: イベント開始の 24 時間以上前に Service Health API を有効化していないと Impact レコードを受け取れない (リソースレベル影響は遡及取得不可)</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span><strong>空リストになるケース</strong>: 対応外プロダクトの障害や、個別リソースに紐づかないコントロールプレーン/リージョンレベルの障害では、イベントは <code>relevance: IMPACTED</code> で表示されるが <code>impacts.list</code> は空リストを返す</span></div>
+      </div>
+
+      <h3>🤔 考慮すべき点</h3>
+      <div class="note-box">
+        <div class="icon-text"><span class="arrow">→</span><span><code>servicehealth.impacts.*</code> 権限を持つプリンシパルはプロジェクト全体の影響リソース名 (<code>assetName</code>) を閲覧できるため、リソース名を秘匿したい場合は <code>impacts</code> 権限を除いたカスタムロールの設計が必要</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>Impact レコードはインシデントのライフサイクル中イベントに関連付けられたままになるため、インシデント全体の状態 (<code>ACTIVE</code> / <code>COMPLETED</code>) はリンクされた Event リソース側で追跡する必要がある</span></div>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>🔍 ユースケース 1: インシデント発生時の影響スコープの即時特定</h3>
+        <p><strong>シナリオ</strong>: リージョナルなネットワーク障害のアラートを受けた SRE チームが、本番プロジェクト内の多数の Cloud SQL インスタンスのうち、どれが実際に影響を受けているかを特定したい。</p>
+        <span class="code-label">Bash</span>
+        <pre><code class="language-bash"># Cloud SQL インスタンスに限定して影響リソースを取得
+gcloud beta service-health impacts list \
+  --project=prod-project \
+  --location=global \
+  --filter='asset.assetType="sqladmin.googleapis.com/Instance"'</code></pre>
+        <p><strong>効果</strong>: メトリクスやログの手動調査なしに影響インスタンスを特定し、レプリカへのフェイルオーバーなどの対処を影響範囲に限定して迅速に実施できる。</p>
+      </div>
+
+      <div class="usecase">
+        <h3>🤖 ユースケース 2: インシデント対応の自動化パイプラインへの組み込み</h3>
+        <p><strong>シナリオ</strong>: Service Health のログベースアラート (Cloud Logging 経由) をトリガーに、影響リソースを自動取得して対応チケットに添付し、GKE クラスタが含まれる場合は代替リージョンへのトラフィック切り替え Runbook を起動したい。</p>
+        <div class="flow-diagram">
+          <div class="flow-step">🔔 ログベース<br>アラート</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">📥 impacts.list で<br>影響リソース取得</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">🎫 チケットに<br>自動添付</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">🔀 Runbook 起動<br>(トラフィック切替)</div>
+        </div>
+        <p><strong>効果</strong>: <code>assetName</code> / <code>assetType</code> が構造化データとして取得できるため、人手を介さない影響判定と自動対処 (トラフィック制御、通知の出し分け) が実現できる。</p>
+      </div>
+
+      <div class="usecase">
+        <h3>🏢 ユースケース 3: 組織レベルでの影響プロジェクトの横断把握</h3>
+        <p><strong>シナリオ</strong>: 組織の中央運用チームが、インシデントの影響を受けている可能性のあるプロジェクトを組織横断で把握し、各プロジェクトチームに連絡したい。</p>
+        <span class="code-label">Bash</span>
+        <pre><code class="language-bash">gcloud beta service-health organization-impacts list \
+  --organization=ORGANIZATION_ID \
+  --location=global</code></pre>
+        <p><strong>効果</strong>: 組織レベルでは非ゼロの関連度を持つプロジェクトが集約されるため、影響範囲の全体像を一度の操作で把握できる。</p>
+      </div>
+    </div>
+
+    <!-- 料金・リージョン -->
+    <div class="section">
+      <h2>💰 料金・利用可能リージョン</h2>
+      <div class="card">
+        <h3>💵 料金</h3>
+        <p>Personalized Service Health のリソースレベル影響機能自体に関する個別の料金情報は、今回のリリースノートおよび参照ドキュメントには記載されていません。利用にはプロジェクトで課金が有効になっている必要があります。詳細は <a class="gc-link" href="https://docs.cloud.google.com/service-health/docs/overview" target="_blank" rel="noopener noreferrer">Personalized Service Health のドキュメント</a>を参照してください。</p>
+      </div>
+      <div class="card">
+        <h3>🌍 利用可能リージョン</h3>
+        <p>Impact リソースのロケーションは <code>global</code> です (<code>projects/{PROJECT_ID}/locations/global/impacts/{IMPACT_ID}</code>)。プロダクト・ロケーションごとの対応状況は<a class="gc-link" href="https://docs.cloud.google.com/service-health/docs/supported-products-locations#resource-level-impact" target="_blank" rel="noopener noreferrer">対応プロダクトとロケーション</a>を参照してください。</p>
+      </div>
+    </div>
+
+    <!-- 関連サービス -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Cloud Asset Inventory</strong>: <code>Impact</code> の <code>assetType</code> は Cloud Asset Inventory のリソースタイプ体系を使用しており、資産管理との突き合わせが可能</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Cloud Logging / Cloud Monitoring</strong>: Service Health イベントはログベースのアラートポリシーで通知可能 (アラートはイベントのリビジョン・状態変化に適用され、個別のリソース影響には適用されない)</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Cloud SQL / GKE / Pub/Sub</strong>: 現時点でリソースレベル影響に対応する 3 プロダクト</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Personalized Service Health リモート MCP サーバー</strong>: 自然言語プロンプトでインシデント情報の取得・監査・デバッグ自動化が可能 (2026 年 8 月リリース)。リソースレベル影響と組み合わせた AI 主導のインシデント対応が見込める</span></div>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="note-box">
+        <p style="margin-top: 0;">
+          Personalized Service Health のリソースレベル影響 (Preview) により、Google Cloud 側の障害が「どのプロジェクトか」だけでなく<span class="highlight">「どのリソースか」まで API/CLI で特定</span>できるようになり、インシデント対応の初動が大きく変わるアップデートです。
+        </p>
+        <p>
+          リソースレベル影響は事後のバックフィルが行われないため、<strong>まずは本番プロジェクトで Service Health API を有効化しておくことを強く推奨</strong>します。対応プロダクトは現時点で Cloud SQL・GKE・Pub/Sub の 3 つですが、今後の拡大を見据えて Runbook 自動化への組み込みを検討する価値があります。
+        </p>
+        <div class="flow-diagram" style="margin-bottom: 0;">
+          <div class="flow-step">✅ Service Health API を<br>事前に有効化</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">🔐 Viewer ロールを<br>付与</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">🤖 Runbook 自動化に<br>組み込み</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p>📎 出典・参考リンク:</p>
+      <ul>
+        <li><a href="https://docs.cloud.google.com/release-notes#November_10_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026-11-10)</a></li>
+        <li><a href="https://docs.cloud.google.com/service-health/docs/concepts#impacted-resources" target="_blank" rel="noopener noreferrer" class="gc-link">Impacted resources (概念ドキュメント)</a></li>
+        <li><a href="https://docs.cloud.google.com/service-health/docs/project-events#list-impacted-resources" target="_blank" rel="noopener noreferrer" class="gc-link">List impacted resources in a project</a></li>
+        <li><a href="https://docs.cloud.google.com/service-health/docs/supported-products-locations#resource-level-impact" target="_blank" rel="noopener noreferrer" class="gc-link">Products supporting resource-level impact (Preview)</a></li>
+        <li><a href="https://docs.cloud.google.com/service-health/docs/reference/rest/v1beta/projects.locations.impacts" target="_blank" rel="noopener noreferrer" class="gc-link">Impact リソース (v1beta API リファレンス)</a></li>
+        <li><a href="https://docs.cloud.google.com/sdk/gcloud/reference/beta/service-health/impacts/list" target="_blank" rel="noopener noreferrer" class="gc-link">gcloud beta service-health impacts list</a></li>
+        <li><a href="https://docs.cloud.google.com/service-health/docs/manage-access" target="_blank" rel="noopener noreferrer" class="gc-link">アクセス管理 (影響リソース詳細へのアクセス制御)</a></li>
+      </ul>
+      <p>🏷️ タグ: Service Health, Personalized Service Health, Observability, Incident Response, SRE, Preview, v1beta API, gcloud, Cloud SQL, GKE, Pub/Sub</p>
+      <p>このインフォグラフィックは Google Cloud News レポート (2026-11-10) を基に生成されています。</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Monitoring: PromQL アラートポリシーで 25 時間超のデータクエリが可能に</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left {
+      flex: 1;
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 12px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--gc-outline);
+      text-align: right;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge-service {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .card-teal {
+      border-left-color: var(--gc-teal);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .before-box h3 {
+      color: var(--gc-red);
+      margin-top: 0;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+    }
+
+    .after-box h3 {
+      color: var(--gc-green);
+      margin-top: 0;
+    }
+
+    .before-box ul, .after-box ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .before-box li, .after-box li {
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card-green {
+      background: linear-gradient(135deg, var(--gc-green), #1B7A3E);
+    }
+
+    .stat-card-purple {
+      background: linear-gradient(135deg, var(--gc-purple), #7B1FA2);
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-800);
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .usecase-card p {
+      margin: 0;
+      font-size: 14px;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      background: #1E1E1E;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .pricing-table {
+      margin: 16px 0;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .merit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .limitation-list {
+      margin: 8px 0;
+      padding-left: 0;
+      list-style: none;
+    }
+
+    .limitation-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    .links-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+
+    .link-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: var(--gc-surface);
+      border-radius: 8px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .link-item a {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+      font-size: 14px;
+      word-break: break-all;
+    }
+
+    .link-item a:hover {
+      text-decoration: underline;
+    }
+
+    footer {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    @media (max-width: 768px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+      .merit-grid {
+        grid-template-columns: 1fr;
+      }
+      .stat-grid {
+        grid-template-columns: 1fr;
+      }
+      h1 {
+        font-size: 24px;
+      }
+      .header {
+        flex-direction: column;
+      }
+      .subtitle {
+        text-align: left;
+        margin-top: 8px;
+      }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>📊 Cloud Monitoring: PromQL アラートポリシーで 25 時間超のデータクエリが可能に</h1>
+        <div>
+          <span class="badge badge-service">Cloud Monitoring</span>
+          <span class="badge badge-ga">GA</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-06-29</div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>🎯 概要</h2>
+      <p>
+        Cloud Monitoring の PromQL ベースのアラートポリシーにおいて、<span class="highlight">25 時間を超えるデータ範囲</span>でのクエリ実行が可能になりました。これにより、最大 <span class="highlight">2 年間</span>のメトリクスデータに対して PromQL クエリを実行するアラートポリシーを作成でき、季節性のあるトレンド分析や長期的なベースラインとの比較に基づくアラートが設定可能となります。
+      </p>
+
+      <!-- Stats -->
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">25h+</div>
+          <div class="stat-label">データ範囲の制限緩和</div>
+        </div>
+        <div class="stat-card stat-card-green">
+          <div class="stat-value">24 ヶ月</div>
+          <div class="stat-label">最大データ保持期間</div>
+        </div>
+        <div class="stat-card stat-card-purple">
+          <div class="stat-value">10 分</div>
+          <div class="stat-label">ダウンサンプリング間隔</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Before/After Section -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before</h3>
+          <ul>
+            <li>リテストウィンドウ最大 24 時間</li>
+            <li>アライメント期間最大 24 時間</li>
+            <li>合計が 25 時間を超えることが不可</li>
+            <li>前週比・前月比の異常検知は外部ツールが必要</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After</h3>
+          <ul>
+            <li>25 時間超のデータ範囲でクエリ可能</li>
+            <li>最大 2 年間のデータを活用</li>
+            <li>長期ベースラインとの偏差アラートが内部完結</li>
+            <li>季節性・週次・月次トレンド対応</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>PromQL アラートポリシーが Monarch バックエンドから長期メトリクスデータ (最大 2 年間) を取得し、25 時間を超えるデータ範囲で条件を評価してインシデントを生成するフローを示します。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph データソース
+        A[("Monarch\nメトリクスストア\n(最大24ヶ月保持)")]
+    end
+
+    subgraph "PromQL アラートポリシー (拡張後)"
+        B["PromQL クエリエンジン"]
+        C{"条件評価\n(25時間超対応)"}
+    end
+
+    subgraph アラート処理
+        D["インシデント生成"]
+        E["通知チャネル\n(Email/Slack/PagerDuty)"]
+    end
+
+    A -->|"長期データ取得\n(最大2年間)"| B
+    B --> C
+    C -->|"条件充足"| D
+    D --> E
+    C -->|"条件未充足"| F["継続監視"]
+    F --> B
+
+    style A fill:#4285F4,color:#fff
+    style B fill:#34A853,color:#fff
+    style C fill:#FBBC04,color:#000
+    style D fill:#EA4335,color:#fff
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features Section -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+
+      <div class="card">
+        <h3>1. 25 時間超のデータ範囲でのクエリ実行</h3>
+        <ul class="limitation-list">
+          <li><span>→</span> アライメント期間とリテストウィンドウの合計制限 (25 時間) が緩和</li>
+          <li><span>→</span> 長期的なメトリクスデータに対する PromQL クエリをアラート条件として使用可能</li>
+          <li><span>→</span> 「Query over 2 years of metric data」機能と連携</li>
+        </ul>
+      </div>
+
+      <div class="card card-green">
+        <h3>2. 既存の PromQL 機能との統合</h3>
+        <ul class="limitation-list">
+          <li><span>→</span> 比率計算、動的しきい値、複合メトリクスなどの PromQL 機能はそのまま利用可能</li>
+          <li><span>→</span> Google Cloud システムメトリクス、カスタムメトリクス、Prometheus メトリクスすべてに対応</li>
+          <li><span>→</span> Managed Service for Prometheus からのメトリクスにも対応</li>
+        </ul>
+      </div>
+
+      <div class="card card-purple">
+        <h3>3. 長期データ保持との連携</h3>
+        <ul class="limitation-list">
+          <li><span>→</span> カスタム / Prometheus メトリクス: 最大 24 ヶ月保持データを活用</li>
+          <li><span>→</span> 主要 GCP サービスメトリクス (Compute Engine, GKE, Cloud Storage 等): 最大 24 ヶ月</li>
+          <li><span>→</span> その他の Google Cloud メトリクス: 6 週間</li>
+          <li><span>→</span> ダウンサンプリングされたデータ (10 分間隔) も含めてクエリ可能</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Technical Specs Section -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3>制限値の変更</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>変更前</th>
+            <th>変更後</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>リテストウィンドウ最大値</td>
+            <td>24 時間</td>
+            <td>拡張</td>
+          </tr>
+          <tr>
+            <td>アライメント期間最大値</td>
+            <td>24 時間</td>
+            <td>拡張</td>
+          </tr>
+          <tr>
+            <td>リテストウィンドウ + アライメント期間の合計</td>
+            <td>最大 25 時間</td>
+            <td>25 時間超が可能</td>
+          </tr>
+          <tr>
+            <td>データ保持期間 (参照可能な最大範囲)</td>
+            <td>最大 24 ヶ月</td>
+            <td>最大 24 ヶ月 (変更なし)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>データのダウンサンプリング</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>メトリクスタイプ</th>
+            <th>オリジナル頻度保持</th>
+            <th>ダウンサンプリング後</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>カスタム/エージェントメトリクス</td>
+            <td>6 週間</td>
+            <td>10 分間隔で最大 24 ヶ月</td>
+          </tr>
+          <tr>
+            <td>Prometheus/OTLP メトリクス</td>
+            <td>1 週間 (その後 1 分間隔で 5 週間)</td>
+            <td>10 分間隔で最大 24 ヶ月</td>
+          </tr>
+          <tr>
+            <td>主要 GCP サービスメトリクス</td>
+            <td>6 週間</td>
+            <td>10 分間隔で最大 24 ヶ月</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Setup Section -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>前提条件</h3>
+      <div class="note-box">
+        <ul class="limitation-list">
+          <li><span>✅</span> Cloud Monitoring が有効なプロジェクト</li>
+          <li><span>✅</span> <code>monitoring.alertPolicies.create</code> 権限を持つ IAM ロール (例: <code>roles/monitoring.alertPolicyEditor</code>)</li>
+          <li><span>✅</span> アラート対象のメトリクスが Cloud Monitoring に存在すること</li>
+        </ul>
+      </div>
+
+      <h3>アラートポリシー作成方法</h3>
+      <div class="flow-diagram">
+        <div class="flow-step">🖥️ Console<br/><small>PromQL エディタ</small></div>
+        <div class="flow-step">💻 gcloud CLI<br/><small>alpha monitoring</small></div>
+        <div class="flow-step">🔌 Monitoring API<br/><small>AlertPolicy</small></div>
+        <div class="flow-step">🔄 Prometheus<br/><small>ルール移行</small></div>
+      </div>
+
+      <h3>PromQL クエリ例: 過去 7 日間の平均 CPU 使用率との比較</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">PromQL</span>
+          <span class="code-title">7 日間の平均から 2 標準偏差以上の異常を検知</span>
+        </div>
+        <pre><code class="language-promql"># 過去 7 日間の平均 CPU 使用率と比較して 2 標準偏差以上の異常を検知
+(
+  avg_over_time({"compute.googleapis.com/instance/cpu/utilization"}[1h])
+  - avg_over_time({"compute.googleapis.com/instance/cpu/utilization"}[7d])
+) > 2 * stddev_over_time({"compute.googleapis.com/instance/cpu/utilization"}[7d])</code></pre>
+      </div>
+
+      <h3>gcloud CLI でのアラートポリシー作成</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">gcloud alpha monitoring policies create</span>
+        </div>
+        <pre><code class="language-bash">gcloud alpha monitoring policies create \
+  --notification-channels="projects/PROJECT_ID/notificationChannels/CHANNEL_ID" \
+  --condition-display-name="Long-range PromQL alert" \
+  --condition-promql-query='avg_over_time({"compute.googleapis.com/instance/cpu/utilization"}[7d]) > 0.8' \
+  --condition-promql-duration=3600s</code></pre>
+      </div>
+    </div>
+
+    <!-- Use Cases Section -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h4>📈 ユースケース 1: 週次比較による異常検知</h4>
+        <p><strong>シナリオ:</strong> E コマースプラットフォームで、同曜日・同時間帯の前週比でトラフィックやレイテンシの異常を検知。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">PromQL</span>
+            <span class="code-title">前週同時間帯と比較して 50% 以上のレイテンシ増加を検知</span>
+          </div>
+          <pre><code class="language-promql">(
+  avg_over_time({"custom.googleapis.com/http/request_latency"}[1h])
+  / avg_over_time({"custom.googleapis.com/http/request_latency"}[1h] offset 7d)
+) > 1.5</code></pre>
+        </div>
+        <p><strong>効果:</strong> 絶対値のしきい値では捉えきれない相対的な異常を検知できる。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>💾 ユースケース 2: 長期的な容量トレンドアラート</h4>
+        <p><strong>シナリオ:</strong> ディスク使用量やメモリ使用量が過去 30 日間の平均と比較して急増している場合にアラートを発火させ、リソース枯渇前に対処。</p>
+        <p><strong>効果:</strong> 従来は外部の分析基盤で定期バッチ処理が必要だった長期トレンド監視を、Cloud Monitoring のリアルタイムアラートとして実装できる。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>📊 ユースケース 3: クォータ消費率の長期予測</h4>
+        <p><strong>シナリオ:</strong> API クォータの消費率を過去数日間のトレンドから算出し、クォータ上限に到達する前にアラートを発火。</p>
+        <p><strong>効果:</strong> 単純な「クォータの 80% に到達」というアラートではなく、消費速度のトレンドに基づく予測的なアラートが実現する。</p>
+      </div>
+    </div>
+
+    <!-- Merits Section -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+      <div class="merit-grid">
+        <div>
+          <h3>🏢 ビジネス面</h3>
+          <div class="card card-green">
+            <ul class="limitation-list">
+              <li><span>🎯</span> <strong>プロアクティブな容量管理</strong>: 長期トレンドに基づいてリソース不足を事前に検知し、サービス停止を未然に防止</li>
+              <li><span>💰</span> <strong>コスト最適化</strong>: 長期的な使用パターンを監視し、過剰プロビジョニングや想定外のコスト増加を検知</li>
+              <li><span>📋</span> <strong>SLA 管理の強化</strong>: 長期間のパフォーマンスデータに基づいて SLO 違反の傾向を早期に把握</li>
+            </ul>
+          </div>
+        </div>
+        <div>
+          <h3>🔧 技術面</h3>
+          <div class="card card-teal">
+            <ul class="limitation-list">
+              <li><span>🔗</span> <strong>外部ツール依存の削減</strong>: 長期データに基づくアラートが Cloud Monitoring 内で完結</li>
+              <li><span>📆</span> <strong>季節性パターンの検知</strong>: 週次・月次の周期パターンからの逸脱を検知する動的しきい値が容易に構築可能</li>
+              <li><span>🔄</span> <strong>Prometheus 互換性</strong>: 既存の Prometheus アラートルールを活用しつつ、Cloud Monitoring の長期データ保持を享受可能</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limitations Section -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <div class="warning-box">
+        <strong>制限事項</strong>
+        <ul class="limitation-list">
+          <li><span>❌</span> メトリクスのデータ保持期間を超えるクエリは実行不可 (最大 24 ヶ月)</li>
+          <li><span>❌</span> 6 週間を超えるデータはダウンサンプリング (10 分間隔) されているため、細かい粒度のデータは利用不可</li>
+          <li><span>❌</span> Prometheus/OTLP メトリクスは 1 週間を超えると 1 分間隔にダウンサンプリング</li>
+          <li><span>❌</span> PromQL で system metadata labels を使用するフィルタはアラートポリシーでは使用不可</li>
+        </ul>
+      </div>
+
+      <div class="warning-box">
+        <strong>考慮すべき点</strong>
+        <ul class="limitation-list">
+          <li><span>💡</span> 長期データ範囲のクエリはコンピュートリソースを多く消費する可能性あり (API Read コストに影響)</li>
+          <li><span>💡</span> アライメント期間が長いほど、アラート発火までのレイテンシが増加</li>
+          <li><span>💡</span> ダウンサンプリングされたデータでのクエリ結果は、オリジナル頻度のデータと若干異なる場合がある</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Pricing Section -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>料金</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>アラートポリシー内のメトリック参照ごと</td>
+            <td><strong>$0.35/月</strong></td>
+          </tr>
+          <tr>
+            <td>メトリックアラートポリシー条件のクエリで返されたポイントごと</td>
+            <td><strong>$0.50/100 万ポイント</strong></td>
+          </tr>
+          <tr>
+            <td>Monitoring API Read 呼び出し</td>
+            <td><strong>$0.50/100 万タイムシリーズ</strong></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="note-box">
+        <strong>💡 注意:</strong> 長期データ範囲のクエリは返却されるデータポイント数が増加する可能性があるため、API Read コストへの影響を考慮してください。
+      </div>
+    </div>
+
+    <!-- Region Section -->
+    <div class="section">
+      <h2>🌍 利用可能リージョン</h2>
+      <p>Cloud Monitoring は<span class="highlight">グローバルサービス</span>として提供されており、特定のリージョン制限なくすべての Google Cloud リージョンのリソースを監視可能です。</p>
+    </div>
+
+    <!-- Related Services Section -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <ul class="limitation-list">
+          <li><span>🔄</span> <strong>Managed Service for Prometheus</strong>: Prometheus メトリクスを Cloud Monitoring に取り込み、同じ長期データ保持とアラート機能を利用可能</li>
+          <li><span>📊</span> <strong>Cloud Monitoring Metrics Explorer</strong>: PromQL を使用したメトリクスの可視化とダッシュボード作成</li>
+          <li><span>📝</span> <strong>Cloud Logging</strong>: ログベースメトリクスを生成し、PromQL アラートポリシーの対象として使用可能</li>
+          <li><span>🔧</span> <strong>Google Cloud Managed Service for Prometheus</strong>: Prometheus 互換の収集・クエリ基盤として本機能と直接連携</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- References Section -->
+    <div class="section">
+      <h2>📚 参考リンク</h2>
+      <div class="links-grid">
+        <div class="link-item">
+          <span>📄</span>
+          <a href="https://docs.cloud.google.com/release-notes#June_29_2026" target="_blank" rel="noopener noreferrer">公式リリースノート</a>
+        </div>
+        <div class="link-item">
+          <span>📖</span>
+          <a href="https://docs.cloud.google.com/monitoring/promql/promql-in-alerting" target="_blank" rel="noopener noreferrer">PromQL in Cloud Monitoring アラートポリシー</a>
+        </div>
+        <div class="link-item">
+          <span>📖</span>
+          <a href="https://docs.cloud.google.com/monitoring/quotas#alerting_uptime_limits" target="_blank" rel="noopener noreferrer">Cloud Monitoring のアラートに関する制限</a>
+        </div>
+        <div class="link-item">
+          <span>📖</span>
+          <a href="https://docs.cloud.google.com/monitoring/promql" target="_blank" rel="noopener noreferrer">PromQL in Cloud Monitoring</a>
+        </div>
+        <div class="link-item">
+          <span>📖</span>
+          <a href="https://docs.cloud.google.com/monitoring/alerts/concepts-indepth" target="_blank" rel="noopener noreferrer">アラートポリシーの動作</a>
+        </div>
+        <div class="link-item">
+          <span>💰</span>
+          <a href="https://cloud.google.com/products/observability/pricing" target="_blank" rel="noopener noreferrer">Google Cloud Observability 料金</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary Section -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <p>
+        Cloud Monitoring の PromQL アラートポリシーにおける 25 時間超のデータクエリ対応は、長期トレンドに基づく高度なアラート運用を Cloud Monitoring 内で完結させる重要なアップデートです。季節性パターンの異常検知、容量計画に基づくプロアクティブなアラート、前週比・前月比の動的しきい値など、これまで外部ツールや複雑なカスタムソリューションを必要としたユースケースが大幅に簡素化されます。
+      </p>
+      <div class="note-box">
+        <strong>🚀 次のステップ:</strong> 既に PromQL ベースのアラートポリシーを使用しているチームは、既存のクエリを拡張して長期データ範囲を活用するアラートの追加を検討しましょう。
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>📎 出典: <a href="https://docs.cloud.google.com/release-notes#June_29_2026" target="_blank" rel="noopener noreferrer" class="gc-link" style="word-break: break-all;">https://docs.cloud.google.com/release-notes#June_29_2026</a></p>
+      <p style="margin-top: 8px; color: var(--gc-outline);">Generated on 2026-06-29 | Cloud Monitoring PromQL Alerting Extended</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

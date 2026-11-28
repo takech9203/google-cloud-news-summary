@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Load Balancing / VPC: BYOIP IPv6 アドレスの事前予約とプロモーション</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    .header-left {
+      flex: 1;
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 12px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+      text-align: right;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge-service {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-teal {
+      border-left-color: var(--gc-teal);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .card-purple {
+      border-left-color: var(--gc-purple);
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-red);
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--gc-green);
+    }
+
+    .before-card h3, .after-card h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-card ul, .after-card ul {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    .before-card li, .after-card li {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h3 {
+      color: var(--gc-blue-900);
+      margin-top: 0;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .code-block {
+      background: #1E1E1E;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+      background: #1E1E1E;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+    }
+
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .merit-demerit {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .merit-section {
+      background: var(--gc-green-tint);
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid #34A85340;
+    }
+
+    .demerit-section {
+      background: var(--gc-yellow-tint);
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid #FBBC0440;
+    }
+
+    .merit-section h3, .demerit-section h3 {
+      margin-top: 0;
+    }
+
+    .merit-section ul, .demerit-section ul {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    .merit-section li, .demerit-section li {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .pricing-card {
+      background: var(--gc-teal-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-teal);
+    }
+
+    .related-links {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .related-link-item {
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 8px;
+      padding: 12px 16px;
+      transition: background 0.2s;
+    }
+
+    .related-link-item:hover {
+      background: var(--gc-blue-50);
+    }
+
+    footer {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .header { flex-direction: column; }
+      .subtitle { text-align: left; margin-top: 8px; }
+      .before-after, .feature-grid, .merit-demerit, .related-links { grid-template-columns: 1fr; }
+      .stat-grid { grid-template-columns: 1fr; }
+      .flow-diagram { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>🌐 BYOIP IPv6 アドレスの事前予約とプロモーション</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge badge-service">Cloud Load Balancing</span>
+          <span class="badge badge-service">Virtual Private Cloud</span>
+          <span class="badge-preview">Preview</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-07-20</div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>リージョナル外部パススルー Network Load Balancer (NLB) で使用する <span class="highlight">BYOIP IPv6 アドレス</span>を、ロードバランサーの作成前に静的アドレスとして事前予約できる機能が Preview として提供開始されました。IPv6 アドレスがロードバランサーのライフサイクルから独立して永続化されます。</p>
+      <p>また、使用中のエフェメラル BYOIP IPv6 アドレスを<span class="highlight">静的 IP アドレスにプロモート</span>する機能も同時に提供されます。</p>
+
+      <div class="note-box">
+        <strong>💡 ポイント:</strong> 自社所有の IPv6 アドレスプレフィックスを Google Cloud 上で使用しているエンタープライズ顧客やサービスプロバイダーに特に有用。DNS レコードやファイアウォールルールで固定 IPv6 アドレスを参照する運用において、アドレスの永続性が保証されます。
+      </div>
+    </div>
+
+    <!-- Before/After Section -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-card">
+          <h3>❌ Before (従来)</h3>
+          <ul>
+            <li>BYOIP IPv6 アドレスはフォワーディングルール作成時にのみ割り当て可能</li>
+            <li>事前予約ができなかった</li>
+            <li>ロードバランサー削除時にアドレスも解放</li>
+            <li>同じアドレスの再取得が保証されない</li>
+            <li>エフェメラルアドレスを静的にプロモートする手段がない</li>
+            <li>メンテナンス時にアドレス変更リスクあり</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h3>✅ After (今回のアップデート)</h3>
+          <ul>
+            <li>BYOIP サブプレフィックスから静的外部 IPv6 アドレスを事前予約可能</li>
+            <li>ロードバランサー作成前にアドレス確保</li>
+            <li>予約アドレスはロードバランサーのライフサイクルから独立</li>
+            <li>エフェメラルアドレスを静的 IP にプロモート可能</li>
+            <li>特定アドレス指定 or 自動割り当てを選択可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>BYOIP IPv6 アドレスのライフサイクルを示す図。サブプレフィックスから静的アドレスを事前予約し、フォワーディングルールに割り当てるフロー、およびエフェメラルアドレスを静的にプロモートするフローを表現しています。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph BYOIP["BYOIP プレフィックス管理"]
+        PAP["Public Advertised Prefix\n(IPv6 プレフィックス)"]
+        PDP["Public Delegated Prefix\n(リージョナル)"]
+        SUB["Sub-Prefix\n(EXTERNAL_IPV6_FORWARDING_RULE_CREATION)"]
+    end
+
+    subgraph Reserve["アドレス予約 (New!)"]
+        STATIC["静的 IPv6 アドレス予約\n(/96 レンジ)"]
+        PROMOTE["エフェメラル → 静的\nプロモーション"]
+    end
+
+    subgraph NLB["External Passthrough NLB"]
+        FR["Forwarding Rule\n(IPv6)"]
+        BS["Backend Service"]
+    end
+
+    PAP --> PDP
+    PDP --> SUB
+    SUB -->|"事前予約"| STATIC
+    STATIC -->|"アドレス割り当て"| FR
+    FR -->|"エフェメラル使用中"| PROMOTE
+    PROMOTE -->|"静的に昇格"| STATIC
+    FR --> BS
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Features Section -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+      <div class="feature-grid">
+        <div class="card">
+          <h3>🔒 BYOIP IPv6 静的アドレスの事前予約</h3>
+          <ul style="margin: 8px 0; padding-left: 20px; font-size: 14px;">
+            <li>EXTERNAL_IPV6_FORWARDING_RULE_CREATION モードのサブプレフィックスから予約可能</li>
+            <li>特定アドレス指定 or 自動割り当て</li>
+            <li>ロードバランサーのライフサイクルから独立</li>
+            <li>/96 プレフィックス長の IPv6 レンジとして予約</li>
+          </ul>
+        </div>
+        <div class="card card-green">
+          <h3>⬆️ エフェメラルアドレスのプロモーション</h3>
+          <ul style="margin: 8px 0; padding-left: 20px; font-size: 14px;">
+            <li>使用中のエフェメラル BYOIP IPv6 アドレスを静的に昇格</li>
+            <li>プロモーション中もパケットドロップなし</li>
+            <li>プロモーション後は LB 削除してもアドレス保持</li>
+          </ul>
+        </div>
+        <div class="card card-teal">
+          <h3>🎯 対応リソースタイプ</h3>
+          <ul style="margin: 8px 0; padding-left: 20px; font-size: 14px;">
+            <li>リージョナル外部パススルー Network Load Balancer</li>
+            <li>外部プロトコルフォワーディング</li>
+            <li>Premium ネットワークサービスティア</li>
+          </ul>
+        </div>
+        <div class="card card-purple">
+          <h3>🔧 柔軟なアドレス管理</h3>
+          <ul style="margin: 8px 0; padding-left: 20px; font-size: 14px;">
+            <li>VPC レベルでの独立した IP ライフサイクル管理</li>
+            <li>IaC (Terraform) との親和性向上</li>
+            <li>Blue/Green デプロイメント対応</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>📐 技術仕様</h2>
+      <h3>BYOIP IPv6 サブプレフィックスモードの要件</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>サブプレフィックスモード</td>
+            <td><code>EXTERNAL_IPV6_FORWARDING_RULE_CREATION</code></td>
+          </tr>
+          <tr>
+            <td>有効なサブプレフィックス長</td>
+            <td>/32, /40, /48, /56, /64, /72</td>
+          </tr>
+          <tr>
+            <td>アロケータブルプレフィックス長</td>
+            <td>/48, /56, /64, /72, /80, /88, /96</td>
+          </tr>
+          <tr>
+            <td>デフォルトプレフィックス長</td>
+            <td>サブプレフィックスが /64 or /72 の場合は /96、それ以外は /64</td>
+          </tr>
+          <tr>
+            <td>ネットワークサービスティア</td>
+            <td>Premium のみ</td>
+          </tr>
+          <tr>
+            <td>スコープ</td>
+            <td>リージョナル</td>
+          </tr>
+          <tr>
+            <td>IPv6 アクセスタイプ</td>
+            <td>External</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>静的アドレス予約のパラメータ</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>パラメータ</th>
+            <th>説明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>--ip-version</code></td>
+            <td>IPV6</td>
+          </tr>
+          <tr>
+            <td><code>--endpoint-type</code></td>
+            <td>NETLB</td>
+          </tr>
+          <tr>
+            <td><code>--ip-collection</code></td>
+            <td>サブプレフィックス名 (PDP)</td>
+          </tr>
+          <tr>
+            <td><code>--addresses</code></td>
+            <td>予約する IPv6 アドレス (オプション、未指定時は自動割り当て)</td>
+          </tr>
+          <tr>
+            <td><code>--prefix-length</code></td>
+            <td>96</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Configuration Steps -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <div class="warning-box">
+        <strong>⚠️ 前提条件:</strong>
+        <ul style="margin: 8px 0; padding-left: 20px; font-size: 14px;">
+          <li>BYOIP の Public Advertised Prefix (PAP) が作成済み</li>
+          <li>Public Delegated Prefix (PDP) が作成済み</li>
+          <li>EXTERNAL_IPV6_FORWARDING_RULE_CREATION モードの IPv6 サブプレフィックスが作成済み</li>
+          <li>サブプレフィックスのアナウンス完了 (プロビジョニングに 2-4 週間)</li>
+        </ul>
+      </div>
+
+      <h3>Step 1: BYOIP IPv6 静的アドレスの予約</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">特定のアドレスを指定して予約</span>
+        </div>
+        <pre><code class="language-bash">gcloud compute addresses create my-byoip-ipv6-address \
+  --region=us-central1 \
+  --ip-version=IPV6 \
+  --endpoint-type=NETLB \
+  --ip-collection=my-sub-prefix \
+  --addresses=2001:db8:1:1::1 \
+  --prefix-length=96</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">自動割り当てで予約 (アドレス未指定)</span>
+        </div>
+        <pre><code class="language-bash">gcloud compute addresses create my-byoip-ipv6-auto \
+  --region=us-central1 \
+  --ip-version=IPV6 \
+  --endpoint-type=NETLB \
+  --ip-collection=my-sub-prefix \
+  --prefix-length=96</code></pre>
+      </div>
+
+      <h3>Step 2: 予約済みアドレスを NLB に割り当て</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">フォワーディングルール作成時に予約済みアドレスを指定</span>
+        </div>
+        <pre><code class="language-bash">gcloud compute forwarding-rules create my-nlb-ipv6-rule \
+  --load-balancing-scheme=EXTERNAL \
+  --ip-protocol=TCP \
+  --ports=80 \
+  --ip-version=IPV6 \
+  --region=us-central1 \
+  --address=my-byoip-ipv6-address \
+  --ip-collection=my-sub-prefix \
+  --backend-service=my-backend-service</code></pre>
+      </div>
+
+      <h3>Step 3: エフェメラルアドレスのプロモーション (既存 NLB)</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">使用中のエフェメラル BYOIP IPv6 アドレスを静的にプロモート</span>
+        </div>
+        <pre><code class="language-bash">gcloud compute addresses create my-promoted-ipv6 \
+  --region=us-central1 \
+  --addresses=2001:db8:1:1::a \
+  --prefix-length=96</code></pre>
+      </div>
+
+      <div class="note-box">
+        <strong>💡 注意:</strong> プロモーション中はパケットドロップが発生せず、サービスは継続されます。
+      </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット / ⚠️ 制約事項</h2>
+      <div class="merit-demerit">
+        <div class="merit-section">
+          <h3>✅ メリット</h3>
+          <p style="font-size: 14px; font-weight: 600; color: var(--gc-on-surface); margin-bottom: 4px;">ビジネス面</p>
+          <ul>
+            <li>DNS レコードやパートナー連携で使用する IPv6 アドレスの永続性保証</li>
+            <li>ロードバランサーのメンテナンス時にアドレス変更に伴うダウンタイム不要</li>
+            <li>自社所有アドレスの管理ポリシーに準拠したライフサイクル管理が可能</li>
+          </ul>
+          <p style="font-size: 14px; font-weight: 600; color: var(--gc-on-surface); margin-bottom: 4px; margin-top: 12px;">技術面</p>
+          <ul>
+            <li>IP アドレスと LB のライフサイクル分離で Blue/Green デプロイ容易</li>
+            <li>ゼロダウンタイムプロモーション (パケットドロップなし)</li>
+            <li>Terraform 等で IP と LB を別リソースとして IaC 管理可能</li>
+          </ul>
+        </div>
+        <div class="demerit-section">
+          <h3>⚠️ 制約事項</h3>
+          <ul>
+            <li>Preview ステータス - 本番 SLA が適用されない可能性</li>
+            <li>IPv6 BYOIP アドレスはリージョナルのみ対応</li>
+            <li>Premium ネットワークサービスティアでのみ利用可能</li>
+            <li>BYOIP プレフィックスのプロビジョニングに 2-4 週間必要</li>
+            <li>BYOIP アドレスはプロジェクト間で移動不可</li>
+            <li>サブプレフィックスのモードは作成後に変更不可</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💼 ユースケース</h2>
+      <div class="usecase-card">
+        <h3>🌍 ユースケース 1: マルチリージョン DNS ベースのフェイルオーバー</h3>
+        <p style="font-size: 14px;">企業が自社所有の IPv6 プレフィックスを使って複数リージョンに NLB をデプロイし、DNS ベースのフェイルオーバーを構成するシナリオ。各リージョンの NLB に固定 IPv6 アドレスを割り当て、DNS レコードに登録。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">マルチリージョンのアドレス予約</span>
+          </div>
+          <pre><code class="language-bash"># リージョン A のアドレス予約
+gcloud compute addresses create nlb-region-a-ipv6 \
+  --region=us-east1 \
+  --ip-version=IPV6 \
+  --endpoint-type=NETLB \
+  --ip-collection=my-byoip-sub-prefix-east \
+  --prefix-length=96
+
+# リージョン B のアドレス予約
+gcloud compute addresses create nlb-region-b-ipv6 \
+  --region=us-west1 \
+  --ip-version=IPV6 \
+  --endpoint-type=NETLB \
+  --ip-collection=my-byoip-sub-prefix-west \
+  --prefix-length=96</code></pre>
+        </div>
+        <p style="font-size: 14px;"><strong>効果:</strong> NLB の再作成や構成変更が発生しても IPv6 アドレスが変わらず、DNS レコードの更新やクライアント側の変更が不要。</p>
+      </div>
+      <div class="usecase-card">
+        <h3>🔄 ユースケース 2: Blue/Green デプロイメントでの IP アドレス移行</h3>
+        <p style="font-size: 14px;">新しいバックエンドサービスへの移行時に、既存の IPv6 アドレスを新しいロードバランサーに付け替えるシナリオ。</p>
+        <div class="flow-diagram">
+          <div class="flow-step">🔵 Blue NLB<br/><small>(旧バックエンド)</small></div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">📌 静的 IPv6<br/><small>(固定アドレス)</small></div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">🟢 Green NLB<br/><small>(新バックエンド)</small></div>
+        </div>
+        <p style="font-size: 14px;"><strong>効果:</strong> 固定 IP アドレスを新旧ロードバランサー間で移動でき、クライアントへの影響なしにインフラを更新可能。</p>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="section">
+      <h2>💰 料金情報</h2>
+      <div class="pricing-card">
+        <h3 style="margin-top: 0; color: var(--gc-on-surface);">💡 BYOIP アドレスの料金</h3>
+        <ul style="font-size: 14px; padding-left: 20px;">
+          <li><strong>BYOIP アドレスの使用:</strong> アイドル状態および使用中のいずれも課金なし (Google 提供 IP アドレスと異なり、BYOIP アドレスには IP アドレス使用料金が発生しない)</li>
+          <li><strong>Network Load Balancer:</strong> フォワーディングルール料金 + データ処理料金が別途発生</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Region -->
+    <div class="section">
+      <h2>🗺️ 利用可能リージョン</h2>
+      <p>BYOIP IPv6 サブプレフィックスが作成可能なすべてのリージョンで利用可能。BYOIP のプロビジョニング時にリージョンを指定するため、具体的な利用可能リージョンはプロジェクトの BYOIP 設定に依存します。</p>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス</h2>
+      <div class="related-links">
+        <div class="related-link-item">
+          <strong>🌐 VPC (Virtual Private Cloud)</strong>
+          <p style="font-size: 13px; margin: 4px 0 0;">BYOIP プレフィックスの管理基盤。PAP、PDP、サブプレフィックスの作成・管理</p>
+        </div>
+        <div class="related-link-item">
+          <strong>⚖️ Cloud Load Balancing</strong>
+          <p style="font-size: 13px; margin: 4px 0 0;">外部パススルー NLB および外部プロトコルフォワーディングでの BYOIP IPv6 利用</p>
+        </div>
+        <div class="related-link-item">
+          <strong>🌍 Cloud DNS</strong>
+          <p style="font-size: 13px; margin: 4px 0 0;">予約した静的 IPv6 アドレスを DNS レコードに登録し、安定したエンドポイント提供</p>
+        </div>
+        <div class="related-link-item">
+          <strong>🛡️ Cloud Armor</strong>
+          <p style="font-size: 13px; margin: 4px 0 0;">NLB と組み合わせた DDoS 保護やセキュリティポリシーの適用</p>
+        </div>
+        <div class="related-link-item">
+          <strong>🏗️ Terraform</strong>
+          <p style="font-size: 13px; margin: 4px 0 0;">google_compute_address リソースによる IaC 管理</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>📎 出典:</strong></p>
+      <ul style="list-style: none; padding: 0; margin: 8px 0;">
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/release-notes#July_20_2026" target="_blank" rel="noopener noreferrer">Google Cloud Release Notes (July 20, 2026)</a></li>
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/vpc/docs/bring-your-own-ip" target="_blank" rel="noopener noreferrer">Bring your own IP addresses (BYOIP) ドキュメント</a></li>
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/vpc/docs/reserve-static-external-ip-address" target="_blank" rel="noopener noreferrer">静的外部 IP アドレスの予約</a></li>
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/vpc/docs/create-ipv6-sub-prefixes" target="_blank" rel="noopener noreferrer">IPv6 サブプレフィックスの作成と使用</a></li>
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/load-balancing/docs/network/setting-up-network-backend-service#byoip-ipv6" target="_blank" rel="noopener noreferrer">外部パススルー NLB の設定 (BYOIP)</a></li>
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/vpc/network-pricing#ipaddress" target="_blank" rel="noopener noreferrer">VPC ネットワーク料金</a></li>
+      </ul>
+      <p style="margin-top: 12px; font-size: 11px; color: #9AA0A6;">Generated by Google Cloud News Summary | #CloudLoadBalancing #VPC #BYOIP #IPv6 #NetworkLoadBalancer #StaticIP #Preview</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

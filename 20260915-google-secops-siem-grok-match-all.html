@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Google SecOps SIEM: Grok フィルタの match_all オプションをサポート</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Google Brand Colors */
+  --gc-blue: #4285F4;
+  --gc-red: #EA4335;
+  --gc-yellow: #FBBC04;
+  --gc-green: #34A853;
+
+  /* Google Cloud UI Blue Scale */
+  --gc-blue-900: #174EA6;
+  --gc-blue-800: #185ABC;
+  --gc-blue-700: #1967D2;
+  --gc-blue-600: #1A73E8;
+  --gc-blue-500: #4285F4;
+  --gc-blue-300: #669DF6;
+  --gc-blue-200: #8AB4F8;
+  --gc-blue-100: #AECBFA;
+  --gc-blue-50: #E8F0FE;
+
+  /* Text Colors */
+  --gc-on-surface: #202124;
+  --gc-on-surface-variant: #5F6368;
+  --gc-outline: #80868B;
+
+  /* Surface Colors */
+  --gc-surface: #FFFFFF;
+  --gc-surface-container-lowest: #F8F9FA;
+  --gc-surface-container-low: #F1F3F4;
+  --gc-surface-container: #E8EAED;
+  --gc-outline-variant: #DADCE0;
+
+  /* Semantic Tints */
+  --gc-blue-tint: #E8F0FE;
+  --gc-green-tint: #E6F4EA;
+  --gc-red-tint: #FCE8E6;
+  --gc-yellow-tint: #FEF7E0;
+  --gc-purple-tint: #F3E8FD;
+  --gc-teal-tint: #E0F7FA;
+
+  /* Extended Colors */
+  --gc-purple: #A142F4;
+  --gc-teal: #00BCD4;
+  --gc-orange: #FF6D00;
+}
+
+body {
+  background-color: var(--gc-surface);
+  font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+  color: var(--gc-on-surface-variant);
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 20px;
+  margin: 0;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.header {
+  margin-bottom: 32px;
+  padding-bottom: 16px;
+  border-bottom: 3px solid var(--gc-blue-600);
+}
+
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+h1, .title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--gc-on-surface);
+  margin: 0 0 8px 0;
+  line-height: 1.4;
+}
+
+h2, .section-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin-top: 0;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 20px 0 8px 0;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: var(--gc-outline);
+}
+
+.section {
+  background: var(--gc-surface-container-low);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid var(--gc-outline-variant);
+}
+
+.highlight {
+  background-color: var(--gc-blue-50);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--gc-blue-800);
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+.card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border-left: 4px solid var(--gc-blue-600);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+}
+
+.card h3 {
+  margin-top: 0;
+}
+
+.icon-text {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  color: var(--gc-on-surface-variant);
+}
+
+.arrow {
+  color: var(--gc-blue-600);
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.gc-link {
+  color: var(--gc-blue-600);
+  text-decoration: none;
+}
+
+.gc-link:hover {
+  color: var(--gc-blue-800);
+  text-decoration: underline;
+}
+
+/* サービスバッジ */
+.badge,
+.badge-ga,
+.badge-preview,
+.badge-deprecated {
+  display: inline-block;
+  color: #FFFFFF;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+  margin: 4px 8px 4px 0;
+}
+
+.badge {
+  background: var(--gc-blue-600);
+}
+
+.badge-ga {
+  background: var(--gc-green);
+  color: #FFFFFF;
+}
+
+.badge-preview {
+  background: var(--gc-orange);
+  color: #FFFFFF;
+}
+
+.badge-deprecated {
+  background: var(--gc-red);
+  color: #FFFFFF;
+}
+
+/* フロー図スタイル */
+.flow-diagram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 24px 0;
+}
+
+.flow-step {
+  background: var(--gc-surface);
+  border: 2px solid var(--gc-blue-600);
+  border-radius: 12px;
+  padding: 12px 20px;
+  text-align: center;
+  min-width: 100px;
+  color: var(--gc-on-surface);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+}
+
+.flow-arrow {
+  color: var(--gc-blue-600);
+  font-size: 24px;
+  font-weight: bold;
+}
+
+/* チェックリストスタイル */
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.check-icon {
+  color: var(--gc-green);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.cross-icon {
+  color: var(--gc-red);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+/* Before/After 比較 */
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.before-box {
+  background: var(--gc-red-tint);
+  border: 1px solid var(--gc-red);
+  border-radius: 12px;
+  padding: 16px 20px;
+}
+
+.after-box {
+  background: var(--gc-green-tint);
+  border: 1px solid var(--gc-green);
+  border-radius: 12px;
+  padding: 16px 20px;
+}
+
+.before-box h3, .after-box h3 {
+  margin-top: 0;
+  font-size: 16px;
+}
+
+.before-box h3 { color: #C5221F; }
+.after-box h3 { color: #188038; }
+
+.before-box ul, .after-box ul {
+  margin: 8px 0 0 0;
+  padding-left: 20px;
+  font-size: 14px;
+}
+
+.before-box li, .after-box li {
+  margin-bottom: 8px;
+}
+
+@media (max-width: 700px) {
+  .before-after {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* コードブロック */
+.code-block,
+pre:not(.mermaid) {
+  background: #1E1E1E;
+  border-radius: 8px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: #E8E8E8;
+  margin: 16px 0;
+}
+
+.code-block {
+  overflow: hidden;
+}
+
+.code-header {
+  background: #2D2D2D;
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.code-lang {
+  color: #9CDCFE;
+  font-weight: bold;
+  font-family: 'Roboto Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.code-title {
+  color: #AAAAAA;
+}
+
+.code-block pre {
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+}
+
+.code-block code {
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 16px !important;
+  display: block;
+}
+
+pre:not(.mermaid) code {
+  background: none;
+  border: none;
+  font-size: inherit;
+}
+
+/* インラインコード */
+code:not(pre code) {
+  background: var(--gc-surface-container-low);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 0.9em;
+  color: var(--gc-blue-900);
+}
+
+.section code:not(pre code) {
+  background: var(--gc-surface);
+}
+
+/* テーブルスタイル */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--gc-outline-variant);
+  background: var(--gc-surface);
+}
+
+th {
+  background: var(--gc-blue-50);
+  color: var(--gc-blue-900);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 2px solid var(--gc-blue-200);
+}
+
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--gc-outline-variant);
+  font-size: 14px;
+}
+
+tr:nth-child(even) {
+  background: var(--gc-surface-container-lowest);
+}
+
+tr:hover {
+  background: var(--gc-blue-50);
+}
+
+/* 注意・警告ボックス */
+.note-box {
+  background: var(--gc-blue-tint);
+  border-left: 4px solid var(--gc-blue-600);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.warning-box {
+  background: var(--gc-yellow-tint);
+  border-left: 4px solid var(--gc-yellow);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.error-box {
+  background: var(--gc-red-tint);
+  border-left: 4px solid var(--gc-red);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.success-box {
+  background: var(--gc-green-tint);
+  border-left: 4px solid var(--gc-green);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+/* Mermaid コンテナ */
+.mermaid-container {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 20px 0;
+  border: 2px solid rgba(66, 133, 244, 0.3);
+  overflow-x: auto;
+}
+
+.mermaid {
+  display: flex;
+  justify-content: center;
+}
+
+/* ユースケース */
+.usecase {
+  background: var(--gc-blue-tint);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border: 1px solid var(--gc-blue-100);
+}
+
+.usecase h3 {
+  margin-top: 0;
+  color: var(--gc-blue-900);
+}
+
+/* 仕様タイルグリッド */
+.spec-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.spec-tile {
+  background: var(--gc-surface);
+  border: 2px solid var(--gc-blue-300);
+  border-radius: 12px;
+  padding: 14px;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+}
+
+.spec-tile .spec-name {
+  font-family: 'Roboto Mono', monospace;
+  font-weight: 700;
+  color: var(--gc-blue-800);
+  font-size: 15px;
+}
+
+.spec-tile .spec-desc {
+  font-size: 12.5px;
+  color: var(--gc-on-surface-variant);
+  margin-top: 4px;
+  line-height: 1.5;
+}
+
+ul {
+  padding-left: 22px;
+}
+
+li {
+  margin-bottom: 6px;
+}
+
+footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gc-outline-variant);
+  font-size: 12px;
+  color: var(--gc-outline);
+}
+
+footer a {
+  color: var(--gc-blue-600);
+  word-break: break-all;
+}
+
+.tags {
+  margin-top: 12px;
+}
+
+.tag {
+  display: inline-block;
+  background: var(--gc-surface-container-low);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 16px;
+  padding: 2px 10px;
+  font-size: 12px;
+  margin: 2px 4px 2px 0;
+  color: var(--gc-on-surface-variant);
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ヘッダー -->
+  <div class="header">
+    <div class="header-top">
+      <div>
+        <span class="badge">🛡️ Google SecOps SIEM</span>
+        <span class="badge badge-ga">GA (一般提供)</span>
+      </div>
+      <div class="subtitle">📅 リリース日: 2026-09-15</div>
+    </div>
+    <h1>🧩 パーサー構文: Grok フィルタの match_all オプション</h1>
+    <div class="subtitle">1 つのログフィールドから、パターンに一致する「すべての値」を一括抽出して UDM に漏れなくマッピング</div>
+  </div>
+
+  <!-- 概要 -->
+  <div class="section">
+    <h2>📝 概要</h2>
+    <p>
+      Google SecOps (旧 Chronicle) SIEM のパーサー構文がアップデートされ、Grok フィルタ内で
+      <span class="highlight">match_all オプション</span>がサポートされた。<code>match_all =&gt; true</code> を設定すると、
+      フィールド内でパターンに一致する<strong>すべての重複しない (non-overlapping) 出現箇所</strong>を抽出できる。
+      従来の Grok フィルタは最初に一致した 1 件のみを返す仕様であったため、これは大きな機能強化となる。
+    </p>
+    <p>
+      抽出された値は<strong>マップ構造</strong>に集約され、キーはマッチのインデックス (<code>"0"</code> から開始) の文字列表現になる。
+      このマップは <code>for</code> ループと <code>map</code> キーワードで反復処理でき、抽出したすべての値を
+      UDM (Unified Data Model) の繰り返しフィールド (例: <code>principal.ip</code>) にマッピングできる。
+    </p>
+    <div class="note-box">
+      <strong>🎯 対象ユーザー:</strong> カスタムパーサーやパーサー拡張 (code snippet) を作成・保守する
+      SOC エンジニア、Detection エンジニア、セキュリティデータエンジニア。1 つのログメッセージに複数の
+      IP アドレス、ホスト名、ハッシュ値などが含まれるログソースの正規化が大幅に簡素化される。
+    </div>
+
+    <div class="before-after">
+      <div class="before-box">
+        <h3>❌ Before: アップデート前の課題</h3>
+        <ul>
+          <li>Grok フィルタは<strong>最初に成功したパターンマッチ 1 件</strong>しか抽出できず、同一フィールド内の 2 件目以降の値を取得できなかった</li>
+          <li>複数の値 (複数の IP アドレスなど) を抽出するには、出現数を想定した複雑な正規表現や、複数の Grok ステートメント・別フィルタの組み合わせといった回避策が必要だった</li>
+          <li>値の出現数が可変のログでは取りこぼしが起きやすく、UDM イベントに一部の値しか反映されないリスクがあった</li>
+        </ul>
+      </div>
+      <div class="after-box">
+        <h3>✅ After: アップデート後の改善</h3>
+        <ul>
+          <li><code>match_all =&gt; true</code> を設定するだけで、フィールド内の<strong>すべての重複しないパターン一致</strong>を一括抽出できる</li>
+          <li>抽出結果はインデックスをキーとするマップ構造に集約され、<code>for</code> ループ + <code>map</code> で反復処理して UDM の繰り返しフィールドに <code>merge</code> できる</li>
+          <li>出現数が可変のログでもシンプルな Grok パターン 1 つで網羅的に値を取得でき、パーサーの可読性・保守性が向上</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- アーキテクチャ図 -->
+  <div class="section">
+    <h2>🏗️ アーキテクチャ図</h2>
+    <div class="mermaid-container">
+      <pre class="mermaid">
+flowchart TD
+    subgraph before["Before: 従来の Grok フィルタ"]
+        L1[/"📄 ログ: ip=10.0.0.1 ip=10.0.0.2 ip=10.0.0.3"/]
+        G1["🔍 grok { match => IP パターン }"]
+        R1["📦 抽出結果: 10.0.0.1 のみ<br/>(最初の 1 件だけ)"]
+        L1 --> G1 --> R1
+    end
+
+    subgraph after["After: match_all オプション"]
+        L2[/"📄 ログ: ip=10.0.0.1 ip=10.0.0.2 ip=10.0.0.3"/]
+        G2["🔍 grok { match => IP パターン<br/>match_all => true }"]
+        R2["🗂️ マップ: {0: 10.0.0.1, 1: 10.0.0.2, 2: 10.0.0.3}"]
+        F2["🔁 for ループ + map で反復処理"]
+        U2[("🧩 UDM: principal.ip に全件 merge")]
+        L2 --> G2 --> R2 --> F2 --> U2
+    end
+
+    before -.->|"match_all サポート"| after
+      </pre>
+    </div>
+    <p>
+      従来はフィールド内の最初のマッチ 1 件しか抽出できなかったが、<code>match_all</code> により全マッチがマップに集約され、
+      for ループで UDM の繰り返しフィールドへ漏れなくマッピングできる。
+    </p>
+  </div>
+
+  <!-- 主要機能 -->
+  <div class="section">
+    <h2>⚡ 主要機能</h2>
+
+    <div class="card">
+      <h3>1️⃣ match_all オプションによる全件抽出</h3>
+      <div class="icon-text"><span class="arrow">→</span><span>Grok フィルタに <code>match_all =&gt; true</code> を指定すると、フィールド内の重複しないすべてのパターン一致を抽出する</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>デフォルト (未指定) では従来どおり最初の 1 件のみを抽出するため、<strong>既存パーサーの動作に影響はない</strong></span></div>
+    </div>
+
+    <div class="card">
+      <h3>2️⃣ マップ構造への集約</h3>
+      <div class="icon-text"><span class="arrow">→</span><span>抽出された値は、マッチのインデックス (<code>"0"</code> から開始) の文字列をキーとするマップ構造に集約される</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>出現数が可変のログでも、事前に件数を想定した正規表現を書く必要がない</span></div>
+    </div>
+
+    <div class="card">
+      <h3>3️⃣ for ループによる反復処理と UDM マッピング</h3>
+      <div class="icon-text"><span class="arrow">→</span><span><code>for index, value in &lt;token&gt; map { ... }</code> の形式でマップを反復処理できる</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span><code>mutate { merge =&gt; ... }</code> と組み合わせて、<code>principal.ip</code> などの UDM 繰り返しフィールドに全値をマッピングできる</span></div>
+      <div class="flow-diagram">
+        <div class="flow-step">📄 ログ<br>フィールド</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🔍 grok +<br>match_all</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🗂️ マップ<br>{0, 1, 2, ...}</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🔁 for + map<br>反復処理</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🧩 UDM<br>merge</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 技術仕様 -->
+  <div class="section">
+    <h2>🔧 技術仕様</h2>
+
+    <h3>📋 match_all オプションの仕様</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>項目</th>
+          <th>詳細</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>対象フィルタ</strong></td>
+          <td>Grok フィルタ (<code>grok { ... }</code>)</td>
+        </tr>
+        <tr>
+          <td><strong>オプション名</strong></td>
+          <td><code>match_all</code></td>
+        </tr>
+        <tr>
+          <td><strong>設定値</strong></td>
+          <td><code>true</code> (全件抽出) / 未指定時は最初の 1 件のみ</td>
+        </tr>
+        <tr>
+          <td><strong>抽出範囲</strong></td>
+          <td>フィールド内の重複しない (non-overlapping) すべてのパターン一致</td>
+        </tr>
+        <tr>
+          <td><strong>出力形式</strong></td>
+          <td>マップ構造 (キーはマッチインデックスの文字列表現、<code>"0"</code> から開始)</td>
+        </tr>
+        <tr>
+          <td><strong>反復処理</strong></td>
+          <td><code>for</code> ループ + <code>map</code> キーワードで反復可能</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>💻 構文例: すべての IP アドレスを principal.ip にマッピング</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Logstash</span>
+        <span class="code-title">Google SecOps パーサー構文 (Grok match_all)</span>
+      </div>
+      <pre><code class="language-plaintext">filter {
+  grok {
+    match => {"message" => "%{IP:ips}"}
+    match_all => true
+  }
+  mutate {
+    replace => {
+      "event.idm.read_only_udm.metadata.event_type" => "GENERIC_EVENT"
+    }
+  }
+  for index, ip in ips map {
+    mutate {
+      merge => {
+        "event.idm.read_only_udm.principal.ip" => "ip"
+      }
+    }
+  }
+  mutate {
+    merge => {
+      "@output" => "event"
+    }
+  }
+}</code></pre>
+    </div>
+  </div>
+
+  <!-- 設定方法 -->
+  <div class="section">
+    <h2>🛠️ 設定方法</h2>
+
+    <h3>✅ 前提条件</h3>
+    <div class="check-item"><span class="check-icon">✓</span><span>Google SecOps SIEM でカスタムパーサーまたはパーサー拡張 (code snippet) を作成・編集できる権限があること</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span>Google SecOps のパーサー構文 (Logstash ベースの Grok フィルタ、mutate、for ループ) の基本を理解していること</span></div>
+
+    <h3>📋 手順</h3>
+    <div class="flow-diagram">
+      <div class="flow-step">1️⃣ Grok フィルタに<br>match_all を追加</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">2️⃣ for ループで<br>UDM にマッピング</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">3️⃣ サンプルログで<br>プレビュー検証</div>
+    </div>
+
+    <div class="card">
+      <h3>ステップ 1: Grok フィルタに match_all を追加</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Logstash</span>
+          <span class="code-title">複数値を抽出したいパターンに match_all を指定</span>
+        </div>
+        <pre><code class="language-plaintext">grok {
+  match => {"message" => "%{IP:ips}"}
+  match_all => true
+}</code></pre>
+      </div>
+      <p>
+        複数値を抽出したいフィールドとパターンを <code>match</code> に指定し、<code>match_all =&gt; true</code> を追加する。
+        なお、Google SecOps のパーサーでは正規表現のエスケープに<span class="highlight">二重バックスラッシュ</span>
+        (<code>\\s</code>、<code>\\d</code> など) が必要な点に注意。
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>ステップ 2: for ループで UDM フィールドにマッピング</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Logstash</span>
+          <span class="code-title">マップを反復処理して UDM 繰り返しフィールドに merge</span>
+        </div>
+        <pre><code class="language-plaintext">for index, ip in ips map {
+  mutate {
+    merge => {
+      "event.idm.read_only_udm.principal.ip" => "ip"
+    }
+  }
+}</code></pre>
+      </div>
+      <p>
+        抽出結果のマップを <code>for</code> ループで反復処理し、<code>merge</code> で UDM の繰り返しフィールドに追加する。
+        パーサーの変更後は、代表的なサンプルログで<strong>プレビュー検証</strong>を行ってから本番反映することを推奨。
+      </p>
+    </div>
+  </div>
+
+  <!-- メリット -->
+  <div class="section">
+    <h2>💡 メリット</h2>
+
+    <h3>💼 ビジネス面</h3>
+    <div class="success-box">
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>可視性の向上:</strong> ログ内のすべてのエンティティ (IP、ホストなど) が UDM イベントに反映されるため、検索・検知・調査での取りこぼしが減り、脅威検知の精度が向上する</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>パーサー開発工数の削減:</strong> 複数値抽出のための複雑な回避策が不要になり、カスタムパーサーの開発・保守コストを削減できる</span></div>
+    </div>
+
+    <h3>⚙️ 技術面</h3>
+    <div class="success-box">
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>パーサーの簡素化:</strong> 出現回数を想定した長い正規表現や複数の Grok ステートメントが、シンプルなパターン 1 つ + for ループに置き換えられる</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>可変長ログへの対応:</strong> 値の出現数が固定でないログでも、件数に依存せず網羅的に抽出できる</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>後方互換性:</strong> <code>match_all</code> はオプトインのオプションであり、既存パーサーのデフォルト動作 (最初の 1 件のみ) は変わらない</span></div>
+    </div>
+  </div>
+
+  <!-- デメリット・制約事項 -->
+  <div class="section">
+    <h2>⚠️ デメリット・制約事項</h2>
+
+    <h3>🚫 制限事項</h3>
+    <div class="error-box">
+      <div class="check-item"><span class="cross-icon">✕</span><span>抽出対象は「重複しない (non-overlapping)」一致のみで、<strong>重なり合うパターンの一致は取得できない</strong></span></div>
+      <div class="check-item"><span class="cross-icon">✕</span><span>抽出結果はマップ構造で返されるため、単一値として扱う場合と異なり、<code>for</code> ループでの反復処理の記述が必要になる</span></div>
+    </div>
+
+    <h3>🤔 考慮すべき点</h3>
+    <div class="warning-box">
+      <div class="check-item"><span class="cross-icon">!</span><span>Grok のベストプラクティスとして、変数は意図が明確な名前 (例: <code>source_ip</code>) を使い、パーサー冒頭で初期化 (<code>""</code> を設定) して <code>overwrite</code> 配列に宣言することが推奨される</span></div>
+      <div class="check-item"><span class="cross-icon">!</span><span>Google SecOps のパーサーでは正規表現トークンに二重バックスラッシュ (<code>\\s</code>、<code>\\d</code>、<code>\\.</code> など) が必要という制約は <code>match_all</code> 使用時も同様に適用される</span></div>
+      <div class="check-item"><span class="cross-icon">!</span><span>可能な限り <code>%{IP}</code> や <code>%{WORD}</code> などの事前定義パターンを使用すると、パース効率と可読性が向上する</span></div>
+    </div>
+  </div>
+
+  <!-- ユースケース -->
+  <div class="section">
+    <h2>🎯 ユースケース</h2>
+
+    <div class="usecase">
+      <h3>🔥 ユースケース 1: 複数の IP アドレスを含むファイアウォールログの正規化</h3>
+      <p>
+        <strong>シナリオ:</strong> ファイアウォールやプロキシのログに、NAT 変換前後のアドレスや複数の通信先など、
+        複数の IP アドレスが 1 行に含まれている。従来のパーサーでは最初の IP しか抽出できず、
+        調査時に一部の通信先が UDM イベントから欠落していた。
+      </p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Logstash</span>
+          <span class="code-title">全 IP アドレスを principal.ip へ格納する実装例</span>
+        </div>
+        <pre><code class="language-plaintext">filter {
+  grok {
+    match => {"message" => "%{IP:ips}"}
+    match_all => true
+  }
+  for index, ip in ips map {
+    mutate {
+      merge => { "event.idm.read_only_udm.principal.ip" => "ip" }
+    }
+  }
+}</code></pre>
+      </div>
+      <p><strong>✨ 効果:</strong> ログ内のすべての IP アドレスが <code>principal.ip</code> に格納され、UDM 検索や検知ルールでどの IP からでもイベントを発見できるようになる。</p>
+    </div>
+
+    <div class="usecase">
+      <h3>📦 ユースケース 2: 可変数のエンティティを含むアプリケーションログのパース</h3>
+      <p>
+        <strong>シナリオ:</strong> アプリケーションログの 1 メッセージ内に、処理対象のユーザー名やファイルハッシュが可変個数記録される。
+        従来は出現数のパターンごとに正規表現を用意する必要があり、パーサーが肥大化していた。
+      </p>
+      <p><strong>✨ 効果:</strong> 単一の Grok パターン + <code>match_all</code> で件数に依存せず全エンティティを抽出でき、パーサーの行数と保守負担が大幅に削減される。</p>
+    </div>
+  </div>
+
+  <!-- 料金 -->
+  <div class="section">
+    <h2>💰 料金</h2>
+    <p>
+      本アップデートはパーサー構文の機能強化であり、<strong>追加料金は発生しない</strong>。
+      Google SecOps 自体の料金はパッケージ (<strong>Standard / Enterprise / Enterprise Plus</strong>) ベース。
+      詳細は料金ページを参照。
+    </p>
+    <div class="icon-text"><span class="arrow">→</span><a class="gc-link" href="https://cloud.google.com/chronicle/docs/preview/pricing" target="_blank" rel="noopener noreferrer">Google SecOps の料金</a></div>
+  </div>
+
+  <!-- 利用可能リージョン -->
+  <div class="section">
+    <h2>🌏 利用可能リージョン</h2>
+    <p>
+      リージョン固有の記載はなし。Google SecOps SIEM のパーサー機能として、
+      Google SecOps が利用可能なすべての環境で使用できる。
+    </p>
+  </div>
+
+  <!-- 関連サービス・機能 -->
+  <div class="section">
+    <h2>🔗 関連サービス・機能</h2>
+    <div class="card">
+      <h3>🧩 UDM (Unified Data Model)</h3>
+      <p>抽出した値のマッピング先となる Google SecOps の統一データモデル。<code>match_all</code> により繰り返しフィールド (例: <code>principal.ip</code>) への全件マッピングが容易になる。</p>
+    </div>
+    <div class="card">
+      <h3>🧷 パーサー拡張 (Parser Extensions)</h3>
+      <p>デフォルトパーサーを補完するカスタムコードスニペット。<code>match_all</code> はカスタムパーサーと同様にパーサー拡張でも活用できる。</p>
+    </div>
+    <div class="card">
+      <h3>📜 YARA-L 検知ルール</h3>
+      <p>UDM イベントに対して検知ルールを実行する機能。すべてのエンティティが UDM に反映されることで検知カバレッジが向上する。</p>
+    </div>
+  </div>
+
+  <!-- まとめ -->
+  <div class="section">
+    <h2>🏁 まとめ</h2>
+    <div class="note-box">
+      <p style="margin-top: 0;">
+        Grok フィルタの <span class="highlight">match_all オプション</span>により、1 つのログフィールドから複数のパターン一致をすべて抽出し、
+        UDM の繰り返しフィールドへ漏れなくマッピングできるようになった。
+      </p>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>効果:</strong> パーサーの簡素化と検知カバレッジの向上を同時に実現できる</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>推奨アクション:</strong> 複数の IP アドレスやエンティティを含むログソースのカスタムパーサーを保守しているチームは、複雑な回避策を <code>match_all</code> + for ループに置き換えることを推奨</span></div>
+    </div>
+    <div class="tags">
+      <span class="tag">#GoogleSecOps</span>
+      <span class="tag">#SIEM</span>
+      <span class="tag">#Chronicle</span>
+      <span class="tag">#パーサー</span>
+      <span class="tag">#Grok</span>
+      <span class="tag">#match_all</span>
+      <span class="tag">#UDM</span>
+      <span class="tag">#ログ正規化</span>
+      <span class="tag">#GA</span>
+    </div>
+  </div>
+
+  <!-- フッター -->
+  <footer>
+    <p><strong>📎 出典・参考リンク</strong></p>
+    <ul style="padding-left: 20px; margin: 8px 0;">
+      <li><a href="https://docs.cloud.google.com/release-notes#September_15_2026" target="_blank" rel="noopener noreferrer">公式リリースノート (2026-09-15)</a></li>
+      <li><a href="https://docs.cloud.google.com/chronicle/docs/reference/parser-syntax#grok_match_all_option" target="_blank" rel="noopener noreferrer">パーサー構文リファレンス (Grok match_all option)</a></li>
+      <li><a href="https://docs.cloud.google.com/chronicle/docs/event-processing/parsing-overview" target="_blank" rel="noopener noreferrer">ログのパースの概要</a></li>
+      <li><a href="https://cloud.google.com/chronicle/docs/preview/pricing" target="_blank" rel="noopener noreferrer">料金ページ (Google SecOps)</a></li>
+    </ul>
+    <p>ソースレポート: reports/2026/2026-09-15-google-secops-siem-grok-match-all.md</p>
+  </footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+    mermaid.initialize({
+        startOnLoad: true,
+        theme: 'base',
+        themeVariables: {
+            primaryColor: '#4285F4',
+            primaryTextColor: '#202124',
+            primaryBorderColor: '#4285F4',
+            lineColor: '#4285F4',
+            secondaryColor: '#F1F3F4',
+            tertiaryColor: '#FAFAFA',
+            background: '#FFFFFF',
+            mainBkg: '#E8F0FE',
+            nodeBorder: '#4285F4',
+            clusterBkg: '#E8F0FE',
+            clusterBorder: '#4285F4',
+            edgeLabelBackground: '#FFFFFF',
+            textColor: '#202124'
+        }
+    });
+</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

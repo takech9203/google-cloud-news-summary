@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dialogflow: mTLS デフォルトクライアント証明書の移行 (Google Trust Services → SSL.com)</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); color: #FFFFFF; }
+    .badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+    .badge-deprecated { background: var(--gc-red); color: #FFFFFF; }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-box h3 { color: var(--gc-red); }
+    .after-box h3 { color: var(--gc-green); }
+
+    .before-box ul, .after-box ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    @media (max-width: 700px) {
+      .before-after { grid-template-columns: 1fr; }
+    }
+
+    /* フロー図スタイル */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+      font-size: 14px;
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* チェックリストスタイル */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon { color: var(--gc-green); font-size: 18px; }
+    .cross-icon { color: var(--gc-red); font-size: 18px; }
+
+    /* コードブロック (Mermaid の pre は除外) */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block {
+      overflow: hidden;
+      padding: 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang { color: #9CDCFE; font-weight: bold; }
+    .code-title { color: #AAAAAA; }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブルスタイル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* 統計カード */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.red {
+      background: linear-gradient(135deg, var(--gc-red), #B3261E);
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-100);
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-800);
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a { word-break: break-all; }
+
+    footer ul {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- タイトルエリア -->
+    <div class="header">
+      <div>
+        <h1>🔐 Dialogflow: mTLS デフォルトクライアント証明書の移行</h1>
+        <div class="subtitle" style="margin-top: 8px;">Google Trust Services → SSL.com | リリース日: 2026-11-16</div>
+        <div style="margin-top: 8px;">
+          <span class="badge">Dialogflow CX / ES</span>
+          <span class="badge badge-deprecated">破壊的変更 (Breaking change)</span>
+          <span class="badge" style="background: var(--gc-orange);">期限: 2026-12-01</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="error-box">
+      <strong>⚠️ 重要な破壊的変更:</strong> mTLS を有効にした Webhook サーバーや Dialogflow CX ツールのバックエンドで、証明書のトラストストアやサブジェクト許可リスト (allowlist) を更新しない場合、<strong>2026 年 12 月 1 日以降に TLS ハンドシェイクが失敗し、Webhook / ツール呼び出しが停止する可能性があります。</strong>
+    </div>
+
+    <!-- 重要数値 -->
+    <div class="stat-grid">
+      <div class="stat-card red">
+        <div class="stat-value">2026-12-01</div>
+        <div class="stat-label">旧 GTS 証明書フォールバック終了日</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">CN=Google LLC</div>
+        <div class="stat-label">新しい証明書サブジェクト (SSL.com 発行)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">2 つ</div>
+        <div class="stat-label">必要な対応 (トラストストア + 許可リスト更新)</div>
+      </div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📝 概要</h2>
+      <p>
+        Dialogflow が Webhook および Dialogflow CX ツールリクエストの際に提示する<span class="highlight">デフォルトの mTLS (相互 TLS) クライアント証明書</span>が、従来の Google Trust Services (GTS) 発行の証明書 (サブジェクト <code>CN=*.dialogflow.com</code>) から、<span class="highlight">SSL.com 発行の証明書 (サブジェクト CN=Google LLC)</span> に移行されます。
+      </p>
+      <p>
+        従来の GTS 証明書は <strong>2026 年 12 月 1 日まで一時的なフォールバックとしてのみ利用可能</strong>です。それ以降は SSL.com 発行の証明書のみが提示されるため、mTLS でクライアント証明書を検証している Webhook サーバーは、期日までにトラストストアへ <strong>SSL.com Root Certification Authority RSA</strong> を追加し、証明書サブジェクトの許可リストを使用している場合は <code>CN=Google LLC</code> を許可するよう更新する必要があります。
+      </p>
+      <p>
+        背景には、ブラウザのルートプログラム要件の変更により、Google Trust Services がパブリック TLS 証明書での clientAuth (クライアント認証) EKU のサポートを段階的に廃止していることがあります (2026 年 4 月以降、clientAuth EKU を含む CSR は例外なく拒否される計画)。
+      </p>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ アップデート前の課題</h3>
+          <ul>
+            <li>mTLS 接続では GTS 発行のクライアント証明書 (<code>CN=*.dialogflow.com</code>、発行チェーン: GTS Root R1 → GTS CA) が提示され、Webhook サーバー側は GTS のルート CA (pki.goog) を信頼するだけでよかった</li>
+            <li>ブラウザルートプログラムの要件変更により、GTS はパブリック証明書での clientAuth サポートを廃止予定で、従来の証明書を継続利用できなくなった</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ アップデート後の改善 (変更点)</h3>
+          <ul>
+            <li>デフォルト mTLS クライアント証明書が SSL.com 発行 (<code>CN=Google LLC</code>) に変更され、clientAuth EKU 廃止後も mTLS 機能を継続利用できる</li>
+            <li>移行期間として、従来の GTS 証明書は <strong>2026 年 12 月 1 日までフォールバックとして利用可能</strong></li>
+            <li>対応作業は「SSL.com Root CA RSA のトラストストア追加」「証明書サブジェクト許可リストの更新」の 2 点に集約</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph before["Before: 2026 年 12 月 1 日まで (フォールバックあり)"]
+        DF1["🤖 Dialogflow CX / ES<br>Webhook・ツールリクエスト"]
+        C1["📜 GTS 証明書<br>CN=*.dialogflow.com"]
+        WH1["🖥️ Webhook サーバー<br>信頼: GTS Root (pki.goog)"]
+        DF1 -->|mTLS ハンドシェイク| C1 --> WH1
+    end
+
+    subgraph after["After: 新デフォルト (12 月 1 日以降はこちらのみ)"]
+        DF2["🤖 Dialogflow CX / ES<br>Webhook・ツールリクエスト"]
+        C2["📜 SSL.com 発行証明書<br>CN=Google LLC"]
+        WH2["🖥️ Webhook サーバー<br>信頼: SSL.com Root CA RSA<br>許可リスト: CN=Google LLC"]
+        DF2 -->|mTLS ハンドシェイク| C2 --> WH2
+    end
+
+    before -.->|"⚠️ 2026-12-01 までに<br>トラストストア更新"| after
+        </pre>
+      </div>
+      <p>
+        Dialogflow が mTLS ハンドシェイク時に提示するクライアント証明書が GTS 発行から SSL.com 発行に変わるため、Webhook サーバー側のトラストストアと証明書サブジェクト許可リストの更新が必要になります。
+      </p>
+    </div>
+
+    <!-- サービスアップデートの詳細 -->
+    <div class="section">
+      <h2>🔧 サービスアップデートの詳細</h2>
+
+      <div class="card">
+        <h3>1️⃣ デフォルト mTLS クライアント証明書の発行元変更</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>対象: Dialogflow の Webhook リクエストおよび Dialogflow CX のツール (tool) リクエスト</span></div>
+        <div class="icon-text"><span class="cross-icon">✗</span><span>旧: Google Trust Services 発行、サブジェクト <code>CN=*.dialogflow.com</code></span></div>
+        <div class="icon-text"><span class="check-icon">✓</span><span>新: SSL.com 発行、サブジェクト <code>CN=Google LLC</code></span></div>
+      </div>
+
+      <div class="card" style="border-left-color: var(--gc-red);">
+        <h3>2️⃣ 移行期限 (2026 年 12 月 1 日)</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>旧 Google Trust Services 証明書は一時的なフォールバックとしてのみ提供</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>2026 年 12 月 1 日以降、フォールバックは終了する</span></div>
+      </div>
+
+      <div class="card" style="border-left-color: var(--gc-green);">
+        <h3>3️⃣ ユーザー側で必要な対応</h3>
+        <div class="icon-text"><span class="check-icon">✓</span><span>Webhook サーバーのトラストストアに <strong>SSL.com Root Certification Authority RSA</strong> を追加する</span></div>
+        <div class="icon-text"><span class="check-icon">✓</span><span>証明書サブジェクトの許可リスト (例: <code>CN=*.dialogflow.com</code> のみを許可する設定) を使用している場合、<code>CN=Google LLC</code> を許可するよう更新する</span></div>
+      </div>
+
+      <h3>👥 影響を受けるユーザー / 受けないユーザー</h3>
+      <table>
+        <thead>
+          <tr><th>構成</th><th>影響</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Webhook サーバーで mTLS (クライアント証明書の検証) を有効化している</td><td>⚠️ <strong>影響あり</strong>。トラストストアの更新が必須</td></tr>
+          <tr><td>クライアント証明書のサブジェクト (CN) を許可リストで検証している</td><td>⚠️ <strong>影響あり</strong>。<code>CN=Google LLC</code> の許可が必須</td></tr>
+          <tr><td>Dialogflow CX のツールリクエストで mTLS を使用している</td><td>⚠️ <strong>影響あり</strong>。同様の対応が必須</td></tr>
+          <tr><td>通常の TLS (サーバー証明書検証のみ) で Webhook を利用している</td><td>✅ 影響なし</td></tr>
+          <tr><td>エージェントレベルのカスタムクライアント証明書 (Secret Manager 連携) を構成している</td><td>✅ デフォルト証明書を使用しないため、直接の影響は受けない</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>📋 技術仕様</h2>
+
+      <h3>証明書の新旧比較</h3>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>旧 (フォールバック、〜2026-12-01)</th><th>新 (デフォルト)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>発行元 CA</td><td>Google Trust Services (GTS Root R1 → GTS CA)</td><td>SSL.com (SSL.com Root Certification Authority RSA)</td></tr>
+          <tr><td>サブジェクト CN</td><td><code>*.dialogflow.com</code></td><td><code>Google LLC</code></td></tr>
+          <tr><td>対象リクエスト</td><td>Webhook / Dialogflow CX ツール</td><td>Webhook / Dialogflow CX ツール</td></tr>
+          <tr><td>ルート証明書の入手先</td><td><a href="https://pki.goog/" target="_blank" rel="noopener noreferrer" class="gc-link">pki.goog</a></td><td>SSL.com のルート証明書配布ページ</td></tr>
+        </tbody>
+      </table>
+
+      <h3>背景: Google Trust Services の clientAuth サポート廃止</h3>
+      <p>
+        Google Trust Services は、ブラウザルートプログラムの要件変更に対応するため、パブリック TLS 証明書における clientAuth EKU (<code>id-kp-clientAuth</code>) のサポートを段階的に廃止しています。
+      </p>
+      <div class="flow-diagram">
+        <div class="flow-step">📅 フェーズ 1<br>(2025 年 11 月〜)<br>clientAuth EKU を含む CSR は<br><strong>原則拒否</strong> (例外条件あり)</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🚫 フェーズ 2<br>(2026 年 4 月〜)<br>clientAuth EKU を含む CSR は<br><strong>例外なく拒否</strong></div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🔄 Dialogflow<br>SSL.com 発行証明書へ<br><strong>移行実施</strong></div>
+      </div>
+      <p>
+        この方針により、<code>CN=*.dialogflow.com</code> のようなパブリック CA 発行のクライアント証明書は継続発行できなくなるため、Dialogflow は SSL.com 発行の証明書への移行を実施しています。
+      </p>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>⚙️ 設定方法</h2>
+
+      <h3>前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>Webhook サーバー (または Dialogflow CX ツールのバックエンド) で mTLS を有効化しており、クライアント証明書を検証している</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>サーバーのトラストストア (CA バンドル) を更新できる権限がある</span></div>
+
+      <h3>ステップ 1: SSL.com Root Certification Authority RSA をトラストストアに追加</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">Debian/Ubuntu 系でシステムのトラストストアに追加する例</span>
+        </div>
+        <pre><code class="language-bash"># 例: Debian/Ubuntu 系でシステムのトラストストアに追加する場合
+# (SSL.com の公式サイトから SSL.com Root Certification Authority RSA を取得)
+sudo cp ssl-com-root-ca-rsa.crt /usr/local/share/ca-certificates/
+sudo update-ca-certificates</code></pre>
+      </div>
+      <p>
+        Nginx や Apache、独自アプリケーションでクライアント CA バンドルを個別指定している場合は、該当するバンドルファイル (例: <code>ssl_client_certificate</code> で指定しているファイル) に SSL.com のルート証明書を追加します。<span class="highlight">移行期間中は GTS と SSL.com の両方のルートを信頼する構成にしておくと安全です。</span>
+      </p>
+
+      <h3>ステップ 2: 証明書サブジェクト許可リストの更新</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">サブジェクト CN 許可リストの更新例</span>
+        </div>
+        <pre><code class="language-bash"># 例: サブジェクト CN を検証するロジックがある場合、新しい CN を許可する
+# 旧: CN=*.dialogflow.com
+# 新: CN=Google LLC
+# 移行期間中は両方を許可する
+ALLOWED_CLIENT_CN=("*.dialogflow.com" "Google LLC")</code></pre>
+      </div>
+      <p>
+        アプリケーションやリバースプロキシでクライアント証明書のサブジェクト (CN) を検証している場合、<code>CN=Google LLC</code> を許可対象に追加します。
+      </p>
+
+      <h3>ステップ 3: 動作確認</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">openssl s_server でクライアント証明書の提示内容を確認する例</span>
+        </div>
+        <pre><code class="language-bash"># openssl s_server でクライアント証明書の提示内容を確認する例
+sudo openssl s_server -key key.pem -cert fullchain.pem -accept 443 -verify 1</code></pre>
+      </div>
+      <p>
+        Dialogflow コンソールや API からテストリクエストを送信し、提示されるクライアント証明書のサブジェクト・発行チェーンを確認して、ハンドシェイクが成功することを検証します。
+      </p>
+      <div class="error-box">
+        <strong>🚨 検証失敗時のエラー例:</strong> クライアント証明書の検証に失敗すると <code>Failed to verify client's certificate: x509: certificate signed by unknown authority</code> のようなエラーで TLS ハンドシェイクが失敗し、セッションが終了します。
+      </div>
+    </div>
+
+    <!-- メリット / デメリット -->
+    <div class="section">
+      <h2>⚖️ メリット・デメリット</h2>
+
+      <h3>✅ メリット (ビジネス面)</h3>
+      <div class="success-box">
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>サービス継続性の確保</strong>: 期日までに対応すれば、GTS の clientAuth 廃止後も mTLS による双方向認証を維持したまま Dialogflow を運用できる</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>明確な移行期限</strong>: 2026 年 12 月 1 日というフォールバック期限が明示されており、計画的な移行作業が可能</span></div>
+      </div>
+
+      <h3>✅ メリット (技術面)</h3>
+      <div class="success-box">
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>mTLS 機能の継続提供</strong>: パブリック CA の業界要件変更後も、Dialogflow からのリクエストをクライアント証明書で認証する構成を継続できる</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>対応作業の限定</strong>: 必要な変更はトラストストアと許可リストの更新のみで、Dialogflow エージェント側の設定変更は不要</span></div>
+      </div>
+
+      <h3>⚠️ 制限事項</h3>
+      <div class="warning-box">
+        <div class="check-item"><span class="cross-icon">✗</span><span>旧 Google Trust Services 証明書 (<code>CN=*.dialogflow.com</code>) のフォールバックは <strong>2026 年 12 月 1 日で終了</strong>する</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>新証明書はサブジェクトが <code>CN=Google LLC</code> となり、ホスト名ベース (<code>*.dialogflow.com</code>) の識別ができなくなる</span></div>
+      </div>
+
+      <h3>💭 考慮すべき点</h3>
+      <div class="note-box">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>未対応の場合は Webhook / ツール呼び出しが失敗する</strong>: トラストストア未更新のまま期限を迎えると、TLS ハンドシェイク失敗により会話フローが停止する</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>CN ベースの検証だけでは送信元のエージェントを特定できない</strong>: <code>CN=Google LLC</code> は Dialogflow 固有の識別子ではないため、従来どおり Authorization ヘッダーのサービス ID トークン (Bearer トークン) の検証を併用することが公式ドキュメントで推奨されている</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>検証機構の棚卸しが必要</strong>: ロードバランサー、リバースプロキシ、WAF、アプリケーションコードなど、クライアント証明書を検証している箇所をすべて洗い出して更新する必要がある</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>デフォルト証明書に依存しない構成 (エージェントレベルのカスタムクライアント証明書) への移行も選択肢となる</span></div>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>🏢 ユースケース 1: mTLS を有効化した社内 Webhook サーバーの移行</h3>
+        <p>
+          <strong>シナリオ:</strong> コンタクトセンターの Dialogflow CX エージェントが、mTLS を必須とする社内 API ゲートウェイ経由の Webhook を呼び出している。ゲートウェイは GTS ルートのみを信頼し、<code>CN=*.dialogflow.com</code> を許可リストで検証している。
+        </p>
+        <div class="flow-diagram">
+          <div class="flow-step">1️⃣ ゲートウェイの CA バンドルに<br>SSL.com Root CA RSA を追加</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">2️⃣ 許可リストに<br>CN=Google LLC を追加<br>(旧 CN と併存)</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">3️⃣ テスト環境で<br>ハンドシェイク成功を確認</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">4️⃣ 2026-12-01 以降<br>旧 GTS ルートと旧 CN を削除</div>
+        </div>
+        <p>
+          <strong>効果:</strong> フォールバック期限後も Webhook 呼び出しが中断せず、会話フローの可用性を維持できる。
+        </p>
+      </div>
+
+      <div class="usecase">
+        <h3>🤖 ユースケース 2: Dialogflow CX ツール (エージェントツール) バックエンドの事前検証</h3>
+        <p>
+          <strong>シナリオ:</strong> 生成 AI エージェントが Dialogflow CX のツール機能で外部 API を呼び出しており、API 側で mTLS を要求している。
+        </p>
+        <p>
+          <strong>効果:</strong> 事前にトラストストアと許可リストを更新し、ステージング環境で新証明書のハンドシェイクを検証しておくことで、本番エージェントのツール呼び出し失敗を未然に防げる。
+        </p>
+      </div>
+    </div>
+
+    <!-- 料金 / リージョン -->
+    <div class="section">
+      <h2>💰 料金・利用可能リージョン</h2>
+      <div class="card">
+        <h3>💳 料金</h3>
+        <p>この変更は証明書の発行元の移行であり、<strong>Dialogflow の料金体系への影響はありません</strong>。料金の詳細は <a href="https://cloud.google.com/dialogflow/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Dialogflow の料金ページ</a>を参照してください。</p>
+      </div>
+      <div class="card">
+        <h3>🌏 利用可能リージョン</h3>
+        <p>この変更は Dialogflow CX / ES の mTLS を使用する<strong>すべての環境</strong>に適用されます。リージョン固有の情報はリリースノートに記載されていません。</p>
+      </div>
+    </div>
+
+    <!-- 関連サービス -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Dialogflow CX Webhook / ツール</strong>: 今回の証明書変更の対象となるリクエスト。フルフィルメントや生成 AI エージェントの外部 API 連携で使用</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Secret Manager</strong>: エージェントレベルのカスタムクライアント証明書を使用する場合、秘密鍵とパスフレーズを Secret Manager で管理 (Dialogflow サービスエージェントに Secret Accessor 権限が必要)</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Certificate Authority Service</strong>: clientAuth 用途をプライベート PKI に移行する際の選択肢として Google が案内しているマネージド CA サービス</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Service Directory</strong>: VPC 内のプライベート Webhook サーバーへのアクセスに使用。カスタム CA 証明書と組み合わせて利用可能</span></div>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>🎯 まとめ</h2>
+      <div class="note-box">
+        <p style="margin: 0;">
+          Dialogflow のデフォルト mTLS クライアント証明書が Google Trust Services (<code>CN=*.dialogflow.com</code>) から SSL.com (<code>CN=Google LLC</code>) に移行される<strong>破壊的変更</strong>です。mTLS で Dialogflow からのリクエストを検証しているすべての Webhook サーバー・ツールバックエンドは、<span class="highlight">2026 年 12 月 1 日のフォールバック終了までに</span> SSL.com Root Certification Authority RSA のトラストストアへの追加と、証明書サブジェクト許可リストの更新を完了してください。
+        </p>
+      </div>
+      <div style="margin-top: 12px;">
+        <span class="badge">Dialogflow</span>
+        <span class="badge">Dialogflow CX</span>
+        <span class="badge">Dialogflow ES</span>
+        <span class="badge">mTLS</span>
+        <span class="badge">証明書</span>
+        <span class="badge">Webhook</span>
+        <span class="badge badge-deprecated">破壊的変更</span>
+        <span class="badge">セキュリティ</span>
+      </div>
+    </div>
+
+    <!-- フッター / 出典 -->
+    <footer>
+      <p>📎 出典・参考リンク:</p>
+      <ul>
+        <li><a href="https://docs.cloud.google.com/release-notes#November_16_2026" target="_blank" rel="noopener noreferrer" class="gc-link">Google Cloud 公式リリースノート (2026-11-16)</a></li>
+        <li><a href="https://docs.cloud.google.com/dialogflow/cx/docs/concept/mtls" target="_blank" rel="noopener noreferrer" class="gc-link">Dialogflow CX mTLS ドキュメント</a></li>
+        <li><a href="https://docs.cloud.google.com/dialogflow/es/docs/fulfillment-mtls" target="_blank" rel="noopener noreferrer" class="gc-link">Dialogflow ES mTLS (フルフィルメント) ドキュメント</a></li>
+        <li><a href="https://developers.google.com/public-key-infrastructure/updates/may2025-clientauth" target="_blank" rel="noopener noreferrer" class="gc-link">Google Trust Services: clientAuth サポート変更のお知らせ</a></li>
+        <li><a href="https://cloud.google.com/dialogflow/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Dialogflow 料金ページ</a></li>
+      </ul>
+      <p>本インフォグラフィックは Google Cloud News レポート (2026-11-16-dialogflow-mtls-certificate-migration.md) を基に生成されています。</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

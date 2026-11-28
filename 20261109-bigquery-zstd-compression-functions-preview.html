@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BigQuery: GoogleSQL の Zstandard (Zstd) 圧縮関数 (Preview)</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* バッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); color: #FFFFFF; }
+    .badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+    .badge-deprecated { background: var(--gc-red); color: #FFFFFF; }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 760px) {
+      .before-after { grid-template-columns: 1fr; }
+    }
+
+    .before-card, .after-card {
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border: 1px solid rgba(234, 67, 53, 0.3);
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border: 1px solid rgba(52, 168, 83, 0.3);
+    }
+
+    .before-card h3, .after-card h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-card h3 { color: #C5221F; }
+    .after-card h3 { color: #188038; }
+
+    .before-card ul, .after-card ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+    }
+
+    .before-card li, .after-card li {
+      margin: 8px 0;
+      font-size: 14px;
+    }
+
+    /* チェックリスト */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon { color: var(--gc-green); font-size: 18px; }
+    .cross-icon { color: var(--gc-red); font-size: 18px; }
+
+    /* コードブロック (Mermaid の pre は除外) */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    .table-wrap { overflow-x: auto; }
+
+    /* ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* 統計カード */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* ユースケース */
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+      border: 1px solid var(--gc-blue-100);
+    }
+
+    .usecase-card h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* メリット 2 カラム */
+    .merit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 760px) {
+      .merit-grid { grid-template-columns: 1fr; }
+    }
+
+    .merit-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .merit-card h3 { margin-top: 0; }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a { word-break: break-all; }
+
+    ul.link-list {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    ul.link-list li { margin: 6px 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <div style="margin-bottom: 8px;">
+          <span class="badge">📊 BigQuery</span>
+          <span class="badge badge-preview">Preview</span>
+        </div>
+        <h1>🗜️ GoogleSQL に Zstandard (Zstd) 圧縮関数が登場</h1>
+        <div class="subtitle">SQL クエリ内で完結するデータの圧縮・解凍 — ZSTD_COMPRESS / ZSTD_DECOMPRESS_TO_BYTES / ZSTD_DECOMPRESS_TO_STRING</div>
+      </div>
+      <div class="subtitle">リリース日: 2026-11-09</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📌 概要</h2>
+      <p>
+        BigQuery の GoogleSQL に、<span class="highlight">Zstandard (Zstd) ロスレス圧縮</span>でバイト列や文字列を圧縮・解凍できる
+        3 つの組み込み関数が <strong>Preview</strong> として追加されました。
+        大きなテキストや JSON ペイロード、ログデータなどを BYTES 型として圧縮保存し、
+        必要なときだけ SQL で解凍するワークフローが<span class="highlight">外部処理なし</span>で実現できます。
+      </p>
+      <p>
+        Zstd は高い圧縮率と高速な圧縮・解凍性能を両立するアルゴリズムとして広く採用されています。
+        同等の圧縮関数は <strong>Spanner の GoogleSQL</strong> でも提供されており、GoogleSQL 方言を使うサービス間で一貫した圧縮処理が可能です。
+      </p>
+
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">3 関数</div>
+          <div class="stat-label">COMPRESS / DECOMPRESS_TO_BYTES / DECOMPRESS_TO_STRING</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">-5 〜 22</div>
+          <div class="stat-label">圧縮レベル (デフォルト 3)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">128 MiB</div>
+          <div class="stat-label">解凍サイズ上限 (size_limit)</div>
+        </div>
+      </div>
+
+      <div class="before-after">
+        <div class="before-card">
+          <h3>❌ Before: アップデート前の課題</h3>
+          <ul>
+            <li>SQL 内に圧縮・解凍の組み込み関数がなく、圧縮処理はクライアントや ETL パイプライン側で実装が必要</li>
+            <li>Zstd 圧縮済みの BYTES データを参照するには、エクスポートや UDF などの回避策が必要</li>
+            <li>大きな文字列をそのまま保持するとストレージ効率が悪く、圧縮には外部処理を挟むためパイプラインが複雑化</li>
+          </ul>
+        </div>
+        <div class="after-card">
+          <h3>✅ After: アップデート後の改善</h3>
+          <ul>
+            <li><code>ZSTD_COMPRESS</code> で STRING / BYTES を SQL 内で直接圧縮 (レベル -5〜22、デフォルト 3)</li>
+            <li><code>ZSTD_DECOMPRESS_TO_BYTES</code> / <code>ZSTD_DECOMPRESS_TO_STRING</code> で SQL 内で解凍が完結</li>
+            <li><code>size_limit</code> (デフォルト・最大 128 MiB) で解凍サイズを制限し、メモリ問題のリスクを抑制</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    subgraph Input["📥 入力データ"]
+        S["📝 STRING / BYTES<br>(ログ・JSON・テキスト)"]
+    end
+
+    subgraph BQ["🔷 BigQuery (GoogleSQL)"]
+        C["🗜️ ZSTD_COMPRESS<br>(level: -5〜22, デフォルト 3)"]
+        T[("🗄️ テーブル<br>BYTES 列に圧縮保存")]
+        DB["📦 ZSTD_DECOMPRESS_TO_BYTES<br>(size_limit: 最大 128 MiB)"]
+        DS["📄 ZSTD_DECOMPRESS_TO_STRING<br>(size_limit: 最大 128 MiB)"]
+    end
+
+    U(["👤 ユーザー / 分析クエリ"])
+
+    S --> C --> T
+    T --> DB --> U
+    T --> DS --> U
+        </pre>
+      </div>
+      <p>
+        元の STRING/BYTES 値を <code>ZSTD_COMPRESS</code> で圧縮して BYTES 列に保存し、参照時に
+        <code>ZSTD_DECOMPRESS_TO_BYTES</code> / <code>ZSTD_DECOMPRESS_TO_STRING</code> で解凍するデータフローです。
+        <span class="highlight">圧縮から解凍まで SQL 内で完結</span>します。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚙️ 主要機能</h2>
+
+      <div class="card">
+        <h3>1️⃣ ZSTD_COMPRESS — 圧縮</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>STRING または BYTES の入力を Zstd アルゴリズムで圧縮し、<strong>BYTES</strong> として返す</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>圧縮レベル <code>level</code> は <strong>-5 〜 22</strong> の整数で指定可能 (デフォルト 3)。値が大きいほど圧縮率が高くなるが、処理は遅くなる</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>入力または <code>level</code> が NULL の場合は NULL を返す</span></div>
+      </div>
+
+      <div class="card">
+        <h3>2️⃣ ZSTD_DECOMPRESS_TO_BYTES — BYTES へ解凍</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>Zstd 圧縮された BYTES を解凍して <strong>BYTES</strong> として返す</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>入力は、非圧縮コンテンツサイズをヘッダーに含む有効な Zstd フレームである必要がある (<code>ZSTD_COMPRESS</code> の出力は常にこの条件を満たす)</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>size_limit</code> で解凍結果のサイズ上限を指定可能 (デフォルト・最大とも 128 MiB)。超過するとエラーを返す</span></div>
+      </div>
+
+      <div class="card">
+        <h3>3️⃣ ZSTD_DECOMPRESS_TO_STRING — STRING へ解凍</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>Zstd 圧縮された BYTES を解凍して <strong>STRING</strong> として返す</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>ZSTD_DECOMPRESS_TO_BYTES</code> と同様に <code>size_limit</code> (デフォルト・最大 128 MiB) をサポート</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>入力が NULL の場合は NULL を返す</span></div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>📐 技術仕様</h2>
+
+      <h3>関数一覧</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>関数</th>
+              <th>入力</th>
+              <th>出力</th>
+              <th>主なオプション</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>ZSTD_COMPRESS</code></td>
+              <td>STRING / BYTES</td>
+              <td>BYTES</td>
+              <td><code>level</code> (-5〜22、デフォルト 3)</td>
+            </tr>
+            <tr>
+              <td><code>ZSTD_DECOMPRESS_TO_BYTES</code></td>
+              <td>BYTES (Zstd フレーム)</td>
+              <td>BYTES</td>
+              <td><code>size_limit</code> (デフォルト・最大 128 MiB)</td>
+            </tr>
+            <tr>
+              <td><code>ZSTD_DECOMPRESS_TO_STRING</code></td>
+              <td>BYTES (Zstd フレーム)</td>
+              <td>STRING</td>
+              <td><code>size_limit</code> (デフォルト・最大 128 MiB)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>使用例</h3>
+      <div class="code-block">
+        <span class="code-label">SQL</span>
+        <pre><code class="language-sql">-- 文字列を圧縮 (デフォルトレベル 3)
+SELECT ZSTD_COMPRESS('string_value') AS result;
+-- 結果: KLUv/SAMYQAAc3RyaW5nX3ZhbHVl (Base64 表現)
+
+-- 圧縮レベルを指定して圧縮
+SELECT ZSTD_COMPRESS(b'bytes_value', level => 1);
+
+-- 圧縮と解凍のラウンドトリップ
+SELECT ZSTD_DECOMPRESS_TO_STRING(ZSTD_COMPRESS('zstd')) AS result;
+-- 結果: "zstd"
+
+-- size_limit を超えるとエラー
+SELECT ZSTD_DECOMPRESS_TO_STRING(ZSTD_COMPRESS('zstd'), size_limit => 1) AS result;
+-- Statement failed: ZSTD output is too large: (4 bytes) > limit (1 bytes)</code></pre>
+      </div>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>💡 メリット</h2>
+      <div class="merit-grid">
+        <div class="merit-card">
+          <h3>💼 ビジネス面</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>パイプラインの簡素化</strong>: 外部ツールや ETL 処理を介さず SQL だけで圧縮・解凍が完結し、開発・運用コストを削減</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>ストレージ効率の向上</strong>: 大きなテキストや JSON を圧縮保存することで、物理ストレージ使用量を抑えられる可能性</span></div>
+        </div>
+        <div class="merit-card">
+          <h3>🔧 技術面</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>圧縮レベルの柔軟な制御</strong>: -5 〜 22 のレベル指定で、圧縮率と処理速度のトレードオフをユースケースに合わせて調整可能</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>安全な解凍処理</strong>: <code>size_limit</code> で解凍後サイズの上限を制御し、巨大データ解凍によるメモリ問題のリスクを低減</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>GoogleSQL 間の一貫性</strong>: Spanner の GoogleSQL にも同名関数があり、サービス間で一貫した圧縮ロジックを利用可能</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>制限事項</h3>
+      <div class="warning-box">
+        <div class="check-item"><span class="cross-icon">▲</span><span><strong>Preview 段階</strong>: Pre-GA Offerings Terms が適用され、サポートが限定される場合がある</span></div>
+        <div class="check-item"><span class="cross-icon">▲</span><span><strong>解凍サイズ上限 128 MiB</strong>: BigQuery での <code>size_limit</code> のデフォルトかつ最大値であり、それを超えるデータは解凍できない</span></div>
+        <div class="check-item"><span class="cross-icon">▲</span><span><strong>有効な Zstd フレームが必要</strong>: 解凍対象の BYTES は非圧縮コンテンツサイズをヘッダーに含む必要がある (外部ツールで生成したフレームは条件を満たさない場合がある)</span></div>
+      </div>
+
+      <h3>考慮すべき点</h3>
+      <div class="note-box">
+        <div class="check-item"><span class="arrow">→</span><span>圧縮レベルを高くするほど圧縮率は向上するが、クエリの処理時間 (スロット消費) が増加する</span></div>
+        <div class="check-item"><span class="arrow">→</span><span>圧縮した列は BigQuery のネイティブなカラムナ圧縮や関数 (文字列検索など) の対象として直接扱えなくなるため、頻繁に検索・フィルタする列への適用は慎重に判断する</span></div>
+        <div class="check-item"><span class="arrow">→</span><span>フィードバックや Preview 機能のサポート依頼は <code>bigquery-sql-preview-support@googlegroups.com</code> 宛てに送付する</span></div>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h3>📦 ユースケース 1: 大きな JSON ペイロードの圧縮保存</h3>
+        <p><strong>シナリオ</strong>: アプリケーションログに含まれる大きな JSON ペイロードを BigQuery に長期保存したいが、参照頻度は低く、ストレージ効率を優先したい。</p>
+        <div class="code-block">
+          <span class="code-label">SQL</span>
+          <pre><code class="language-sql">-- 取り込み時に圧縮して保存
+INSERT INTO logs.archived_payloads (log_id, payload_compressed)
+SELECT log_id, ZSTD_COMPRESS(payload_json, level => 10)
+FROM logs.raw_events;
+
+-- 必要なときだけ解凍して参照
+SELECT log_id, ZSTD_DECOMPRESS_TO_STRING(payload_compressed) AS payload_json
+FROM logs.archived_payloads
+WHERE log_id = 'abc-123';</code></pre>
+        </div>
+        <div class="success-box">
+          <strong>✅ 効果:</strong> 参照頻度の低い大容量テキストを圧縮状態で保持し、必要時のみ SQL で解凍することでストレージ効率と運用のシンプルさを両立できる。
+        </div>
+      </div>
+
+      <div class="usecase-card">
+        <h3>🔄 ユースケース 2: 外部システムで Zstd 圧縮されたデータの直接解凍</h3>
+        <p><strong>シナリオ</strong>: 他システムから Zstd 圧縮済みの BYTES データが BigQuery に取り込まれており、分析時に解凍して内容を確認したい。</p>
+        <div class="success-box">
+          <strong>✅ 効果:</strong> データをエクスポートして外部で解凍する手間がなくなり、<code>ZSTD_DECOMPRESS_TO_STRING</code> / <code>ZSTD_DECOMPRESS_TO_BYTES</code> を使って BigQuery 内で直接分析できる (入力が有効な Zstd フレームである必要あり)。
+        </div>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>
+        この機能自体に追加料金の記載はありません。関数の実行は<span class="highlight">通常の BigQuery クエリとして課金</span>されます
+        (オンデマンドまたは BigQuery Editions)。詳細は料金ページを参照してください。
+      </p>
+      <ul class="link-list">
+        <li><a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">BigQuery の料金</a></li>
+      </ul>
+    </div>
+
+    <!-- 関連サービス・機能 -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <h3>🗄️ Spanner (GoogleSQL 圧縮関数)</h3>
+        <p>Spanner の GoogleSQL にも同名の <code>ZSTD_COMPRESS</code> / <code>ZSTD_DECOMPRESS_TO_BYTES</code> / <code>ZSTD_DECOMPRESS_TO_STRING</code> が提供されており、GoogleSQL 方言間で一貫した圧縮処理が可能 (Spanner では <code>size_limit</code> のデフォルトは 1 GiB)。</p>
+      </div>
+      <div class="card">
+        <h3>📚 BigQuery GoogleSQL 関数リファレンス</h3>
+        <p>圧縮関数は GoogleSQL の関数群の一部として提供され、他の文字列関数・バイト関数と組み合わせて利用できる。</p>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="note-box">
+        <p style="margin: 0;">
+          BigQuery の GoogleSQL に Zstd 圧縮・解凍関数が Preview 追加され、<strong>外部処理なしに SQL 内でデータの圧縮・解凍が完結</strong>できるようになりました。
+          大容量テキストの圧縮保存や、Zstd 圧縮済みデータの直接解凍が必要な場合は、圧縮レベルと <code>size_limit</code> (最大 128 MiB) の制約を確認したうえで検証を始めることを推奨します。
+        </p>
+      </div>
+      <div>
+        <span class="badge">BigQuery</span>
+        <span class="badge">GoogleSQL</span>
+        <span class="badge">Zstandard</span>
+        <span class="badge">ZSTD_COMPRESS</span>
+        <span class="badge">データ圧縮</span>
+        <span class="badge badge-preview">Preview</span>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul class="link-list">
+        <li><a href="https://docs.cloud.google.com/release-notes#November_09_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026-11-09)</a></li>
+        <li><a href="https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/compression-functions" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: Compression functions (BigQuery)</a></li>
+        <li><a href="https://docs.cloud.google.com/spanner/docs/reference/standard-sql/compression-functions" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: Compression functions (Spanner)</a></li>
+        <li><a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">BigQuery 料金ページ</a></li>
+      </ul>
+      <p>本インフォグラフィックは Google Cloud News レポート (2026-11-09) を基に作成されました。</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

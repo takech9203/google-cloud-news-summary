@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud SQL for PostgreSQL: pgAudit によるログ内の機密リテラルのマスキング</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated,
+    .badge-changed {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    .badge-deprecated {
+      background: var(--gc-red);
+      color: #FFFFFF;
+    }
+
+    .badge-changed {
+      background: var(--gc-yellow);
+      color: #FFFFFF;
+    }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box, .after-box {
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid var(--gc-red);
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid var(--gc-green);
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      margin-bottom: 8px;
+      font-size: 16px;
+    }
+
+    .before-box h3 { color: var(--gc-red); }
+    .after-box h3 { color: #188038; }
+
+    .before-box ul, .after-box ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin: 6px 0;
+    }
+
+    @media (max-width: 720px) {
+      .before-after { grid-template-columns: 1fr; }
+      h1 { font-size: 26px; }
+    }
+
+    /* チェックリストスタイル */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+    }
+
+    /* コードブロック (Mermaid の pre を除外) */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブルスタイル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+    }
+
+    /* ステップ表示 */
+    .step {
+      display: flex;
+      gap: 16px;
+      margin: 16px 0;
+      align-items: flex-start;
+    }
+
+    .step-number {
+      background: var(--gc-blue-600);
+      color: #FFFFFF;
+      width: 32px;
+      height: 32px;
+      min-width: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 16px;
+      margin-top: 2px;
+    }
+
+    .step-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .step-content h3 {
+      margin-top: 4px;
+    }
+
+    /* メリット/デメリット 2 カラム */
+    .pros-cons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 720px) {
+      .pros-cons { grid-template-columns: 1fr; }
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      word-break: break-all;
+    }
+
+    footer ul {
+      padding-left: 20px;
+      margin: 8px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- タイトルエリア -->
+    <div class="header">
+      <div>
+        <div>
+          <span class="badge">🐘 Cloud SQL for PostgreSQL</span>
+          <span class="badge badge-changed">Changed</span>
+        </div>
+        <h1>🔒 pgAudit によるログ内の機密リテラルのマスキング</h1>
+        <div class="subtitle">監査ログに記録される SQL 文のリテラル値を位置プレースホルダに自動置換</div>
+      </div>
+      <div class="subtitle">📅 リリース日: 2026-09-29</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        Cloud SQL for PostgreSQL で、pgAudit 拡張機能を使用して、<span class="highlight">パスワードやシークレットなどの機密情報がログクエリ結果に表示されるのを防止</span>できるようになりました。
+        <code>cloudsql.pgaudit_mask_literals</code> データベースフラグを有効にすると、監査ログに記録される SQL 文内のリテラル値 (文字列定数、数値など) が位置プレースホルダ (<code>$1</code>, <code>$2</code> など) に置換されます。
+      </p>
+      <p>
+        クエリの構造と実行された操作は監査できる一方で、クエリに埋め込まれた機密性の高いデータ値そのものはログに残りません。政府機関、金融、ISO 認証などのコンプライアンス要件で SQL 操作の監査ログが求められる組織にとって、<span class="highlight">監査可能性とデータプライバシーを両立</span>できる重要な機能強化です。
+      </p>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before: アップデート前の課題</h3>
+          <ul>
+            <li>pgAudit のセッション監査ログには SQL 文がそのまま記録され、パスワード・個人情報・シークレットなどのリテラル値が Cloud Logging にそのまま残るリスクがあった</li>
+            <li>回避策は監査対象の操作クラス (<code>pgaudit.log</code>) を絞り込む程度しかなく、監査の網羅性とデータプライバシーがトレードオフだった</li>
+            <li>ログに機密データが含まれると、閲覧権限管理やコンプライアンス・規制要件への対応が困難だった</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After: アップデート後の改善</h3>
+          <ul>
+            <li><code>cloudsql.pgaudit_mask_literals</code> フラグを <code>on</code> にするだけで、ログ書き込み前にリテラル値が位置プレースホルダに置換される</li>
+            <li>クエリの構造 (どのテーブルにどの操作が行われたか) は引き続き監査でき、網羅性を維持したまま機密データ流出を防止</li>
+            <li>データプライバシーに関するコンプライアンス・規制要件への対応が容易に</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="note-box">
+        <strong>💡 補足:</strong> 今回のリリースには前バージョンに対するマイナーなバグ修正も含まれています。この pgAudit 拡張機能の機能は、メンテナンスバージョン <code>[PostgreSQL version].R20260712.01_RC31</code> 以降でサポートされます。
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    USER(["👤 アプリケーション / DB ユーザー"])
+    USER -->|"SQL 実行
+INSERT INTO users (id, email)
+VALUES (123, 'sensitive@example.com')"| PG
+
+    subgraph SQL["☁️ Cloud SQL for PostgreSQL"]
+        PG[("🐘 PostgreSQL
+インスタンス")]
+        AUDIT["🔍 pgAudit 拡張機能
+(cloudsql.enable_pgaudit=on)"]
+        MASK{"cloudsql.pgaudit_mask_literals"}
+        PG --> AUDIT --> MASK
+    end
+
+    MASK -->|"off (従来)
+VALUES (123, 'sensitive@example.com')"| LOG
+    MASK -->|"✨ on (マスキング)
+VALUES ($1, $2)"| LOG
+
+    LOG[("📋 Cloud Logging
+データアクセス監査ログ")]
+    LOG --> EXPLORER["📊 Logs Explorer
+(監査担当者)"]
+        </pre>
+      </div>
+      <p>
+        pgAudit 拡張機能は SQL 文を Cloud Logging のデータアクセス監査ログへ書き込む前に処理し、<code>cloudsql.pgaudit_mask_literals</code> フラグが <code>on</code> の場合はリテラル値を位置プレースホルダに置換してから記録します。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚙️ 主要機能</h2>
+
+      <div class="card">
+        <h3>1️⃣ リテラル値の自動マスキング</h3>
+        <p>
+          <code>cloudsql.pgaudit_mask_literals</code> フラグを <code>on</code> に設定すると、pgAudit がログ書き込み前に SQL 文を処理し、識別したリテラル値 (文字列定数、数値など) を位置プレースホルダに置換します。
+        </p>
+        <p style="margin-bottom: 0;">
+          例: <code>INSERT INTO users (id, email) VALUES (123, 'sensitive@example.com');</code> は、監査ログ上では <code>INSERT INTO users (id, email) VALUES ($1, $2);</code> として記録されます。
+        </p>
+      </div>
+
+      <div class="card">
+        <h3>2️⃣ 監査の網羅性の維持</h3>
+        <p style="margin-bottom: 0;">
+          マスキングされるのは<span class="highlight">リテラル値のみ</span>で、クエリの構造 (コマンド、対象テーブル・カラム) は引き続き記録されます。実行された操作の監査を維持しながら、機密性の高いデータ値のログ流出を防げます。
+        </p>
+      </div>
+
+      <div class="card">
+        <h3>3️⃣ マイナーなバグ修正</h3>
+        <p style="margin-bottom: 0;">
+          今回のリリースには、pgAudit 拡張機能の前バージョンに対するマイナーなバグ修正が含まれます。
+        </p>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3>📌 要件</h3>
+      <table>
+        <tr><th>項目</th><th>詳細</th></tr>
+        <tr><td>対象サービス</td><td>Cloud SQL for PostgreSQL</td></tr>
+        <tr><td>PostgreSQL バージョン</td><td><code>cloudsql.pgaudit_mask_literals</code> フラグは PostgreSQL 14 以降でサポート</td></tr>
+        <tr><td>メンテナンスバージョン</td><td><code>[PostgreSQL version].R20260712.01_RC31</code> 以降</td></tr>
+        <tr><td>前提フラグ</td><td><code>cloudsql.enable_pgaudit=on</code> (デフォルトは off) が必要</td></tr>
+        <tr><td>マスキングフラグ</td><td><code>cloudsql.pgaudit_mask_literals</code> (on / off)</td></tr>
+        <tr><td>マスキング対象</td><td>SQL 文内の文字列定数・数値などのリテラル値 → 位置プレースホルダ (<code>$1</code>, <code>$2</code>, ...) に置換</td></tr>
+        <tr><td>ログの出力先</td><td>Cloud Logging のデータアクセス監査ログ (<code>cloudaudit.googleapis.com/data_access</code>)</td></tr>
+      </table>
+
+      <h3>🎭 マスキングの動作例</h3>
+      <span class="code-label">SQL</span>
+      <pre><code class="language-sql">-- 元の SQL 文
+INSERT INTO users (id, email) VALUES (123, 'sensitive@example.com');
+
+-- マスキング有効時に監査ログへ記録される SQL 文
+INSERT INTO users (id, email) VALUES ($1, $2);</code></pre>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <div class="note-box">
+        <strong>📌 前提条件:</strong>
+        <ol style="margin: 8px 0 0; padding-left: 20px;">
+          <li>Cloud SQL for PostgreSQL 14 以降のインスタンスで、対象のメンテナンスバージョン (<code>R20260712.01_RC31</code> 以降) が適用されていること</li>
+          <li><code>cloudsql.enable_pgaudit</code> フラグを <code>on</code> に設定し、pgAudit 拡張機能を作成済みであること (フラグ変更時にインスタンスが再起動される点に注意)</li>
+        </ol>
+      </div>
+
+      <div class="step">
+        <div class="step-number">1</div>
+        <div class="step-content">
+          <h3>pgAudit を有効化して拡張機能を作成</h3>
+          <span class="code-label">Bash</span>
+          <pre><code class="language-bash"># pgAudit を有効化 (インスタンスが再起動される)
+gcloud sql instances patch INSTANCE_NAME \
+  --database-flags cloudsql.enable_pgaudit=on,pgaudit.log=all</code></pre>
+          <p>その後、psql クライアントで拡張機能を作成します (Terraform での作成はサポートされません)。</p>
+          <span class="code-label">SQL</span>
+          <pre><code class="language-sql">CREATE EXTENSION pgaudit;</code></pre>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-number">2</div>
+        <div class="step-content">
+          <h3>リテラルマスキングを有効化</h3>
+          <span class="code-label">Bash</span>
+          <pre><code class="language-bash">gcloud sql instances patch INSTANCE_NAME \
+  --database-flags cloudsql.enable_pgaudit=on,pgaudit.log=all,cloudsql.pgaudit_mask_literals=on</code></pre>
+          <p><code>gcloud sql instances patch</code> の <code>--database-flags</code> は既存のフラグを上書きするため、維持したいフラグをすべて指定します。無効化する場合は <code>cloudsql.pgaudit_mask_literals=off</code> を設定します。</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-number">3</div>
+        <div class="step-content">
+          <h3>監査ログの確認</h3>
+          <p>Logs Explorer で以下のクエリを使用して pgAudit ログを確認できます (プロジェクトでデータアクセス監査ログの有効化が必要です)。</p>
+          <span class="code-label">Logs Explorer</span>
+          <pre><code class="language-plaintext">resource.type="cloudsql_database"
+logName="projects/&lt;your-project-name&gt;/logs/cloudaudit.googleapis.com%2Fdata_access"
+protoPayload.request.@type="type.googleapis.com/google.cloud.sql.audit.v1.PgAuditEntry"</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- メリット / デメリット -->
+    <div class="section">
+      <h2>⚖️ メリットと制約事項</h2>
+
+      <div class="pros-cons">
+        <div>
+          <h3>✅ メリット (ビジネス面)</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>コンプライアンス対応の強化</strong>: 監査ログの要件 (政府、金融、ISO 認証など) と機密データ保護の両立が容易に</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>情報漏えいリスクの低減</strong>: パスワード・個人情報・シークレットが監査ログ経由で漏えいするリスクを低減</span></div>
+          <h3>✅ メリット (技術面)</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>フラグ 1 つで有効化</strong>: アプリケーション側の変更なしにマスキングが適用される</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span><strong>監査構造の維持</strong>: 「誰がどのテーブルにどの操作をしたか」の監査目的は損なわれない</span></div>
+        </div>
+        <div>
+          <h3>⚠️ 制限事項</h3>
+          <div class="check-item"><span class="cross-icon">✗</span><span>Cloud SQL for <strong>PostgreSQL 14 以降</strong>でのみサポート</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>メンテナンスバージョン <code>R20260712.01_RC31</code> 以降が必要</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>前提の <code>cloudsql.enable_pgaudit</code> はデフォルト無効で、値の変更時に<strong>インスタンスが再起動</strong>される</span></div>
+        </div>
+      </div>
+
+      <div class="warning-box">
+        <strong>⚠️ 考慮すべき点:</strong>
+        <ul style="margin: 8px 0 0; padding-left: 20px;">
+          <li>マスキング有効時は監査ログからリテラル値 (実際に投入・検索された値) を確認できなくなるため、値の内容まで追跡したい調査用途とのトレードオフを検討する</li>
+          <li>pgAudit の監査ログは Cloud Logging へ送信される前に一時的にインスタンスのディスクに書き込まれる。pgAudit 使用時はストレージの自動増量の有効化が推奨される</li>
+          <li>明示的な <code>CREATE ROLE</code> コマンドで作成されたデータベースユーザーには監査設定を変更する権限がなく、Google Cloud コンソールまたは gcloud で作成されたユーザーのみが変更できる</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>💼 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>🏦 ユースケース 1: 金融システムのデータベース監査</h3>
+        <p><strong>シナリオ</strong>: 金融規制により全 DML 操作の監査ログが必須だが、顧客の個人情報や口座情報がクエリのリテラル値としてログに残ることは避けたい。</p>
+        <span class="code-label">Bash</span>
+        <pre><code class="language-bash">gcloud sql instances patch finance-db \
+  --database-flags cloudsql.enable_pgaudit=on,pgaudit.log=read,write,cloudsql.pgaudit_mask_literals=on</code></pre>
+        <p style="margin-bottom: 0;"><strong>効果</strong>: 読み取り・書き込み操作の監査を網羅しながら、監査ログには <code>VALUES ($1, $2)</code> のようにマスキングされた文のみが記録され、個人情報のログ流出を防止できる。</p>
+      </div>
+
+      <div class="usecase">
+        <h3>👥 ユースケース 2: 監査ログの閲覧権限を広く付与する運用</h3>
+        <p><strong>シナリオ</strong>: 開発チームやセキュリティチームなど複数の関係者が Logs Explorer で監査ログを参照する運用をしているが、ログ内に機密データが含まれると閲覧権限の管理が複雑になる。</p>
+        <p style="margin-bottom: 0;"><strong>効果</strong>: リテラル値がマスキングされるため、ログ閲覧者に実データが露出せず、クエリ構造ベースの監査・調査を広いメンバーで安全に実施できる。</p>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>
+        このアップデート自体に<span class="highlight">追加料金はありません</span>。pgAudit で生成された監査ログは Cloud Logging のデータアクセス監査ログとして送信されるため、Cloud Logging の取り込み量に応じた料金が発生します。詳細は各料金ページを参照してください。
+      </p>
+      <div class="check-item"><span class="check-icon">→</span><a class="gc-link" href="https://cloud.google.com/sql/pricing" target="_blank" rel="noopener noreferrer">Cloud SQL の料金</a></div>
+      <div class="check-item"><span class="check-icon">→</span><a class="gc-link" href="https://cloud.google.com/stackdriver/pricing" target="_blank" rel="noopener noreferrer">Cloud Logging の料金</a></div>
+    </div>
+
+    <!-- 利用可能リージョン -->
+    <div class="section">
+      <h2>🌏 利用可能リージョン</h2>
+      <p style="margin-bottom: 0;">
+        リージョン固有の制限はリリースノートに記載されていません。メンテナンスバージョン <code>R20260712.01_RC31</code> 以降が適用されたインスタンスで利用できます。
+      </p>
+    </div>
+
+    <!-- 関連サービス -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <h3>📋 Cloud Logging</h3>
+        <p style="margin-bottom: 0;">pgAudit のログはデータアクセス監査ログとして Cloud Logging に送信され、Logs Explorer で参照できる。</p>
+      </div>
+      <div class="card">
+        <h3>🛡️ Cloud Audit Logs</h3>
+        <p style="margin-bottom: 0;">pgAudit が SQL コマンド・クエリの監査を担うのに対し、Cloud SQL インスタンスに対する管理・メンテナンス操作の監査には Cloud Audit Logs を使用する。</p>
+      </div>
+      <div class="card">
+        <h3>🚩 Cloud SQL データベースフラグ</h3>
+        <p style="margin-bottom: 0;"><code>cloudsql.enable_pgaudit</code> や <code>cloudsql.pgaudit_mask_literals</code> などのフラグは、コンソール・gcloud CLI・Cloud SQL Admin API から設定できる。</p>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>🎯 まとめ</h2>
+      <div class="success-box">
+        <p style="margin: 0 0 8px;">
+          Cloud SQL for PostgreSQL の pgAudit リテラルマスキングは、<strong>「監査ログの網羅性」と「機密データの保護」</strong>というこれまでトレードオフになりがちだった 2 つの要件を、<span class="highlight">フラグ 1 つで両立</span>できるアップデートです。
+        </p>
+        <p style="margin: 0;">
+          pgAudit を利用してコンプライアンス対応をしているチームは、インスタンスのメンテナンスバージョン (<code>R20260712.01_RC31</code> 以降) と PostgreSQL バージョン (14 以降) を確認のうえ、<code>cloudsql.pgaudit_mask_literals</code> フラグの有効化を検討することを推奨します。
+        </p>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul>
+        <li><a href="https://docs.cloud.google.com/release-notes#September_29_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026-09-29)</a></li>
+        <li><a href="https://docs.cloud.google.com/sql/docs/postgres/pg-audit" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: Audit for PostgreSQL using pgAudit</a></li>
+        <li><a href="https://cloud.google.com/sql/docs/postgres/flags" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: Configure database flags</a></li>
+        <li><a href="https://cloud.google.com/sql/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud SQL 料金ページ</a></li>
+      </ul>
+      <p>このインフォグラフィックは Google Cloud News レポート (2026-09-29) に基づいて生成されました。</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+        startOnLoad: true,
+        theme: 'base',
+        themeVariables: {
+            primaryColor: '#4285F4',
+            primaryTextColor: '#202124',
+            primaryBorderColor: '#4285F4',
+            lineColor: '#4285F4',
+            secondaryColor: '#F1F3F4',
+            tertiaryColor: '#FAFAFA',
+            background: '#FFFFFF',
+            mainBkg: '#E8F0FE',
+            nodeBorder: '#4285F4',
+            clusterBkg: '#E8F0FE',
+            clusterBorder: '#4285F4',
+            edgeLabelBackground: '#FFFFFF',
+            textColor: '#202124'
+        }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BigQuery pipelines / Dataform: 自動メタデータエンリッチメントと Knowledge Catalog データ品質スコアカード統合 (GA)</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+:root {
+  --gc-blue: #4285F4;
+  --gc-red: #EA4335;
+  --gc-yellow: #FBBC04;
+  --gc-green: #34A853;
+  --gc-blue-900: #174EA6;
+  --gc-blue-800: #185ABC;
+  --gc-blue-700: #1967D2;
+  --gc-blue-600: #1A73E8;
+  --gc-blue-500: #4285F4;
+  --gc-blue-300: #669DF6;
+  --gc-blue-200: #8AB4F8;
+  --gc-blue-100: #AECBFA;
+  --gc-blue-50: #E8F0FE;
+  --gc-on-surface: #202124;
+  --gc-on-surface-variant: #5F6368;
+  --gc-outline: #80868B;
+  --gc-surface: #FFFFFF;
+  --gc-surface-container-lowest: #F8F9FA;
+  --gc-surface-container-low: #F1F3F4;
+  --gc-surface-container: #E8EAED;
+  --gc-outline-variant: #DADCE0;
+  --gc-blue-tint: #E8F0FE;
+  --gc-green-tint: #E6F4EA;
+  --gc-red-tint: #FCE8E6;
+  --gc-yellow-tint: #FEF7E0;
+  --gc-purple-tint: #F3E8FD;
+  --gc-teal-tint: #E0F7FA;
+  --gc-purple: #A142F4;
+  --gc-teal: #00BCD4;
+  --gc-orange: #FF6D00;
+}
+
+body {
+  background-color: var(--gc-surface);
+  font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+  color: var(--gc-on-surface-variant);
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 20px;
+  margin: 0;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 3px solid var(--gc-blue-600);
+}
+
+h1, .title {
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--gc-on-surface);
+  margin: 0;
+  line-height: 1.4;
+}
+
+h2, .section-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin-top: 0;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gc-on-surface);
+  margin: 20px 0 8px;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: var(--gc-outline);
+}
+
+.section {
+  background: var(--gc-surface-container-low);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid var(--gc-outline-variant);
+}
+
+.highlight {
+  background-color: var(--gc-blue-50);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--gc-blue-800);
+  border-bottom: 2px solid var(--gc-blue-600);
+}
+
+.card {
+  background: var(--gc-surface);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border-left: 4px solid var(--gc-blue-600);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+}
+
+.card h3 {
+  margin-top: 0;
+}
+
+.icon-text {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+  color: var(--gc-on-surface-variant);
+}
+
+.arrow {
+  color: var(--gc-blue-600);
+  font-size: 20px;
+}
+
+.gc-link {
+  color: var(--gc-blue-600);
+  text-decoration: none;
+}
+
+.gc-link:hover {
+  color: var(--gc-blue-800);
+  text-decoration: underline;
+}
+
+.badge,
+.badge-ga,
+.badge-preview,
+.badge-deprecated {
+  display: inline-block;
+  color: #FFFFFF;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+  margin: 4px 8px 4px 0;
+}
+
+.badge {
+  background: var(--gc-blue-600);
+}
+
+.badge-ga {
+  background: var(--gc-green);
+  color: #FFFFFF;
+}
+
+.badge-preview {
+  background: var(--gc-orange);
+  color: #FFFFFF;
+}
+
+.badge-deprecated {
+  background: var(--gc-red);
+  color: #FFFFFF;
+}
+
+/* Before/After 比較 */
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+@media (max-width: 768px) {
+  .before-after {
+    grid-template-columns: 1fr;
+  }
+}
+
+.before-box, .after-box {
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.before-box {
+  background: var(--gc-red-tint);
+  border: 1px solid rgba(234, 67, 53, 0.3);
+}
+
+.after-box {
+  background: var(--gc-green-tint);
+  border: 1px solid rgba(52, 168, 83, 0.3);
+}
+
+.before-box h3, .after-box h3 {
+  margin-top: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.before-box h3 { color: #C5221F; }
+.after-box h3 { color: #188038; }
+
+.before-box ul, .after-box ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+
+.before-box li, .after-box li {
+  margin: 8px 0;
+  font-size: 14px;
+}
+
+/* フロー図 */
+.flow-diagram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 24px 0;
+}
+
+.flow-step {
+  background: var(--gc-surface);
+  border: 2px solid var(--gc-blue-600);
+  border-radius: 12px;
+  padding: 12px 20px;
+  text-align: center;
+  min-width: 100px;
+  color: var(--gc-on-surface);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+  font-size: 14px;
+}
+
+.flow-arrow {
+  color: var(--gc-blue-600);
+  font-size: 24px;
+  font-weight: bold;
+}
+
+/* チェックリスト */
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.check-icon {
+  color: var(--gc-green);
+  font-size: 18px;
+}
+
+.cross-icon {
+  color: var(--gc-red);
+  font-size: 18px;
+}
+
+/* Mermaid コンテナ */
+.mermaid-container {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 20px 0;
+  border: 2px solid rgba(66, 133, 244, 0.3);
+  overflow-x: auto;
+}
+
+.mermaid {
+  display: flex;
+  justify-content: center;
+}
+
+/* コードブロック */
+.code-block,
+pre:not(.mermaid) {
+  background: #1E1E1E;
+  border-radius: 8px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: #E8E8E8;
+  margin: 16px 0;
+}
+
+.code-block {
+  overflow: hidden;
+}
+
+.code-header {
+  background: #2D2D2D;
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.code-lang {
+  color: #9CDCFE;
+  font-weight: bold;
+}
+
+.code-title {
+  color: #AAAAAA;
+}
+
+.code-block pre {
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+}
+
+.code-block code {
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 16px !important;
+  display: block;
+}
+
+pre:not(.mermaid) code {
+  background: none;
+  border: none;
+  font-size: inherit;
+  color: inherit;
+}
+
+/* インラインコード */
+code:not(pre code) {
+  background: var(--gc-surface-container-low);
+  border: 1px solid var(--gc-outline-variant);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+  font-size: 0.9em;
+  color: var(--gc-blue-900);
+}
+
+.section code:not(pre code) {
+  background: var(--gc-surface);
+}
+
+/* テーブル */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--gc-outline-variant);
+  background: var(--gc-surface);
+}
+
+th {
+  background: var(--gc-blue-50);
+  color: var(--gc-blue-900);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 2px solid var(--gc-blue-200);
+}
+
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--gc-outline-variant);
+  font-size: 14px;
+}
+
+tr:nth-child(even) {
+  background: var(--gc-surface-container-lowest);
+}
+
+tr:hover {
+  background: var(--gc-blue-50);
+}
+
+/* ボックス */
+.note-box {
+  background: var(--gc-blue-tint);
+  border-left: 4px solid var(--gc-blue-600);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.warning-box {
+  background: var(--gc-yellow-tint);
+  border-left: 4px solid var(--gc-yellow);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.error-box {
+  background: var(--gc-red-tint);
+  border-left: 4px solid var(--gc-red);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.ai-box {
+  background: var(--gc-purple-tint);
+  border-left: 4px solid var(--gc-purple);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+.success-box {
+  background: var(--gc-green-tint);
+  border-left: 4px solid var(--gc-green);
+  padding: 16px 20px;
+  border-radius: 0 12px 12px 0;
+  margin: 16px 0;
+}
+
+/* ユースケース */
+.usecase {
+  background: var(--gc-blue-tint);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+  border: 1px solid var(--gc-blue-100);
+}
+
+.usecase h3 {
+  margin-top: 0;
+  color: var(--gc-blue-900);
+}
+
+/* ステップ番号 */
+.step-item {
+  display: flex;
+  gap: 12px;
+  margin: 16px 0;
+  align-items: flex-start;
+}
+
+.step-number {
+  background: var(--gc-blue-600);
+  color: #FFFFFF;
+  min-width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.step-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.step-content h3 {
+  margin-top: 2px;
+}
+
+/* 2 カラムグリッド */
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 768px) {
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+ul {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+
+li {
+  margin: 6px 0;
+}
+
+footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gc-outline-variant);
+  font-size: 12px;
+  color: var(--gc-outline);
+}
+
+footer a {
+  color: var(--gc-blue-600);
+  word-break: break-all;
+}
+
+footer ul {
+  padding-left: 20px;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ヘッダー -->
+  <div class="header">
+    <div>
+      <div style="margin-bottom: 8px;">
+        <span class="badge">BigQuery pipelines</span>
+        <span class="badge">Dataform</span>
+        <span class="badge" style="background: var(--gc-purple);">Knowledge Catalog</span>
+        <span class="badge badge-ga">GA (一般提供)</span>
+      </div>
+      <h1>🗂️ 自動メタデータエンリッチメントと<br>Knowledge Catalog データ品質スコアカード統合</h1>
+    </div>
+    <div class="subtitle">📅 リリース日: 2026-10-01</div>
+  </div>
+
+  <!-- 概要 -->
+  <div class="section">
+    <h2>📋 概要</h2>
+    <p>
+      BigQuery pipelines と Dataform で、<span class="highlight">自動メタデータエンリッチメント</span>と
+      <span class="highlight">Knowledge Catalog データ品質スコアカード統合</span>が一般提供 (GA) になりました。
+      SQLX の config ブロックに <code>metadata</code> キーでセマンティックメタデータ (Overview / Generic アスペクト) を定義すると、
+      パイプラインアクションの正常完了時に Dataform が自動的に Knowledge Catalog へ同期します。
+      さらに、Dataform アサーション (データ品質テスト) の結果が自動的にデータ品質スコアカードへ
+      <strong>Pass/Fail</strong> として発行されます。
+    </p>
+    <p>
+      パイプラインコード (Dataform SQLX) をメタデータとデータ品質の信頼できる情報源 (Source of Truth) として扱う
+      <span class="highlight">「Governance as Code」</span>を実現し、カタログ整備と品質可視化の運用負荷を大きく削減します。
+    </p>
+
+    <div class="before-after">
+      <div class="before-box">
+        <h3>❌ Before (アップデート前)</h3>
+        <ul>
+          <li>ビジネス的な説明文 (Overview) などのセマンティックメタデータは Knowledge Catalog 側で<strong>手動管理</strong>が必要だった</li>
+          <li>Dataform アサーションの結果はパイプライン内で確認する必要があり、カタログのデータ品質スコアカードには<strong>自動反映されなかった</strong></li>
+          <li>2026 年 8 月 13 日から Preview 提供されていたが、本番利用には GA を待つ必要があった</li>
+        </ul>
+      </div>
+      <div class="after-box">
+        <h3>✅ After (アップデート後)</h3>
+        <ul>
+          <li>SQLX config の metadata (Overview、Generic アスペクト) がアクション正常完了時に Knowledge Catalog へ<strong>自動同期</strong> (GA)</li>
+          <li>アサーション結果がデータ品質スコアカードへ自動発行され、<strong>Pass/Fail がカタログ上で可視化</strong> (GA)</li>
+          <li><strong>Data Engineering Agent</strong> がテーブル構成からメタデータを自動生成し、実行時に Knowledge Catalog へ送信可能</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- アーキテクチャ図 -->
+  <div class="section">
+    <h2>🏗️ アーキテクチャ図</h2>
+    <div class="mermaid-container">
+      <pre class="mermaid">
+flowchart LR
+    subgraph Dev["開発"]
+        AG["🤖 Data Engineering Agent<br>(メタデータを自動生成)"]
+        SQLX["📝 SQLX config<br>metadata / assertions"]
+    end
+
+    subgraph Exec["実行"]
+        PL["⚙️ BigQuery pipelines /<br>Dataform ワークフロー"]
+        BQ[("🗄️ BigQuery<br>テーブル / ビュー")]
+        AS{"✅ アサーション<br>(データ品質テスト)"}
+    end
+
+    subgraph KC["Knowledge Catalog"]
+        OV["📋 Overview / Generic<br>アスペクト"]
+        DQ["📊 データ品質<br>スコアカード (Pass/Fail)"]
+    end
+
+    AG -->|"メタデータ提案"| SQLX
+    SQLX --> PL
+    PL -->|"テーブル作成"| BQ
+    PL --> AS
+    PL -.->|"非同期メタデータ同期<br>(失敗時は自動リトライ)"| OV
+    AS -.->|"結果を自動発行"| DQ
+      </pre>
+    </div>
+    <p style="font-size: 14px;">
+      SQLX config に定義したセマンティックメタデータは、パイプラインアクションの正常完了時に<strong>非同期</strong>で Knowledge Catalog に同期されます。
+      アサーションの実行結果はデータ品質スコアカードに Pass/Fail として自動発行されます。
+    </p>
+  </div>
+
+  <!-- 主要機能 -->
+  <div class="section">
+    <h2>⚡ 主要機能</h2>
+
+    <div class="card">
+      <h3>📝 1. 自動メタデータエンリッチメント</h3>
+      <div class="icon-text"><span class="arrow">→</span><span>SQLX ファイルの config ブロックの <code>metadata</code> キーに Knowledge Catalog 向けカスタムメタデータを定義</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>サポート対象: <strong>Overview</strong> (エントリのドキュメント・サマリーテキスト)、<strong>Generic アスペクト</strong> (システムやタイプ情報などのセマンティック詳細)</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>テーブルアクションの正常完了時に、Dataform が対応するエントリへのメタデータ書き込みを自動開始</span></div>
+    </div>
+
+    <div class="card" style="border-left-color: var(--gc-green);">
+      <h3>📊 2. Knowledge Catalog データ品質スコアカード統合</h3>
+      <div class="icon-text"><span class="arrow">→</span><span>パイプライン実行中に Dataform アサーションの結果が自動的に Knowledge Catalog へ発行</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>結果はデータ品質スコアカードに <strong>Pass/Fail</strong> ステータスとして反映</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>各実行は以前の Dataform 実行によるスコアカードを上書き (Knowledge Catalog のデータスキャン由来のスコアカードには影響なし)</span></div>
+    </div>
+
+    <div class="card" style="border-left-color: var(--gc-teal);">
+      <h3>🔄 3. SQL 実行から分離された同期設計</h3>
+      <div class="icon-text"><span class="arrow">→</span><span><strong>レイテンシ</strong>: 同期は非同期で行われ、BigQuery ジョブは Knowledge Catalog の更新完了を待たない</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span><strong>信頼性</strong>: 同期失敗時 (API レート制限など) は自動リトライ。メタデータ更新の失敗がアクションやワークフローの失敗を引き起こすことはない</span></div>
+    </div>
+
+    <div class="card" style="border-left-color: var(--gc-purple);">
+      <h3>🤖 4. Data Engineering Agent によるメタデータ生成</h3>
+      <div class="icon-text"><span class="arrow">→</span><span>エージェントがテーブル構成から Knowledge Catalog メタデータを自動生成し、パイプライン実行時に送信</span></div>
+      <div class="icon-text"><span class="arrow">→</span><span>アサーション追加の指示にも対応し、スキーマやサンプルデータから妥当なデータ品質チェックを推論して追加可能</span></div>
+    </div>
+  </div>
+
+  <!-- 技術仕様 -->
+  <div class="section">
+    <h2>🔧 技術仕様</h2>
+
+    <h3>📦 サポートされるメタデータ構成要素</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>メタデータ構成要素</th>
+          <th>内容</th>
+          <th>必要な Dataform core バージョン</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Overview</strong></td>
+          <td>エントリのドキュメントおよびサマリーテキスト</td>
+          <td><code>3.0.37</code> 以降</td>
+        </tr>
+        <tr>
+          <td><strong>Generic アスペクト</strong></td>
+          <td>テーブルのシステム・タイプ情報などのセマンティック詳細</td>
+          <td><code>3.0.52</code> 以降</td>
+        </tr>
+        <tr>
+          <td><strong>データ品質スコアカード</strong></td>
+          <td>アサーション結果の Pass/Fail ステータス</td>
+          <td>- (パイプライン実行時に自動発行)</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>📝 SQLX config の記述例</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">SQLX</span>
+        <span class="code-title">config ブロックにメタデータを定義</span>
+      </div>
+      <pre><code class="language-javascript">config {
+  type: "table",
+  metadata: {
+    overview: "This table provides standardized trip data.",
+    extraProperties: {
+      generic: {
+        system: "BigQuery",
+        type: "table"
+      }
+    }
+  }
+}</code></pre>
+    </div>
+
+    <h3>🔐 必要な IAM ロール (Knowledge Catalog メタデータ管理)</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>用途</th>
+          <th>ロール</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Knowledge Catalog でのメタデータの表示・管理</td>
+          <td>Dataplex Catalog Editor (<code>roles/dataplex.catalogEditor</code>) をプロジェクトまたは <code>@bigquery</code> エントリグループに付与</td>
+        </tr>
+        <tr>
+          <td>カスタムサービスアカウントでのパイプライン実行</td>
+          <td>上記に加え BigQuery Job User (<code>roles/bigquery.jobUser</code>)、BigQuery Data Editor (<code>roles/bigquery.dataEditor</code>)</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 設定方法 -->
+  <div class="section">
+    <h2>🛠️ 設定方法</h2>
+
+    <h3>✅ 前提条件</h3>
+    <div class="check-item"><span class="check-icon">✓</span><span>BigQuery pipeline または Dataform ワークフローを作成済みであること</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span>プロジェクトで Dataplex API が有効化されていること</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span>Dataform core バージョンが要件を満たしていること (Overview: 3.0.37 以降、Generic アスペクト: 3.0.52 以降)</span></div>
+    <div class="check-item"><span class="check-icon">✓</span><span>必要な IAM ロール (<code>roles/dataplex.catalogEditor</code> など) が付与されていること</span></div>
+
+    <div class="step-item">
+      <div class="step-number">1</div>
+      <div class="step-content">
+        <h3>SQLX config にメタデータを定義</h3>
+        <p style="font-size: 14px; margin: 4px 0;">テーブル定義 SQLX ファイルの config ブロックに <code>metadata</code> キーを追加します。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQLX</span>
+            <span class="code-title">テーブル定義 + メタデータ</span>
+          </div>
+          <pre><code class="language-javascript">config {
+  type: "table",
+  description: "Description of the table",
+  metadata: {
+    overview: "This table provides standardized trip data.",
+    extraProperties: {
+      generic: {
+        system: "BigQuery",
+        type: "table"
+      }
+    }
+  }
+}</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="step-item">
+      <div class="step-number">2</div>
+      <div class="step-content">
+        <h3>アサーション (データ品質テスト) を定義</h3>
+        <p style="font-size: 14px; margin: 4px 0;">config ブロック内 (または別の SQLX ファイル) でアサーションを定義すると、実行時に結果がデータ品質スコアカードへ自動発行されます。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQLX</span>
+            <span class="code-title">アサーション定義</span>
+          </div>
+          <pre><code class="language-javascript">config {
+  assertions: {
+    uniqueKey: ["id"]
+  }
+}</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="step-item">
+      <div class="step-number">3</div>
+      <div class="step-content">
+        <h3>パイプラインを実行し、同期状態を確認</h3>
+        <p style="font-size: 14px; margin: 4px 0;">アクションの正常完了後、メタデータ同期が自動的に開始されます。同期ステータスは以下で確認できます。</p>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Dataform ワークフロー</strong>: <a href="https://docs.cloud.google.com/dataform/docs/monitor-runs#inspect-workspace-execution-logs" target="_blank" rel="noopener noreferrer" class="gc-link">ワークスペース実行ログを確認</a></span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>BigQuery pipelines</strong>: <a href="https://docs.cloud.google.com/bigquery/docs/manage-pipelines#view-manual-runs" target="_blank" rel="noopener noreferrer" class="gc-link">過去の手動実行を確認</a></span></div>
+        <p style="font-size: 14px; margin: 4px 0;">同期完了後は、Knowledge Catalog でアセットを検索してエンリッチされたメタデータを確認できます。</p>
+      </div>
+    </div>
+
+    <div class="flow-diagram">
+      <div class="flow-step">📝 SQLX config に<br>metadata を定義</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">✅ アサーション<br>を定義</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">⚙️ パイプライン<br>実行</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">🗂️ Knowledge Catalog<br>へ自動同期</div>
+    </div>
+  </div>
+
+  <!-- メリット / デメリット -->
+  <div class="section">
+    <h2>⚖️ メリット・デメリット / 制約事項</h2>
+    <div class="grid-2">
+      <div>
+        <h3 style="margin-top: 0;">💼 ビジネス面のメリット</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>データガバナンスの自動化</strong>: コードにメタデータを定義するだけでカタログが自動整備され、属人化や陳腐化を防止</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>データ品質の可視化</strong>: スコアカードの Pass/Fail でデータ利用者が信頼性を判断しやすい</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>GA による本番利用</strong>: 本番環境のガバナンスプロセスに組み込み可能</span></div>
+        <h3>🔧 技術面のメリット</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>Governance as Code</strong>: テーブル定義・品質テスト・メタデータを SQLX で一元管理し、Git でバージョン管理可能</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>パイプラインへの影響なし</strong>: 同期は非同期で、失敗してもワークフローは失敗せず自動リトライ</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>AI による省力化</strong>: Data Engineering Agent がメタデータや品質チェックをプロアクティブに生成</span></div>
+      </div>
+      <div>
+        <h3 style="margin-top: 0;">⚠️ 制限事項</h3>
+        <div class="check-item"><span class="cross-icon">✗</span><span>Overview には Dataform core <strong>3.0.37 以降</strong>、Generic アスペクトには <strong>3.0.52 以降</strong>が必要</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>各実行は以前の Dataform 実行によるスコアカードを<strong>上書き</strong>する (履歴は保持されない)。ただしデータスキャン由来のスコアカードには影響しない</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span>Knowledge Catalog のクォータ・制限、および<strong>料金の対象</strong>となる</span></div>
+        <h3>🤔 考慮すべき点</h3>
+        <div class="check-item"><span style="font-size: 18px;">💡</span><span>同期は非同期のため、アクション完了直後は未反映の場合がある。同期ステータスは実行ログで確認</span></div>
+        <div class="check-item"><span style="font-size: 18px;">💡</span><span>カスタムサービスアカウント実行時は、そのサービスアカウントにも <code>roles/dataplex.catalogEditor</code> の付与が必要</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ユースケース -->
+  <div class="section">
+    <h2>🎯 ユースケース</h2>
+
+    <div class="usecase">
+      <h3>📚 ユースケース 1: パイプラインコードによるデータカタログの自動整備</h3>
+      <p style="font-size: 14px;">
+        <strong>シナリオ</strong>: 数百のテーブルを Dataform / BigQuery pipelines で管理しており、Knowledge Catalog 上の説明文やビジネスコンテキストが手動更新のため古くなりがち。
+      </p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">SQLX</span>
+          <span class="code-title">実装例: description、columns、metadata の一元管理</span>
+        </div>
+        <pre><code class="language-javascript">config {
+  type: "table",
+  description: "This table joins orders information from OnlineStore & payment information from PaymentApp",
+  columns: {
+    order_date: "The date when a customer placed their order",
+    id: "Order ID as defined by OnlineStore",
+    payment_status: "The status of a payment, for example, pending, paid"
+  },
+  metadata: {
+    overview: "This table provides joined orders and payment data.",
+    extraProperties: {
+      generic: {
+        system: "BigQuery",
+        type: "table"
+      }
+    }
+  }
+}</code></pre>
+      </div>
+      <p style="font-size: 14px; margin-bottom: 0;">
+        <strong>効果</strong>: 実行のたびに最新メタデータが Knowledge Catalog へ同期され、カタログとコードの乖離がなくなる。コードレビューでメタデータの品質も担保できる。
+      </p>
+    </div>
+
+    <div class="usecase">
+      <h3>🔍 ユースケース 2: データ品質ステータスのカタログ上での可視化</h3>
+      <p style="font-size: 14px;">
+        <strong>シナリオ</strong>: データ利用者 (アナリストや AI エージェント) が、テーブル利用前にデータが品質チェックを通過しているかを確認したい。
+      </p>
+      <div class="ai-box" style="font-size: 14px;">
+        <strong>🤖 実装例</strong>: Data Engineering Agent に「Add data quality checks for bigquery-public-data.thelook_ecommerce.users」のようにプロンプトし、スキーマとサンプルに基づくアサーションを自動生成。パイプライン実行時に結果が Knowledge Catalog のデータ品質スコアカードへ発行される。
+      </div>
+      <p style="font-size: 14px; margin-bottom: 0;">
+        <strong>効果</strong>: Knowledge Catalog のエントリを見るだけで最新実行のアサーション結果 (Pass/Fail) を確認でき、信頼できるデータかどうかを判断できる。
+      </p>
+    </div>
+  </div>
+
+  <!-- 料金・リージョン -->
+  <div class="section">
+    <h2>💰 料金・利用可能リージョン</h2>
+    <div class="note-box">
+      <strong>💰 料金</strong>: 本機能自体の追加料金に関する記載はリリースノートにありませんが、Knowledge Catalog でのパイプラインメタデータ管理は <strong>Knowledge Catalog (Dataplex) の料金の対象</strong>となります。
+      詳細は <a href="https://cloud.google.com/dataplex/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Dataplex (Knowledge Catalog) の料金</a> と
+      <a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">BigQuery の料金</a> を参照してください。
+    </div>
+    <div class="success-box">
+      <strong>🌏 利用可能リージョン</strong>: Knowledge Catalog によるパイプラインのメタデータ管理は、すべての<a href="https://docs.cloud.google.com/bigquery/docs/locations" target="_blank" rel="noopener noreferrer" class="gc-link">パイプラインロケーション</a>で利用できます。
+    </div>
+  </div>
+
+  <!-- 関連サービス -->
+  <div class="section">
+    <h2>🔗 関連サービス・機能</h2>
+    <div class="grid-2">
+      <div class="card" style="margin: 0;">
+        <h3>🗂️ Knowledge Catalog (Dataplex)</h3>
+        <p style="font-size: 14px; margin: 4px 0 0;">メタデータの保存・検索・エンリッチメント先。エントリ、アスペクト、データ品質スコアカードを提供。</p>
+      </div>
+      <div class="card" style="margin: 0; border-left-color: var(--gc-green);">
+        <h3>⚙️ Dataform</h3>
+        <p style="font-size: 14px; margin: 4px 0 0;">BigQuery pipelines の実行基盤。SQLX によるテーブル定義・アサーション・メタデータの一元管理を提供。</p>
+      </div>
+      <div class="card" style="margin: 0; border-left-color: var(--gc-purple);">
+        <h3>🤖 Data Engineering Agent (Gemini in BigQuery)</h3>
+        <p style="font-size: 14px; margin: 4px 0 0;">自然言語によるパイプライン構築に加え、Knowledge Catalog メタデータの自動生成・送信、データ品質チェックの推論・追加が可能。</p>
+      </div>
+      <div class="card" style="margin: 0; border-left-color: var(--gc-teal);">
+        <h3>🔍 Knowledge Catalog データスキャン</h3>
+        <p style="font-size: 14px; margin: 4px 0 0;">Dataform アサーションとは独立したデータ品質スコアカードのソース。Dataform 実行による上書きの影響を受けない。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- まとめ -->
+  <div class="section">
+    <h2>📌 まとめ</h2>
+    <div class="success-box">
+      <p style="margin: 0 0 8px;">
+        BigQuery pipelines と Dataform の自動メタデータエンリッチメントと Knowledge Catalog データ品質スコアカード統合が <strong>GA</strong> となり、
+        パイプラインコードを起点にしたメタデータ管理とデータ品質の可視化を本番環境で利用できるようになりました。
+      </p>
+      <p style="margin: 0;">
+        Dataform / BigQuery pipelines を利用中のチームは、SQLX config への <code>metadata</code> キー追加とアサーション定義から始めることで Knowledge Catalog の整備を自動化できます。
+        <strong>Data Engineering Agent</strong> を併用すれば、メタデータ記述の省力化も図れます。
+      </p>
+    </div>
+    <div style="margin-top: 12px;">
+      <span class="badge">BigQuery</span>
+      <span class="badge">Dataform</span>
+      <span class="badge">Knowledge Catalog</span>
+      <span class="badge">Dataplex</span>
+      <span class="badge">データガバナンス</span>
+      <span class="badge">データ品質</span>
+      <span class="badge">メタデータ</span>
+      <span class="badge" style="background: var(--gc-purple);">Data Engineering Agent</span>
+      <span class="badge badge-ga">GA</span>
+    </div>
+  </div>
+
+  <!-- フッター -->
+  <footer>
+    <p><strong>📎 出典・参考リンク</strong></p>
+    <ul>
+      <li><a href="https://docs.cloud.google.com/release-notes#October_01_2026" target="_blank" rel="noopener noreferrer">公式リリースノート (2026-10-01)</a></li>
+      <li><a href="https://docs.cloud.google.com/bigquery/docs/manage-pipelines" target="_blank" rel="noopener noreferrer">Metadata enrichment and data quality scorecard integration (Manage pipelines)</a></li>
+      <li><a href="https://docs.cloud.google.com/dataform/docs/create-tables#add-metadata" target="_blank" rel="noopener noreferrer">Add metadata for Knowledge Catalog (Dataform)</a></li>
+      <li><a href="https://docs.cloud.google.com/knowledge-catalog/docs/enrich-entries-metadata#data-quality-scorecard" target="_blank" rel="noopener noreferrer">Knowledge Catalog データ品質スコアカード</a></li>
+      <li><a href="https://docs.cloud.google.com/gemini/data-agents/data-engineering-agent/agent-overview" target="_blank" rel="noopener noreferrer">Data Engineering Agent の概要</a></li>
+      <li><a href="https://cloud.google.com/dataplex/pricing" target="_blank" rel="noopener noreferrer">料金ページ (Dataplex / Knowledge Catalog)</a></li>
+    </ul>
+    <p>本インフォグラフィックは Google Cloud News レポート (2026-10-01) を基に生成されました。</p>
+  </footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#4285F4',
+      primaryTextColor: '#202124',
+      primaryBorderColor: '#4285F4',
+      lineColor: '#4285F4',
+      secondaryColor: '#F1F3F4',
+      tertiaryColor: '#FAFAFA',
+      background: '#FFFFFF',
+      mainBkg: '#E8F0FE',
+      nodeBorder: '#4285F4',
+      clusterBkg: '#E8F0FE',
+      clusterBorder: '#4285F4',
+      edgeLabelBackground: '#FFFFFF',
+      textColor: '#202124'
+    }
+  });
+</script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

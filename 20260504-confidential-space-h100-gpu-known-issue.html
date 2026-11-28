@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Confidential Space: NVIDIA H100 GPU 既知の問題と回避策</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 12px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-error {
+      border-left-color: var(--gc-red);
+    }
+
+    .card-warning {
+      border-left-color: var(--gc-orange);
+    }
+
+    .card-success {
+      border-left-color: var(--gc-green);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-issue {
+      background: var(--gc-red);
+      color: #FFFFFF;
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge-workaround {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .feature-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid var(--gc-outline-variant);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .feature-card h4 {
+      color: var(--gc-on-surface);
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .feature-card p {
+      margin: 0;
+      font-size: 14px;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .steps-container {
+      counter-reset: step-counter;
+    }
+
+    .step-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      margin: 16px 0;
+      padding: 16px;
+      background: var(--gc-surface);
+      border-radius: 12px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .step-number {
+      background: var(--gc-blue-600);
+      color: #FFFFFF;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .step-content {
+      flex: 1;
+    }
+
+    .step-content h4 {
+      margin: 0 0 8px 0;
+      color: var(--gc-on-surface);
+    }
+
+    .step-content p {
+      margin: 0;
+      font-size: 14px;
+    }
+
+    .related-services {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .service-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px;
+      background: var(--gc-surface);
+      border-radius: 8px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .service-item .service-icon {
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .service-item .service-info h4 {
+      margin: 0 0 4px 0;
+      font-size: 14px;
+      color: var(--gc-on-surface);
+    }
+
+    .service-item .service-info p {
+      margin: 0;
+      font-size: 12px;
+      color: var(--gc-on-surface-variant);
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+      .feature-grid { grid-template-columns: 1fr; }
+      .related-services { grid-template-columns: 1fr; }
+      .flow-diagram { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>🔒 Confidential Space: NVIDIA H100 GPU 既知の問題と回避策</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Confidential Space</span>
+          <span class="badge-issue">Known Issue</span>
+          <span class="badge-workaround">回避策あり</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-05-04</div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        Google Cloud は Confidential Space において <span class="highlight">NVIDIA H100 GPU</span> を使用したワークロード実行時に発生する既知の問題を公表しました。
+        Confidential Space イメージ上で GPU ドライバーのインストールプロセスが正常に動作しないことが原因です。
+      </p>
+
+      <div class="error-box">
+        <strong>&#x26A0;&#xFE0F; エラーメッセージ:</strong><br>
+        <code style="background: #1E1E1E; color: #E8E8E8; padding: 4px 8px; border: none; font-size: 13px;">failed to get launchspec, make sure you're running inside a GCE VM: GPU Driver installation is not supported.</code>
+      </div>
+
+      <div class="note-box">
+        <strong>&#x1F4A1; 背景:</strong> 2026年4月29日に Confidential Space での H100 GPU サポート (a3-highgpu-1g マシンファミリー) が GA になったばかりであるため、利用開始直後のユーザーに特に影響する可能性があります。
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>&#x1F3D7;&#xFE0F; アーキテクチャ図</h2>
+      <p>Confidential VM の起動時に GPU ドライバーのインストール処理が失敗する場合があり、VM の再起動により問題が解消されます。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    A[Confidential VM 起動<br/>a3-highgpu-1g] --> B[Confidential Space イメージ読み込み]
+    B --> C[tee-install-gpu-driver=true<br/>メタデータ設定確認]
+    C --> D{GPU ドライバー<br/>インストール処理}
+    D -->|正常| E[ワークロードコンテナ起動]
+    D -->|異常| F[エラー発生<br/>GPU Driver installation<br/>is not supported]
+    F --> G[回避策: Confidential VM 再起動]
+    G --> D
+    E --> H[GPU ベースの<br/>機密ワークロード実行]
+
+    style F fill:#ff6b6b,stroke:#c0392b,color:#fff
+    style G fill:#f39c12,stroke:#e67e22,color:#fff
+    style H fill:#27ae60,stroke:#1e8449,color:#fff
+        </pre>
+      </div>
+    </div>
+
+    <!-- Problem Details -->
+    <div class="section">
+      <h2>&#x1F6A8; 問題の詳細</h2>
+
+      <div class="card card-error">
+        <h3>&#x274C; 発生条件</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>Confidential Space イメージを使用した Confidential VM</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>NVIDIA H100 GPU がアタッチされた構成 (<code>a3-highgpu-1g</code> マシンタイプ)</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>メタデータ変数 <code>tee-install-gpu-driver=true</code> が設定されている環境</span></div>
+      </div>
+
+      <div class="card card-warning">
+        <h3>&#x26A0;&#xFE0F; 影響範囲</h3>
+        <div class="icon-text"><span class="arrow">→</span><span>GPU ドライバーのインストールが完了しないため、GPU ベースのワークロードが起動できない</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>Confidential Space の GPU アテステーション機能も利用不可となる</span></div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>&#x2699;&#xFE0F; 技術仕様</h2>
+      <h3>影響を受ける構成</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>マシンタイプ</td><td><code>a3-highgpu-1g</code></td></tr>
+          <tr><td>GPU</td><td>NVIDIA H100 80GB</td></tr>
+          <tr><td>Confidential Computing 技術</td><td>Intel TDX</td></tr>
+          <tr><td>プロビジョニングモデル</td><td>Spot または Flex-start</td></tr>
+          <tr><td>イメージファミリー</td><td><code>confidential-space</code> / <code>confidential-space-debug</code></td></tr>
+          <tr><td>必須メタデータ</td><td><code>tee-install-gpu-driver=true</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3>関連する既知の問題</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>問題</th>
+            <th>回避策</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>GPU ドライバーインストール未サポートエラー</td>
+            <td>Confidential VM の再起動</td>
+          </tr>
+          <tr>
+            <td>GPU アテステーション失敗 (index 9 の measurement record 不一致)</td>
+            <td>Confidential VM の完全な停止と再起動 (ゲスト OS からの再起動では不可)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Workaround Section -->
+    <div class="section">
+      <h2>&#x1F527; 回避策</h2>
+
+      <div class="steps-container">
+        <div class="step-item">
+          <div class="step-number">1</div>
+          <div class="step-content">
+            <h4>Confidential VM の再起動</h4>
+            <p>Google Cloud Console または gcloud CLI を使用して Confidential VM を再起動します。</p>
+            <span class="code-label">Bash</span>
+            <pre><code class="language-bash"># gcloud CLI を使用した VM の停止と起動
+gcloud compute instances stop INSTANCE_NAME \
+    --zone=ZONE_NAME \
+    --project=PROJECT_ID
+
+gcloud compute instances start INSTANCE_NAME \
+    --zone=ZONE_NAME \
+    --project=PROJECT_ID</code></pre>
+          </div>
+        </div>
+
+        <div class="step-item">
+          <div class="step-number">2</div>
+          <div class="step-content">
+            <h4>再起動後の確認</h4>
+            <p>VM が再起動した後、ワークロードが正常に GPU を認識して動作していることを確認します。</p>
+            <span class="code-label">Bash</span>
+            <pre><code class="language-bash"># インスタンスのステータス確認
+gcloud compute instances describe INSTANCE_NAME \
+    --zone=ZONE_NAME \
+    --project=PROJECT_ID \
+    --format="value(status)"</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="warning-box">
+        <strong>&#x1F4DD; 注意事項:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>GPU アテステーション失敗の問題とは異なり、本問題ではゲスト OS からの再起動でも回避できる可能性があります</li>
+          <li>再起動後も問題が継続する場合は、VM の完全な停止と再起動 (stop/start) を試してください</li>
+          <li>Google は根本的な修正に取り組んでいます</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Workaround Flow -->
+    <div class="section">
+      <h2>&#x1F504; 回避策フロー</h2>
+      <div class="flow-diagram">
+        <div class="flow-step">&#x1F6A8; エラー発生</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">&#x23F9;&#xFE0F; VM 停止<br/><code style="font-size:11px;">gcloud stop</code></div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">&#x25B6;&#xFE0F; VM 起動<br/><code style="font-size:11px;">gcloud start</code></div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">&#x2705; 正常動作</div>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#x1F517; 関連サービス</h2>
+      <div class="related-services">
+        <div class="service-item">
+          <span class="service-icon">&#x1F512;</span>
+          <div class="service-info">
+            <h4>Confidential Computing</h4>
+            <p>Intel TDX 技術を使用してメモリを暗号化し、データの機密性を保護する基盤</p>
+          </div>
+        </div>
+        <div class="service-item">
+          <span class="service-icon">&#x1F6E1;&#xFE0F;</span>
+          <div class="service-info">
+            <h4>Confidential Space</h4>
+            <p>マルチパーティ計算や機密データ処理のための TEE 環境</p>
+          </div>
+        </div>
+        <div class="service-item">
+          <span class="service-icon">&#x1F4BB;</span>
+          <div class="service-info">
+            <h4>NVIDIA Confidential Computing</h4>
+            <p>H100 GPU のハードウェアベースのセキュリティ機能 (SPT モード)</p>
+          </div>
+        </div>
+        <div class="service-item">
+          <span class="service-icon">&#x2699;&#xFE0F;</span>
+          <div class="service-info">
+            <h4>Confidential GKE Nodes</h4>
+            <p>GKE 上で Confidential Computing を利用した GPU ワークロードを実行</p>
+          </div>
+        </div>
+        <div class="service-item">
+          <span class="service-icon">&#x2601;&#xFE0F;</span>
+          <div class="service-info">
+            <h4>Compute Engine</h4>
+            <p>Confidential VM の基盤となるインフラストラクチャサービス</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>&#x1F4DD; まとめ</h2>
+      <div class="success-box">
+        <strong>&#x2705; 要点:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>Confidential Space で NVIDIA H100 GPU 使用時に GPU ドライバーインストールエラーが発生する既知の問題</li>
+          <li>Confidential VM を再起動することで問題を回避可能</li>
+          <li>2026年4月29日に GA となったばかりの機能 - 新規利用者は運用手順に VM 再起動のステップを含めることを推奨</li>
+          <li>Google および NVIDIA による根本修正が進行中</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>&#x1F4CE; 出典:</strong></p>
+      <ul style="list-style: none; padding: 0; margin: 8px 0;">
+        <li style="margin: 4px 0;">&#x2022; <a href="https://cloud.google.com/confidential-computing/confidential-space/docs/release-notes" target="_blank" rel="noopener noreferrer">Confidential Space リリースノート</a></li>
+        <li style="margin: 4px 0;">&#x2022; <a href="https://cloud.google.com/confidential-computing/confidential-space/docs/deploy-workloads" target="_blank" rel="noopener noreferrer">Confidential Space GPU ワークロードのデプロイ</a></li>
+        <li style="margin: 4px 0;">&#x2022; <a href="https://cloud.google.com/kubernetes-engine/docs/how-to/gpus-confidential-nodes" target="_blank" rel="noopener noreferrer">Confidential GKE Nodes での GPU 使用</a></li>
+        <li style="margin: 4px 0;">&#x2022; <a href="https://cloud.google.com/compute/docs/instances/stop-start-instance" target="_blank" rel="noopener noreferrer">VM の停止と起動</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline);">Generated: 2026-05-05 | Google Cloud News Infographic</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

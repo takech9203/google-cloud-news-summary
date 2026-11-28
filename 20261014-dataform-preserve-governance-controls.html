@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dataform: preserveGovernanceControls による BigQuery ガバナンス制御の自動保持</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+      text-align: right;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .badge-preview {
+      background: var(--gc-orange);
+      color: #FFFFFF;
+    }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 768px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+    }
+
+    .before-box h3 {
+      color: var(--gc-red);
+    }
+
+    .after-box h3 {
+      color: var(--gc-green);
+    }
+
+    .before-after ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .before-after li {
+      margin: 8px 0;
+      font-size: 14px;
+    }
+
+    /* チェックリスト */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+    }
+
+    /* コードブロック (pre:not(.mermaid) で Mermaid 図を除外) */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block {
+      overflow: hidden;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* ステップ番号 */
+    .step {
+      display: flex;
+      gap: 16px;
+      margin: 16px 0;
+      align-items: flex-start;
+    }
+
+    .step-number {
+      background: var(--gc-blue-600);
+      color: #FFFFFF;
+      min-width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 16px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .step-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .step-content h3 {
+      margin-top: 0;
+      margin-bottom: 4px;
+    }
+
+    /* 保持シーケンスフロー (縦) */
+    .sequence-list {
+      counter-reset: seq;
+      list-style: none;
+      padding-left: 0;
+      margin: 12px 0;
+    }
+
+    .sequence-list li {
+      counter-increment: seq;
+      position: relative;
+      padding: 10px 14px 10px 48px;
+      margin: 8px 0;
+      background: var(--gc-surface);
+      border: 1px solid var(--gc-blue-200);
+      border-radius: 8px;
+      font-size: 14px;
+    }
+
+    .sequence-list li::before {
+      content: counter(seq);
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: var(--gc-blue-600);
+      color: #FFFFFF;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    /* ユースケース */
+    .usecase-box {
+      background: var(--gc-blue-tint);
+      border: 1px solid var(--gc-blue-200);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+    }
+
+    .usecase-box h3 {
+      margin-top: 0;
+      color: var(--gc-blue-800);
+    }
+
+    .usecase-label {
+      font-weight: 600;
+      color: var(--gc-on-surface);
+    }
+
+    /* 2 カラムグリッド */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 768px) {
+      .two-col {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    ul {
+      padding-left: 22px;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <h1>🛡️ Dataform: BigQuery ガバナンス制御の自動保持</h1>
+        <div style="margin-top: 12px;">
+          <span class="badge">Dataform</span>
+          <span class="badge">BigQuery</span>
+          <span class="badge badge-ga">GA (一般提供)</span>
+          <span class="badge badge-preview">データガバナンスタグは Preview</span>
+        </div>
+      </div>
+      <div class="subtitle">
+        リリース日: 2026-10-14<br>
+        <code>preserveGovernanceControls</code>
+      </div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📌 概要</h2>
+      <p>
+        Dataform で <span class="highlight">preserveGovernanceControls</span> オプションを有効化すると、Dataform の実行をまたいで
+        <strong>BigQuery のデータポリシー</strong>と<strong>データガバナンスタグ (Preview)</strong> を自動的に保持できるようになりました。
+      </p>
+      <p>
+        Dataform がワークフローアクションでオブジェクト (標準テーブル、ビュー、フルリフレッシュ時の増分テーブルなど) を再作成する際、
+        BigQuery では <code>CREATE OR REPLACE</code> ステートメントが生成されます。BigQuery のデフォルト動作では、このテーブル置換により
+        既存の<strong>列レベルアクセス制御メタデータ</strong> (データポリシーや、外部データガバナンスシステムが適用したタグ) が
+        自動的に削除されてしまいます。本アップデートで、タグなし (tagless) データポリシーを含むこれらのメタデータを
+        ワークフロー実行をまたいで自動保持できます。
+      </p>
+      <div class="note-box">
+        <strong>💡 誰に重要?</strong> 機密データを扱う ELT パイプラインを Dataform で運用し、BigQuery の列レベルセキュリティや
+        データマスキングを併用している<strong>データエンジニアリングチーム・データガバナンスチーム</strong>にとって重要なアップデートです。
+      </div>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before: アップデート前の課題</h3>
+          <ul>
+            <li>テーブル再作成 (<code>CREATE OR REPLACE</code>) のたびに、データポリシー・データガバナンスタグが<strong>削除</strong>されていた</li>
+            <li>外部データガバナンスシステムで適用したタグも、ワークフロー実行のたびに失われていた</li>
+            <li>セキュリティポリシー維持には、実行後に再適用する運用上の工夫が必要だった</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After: アップデート後の改善</h3>
+          <ul>
+            <li><code>preserveGovernanceControls: true</code> の設定だけで、データポリシー (タグなしを含む) とガバナンスタグを<strong>自動保持</strong></li>
+            <li>テーブル単位 (SQLX config) とリポジトリ全体 (workflow_settings.yaml) の両方で設定可能、個別オーバーライドも対応</li>
+            <li>中間ステージングテーブルへのポリシー再適用と<strong>アトミックなテーブルスワップ</strong>で安全に置換</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Before["❌ Before: 従来の動作"]
+        A1["🧑‍💻 Dataform 実行"] --> B1["📄 CREATE OR REPLACE TABLE"]
+        B1 --> C1[("🗄️ 新テーブル")]
+        B1 -. 削除される .-> D1["🔒 データポリシー<br/>🏷️ データガバナンスタグ"]
+    end
+
+    subgraph After["✅ After: preserveGovernanceControls 有効時"]
+        A2["🧑‍💻 Dataform 実行"] --> B2["📋 INFORMATION_SCHEMA.COLUMNS<br/>から列メタデータをバックアップ"]
+        B2 --> C2["🗂️ 中間ステージングテーブル作成"]
+        C2 --> D2["🔒 セキュリティポリシーを再適用"]
+        D2 --> E2["📥 データ投入"]
+        E2 --> F2[("🗄️ アトミックスワップで<br/>元テーブルを置換")]
+    end
+        </pre>
+      </div>
+      <p>
+        従来はテーブル置換時に列レベルアクセス制御メタデータが失われていましたが、本機能を有効化すると、
+        <span class="highlight">メタデータのバックアップ → ステージングテーブルへのポリシー再適用 → データ投入 → アトミックスワップ</span>
+        という順序で実行され、ガバナンス制御が保持されます。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚙️ 主要機能</h2>
+
+      <div class="card">
+        <h3>1️⃣ データポリシー・データガバナンスタグの自動保持</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span>BigQuery データポリシー (タグなしデータポリシーを含む) とデータガバナンスタグ (Preview) を、ワークフロー実行をまたいで自動保持</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>外部データガバナンスシステムによって適用されたタグも保持対象</span></div>
+      </div>
+
+      <div class="card">
+        <h3>2️⃣ 安全な置換シーケンス</h3>
+        <p style="margin: 4px 0;">有効化すると、Dataform は実行時に次の順序で処理します。</p>
+        <ol class="sequence-list">
+          <li>📋 <code>INFORMATION_SCHEMA.COLUMNS</code> ビューから既存の列メタデータをバックアップ</li>
+          <li>🗂️ 中間の空ステージングテーブルを作成</li>
+          <li>🔒 ステージングテーブルにセキュリティポリシーを再適用</li>
+          <li>📥 テーブルにデータを投入</li>
+          <li>🔄 アトミックなテーブルスワップで元のテーブルを置換</li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <h3>3️⃣ 柔軟な設定スコープ</h3>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>テーブル・増分テーブル・ビュー単位</strong>: SQLX 定義ファイルの config ブロックで設定</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>リポジトリ全体</strong>: <code>workflow_settings.yaml</code> でプロジェクト全体のデフォルトとして設定</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span>グローバル有効化時も、個別テーブルの config ブロックで <code>false</code> を設定してオーバーライド可能</span></div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔬 技術仕様: 要件と保持対象</h2>
+      <table>
+        <tr><th>項目</th><th>詳細</th></tr>
+        <tr><td>必要な Dataform core バージョン</td><td><strong>3.0.62 以降</strong></td></tr>
+        <tr><td>対象オブジェクト</td><td>テーブル、増分テーブル、ビュー</td></tr>
+        <tr><td>保持されるもの</td><td>BigQuery データポリシー (タグなしデータポリシーを含む)、データガバナンスタグ (Preview)</td></tr>
+        <tr><td>保持されないもの</td><td>行アクセスポリシー (post_operations での再適用が必要)、レガシーポリシータグ</td></tr>
+        <tr><td>設定スコープ</td><td>テーブル単位 (SQLX config)、リポジトリ全体 (workflow_settings.yaml)</td></tr>
+      </table>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <div class="note-box">
+        <strong>📋 前提条件:</strong>
+        ① Dataform core 3.0.62 以降を使用していること /
+        ② Dataform のリポジトリと開発ワークスペースが作成済みであること
+      </div>
+
+      <div class="step">
+        <div class="step-number">1</div>
+        <div class="step-content">
+          <h3>個別テーブルで有効化する</h3>
+          <p style="margin: 4px 0;">開発ワークスペースの Files ペインで <code>definitions/</code> を展開し、SQLX テーブル定義ファイルの config ブロックに <code>preserveGovernanceControls: true</code> を追加します。</p>
+          <div class="code-block">
+            <div class="code-header">
+              <span class="code-lang">SQLX</span>
+              <span class="code-title">テーブル定義で有効化</span>
+            </div>
+            <pre><code class="language-javascript">config {
+  type: "table",
+  preserveGovernanceControls: true
+}
+SELECT customer_id, email, phone_number FROM ${ref("raw_customers")}</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-number">2</div>
+        <div class="step-content">
+          <h3>リポジトリ全体で有効化する (任意)</h3>
+          <p style="margin: 4px 0;"><code>workflow_settings.yaml</code> に追加すると、すべてのテーブル・増分テーブル・ビューに対するプロジェクト全体のデフォルト動作として有効化できます。</p>
+          <div class="code-block">
+            <div class="code-header">
+              <span class="code-lang">YAML</span>
+              <span class="code-title">workflow_settings.yaml</span>
+            </div>
+            <pre><code class="language-yaml">defaultProject: my-gcp-project-id
+defaultDataset: my_dataform_dataset
+defaultLocation: US
+defaultAssertionDataset: my_dataform_assertions
+dataformCoreVersion: 3.0.62
+preserveGovernanceControls: true</code></pre>
+          </div>
+          <p style="margin: 4px 0; font-size: 14px;">グローバルに有効化した場合でも、特定のテーブルの config ブロックで <code>preserveGovernanceControls: false</code> を設定すれば、そのテーブルのみ保持を無効化できます。</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-number">3</div>
+        <div class="step-content">
+          <h3>行アクセスポリシーを post_operations で再適用する (必要な場合)</h3>
+          <p style="margin: 4px 0;">本機能は<strong>列レベル</strong>のメタデータを保護しますが、<strong>行アクセスポリシーは自動復元されません</strong>。オブジェクト置換により行レベルセキュリティルールは削除されるため、SQLX の <code>post_operations</code> ブロック内に SQL DDL を定義して、テーブル作成後に再適用します。</p>
+          <div class="code-block">
+            <div class="code-header">
+              <span class="code-lang">SQLX</span>
+              <span class="code-title">行アクセスポリシーの再適用</span>
+            </div>
+            <pre><code class="language-sql">config {
+  type: "table",
+}
+SELECT bike_id, start_time, duration FROM ${ref("raw_trips")}
+
+post_operations {
+  CREATE ROW ACCESS POLICY my_policy
+  ON ${self()}
+  GRANT TO ('serviceAccount:sa-name@example-gcp-project.iam.gserviceaccount.com')
+  FILTER USING (bike_id LIKE 'US-%');
+}</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- メリット / デメリット -->
+    <div class="section">
+      <h2>⚖️ メリットと制約事項</h2>
+      <div class="two-col">
+        <div>
+          <h3>💼 ビジネス面のメリット</h3>
+          <div class="success-box" style="margin-top: 8px;">
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>ガバナンスとコンプライアンスの維持</strong>: 機密列のマスキングやアクセス制御がパイプライン実行のたびに失われるリスクを排除し、継続的なコンプライアンスを担保</span></div>
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>運用負荷の削減</strong>: 実行のたびにポリシーを手動または独自の仕組みで再適用する必要がなくなる</span></div>
+          </div>
+          <h3>🔧 技術面のメリット</h3>
+          <div class="success-box" style="margin-top: 8px;">
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>宣言的な設定</strong>: config ブロックまたは workflow_settings.yaml に 1 行追加するだけで有効化</span></div>
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>アトミックなテーブルスワップ</strong>: ポリシー再適用後にデータを投入し、アトミックに置換するため安全</span></div>
+            <div class="check-item"><span class="check-icon">✓</span><span><strong>外部ガバナンスシステムとの親和性</strong>: 外部システムが適用したデータガバナンスタグも保持</span></div>
+          </div>
+        </div>
+        <div>
+          <h3>🚧 制限事項</h3>
+          <div class="warning-box" style="margin-top: 8px;">
+            <div class="check-item"><span class="cross-icon">✗</span><span>Dataform core <strong>3.0.62 以降</strong>が必要</span></div>
+            <div class="check-item"><span class="cross-icon">✗</span><span><strong>行アクセスポリシーは自動保持されない</strong> (post_operations での再適用が必要)</span></div>
+            <div class="check-item"><span class="cross-icon">✗</span><span><strong>レガシーポリシータグは保持できない</strong> (公式ドキュメントは、列レベルセキュリティにはポリシータグではなく BigQuery データガバナンスタグ (Preview) の使用を推奨)</span></div>
+          </div>
+          <h3>🤔 考慮すべき点</h3>
+          <div class="warning-box" style="margin-top: 8px;">
+            <div class="check-item"><span>⚠️</span><span>保持対象であるデータガバナンスタグ自体は <strong>Preview 段階</strong>の機能であり、Pre-GA 利用規約が適用される</span></div>
+            <div class="check-item"><span>⚠️</span><span>有効化すると実行シーケンスにメタデータのバックアップ、ステージングテーブル作成、ポリシー再適用のステップが追加される</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase-box">
+        <h3>📧 ユースケース 1: 機密データを含む ELT パイプラインでの列レベルセキュリティ維持</h3>
+        <p><span class="usecase-label">シナリオ:</span> 顧客のメールアドレスや電話番号を含むテーブルを Dataform で日次再構築しており、BigQuery のデータポリシーでマスキングを適用している。従来は再構築のたびにポリシーが失われていた。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">SQLX</span>
+            <span class="code-title">実装例</span>
+          </div>
+          <pre><code class="language-javascript">config {
+  type: "table",
+  preserveGovernanceControls: true
+}
+SELECT customer_id, email, phone_number FROM ${ref("raw_customers")}</code></pre>
+        </div>
+        <p style="margin-bottom: 0;"><span class="usecase-label">効果:</span> 日次実行後もデータポリシーとデータガバナンスタグが維持され、機密列のマスキングが途切れなく適用され続ける。</p>
+      </div>
+
+      <div class="usecase-box">
+        <h3>🏢 ユースケース 2: リポジトリ全体でのガバナンス統制の標準化</h3>
+        <p><span class="usecase-label">シナリオ:</span> 多数のテーブル定義を持つ Dataform リポジトリで、ガバナンス制御の保持をチーム標準として一括適用したい。</p>
+        <p style="margin-bottom: 0;"><span class="usecase-label">効果:</span> <code>workflow_settings.yaml</code> に <code>preserveGovernanceControls: true</code> を 1 行追加するだけで全テーブル・ビューに適用され、個別テーブルで <code>false</code> によるオーバーライドも可能なため、柔軟に統制を標準化できる。</p>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>本アップデートに固有の料金情報はリリースノートに記載されていません。Dataform および BigQuery の料金は以下を参照してください。</p>
+      <ul>
+        <li><a href="https://cloud.google.com/dataform/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Dataform の料金</a></li>
+        <li><a href="https://cloud.google.com/bigquery/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">BigQuery の料金</a></li>
+      </ul>
+    </div>
+
+    <!-- 関連サービス -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <h3>🔒 BigQuery データポリシー</h3>
+        <p style="margin: 0;">列レベルのデータマスキングやアクセス制御を実現する仕組み。本機能の<strong>保持対象</strong> (タグなしデータポリシーを含む)。</p>
+      </div>
+      <div class="card">
+        <h3>🏷️ BigQuery データガバナンスタグ <span class="badge badge-preview">Preview</span></h3>
+        <p style="margin: 0;">Resource Manager タグの一種で、機密列に付与してデータポリシーと組み合わせることで条件付きアクセスを実現する。本機能の<strong>保持対象</strong>。</p>
+      </div>
+      <div class="card" style="border-left-color: var(--gc-red);">
+        <h3>🚪 BigQuery 行アクセスポリシー</h3>
+        <p style="margin: 0;">行レベルのセキュリティルール。本機能では<strong>自動保持されない</strong>ため、Dataform の post_operations で再適用する。</p>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="success-box">
+        <p style="margin-top: 0;">
+          Dataform の <span class="highlight">preserveGovernanceControls</span> オプションにより、テーブル再作成のたびに
+          BigQuery のデータポリシーとデータガバナンスタグが失われるという<strong>長年の運用課題が解消</strong>されます。
+        </p>
+        <div class="check-item"><span class="check-icon">✓</span><span>機密データを扱う Dataform パイプラインを運用しているチームは、<strong>Dataform core 3.0.62 以降へ更新</strong>のうえ、workflow_settings.yaml または対象テーブルの config ブロックで本オプションの有効化を検討</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><strong>行アクセスポリシーは保持対象外</strong>のため、post_operations での再適用を併せて設計することを推奨</span></div>
+      </div>
+      <p style="font-size: 14px; color: var(--gc-outline);">
+        タグ: #Dataform #BigQuery #DataGovernance #ColumnLevelSecurity #DataMasking #GA
+      </p>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="padding-left: 20px; margin: 4px 0;">
+        <li>レポート: <code>reports/2026/2026-10-14-dataform-preserve-governance-controls.md</code> (Google Cloud News Summary)</li>
+        <li><a href="https://docs.cloud.google.com/release-notes#October_14_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026-10-14)</a></li>
+        <li><a href="https://docs.cloud.google.com/dataform/docs/create-tables#preserve-access-controls" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: Preserve access controls metadata</a></li>
+        <li><a href="https://docs.cloud.google.com/bigquery/docs/tags#data-governance-tags" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: BigQuery データガバナンスタグ</a></li>
+        <li><a href="https://docs.cloud.google.com/bigquery/docs/column-data-masking-intro" target="_blank" rel="noopener noreferrer" class="gc-link">ドキュメント: データマスキングの概要</a></li>
+      </ul>
+      <p>生成日: 2026-10-15 | テーマ: Google Cloud News</p>
+    </footer>
+
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

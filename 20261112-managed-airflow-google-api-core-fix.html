@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Managed Service for Apache Airflow: google-api-core パフォーマンス劣化問題の修正</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated,
+    .badge-fixed {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-fixed {
+      background: var(--gc-green);
+    }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-box h3 { color: #C5221F; }
+    .after-box h3 { color: #188038; }
+
+    .before-after ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-after li {
+      margin: 6px 0;
+    }
+
+    @media (max-width: 720px) {
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+      h1, .title {
+        font-size: 24px;
+      }
+    }
+
+    /* フロー図 */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+      font-size: 14px;
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* チェックリスト */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* コードブロック (Mermaid の pre を除外) */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block {
+      overflow: hidden;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    .section code:not(pre code) {
+      background: var(--gc-surface);
+    }
+
+    /* テーブル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    /* ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* 統計カード */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+    }
+
+    /* リージョンチップ */
+    .region-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    .region-chip {
+      background: var(--gc-teal-tint);
+      border: 1px solid var(--gc-teal);
+      color: var(--gc-on-surface);
+      border-radius: 16px;
+      padding: 4px 14px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    /* 参考リンク */
+    .link-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .link-list li {
+      margin: 8px 0;
+      padding-left: 24px;
+      position: relative;
+    }
+
+    .link-list li::before {
+      content: "🔗";
+      position: absolute;
+      left: 0;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      word-break: break-all;
+    }
+
+    .tags {
+      margin-top: 12px;
+      font-size: 13px;
+      color: var(--gc-blue-700);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <h1>🛠️ Managed Service for Apache Airflow<br>Python 3.11 環境の google-api-core パフォーマンス劣化問題を修正</h1>
+        <div style="margin-top: 12px;">
+          <span class="badge">Managed Airflow (旧 Cloud Composer)</span>
+          <span class="badge-fixed">✅ Fixed (修正)</span>
+        </div>
+      </div>
+      <div class="subtitle">📅 リリース日: 2026-11-12</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        Python 3.11 環境の Managed Airflow で <span class="highlight">google-api-core 2.28.0〜2.43.0</span> が引き起こしていたパフォーマンス劣化問題が、<strong>新規環境およびイメージ更新に対して解決</strong>されました。2026 年 11 月 6 日以降のイメージには修正版 <span class="highlight">google-api-core 2.43.1</span> がプリインストールされています。
+      </p>
+      <p>
+        問題の原因は、2026 年 10 月 24 日以降に google-api-core が Python 3.11 の非推奨チェックを実行するようになったことです。Google Cloud クライアントライブラリが新しい Python サブプロセスでインポートされるたびにパッケージメタデータのスキャンが発生し、<strong>DAG 数が多い環境・短時間タスクが頻繁な環境・データリネージ統合が有効な環境</strong>で顕著な性能劣化を引き起こしていました。
+      </p>
+      <p>
+        影響を受けていた以前のビルドもベースコンテナイメージが<strong>全リージョンでパッチ適用済み</strong>となり、古いビルドで新規作成した環境も影響を受けません。ただし<strong>既存環境はキャッシュされたコンテナイメージを使い続ける</strong>ため、定期メンテナンスまたは手動の環境更新が完了するまで影響が残ります。
+      </p>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ アップデート前の課題 (2026-10-24 以降)</h3>
+          <ul>
+            <li>google-api-core 2.28.0〜2.43.0 の Python 3.11 非推奨チェックにより、クライアントライブラリのインポートごとにパッケージメタデータのスキャンが実行</li>
+            <li>DAG パース時間の増加・DAG プロセッサの CPU 使用率上昇</li>
+            <li>タスク実行時間の長期化・ワーカーの CPU 使用率上昇</li>
+            <li><code>google/api_core/_python_version_support.py</code> からの FutureWarning ログが頻発</li>
+            <li>回避策として google-api-core>=2.43.1 の手動インストールや sitecustomize.py パッチが必要だった</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ アップデート後の改善</h3>
+          <ul>
+            <li>2026-11-06 以降のイメージ (composer-3-airflow-3.3.1-build.6、3.2.2-build.10、2.11.1-build.23、composer-2.17.17-airflow-2.11.1) に google-api-core 2.43.1 をプリインストール</li>
+            <li>以前のビルドのベースコンテナイメージも全リージョンでパッチ適用済み。古いビルドの新規環境も影響なし</li>
+            <li>既存環境も定期メンテナンスや手動更新 (イメージアップグレード / PyPI 更新 / ワークロード再起動) でパッチ適用済みイメージに切り替え可能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph Before["❌ 修正前 (2026-10-24 以降)"]
+        A1["🐍 Python サブプロセス起動<br/>(タスク実行 / DAG パースごと)"] --> B1["📦 google-api-core<br/>2.28.0〜2.43.0"]
+        B1 --> C1["🔍 Python 3.11 非推奨チェック<br/>全パッケージメタデータをスキャン"]
+        C1 --> D1["🐢 DAG パース遅延<br/>タスク実行時間増加<br/>CPU 使用率上昇"]
+    end
+
+    subgraph After["✅ 修正後 (2026-11-06 以降のイメージ)"]
+        A2["🐍 Python サブプロセス起動"] --> B2["📦 google-api-core 2.43.1<br/>(プリインストール)"]
+        B2 --> D2["⚡ 通常のパフォーマンスで実行"]
+    end
+
+    E["🏗️ 既存環境 (パッチ未適用)"] -->|"定期メンテナンス /<br/>イメージアップグレード /<br/>PyPI 更新 / ワークロード再起動"| After
+        </pre>
+      </div>
+      <p>
+        修正前は Python サブプロセス起動のたびに非推奨チェックによるメタデータスキャンが実行されていましたが、修正版 google-api-core 2.43.1 を含むイメージではこのオーバーヘッドが解消されます。既存環境はメンテナンスまたは手動更新でパッチ適用済みイメージに移行します。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚙️ 主要機能 (修正内容)</h2>
+
+      <div class="card">
+        <h3>1️⃣ 修正版イメージのリリース (2026-11-06 以降)</h3>
+        <p>以下のイメージに google-api-core 2.43.1 がプリインストールされ、問題が修正済みです。これ以降のイメージも同様に修正済みです。</p>
+        <div class="icon-text"><span class="check-icon">✓</span><span><code>composer-3-airflow-3.3.1-build.6</code></span></div>
+        <div class="icon-text"><span class="check-icon">✓</span><span><code>composer-3-airflow-3.2.2-build.10</code></span></div>
+        <div class="icon-text"><span class="check-icon">✓</span><span><code>composer-3-airflow-2.11.1-build.23</code></span></div>
+        <div class="icon-text"><span class="check-icon">✓</span><span><code>composer-2.17.17-airflow-2.11.1</code></span></div>
+      </div>
+
+      <div class="card">
+        <h3>2️⃣ 既存ビルドのベースコンテナイメージのパッチ適用</h3>
+        <div class="icon-text"><span class="check-icon">✓</span><span>影響を受けていた Gen 3 / Gen 2 ビルドのベースコンテナイメージが<strong>全リージョンでパッチ適用済み</strong></span></div>
+        <div class="icon-text"><span class="check-icon">✓</span><span>古いビルドを指定して新規作成した環境も影響を受けない</span></div>
+        <div class="icon-text"><span class="cross-icon">✗</span><span>2026-11-05 より前に作成された既存環境は、キャッシュ済みコンテナイメージを更新するまで影響が継続</span></div>
+      </div>
+
+      <div class="card">
+        <h3>3️⃣ 既存環境向けの複数の緩和オプション</h3>
+        <div class="flow-diagram">
+          <div class="flow-step">🔄 定期メンテナンス<br>(自動更新)</div>
+          <span class="flow-arrow">/</span>
+          <div class="flow-step">⬆️ イメージ<br>アップグレード<br>(全リージョン)</div>
+          <span class="flow-arrow">/</span>
+          <div class="flow-step">📦 PyPI 更新で<br>イメージ再ビルド<br>(全リージョン)</div>
+          <span class="flow-arrow">/</span>
+          <div class="flow-step">🔁 ワークロード再起動<br>(対象 Gen 3 リージョン<br>ファストパス)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔬 技術仕様</h2>
+
+      <h3>📌 問題の技術的背景</h3>
+      <table>
+        <tr><th>項目</th><th>詳細</th></tr>
+        <tr><td>問題発生日</td><td>2026 年 10 月 24 日以降</td></tr>
+        <tr><td>原因</td><td>google-api-core の Python 3.11 非推奨チェック。クライアントライブラリのインポート時に新しい Python サブプロセスごとにパッケージメタデータをスキャン</td></tr>
+        <tr><td>影響バージョン</td><td>google-api-core 2.28.0〜2.43.0 (Python 3.11 環境)</td></tr>
+        <tr><td>修正バージョン</td><td><strong>google-api-core 2.43.1</strong></td></tr>
+        <tr><td>特に影響が大きい環境</td><td>DAG 数が多い環境、短時間タスクが頻繁な環境、データリネージ統合が有効な環境</td></tr>
+      </table>
+
+      <h3>🩺 症状</h3>
+      <div class="icon-text"><span class="cross-icon">✗</span><span>Airflow DAG プロセッサでの DAG パース時間の増加と CPU 使用率の上昇</span></div>
+      <div class="icon-text"><span class="cross-icon">✗</span><span>Airflow ワーカーでのタスク実行時間の長期化と CPU 使用率の上昇</span></div>
+      <div class="icon-text"><span class="cross-icon">✗</span><span><code>google/api_core/_python_version_support.py</code> からの FutureWarning ログの頻発</span></div>
+
+      <h3>📦 影響を受けていたビルド (パッチ適用前)</h3>
+      <table>
+        <tr><th>世代</th><th>影響ビルド</th></tr>
+        <tr><td>Managed Airflow (Gen 3)</td><td>composer-3-airflow-3.3.1-build.0〜build.5 / 3.2.2-build.0〜build.9 / 3.1.8-build.0〜build.4 / 3.1.7-build.7〜build.13 / 2.11.1-build.3〜build.22 / 2.10.5-build.36〜build.52</td></tr>
+        <tr><td>Managed Airflow (Gen 2)</td><td>composer-2.17.0〜2.17.16-airflow-2.11.1 / composer-2.17.0〜2.17.13-airflow-2.10.5</td></tr>
+      </table>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🔧 設定方法 (既存環境の緩和策)</h2>
+
+      <div class="note-box">
+        <strong>💡 前提条件:</strong>
+        <ol style="margin: 8px 0 0; padding-left: 20px;">
+          <li>自身の環境が影響対象か確認する (Python 3.11 環境で google-api-core 2.28.0〜2.43.0 を使用しているか、影響ビルドに該当するか)</li>
+          <li>環境ログで <code>google/api_core/_python_version_support.py</code> からの FutureWarning の有無を確認する</li>
+        </ol>
+      </div>
+
+      <h3>🅰️ オプション 1: 環境をアップグレードする (全リージョン)</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">修正済みビルドへのアップグレード</span>
+        </div>
+        <pre><code class="language-bash">gcloud composer environments update ENVIRONMENT_NAME \
+  --location LOCATION \
+  --image-version composer-3-airflow-3.3.1-build.6</code></pre>
+      </div>
+      <p>composer-3-airflow-3.3.1-build.6、composer-3-airflow-3.2.2-build.10、composer-3-airflow-2.11.1-build.23 (Gen 2 の場合は composer-2.17.17-airflow-2.11.1) など、修正済みビルドへアップグレードします。</p>
+
+      <h3>🅱️ オプション 2: PyPI パッケージ更新をトリガーする (全リージョン)</h3>
+      <p>既存のカスタム PyPI パッケージの更新または追加パッケージのインストールを行うと、パッチ適用済みベースイメージの上に環境イメージが再ビルドされ、すべての Airflow ワークロードが再起動されます。</p>
+      <div class="warning-box">
+        <strong>⚠️ 注意:</strong> composer-3-airflow-3.3.1-build.0〜build.5、3.2.2-build.1〜build.9、3.1.8-build.3〜build.4 では <code>google-api-core>=2.43.1</code> を直接インストールできます。それより前の Airflow 3 ビルドや Airflow 2 ビルド (composer-2.17.16 以前を含む) では、<code>opentelemetry-api>=1.44.0</code> が必要となり依存関係の競合を起こすため、google-api-core の直接インストールは避け、別のパッケージ更新でイメージ再ビルドをトリガーしてください。
+      </div>
+
+      <h3>🆎 オプション 3: 対象 Gen 3 リージョンでワークロードを再起動する (ファストパス)</h3>
+      <p>asia-east1、asia-northeast2、europe-central2、me-central1、northamerica-northeast1、us-south1 では、定期メンテナンスが完了済みの環境に対し、プレースホルダー環境変数の設定で Airflow ワークロードをパッチ適用済みインフラ上に再起動できます。</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">プレースホルダー環境変数によるワークロード再起動</span>
+        </div>
+        <pre><code class="language-bash">gcloud composer environments update ENVIRONMENT_NAME \
+  --location LOCATION \
+  --update-env-variables=COMPOSER_RELOAD=1</code></pre>
+      </div>
+      <p>操作完了後、環境ログで FutureWarning が引き続き出力される場合は、全リージョン向けのオプション 1 または 2 を適用します。</p>
+
+      <h3>🆘 オプション 4: sitecustomize.py ランタイムパッチ (アップグレード不可の場合の代替)</h3>
+      <p>VPC Service Controls を使用していて PyPI リポジトリにアクセスできないなど、すぐにアップグレードできない場合は、GitHub で公開されている <code>sitecustomize.py</code> を環境のバケットの <code>dags/patches</code> フォルダにアップロードし、<code>PYTHONPATH</code> 環境変数に <code>/home/airflow/gcs/dags/patches</code> を設定します。アップグレードまたはイメージ再ビルド後は、この回避策を削除できます。</p>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>💡 メリット</h2>
+
+      <h3>💼 ビジネス面</h3>
+      <div class="card" style="border-left-color: var(--gc-green);">
+        <div class="icon-text"><span class="check-icon">✓</span><span><strong>運用コストの削減</strong>: 性能劣化による CPU 使用率上昇が解消され、不要なリソース増強や環境スケールアップの必要がなくなる</span></div>
+        <div class="icon-text"><span class="check-icon">✓</span><span><strong>パイプラインの SLA 回復</strong>: DAG パースやタスク実行の遅延が解消され、データパイプラインの処理時間が正常化する</span></div>
+      </div>
+
+      <h3>🔧 技術面</h3>
+      <div class="card" style="border-left-color: var(--gc-green);">
+        <div class="icon-text"><span class="check-icon">✓</span><span><strong>新規環境は対応不要</strong>: ベースイメージが全リージョンでパッチ適用済みのため、古いビルドで新規作成しても影響を受けない</span></div>
+        <div class="icon-text"><span class="check-icon">✓</span><span><strong>複数の緩和パスの提供</strong>: イメージアップグレード、PyPI 更新、ワークロード再起動、sitecustomize.py パッチと、環境の制約 (VPC Service Controls など) に応じた選択肢が用意されている</span></div>
+        <div class="icon-text"><span class="check-icon">✓</span><span><strong>ログノイズの解消</strong>: 頻発していた FutureWarning ログがなくなり、ログの可観測性が改善する</span></div>
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>🚧 制限事項</h3>
+      <div class="error-box">
+        <div class="icon-text"><span class="cross-icon">✗</span><span>既存環境 (2026-11-05 より前に作成) は、定期メンテナンスまたは手動の環境更新が行われるまでキャッシュ済みイメージで動作し続け、<strong>自動では修正されない</strong></span></div>
+        <div class="icon-text"><span class="cross-icon">✗</span><span>環境変数のプレースホルダー設定によるワークロード再起動 (ファストパス) は、asia-east1、asia-northeast2、europe-central2、me-central1、northamerica-northeast1、us-south1 の <strong>6 リージョンの Gen 3 環境</strong>で、定期メンテナンス完了済みの場合のみ有効</span></div>
+        <div class="icon-text"><span class="cross-icon">✗</span><span>Gen 2 では、プレースホルダー環境変数の設定のみではカスタム PyPI イメージの再ビルドもキャッシュ済みイメージの置き換えも行われないため、問題は解決しない</span></div>
+        <div class="icon-text"><span class="cross-icon">✗</span><span>composer-2.17.16 以前や古い Airflow 3 ビルドに <code>google-api-core>=2.43.1</code> を直接インストールすると依存関係の競合 (opentelemetry-api>=1.44.0 要求) が発生する</span></div>
+      </div>
+
+      <h3>🤔 考慮すべき点</h3>
+      <div class="warning-box">
+        <div class="icon-text"><span>⏳</span><span><strong>2026-11-16〜12-02 は全 Managed Airflow 環境の GKE クラスタにメンテナンス除外が設定</strong>されるため (10 月 14 日発表)、定期メンテナンスによる自動修正を待つ場合はこの期間を考慮する必要がある</span></div>
+        <div class="icon-text"><span>🌍</span><span>europe-north1、europe-west3、us-east1、us-west2 では、定期メンテナンスがスケジューラや DAG プロセッサなどの非ワーカーワークロードを自動的にパッチ適用済みイメージへ再起動するが、<strong>ワーカーを即時更新するには手動オプションの適用が必要</strong></span></div>
+        <div class="icon-text"><span>📝</span><span>sitecustomize.py を使用する場合、Airflow の DAG 検出セーフモードに無視させるため、<strong>ファイル内に airflow や dag という単語 (コメント含む) を含めてはならない</strong></span></div>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>📊 ユースケース 1: 大量の短時間タスクを実行するデータパイプライン環境の復旧</h3>
+        <p><strong>シナリオ</strong>: 数百の DAG と短時間タスクを頻繁に実行する Managed Airflow (Gen 3) 環境で、10 月下旬からタスク実行時間の増加とワーカー CPU 使用率の上昇が発生している。</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">修正済みビルドへのアップグレード</span>
+          </div>
+          <pre><code class="language-bash"># 修正済みビルドへのアップグレード
+gcloud composer environments update my-airflow-env \
+  --location asia-northeast1 \
+  --image-version composer-3-airflow-3.3.1-build.6</code></pre>
+        </div>
+        <p><strong>効果</strong>: google-api-core 2.43.1 を含む修正済みイメージへ移行し、非推奨チェックによるオーバーヘッドが解消され、タスク実行時間と CPU 使用率が正常化する。</p>
+      </div>
+
+      <div class="usecase">
+        <h3>🔒 ユースケース 2: VPC Service Controls 配下で PyPI アクセスがない環境の暫定対応</h3>
+        <p><strong>シナリオ</strong>: VPC Service Controls を使用しており PyPI リポジトリにアクセスできず、業務上の理由で即時のアップグレードも難しい Gen 3 環境。</p>
+        <p><strong>効果</strong>: GitHub で提供される sitecustomize.py を環境バケットの dags/patches にアップロードし、PYTHONPATH を設定することで、アップグレードせずにランタイムパッチで性能劣化を回避できる。後日アップグレード完了後にパッチを削除すればよい。</p>
+      </div>
+    </div>
+
+    <!-- 料金 -->
+    <div class="section">
+      <h2>💰 料金</h2>
+      <p>本修正自体に<strong>追加料金は発生しません</strong>。Managed Service for Apache Airflow の料金体系 (環境のコンピュート、ストレージ、ネットワークに基づく従量課金) に変更はありません。</p>
+      <div class="success-box">
+        <strong>✅ コスト改善の期待:</strong> 性能劣化により CPU 使用率が上昇していた環境では、修正適用後にリソース使用量が正常化することでコストの改善が期待できます。
+      </div>
+      <p>詳細は <a href="https://cloud.google.com/composer/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Cloud Composer の料金ページ</a> を参照してください。</p>
+    </div>
+
+    <!-- 利用可能リージョン -->
+    <div class="section">
+      <h2>🌏 利用可能リージョン</h2>
+      <p>影響を受けていたビルドのベースコンテナイメージは、<span class="highlight">全リージョン</span> でパッチ適用済みです。</p>
+      <p>環境変数設定によるワークロード再起動 (ファストパス) は、以下の Gen 3 リージョンで利用できます。</p>
+      <div class="region-chips">
+        <span class="region-chip">asia-east1</span>
+        <span class="region-chip">asia-northeast2</span>
+        <span class="region-chip">europe-central2</span>
+        <span class="region-chip">me-central1</span>
+        <span class="region-chip">northamerica-northeast1</span>
+        <span class="region-chip">us-south1</span>
+      </div>
+    </div>
+
+    <!-- 関連サービス -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Cloud Monitoring / Cloud Logging</strong>: FutureWarning ログの確認や、DAG パース時間・CPU 使用率のメトリクス監視により、自身の環境が影響を受けているかの判断と修正適用後の効果確認に利用</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Google Kubernetes Engine (GKE)</strong>: Managed Airflow 環境の基盤。キャッシュされたコンテナイメージは GKE ノード上に保持されるため、ワークロードの再起動やノード更新がパッチ反映の鍵となる</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Dataplex (データリネージ)</strong>: データリネージ統合が有効な環境は本問題の影響を特に受けやすいとされており、該当環境は優先的な対応が推奨される</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>VPC Service Controls</strong>: PyPI アクセスが制限される環境では、sitecustomize.py による代替ワークアラウンドが用意されている</span></div>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="success-box">
+        <p style="margin-top: 0;">Python 3.11 環境の Managed Airflow で 10 月下旬から発生していた google-api-core 起因の性能劣化が、<strong>新規環境とイメージ更新に対して解決</strong>されました。</p>
+        <p style="margin-bottom: 0;">ただし<strong>既存環境はキャッシュ済みイメージのままでは修正されない</strong>ため、影響ビルドを使用している場合は、修正済みビルド (composer-3-airflow-3.3.1-build.6 など) へのアップグレード、PyPI パッケージ更新、または対象リージョンでのワークロード再起動を早期に実施することを推奨します。<strong>11 月 16 日からのメンテナンス除外期間に入る前に対応を完了させる</strong>のが望ましいでしょう。</p>
+      </div>
+      <div class="flow-diagram">
+        <div class="flow-step">🔍 影響確認<br>(ビルド / FutureWarning ログ)</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🛠️ 緩和策の選択<br>(アップグレード / PyPI 更新 /<br>再起動 / パッチ)</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">⏰ 11/16 までに適用<br>(メンテナンス除外前)</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">✅ 性能・コスト正常化</div>
+      </div>
+    </div>
+
+    <!-- 参考リンク -->
+    <div class="section">
+      <h2>📚 参考リンク</h2>
+      <ul class="link-list">
+        <li><a href="https://docs.cloud.google.com/release-notes#November_12_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026-11-12)</a></li>
+        <li><a href="https://docs.cloud.google.com/composer/docs/composer-3/known-issues#google-api-core-2-30-3-to-2-43-0" target="_blank" rel="noopener noreferrer" class="gc-link">Managed Airflow (Gen 3) の既知の問題</a></li>
+        <li><a href="https://docs.cloud.google.com/composer/docs/composer-2/known-issues#google-api-core-2-30-3-to-2-43-0" target="_blank" rel="noopener noreferrer" class="gc-link">Managed Airflow (Gen 2) の既知の問題</a></li>
+        <li><a href="https://docs.cloud.google.com/composer/docs/release-notes" target="_blank" rel="noopener noreferrer" class="gc-link">Managed Airflow リリースノート</a></li>
+        <li><a href="https://docs.cloud.google.com/composer/docs/composer-3/upgrade-environments" target="_blank" rel="noopener noreferrer" class="gc-link">環境のアップグレード (Gen 3)</a></li>
+        <li><a href="https://cloud.google.com/composer/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">料金ページ</a></li>
+      </ul>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="margin: 4px 0; padding-left: 20px;">
+        <li><a href="https://docs.cloud.google.com/release-notes#November_12_2026" target="_blank" rel="noopener noreferrer">https://docs.cloud.google.com/release-notes#November_12_2026</a></li>
+        <li><a href="https://docs.cloud.google.com/composer/docs/composer-3/known-issues#google-api-core-2-30-3-to-2-43-0" target="_blank" rel="noopener noreferrer">https://docs.cloud.google.com/composer/docs/composer-3/known-issues#google-api-core-2-30-3-to-2-43-0</a></li>
+        <li><a href="https://docs.cloud.google.com/composer/docs/composer-2/known-issues#google-api-core-2-30-3-to-2-43-0" target="_blank" rel="noopener noreferrer">https://docs.cloud.google.com/composer/docs/composer-2/known-issues#google-api-core-2-30-3-to-2-43-0</a></li>
+      </ul>
+      <p>本インフォグラフィックは Google Cloud News レポート (2026-11-12) を基に作成されています。</p>
+      <p class="tags">タグ: #ManagedAirflow #CloudComposer #ApacheAirflow #Fixed #Performance #Python311 #GoogleApiCore</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

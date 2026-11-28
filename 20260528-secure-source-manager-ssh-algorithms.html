@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Secure Source Manager: Git-over-SSH レガシーアルゴリズムのサポート廃止</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 16px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-red {
+      border-left-color: var(--gc-red);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-orange {
+      border-left-color: var(--gc-orange);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-red);
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-step-fail {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card-red {
+      background: linear-gradient(135deg, var(--gc-red), #C62828);
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card-green {
+      background: linear-gradient(135deg, var(--gc-green), #1B5E20);
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h3 {
+      color: var(--gc-blue-800);
+      margin-top: 0;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+      .before-after { grid-template-columns: 1fr; }
+      .stat-cards { grid-template-columns: 1fr; }
+      .flow-diagram { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>🔐 Secure Source Manager: Git-over-SSH レガシーアルゴリズムのサポート廃止</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Secure Source Manager</span>
+          <span class="badge-deprecated">Breaking Change</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-05-28</div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>
+        Google Cloud Secure Source Manager の Git-over-SSH サーバー構成において、セキュリティ強化と脆弱性 <span class="highlight">GHSA-3m6q-h5gj-7mrw</span> への対応として、複数のレガシーおよび安全でない SSH アルゴリズムのサポートが削除されました。
+      </p>
+      <p>
+        SSH クライアントは接続時に <span class="highlight">curve25519-sha256</span> や <span class="highlight">aes256-gcm</span> などのモダンなアルゴリズムを少なくとも1つサポートしている必要があります。<strong>OpenSSH 7.3 以降</strong>を使用している場合は通常影響を受けません。
+      </p>
+
+      <div class="warning-box">
+        <strong>⚠️ 重要:</strong> この変更は段階的な移行期間なく即座に適用されます。古い SSH クライアントを使用しているユーザーは即座に接続不能になる可能性があります。HTTPS 認証には影響しません。
+      </div>
+    </div>
+
+    <!-- Before/After Comparison -->
+    <div class="section">
+      <h2>🔄 Before / After 比較</h2>
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before (変更前)</h3>
+          <div class="check-item"><span class="cross-icon">✗</span><span>SHA-1 ベースの鍵交換がサポートされていた</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>CBC モード暗号 (aes128-cbc, 3des-cbc等) が使用可能</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>HMAC-SHA1, HMAC-MD5 などのレガシー MAC を許可</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>GHSA-3m6q-h5gj-7mrw の脆弱性リスクが存在</span></div>
+          <div class="check-item"><span class="cross-icon">✗</span><span>MITM 攻撃や暗号解読のリスク</span></div>
+        </div>
+        <div class="after-box">
+          <h3>✅ After (変更後)</h3>
+          <div class="check-item"><span class="check-icon">✓</span><span>モダンで安全なアルゴリズムのみ許可</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>AES-GCM, ChaCha20-Poly1305 (AEAD) を使用</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>HMAC-SHA2-256 系のみサポート</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>既知の脆弱性リスクを解消</span></div>
+          <div class="check-item"><span class="check-icon">✓</span><span>業界標準のセキュリティ基準に準拠</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram (Mermaid) -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>SSH クライアントが Secure Source Manager に接続する際のネゴシエーションフロー。モダンなアルゴリズムを持たないクライアントは接続を拒否されます。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+sequenceDiagram
+    participant Client as SSH Client
+    participant SSM as Secure Source Manager<br/>Git-over-SSH Server
+    participant Repo as Repository
+
+    Client->>SSM: SSH Connection Request
+    Note over Client,SSM: Key Exchange Algorithm Negotiation
+
+    alt Modern Algorithm Supported
+        SSM->>Client: Algorithm Agreed (curve25519-sha256)
+        Client->>SSM: Encrypted Session (aes256-gcm)
+        SSM->>Client: Authentication Success
+        Client->>SSM: Git Operation (clone/push/pull)
+        SSM->>Repo: Repository Access
+        Repo->>SSM: Data Response
+        SSM->>Client: Git Response
+    else Legacy Algorithm Only
+        SSM--xClient: Connection Rejected (Algorithm Mismatch)
+        Note over Client: Error: no matching key exchange method found
+    end
+        </pre>
+      </div>
+    </div>
+
+    <!-- Key Statistics -->
+    <div class="section">
+      <h2>📊 数字で見るアップデート</h2>
+      <div class="stat-cards">
+        <div class="stat-card">
+          <div class="stat-value">2</div>
+          <div class="stat-label">サポート対象の鍵交換アルゴリズム</div>
+        </div>
+        <div class="stat-card-green">
+          <div class="stat-value">6</div>
+          <div class="stat-label">サポート対象の暗号化方式</div>
+        </div>
+        <div class="stat-card-red">
+          <div class="stat-value">7.3+</div>
+          <div class="stat-label">最低互換 OpenSSH バージョン</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Features -->
+    <div class="section">
+      <h2>🔑 主要な変更点</h2>
+
+      <div class="card">
+        <h3>🔒 鍵交換アルゴリズムの制限</h3>
+        <p>サポートされるアルゴリズムが <strong>2種類に限定</strong>されました。</p>
+        <div class="check-item"><span class="check-icon">✓</span><span><code>curve25519-sha256</code> - 楕円曲線 Diffie-Hellman (最推奨)</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><code>diffie-hellman-group14-sha256</code> - 2048-bit DH グループ 14 + SHA-256</span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span><code>diffie-hellman-group1-sha1</code>, <code>diffie-hellman-group14-sha1</code> - 廃止</span></div>
+      </div>
+
+      <div class="card">
+        <h3>🛡️ 暗号化方式 (Ciphers) の制限</h3>
+        <p>ChaCha20-Poly1305 および AES-CTR/GCM モードのみサポート。</p>
+        <div class="check-item"><span class="check-icon">✓</span><span><code>chacha20-poly1305@openssh.com</code></span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><code>aes128-ctr</code> / <code>aes192-ctr</code> / <code>aes256-ctr</code></span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><code>aes128-gcm@openssh.com</code> / <code>aes256-gcm@openssh.com</code></span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span><code>aes128-cbc</code>, <code>aes256-cbc</code>, <code>3des-cbc</code> - 廃止</span></div>
+      </div>
+
+      <div class="card">
+        <h3>📝 MAC アルゴリズムの制限</h3>
+        <p>HMAC-SHA2-256 系 (ETM モードを含む) のみサポート。</p>
+        <div class="check-item"><span class="check-icon">✓</span><span><code>hmac-sha2-256-etm@openssh.com</code> - Encrypt-then-MAC</span></div>
+        <div class="check-item"><span class="check-icon">✓</span><span><code>hmac-sha2-256</code></span></div>
+        <div class="check-item"><span class="cross-icon">✗</span><span><code>hmac-sha1</code>, <code>hmac-md5</code> - 廃止</span></div>
+      </div>
+    </div>
+
+    <!-- Technical Specifications -->
+    <div class="section">
+      <h2>📐 技術仕様</h2>
+
+      <h3>サポートされる SSH アルゴリズム一覧</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>カテゴリ</th>
+            <th>アルゴリズム</th>
+            <th>説明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>鍵交換</td>
+            <td><code>curve25519-sha256</code></td>
+            <td>楕円曲線 Diffie-Hellman (最推奨)</td>
+          </tr>
+          <tr>
+            <td>鍵交換</td>
+            <td><code>diffie-hellman-group14-sha256</code></td>
+            <td>2048-bit DH グループ 14 + SHA-256</td>
+          </tr>
+          <tr>
+            <td>暗号化</td>
+            <td><code>chacha20-poly1305@openssh.com</code></td>
+            <td>ChaCha20 ストリーム暗号 + Poly1305 MAC</td>
+          </tr>
+          <tr>
+            <td>暗号化</td>
+            <td><code>aes128-ctr</code> / <code>aes192-ctr</code> / <code>aes256-ctr</code></td>
+            <td>AES CTR モード (128/192/256-bit)</td>
+          </tr>
+          <tr>
+            <td>暗号化</td>
+            <td><code>aes128-gcm@openssh.com</code> / <code>aes256-gcm@openssh.com</code></td>
+            <td>AES GCM (認証付き暗号)</td>
+          </tr>
+          <tr>
+            <td>MAC</td>
+            <td><code>hmac-sha2-256-etm@openssh.com</code></td>
+            <td>HMAC-SHA2-256 Encrypt-then-MAC</td>
+          </tr>
+          <tr>
+            <td>MAC</td>
+            <td><code>hmac-sha2-256</code></td>
+            <td>HMAC-SHA2-256</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>SSH クライアント互換性</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>SSH クライアント</th>
+            <th>最低互換バージョン</th>
+            <th>備考</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>OpenSSH</td>
+            <td><strong>7.3 以降</strong></td>
+            <td>curve25519-sha256 サポート</td>
+          </tr>
+          <tr>
+            <td>PuTTY</td>
+            <td><strong>0.68 以降</strong></td>
+            <td>ChaCha20-Poly1305 サポート</td>
+          </tr>
+          <tr>
+            <td>libssh</td>
+            <td><strong>0.8.0 以降</strong></td>
+            <td>モダンアルゴリズムサポート</td>
+          </tr>
+          <tr>
+            <td>Dropbear</td>
+            <td><strong>2018.76 以降</strong></td>
+            <td>curve25519 サポート</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Configuration Steps -->
+    <div class="section">
+      <h2>⚙️ 設定方法</h2>
+
+      <div class="flow-diagram">
+        <div class="flow-step">1. バージョン確認<br/><code>ssh -V</code></div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">2. アルゴリズム確認<br/><code>ssh -Q kex</code></div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">3. 接続テスト<br/><code>ssh -T -v</code></div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">4. 設定適用<br/><code>~/.ssh/config</code></div>
+      </div>
+
+      <h3>ステップ 1: SSH クライアントのバージョン確認</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># OpenSSH のバージョンを確認
+ssh -V</code></pre>
+
+      <h3>ステップ 2: サポートされるアルゴリズムの確認</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># 鍵交換アルゴリズムを確認
+ssh -Q kex
+
+# 暗号化方式を確認
+ssh -Q cipher
+
+# MAC アルゴリズムを確認
+ssh -Q mac</code></pre>
+
+      <h3>ステップ 3: 接続テスト</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># Secure Source Manager への SSH 接続テスト
+ssh -T -v INSTANCE_ID-PROJECT_NUMBER-ssh.LOCATION.sourcemanager.dev</code></pre>
+
+      <h3>ステップ 4: SSH 設定の明示的指定</h3>
+      <span class="code-label">SSH Config</span>
+      <pre><code class="language-bash"># ~/.ssh/config に以下を追加
+Host *.sourcemanager.dev
+    KexAlgorithms curve25519-sha256,diffie-hellman-group14-sha256
+    Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr
+    MACs hmac-sha2-256-etm@openssh.com,hmac-sha2-256</code></pre>
+
+      <h3>ステップ 5: SSH クライアントのアップデート (非互換の場合)</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash"># Ubuntu/Debian
+sudo apt-get update && sudo apt-get install openssh-client
+
+# CentOS/RHEL
+sudo yum update openssh-clients
+
+# macOS (Homebrew)
+brew install openssh</code></pre>
+    </div>
+
+    <!-- Benefits -->
+    <div class="section">
+      <h2>✅ メリット</h2>
+
+      <div class="card card-green">
+        <h3>💼 ビジネス面</h3>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>コンプライアンス強化:</strong> NIST SP 800-131A や FedRAMP などのセキュリティ基準に準拠</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>リスク低減:</strong> ソースコードの機密性が強化され、情報漏洩リスクが低減</span></div>
+      </div>
+
+      <div class="card card-green">
+        <h3>🔬 技術面</h3>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>前方秘匿性 (Forward Secrecy):</strong> 過去の通信が将来的に解読されるリスクを排除</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>認証付き暗号 (AEAD):</strong> AES-GCM / ChaCha20-Poly1305 でパディングオラクル攻撃を防止</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Encrypt-then-MAC:</strong> 暗号文の改ざん検知が暗号化解除前に行われ、堅牢なセキュリティを実現</span></div>
+      </div>
+    </div>
+
+    <!-- Limitations -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <div class="card card-red">
+        <h3>🚫 制限事項</h3>
+        <div class="icon-text"><span class="cross-icon">✗</span><span>OpenSSH 7.3 より古いバージョンでは SSH 経由の Git 操作が不可能に</span></div>
+        <div class="icon-text"><span class="cross-icon">✗</span><span>レガシー組み込みシステムやカスタム SSH クライアントでは対応が困難な場合あり</span></div>
+        <div class="icon-text"><span class="cross-icon">✗</span><span>CI/CD パイプラインで古い SSH クライアントを使用している場合、即座に失敗</span></div>
+      </div>
+
+      <div class="card card-orange">
+        <h3>💡 考慮すべき点</h3>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>即時適用:</strong> 段階的な移行期間なく即座に適用。事前の互換性確認が重要</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>代替手段:</strong> SSH が使えない場合は HTTPS 認証への切り替えを検討</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>鍵タイプとの違い:</strong> 今回はトランスポート層のアルゴリズム変更。RSA/ECDSA/Ed25519 鍵タイプとは別の問題</span></div>
+      </div>
+    </div>
+
+    <!-- Use Cases -->
+    <div class="section">
+      <h2>💡 ユースケース</h2>
+
+      <div class="usecase-card">
+        <h3>🔧 ユースケース 1: CI/CD パイプラインの互換性確認</h3>
+        <p><strong>シナリオ:</strong> GitHub Actions や Cloud Build から SSH 経由で Secure Source Manager のリポジトリにアクセスしている CI/CD パイプラインが突然失敗する。</p>
+        <span class="code-label">Bash</span>
+        <pre><code class="language-bash"># CI/CD 環境の SSH バージョンを確認
+ssh -V
+
+# サポートされるアルゴリズムを確認
+ssh -Q kex | grep -E "curve25519-sha256|diffie-hellman-group14-sha256"
+
+# 接続テストを実行
+ssh -T -o KexAlgorithms=curve25519-sha256 INSTANCE-PROJECT-ssh.REGION.sourcemanager.dev</code></pre>
+        <p><strong>効果:</strong> パイプライン障害の原因を迅速に特定し、SSH クライアントのアップデートまたは HTTPS への切り替えで復旧。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>🏢 ユースケース 2: エンタープライズ環境での一括対応</h3>
+        <p><strong>シナリオ:</strong> 大規模開発チームで多数の開発者が Secure Source Manager を使用しており、一部の開発者が古い OS やカスタム SSH クライアントを使用している。</p>
+        <p><strong>効果:</strong> IT 部門が全社的に SSH クライアントのバージョンを確認し、<code>~/.ssh/config</code> の標準テンプレートを配布することで、統一的な対応が可能。アップデートが困難な端末については HTTPS 認証への移行を案内。</p>
+      </div>
+
+      <div class="usecase-card">
+        <h3>🔍 ユースケース 3: セキュリティ監査への対応</h3>
+        <p><strong>シナリオ:</strong> 情報セキュリティ監査において、ソースコード管理システムの暗号化通信に使用されるアルゴリズムの安全性を証明する必要がある。</p>
+        <p><strong>効果:</strong> Secure Source Manager が業界標準のモダンアルゴリズムのみをサポートしていることを示すことで、監査要件を容易に満たすことが可能。</p>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>🔗 関連サービス</h2>
+
+      <div class="card">
+        <div class="icon-text"><span>☁️</span><span><strong>Cloud Source Repositories</strong> - 同様に SSH 認証をサポート。RSA (2048-bit以上), ECDSA, Ed25519 対応</span></div>
+      </div>
+      <div class="card">
+        <div class="icon-text"><span>🔌</span><span><strong>Developer Connect</strong> - HTTPS 経由のアクセスが可能。SSH が使えない場合の代替手段</span></div>
+      </div>
+      <div class="card">
+        <div class="icon-text"><span>🏗️</span><span><strong>Cloud Build</strong> - Secure Source Manager のリポジトリと連携してビルドを自動実行</span></div>
+      </div>
+      <div class="card">
+        <div class="icon-text"><span>🔑</span><span><strong>Secret Manager</strong> - SSH 秘密鍵の安全な保管に使用可能</span></div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>📌 まとめ</h2>
+      <div class="note-box">
+        <p><strong>Secure Source Manager の Git-over-SSH サーバーからレガシー SSH アルゴリズムが削除され、モダンで安全なアルゴリズムのみがサポートされるようになりました。</strong></p>
+        <p style="margin-bottom: 0;">この破壊的変更は GHSA-3m6q-h5gj-7mrw への対応を含むセキュリティ強化策です。影響を受ける可能性があるユーザーは、以下のアクションを検討してください:</p>
+      </div>
+      <div class="flow-diagram">
+        <div class="flow-step">🔍 SSH バージョン確認<br/>(OpenSSH 7.3+?)</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">⚙️ アルゴリズム<br/>互換性テスト</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">✅ アップデート<br/>or HTTPS 移行</div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul style="margin: 4px 0; padding-left: 20px;">
+        <li><a href="https://cloud.google.com/secure-source-manager/docs/overview" target="_blank" rel="noopener noreferrer">Secure Source Manager ドキュメント</a></li>
+        <li><a href="https://cloud.google.com/secure-source-manager/docs/ssh-keys" target="_blank" rel="noopener noreferrer">SSH 認証の設定</a></li>
+        <li><a href="https://cloud.google.com/secure-source-manager/docs/use-git" target="_blank" rel="noopener noreferrer">Git SCM の使用</a></li>
+        <li><a href="https://github.com/advisories/GHSA-3m6q-h5gj-7mrw" target="_blank" rel="noopener noreferrer">GHSA-3m6q-h5gj-7mrw (セキュリティアドバイザリ)</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline);">Generated: 2026-05-29 | #SecureSourceManager #SSH #BreakingChange #GoogleCloud</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

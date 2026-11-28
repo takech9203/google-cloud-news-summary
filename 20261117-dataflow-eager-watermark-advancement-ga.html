@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dataflow: Eager Watermark Advancement が GA</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px 0;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+      text-align: right;
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge {
+      background: var(--gc-blue-600);
+    }
+
+    .badge-ga {
+      background: var(--gc-green);
+    }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-box, .after-box {
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid rgba(234, 67, 53, 0.3);
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid rgba(52, 168, 83, 0.3);
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-box h3 { color: #C5221F; }
+    .after-box h3 { color: #188038; }
+
+    .before-box ul, .after-box ul {
+      margin: 8px 0 0 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li {
+      margin-bottom: 8px;
+    }
+
+    @media (max-width: 720px) {
+      .before-after { grid-template-columns: 1fr; }
+      .merit-grid { grid-template-columns: 1fr; }
+      h1 { font-size: 26px; }
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon { color: var(--gc-green); font-size: 18px; }
+    .cross-icon { color: var(--gc-red); font-size: 18px; }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* コードブロック */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block {
+      overflow: hidden;
+      padding: 0;
+    }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .code-lang {
+      color: #9CDCFE;
+      font-weight: bold;
+    }
+
+    .code-title {
+      color: #AAAAAA;
+    }
+
+    .code-block pre {
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.88em;
+      color: var(--gc-blue-900);
+      word-break: break-all;
+    }
+
+    /* テーブル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* メリットグリッド */
+    .merit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .merit-card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      border-top: 4px solid var(--gc-green);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .merit-card h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .merit-card ul {
+      margin: 8px 0 0 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .merit-card li { margin-bottom: 8px; }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+      border: 1px solid var(--gc-blue-100);
+    }
+
+    .usecase h3 {
+      margin-top: 0;
+      color: var(--gc-blue-900);
+      font-size: 17px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    ul.link-list {
+      padding-left: 20px;
+      margin: 8px 0;
+    }
+
+    ul.link-list li { margin-bottom: 6px; }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a { word-break: break-all; }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <div>
+        <h1>🌊 Dataflow: Eager Watermark Advancement が GA</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Dataflow</span>
+          <span class="badge">Streaming Engine</span>
+          <span class="badge badge-ga">GA (一般提供)</span>
+        </div>
+      </div>
+      <div class="subtitle">リリース日: 2026-11-17</div>
+    </div>
+
+    <!-- 概要 -->
+    <div class="section">
+      <h2>📌 概要</h2>
+      <p>
+        Dataflow の Streaming Engine ジョブ向けに <span class="highlight">Eager Watermark Advancement (積極的なウォーターマーク前進)</span> が GA になりました。
+        有効にすると、遅れて到着したレコードが<strong>ウォーターマークの前進を停滞させなくなり</strong>、ウィンドウ集計の結果出力やイベントタイム タイマーが<strong>スケジュールどおりに実行</strong>されます。
+        遅延レコードは破棄されず、オンタイムのデータと<strong>並行して処理</strong>されます。
+      </p>
+      <p>
+        ウォーターマークは「このウィンドウのデータはすべて到着したはず」と Dataflow が判断するしきい値で、ウィンドウのクローズやイベントタイム タイマーの発火を駆動します。
+        従来は未処理イベントの最小タイムスタンプを追跡するため、<strong>1 件の大幅に遅延したレコード</strong>がパイプライン全体のウォーターマークを凍結させる可能性がありました。
+      </p>
+      <div class="note-box">
+        <strong>💡 こんなユーザーに有効:</strong> オフライン復帰後にバッファ済みデータをまとめて送信する IoT / モバイル ソース、過去のイベント タイムスタンプを持つ Pub/Sub メッセージや Kafka パーティションのバックログを扱うパイプラインの運用者。
+        ウィンドウ集計やステートフル処理を使う場合は、有効化前に <code>allowed lateness</code> (許容遅延) の設定が必要です。
+      </div>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>❌ Before: アップデート前の課題</h3>
+          <ul>
+            <li>遅延レコードが 1 件でも到着すると、ウォーターマークが最小タイムスタンプに固定され、<strong>パイプライン全体の前進が停滞</strong></li>
+            <li>ウィンドウ集計の結果出力とイベントタイム タイマーの発火が遅延し、<strong>オンタイム データの結果まで待たされる</strong></li>
+            <li>停滞解消の瞬間に溜まったウィンドウが一斉クローズし、<strong>ワーカー使用率のスパイク</strong>が発生</li>
+            <li>IoT のバッファ送信や Kafka バックログ流入のたびに<strong>出力レイテンシが予測不能</strong></li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>✅ After: アップデート後の改善</h3>
+          <ul>
+            <li>遅延レコードの処理とウォーターマーク前進が<strong>分離</strong>され、オンタイム データに基づいて前進</li>
+            <li>ウィンドウ結果とタイマーがスケジュールどおり実行され、<strong>出力レイテンシが予測可能</strong>に</li>
+            <li>遅延レコードは並行処理され、allowed lateness に従い <strong>late パネとして出力</strong></li>
+            <li>一斉クローズによるスパイクが緩和され、<strong>リソース使用が平準化</strong></li>
+            <li>全 Beam SDK (Java / Python / Go) で <strong>SDK アップグレード不要</strong>、オプション指定のみ</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- アーキテクチャ図 -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart LR
+    subgraph Sources["📡 データソース"]
+        IOT(["📱 IoT / モバイル<br>(オフライン復帰)"])
+        PS["📨 Pub/Sub / Kafka"]
+    end
+
+    subgraph SE["⚙️ Dataflow Streaming Engine"]
+        WM{"⏱️ ウォーターマーク判定"}
+        OnTime["✅ オンタイム レコード<br>→ ウォーターマークを前進"]
+        LateProc["🕒 遅延レコード<br>→ 並行処理 (停滞させない)"]
+        Win["🪟 ウィンドウ集計 / タイマー<br>スケジュールどおり発火"]
+        LatePane["📤 late パネ出力<br>(allowed lateness 内)"]
+    end
+
+    Sink[("💾 BigQuery / 出力先")]
+
+    IOT --> WM
+    PS --> WM
+    WM -->|watermark 以降| OnTime --> Win
+    WM -->|watermark より遅延| LateProc --> LatePane
+    Win --> Sink
+    LatePane --> Sink
+        </pre>
+      </div>
+      <p>
+        Eager Watermark Advancement を有効にすると、遅延レコードはウォーターマークの前進から切り離されて並行処理され、オンタイム データによるウィンドウ集計とタイマーは停滞せずにスケジュールどおり実行されます。
+        遅延レコードは allowed lateness の範囲内であれば late パネとして出力されます。
+      </p>
+    </div>
+
+    <!-- 主要機能 -->
+    <div class="section">
+      <h2>⚡ 主要機能</h2>
+
+      <div class="card">
+        <h3>1️⃣ ウォーターマーク前進と遅延レコード処理の分離</h3>
+        <p style="font-size: 14px; margin: 0;">
+          従来は 1 件の遅延レコードが全下流ステージのウォーターマークを凍結。有効化後は、遅延レコードはステージのウォーターマークを保持せずに処理され、ウォーターマークは<strong>オンタイム データに基づいて前進</strong>します。
+        </p>
+      </div>
+
+      <div class="card">
+        <h3>2️⃣ スケジュールどおりのウィンドウ出力とタイマー発火</h3>
+        <p style="font-size: 14px; margin: 0;">
+          ウィンドウ集計の結果とイベントタイム タイマーが遅延レコードの影響を受けずに予定どおり実行。溜まったウィンドウの一斉クローズによる<strong>ワーカー使用率スパイクも緩和</strong>され、使用率が平準化されます。
+        </p>
+      </div>
+
+      <div class="card">
+        <h3>3️⃣ 遅延レコードの継続処理 (破棄ではない)</h3>
+        <p style="font-size: 14px; margin: 0;">
+          遅延レコードはオンタイム データと並行して処理され、<strong>allowed lateness 内であれば late パネとして出力</strong>。超過したレコードはウィンドウ結果から除外されるため、事前の設定確認が重要です。
+        </p>
+      </div>
+
+      <div class="card">
+        <h3>4️⃣ 専用モニタリング メトリクスの提供</h3>
+        <p style="font-size: 14px; margin: 0;">
+          <code>per_stage_data_watermark_age_with_late_data</code> は本機能がない場合のウォーターマーク経過時間を示し、差分で<strong>削減されたレイテンシを確認</strong>できます。
+          <code>per_stage_oldest_pending_element_age</code> は最古の未処理要素の経過時間を示し、allowed lateness に近づくと<strong>破棄リスクを察知</strong>できます。
+        </p>
+      </div>
+    </div>
+
+    <!-- 技術仕様 -->
+    <div class="section">
+      <h2>🔧 技術仕様</h2>
+
+      <h3>📋 機能の要点</h3>
+      <table>
+        <tr><th style="width: 30%;">項目</th><th>詳細</th></tr>
+        <tr><td>対象ジョブ</td><td>Streaming Engine を使用するストリーミング ジョブのみ</td></tr>
+        <tr><td>有効化方法</td><td>サービス オプション <code>enable_eager_watermark_advancement</code> を起動時に指定</td></tr>
+        <tr><td>SDK 要件</td><td>Streaming Engine 上の全 Beam SDK (Java / Python / Go) で利用可、SDK アップグレード不要</td></tr>
+        <tr><td>遅延レコードの扱い</td><td>allowed lateness 内は late パネとして出力、超過分はウィンドウ結果から除外</td></tr>
+        <tr><td>実行中ジョブへの適用</td><td>不可。新規ジョブまたは置換ジョブ (<code>--update</code>) で設定</td></tr>
+        <tr><td>無効化</td><td>オプションを外した置換ジョブを起動 (ウォーターマークは後退せず引き継がれる)</td></tr>
+        <tr><td>有効化の確認</td><td>ジョブログの "Eager watermark advancement is enabled for this job." またはジョブ情報パネルの Pipeline options</td></tr>
+      </table>
+
+      <h3>🚀 有効化オプション</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">サービス オプションの指定</span>
+        </div>
+        <pre><code class="language-bash"># Java
+--dataflowServiceOptions=enable_eager_watermark_advancement
+
+# Python / Go
+--dataflow_service_options=enable_eager_watermark_advancement</code></pre>
+      </div>
+
+      <h3>📊 モニタリング メトリクス (Cloud Monitoring、ステージ単位・秒)</h3>
+      <table>
+        <tr><th style="width: 55%;">メトリクス</th><th>用途</th></tr>
+        <tr>
+          <td><code>dataflow.googleapis.com/job/per_stage_data_watermark_age_with_late_data</code></td>
+          <td>本機能がない場合のウォーターマーク経過時間。<code>per_stage_data_watermark_age</code> との差分が削減されたレイテンシ</td>
+        </tr>
+        <tr>
+          <td><code>dataflow.googleapis.com/job/per_stage_oldest_pending_element_age</code></td>
+          <td>遅延レコードを含む最古の未処理要素の経過時間。ウォーターマーク経過時間との差が allowed lateness に近づくと破棄リスクあり</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- 設定方法 -->
+    <div class="section">
+      <h2>🛠️ 設定方法</h2>
+
+      <h3>✅ 前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>ジョブが Streaming Engine を使用するストリーミング パイプラインであること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>想定される遅延をカバーする allowed lateness をウィンドウ戦略に設定すること (例: <code>Window.into(...).withAllowedLateness(Duration.standardMinutes(60))</code>)</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>トリガー、累積モード (accumulation mode)、<code>PaneInfo</code> の扱いが late パネを正しく処理できることを確認すること</span></div>
+
+      <h3>ステップ 1: allowed lateness の設定を確認する</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Java</span>
+          <span class="code-title">1 時間の遅延を許容するウィンドウ設定</span>
+        </div>
+        <pre><code class="language-java">// Java の例: 1 時間の遅延を許容するウィンドウ設定
+PCollection&lt;KV&lt;String, Long&gt;&gt; counts = input
+    .apply(Window.&lt;KV&lt;String, Long&gt;&gt;into(FixedWindows.of(Duration.standardMinutes(5)))
+        .withAllowedLateness(Duration.standardHours(1))
+        .triggering(AfterWatermark.pastEndOfWindow()
+            .withLateFirings(AfterPane.elementCountAtLeast(1)))
+        .accumulatingFiredPanes())
+    .apply(Count.perKey());</code></pre>
+      </div>
+      <div class="warning-box">
+        <strong>⚠️ 注意:</strong> 従来はウォーターマークの停滞により遅延レコードが「オンタイム」と誤分類される副次的な安全網がありました。有効化後はより多くのレコードが正しく late と判定されます。<strong>allowed lateness が不足していると破棄が増える</strong>ため、事前に設定を見直してください。
+      </div>
+
+      <h3>ステップ 2: サービス オプションを指定してジョブを起動する</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">Flex Template の例</span>
+        </div>
+        <pre><code class="language-bash">gcloud dataflow flex-template run JOB_NAME \
+    --template-file-gcs-location=TEMPLATE_LOCATION \
+    --region=REGION \
+    --enable-streaming-engine \
+    --additional-experiments=enable_eager_watermark_advancement</code></pre>
+      </div>
+      <p style="font-size: 14px;">
+        Terraform の場合は <code>google_dataflow_flex_template_job</code> リソースで <code>enable_streaming_engine = true</code> と <code>additional_experiments = ["enable_eager_watermark_advancement"]</code> を指定します。
+      </p>
+
+      <h3>ステップ 3: 有効化と破棄率をモニタリングする</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">ジョブログで有効化を確認</span>
+        </div>
+        <pre><code class="language-bash"># ジョブログで有効化を確認
+# "Eager watermark advancement is enabled for this job." が出力される
+gcloud logging read 'resource.type="dataflow_step" AND "Eager watermark advancement"' --limit 5</code></pre>
+      </div>
+      <p style="font-size: 14px;">
+        有効化後は、ジョブ情報パネルのカスタム カウンタ <code>droppedDueToLateness</code> を監視し、遅延による破棄が許容範囲内であることを確認します。破棄が多い場合は allowed lateness を延長します。
+      </p>
+    </div>
+
+    <!-- メリット -->
+    <div class="section">
+      <h2>👍 メリット</h2>
+      <div class="merit-grid">
+        <div class="merit-card">
+          <h3>💼 ビジネス面</h3>
+          <ul>
+            <li><strong>出力レイテンシの予測可能性</strong>: ダッシュボードやアラートなどリアルタイム分析の結果が、少数の遅延データに左右されずスケジュールどおりに届く</li>
+            <li><strong>SLO 達成の容易化</strong>: イベントタイム ベースの集計結果の提供時間が安定し、下流システムとのレイテンシ SLO を立てやすい</li>
+            <li><strong>導入コストの低さ</strong>: SDK アップグレード不要でサービス オプションの指定のみ。既存パイプラインへの適用障壁が低い</li>
+          </ul>
+        </div>
+        <div class="merit-card">
+          <h3>⚙️ 技術面</h3>
+          <ul>
+            <li><strong>ウォーターマーク停滞の解消</strong>: 1 件の遅延レコードがパイプライン全体のウィンドウ出力とタイマーを凍結させる問題が解消</li>
+            <li><strong>リソース使用の平準化</strong>: 溜まったウィンドウの一斉クローズによるワーカー使用率スパイクが緩和</li>
+            <li><strong>可観測性の向上</strong>: 専用メトリクスでレイテンシ削減効果と破棄リスクを定量的に把握</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- デメリット・制約事項 -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>🚫 制限事項</h3>
+      <div class="check-item"><span class="cross-icon">✕</span><span>Streaming Engine を使用するストリーミング ジョブ専用 (バッチジョブや Streaming Engine 無効のジョブでは利用不可)</span></div>
+      <div class="check-item"><span class="cross-icon">✕</span><span>実行中のジョブでオン / オフを切り替えられず、新規ジョブまたは置換ジョブ (<code>--update</code>) が必要</span></div>
+      <div class="check-item"><span class="cross-icon">✕</span><span>すべてのソースが有界 (bounded) の場合、ジョブは自動的に完了しないため、手動でドレインが必要</span></div>
+      <div class="check-item"><span class="cross-icon">✕</span><span>処理の遅さ (重い計算、遅い RPC、CPU / メモリのボトルネック) に起因するウォーターマーク ラグは改善されない。あくまで遅延到着データの影響を分離する機能</span></div>
+
+      <h3>🤔 考慮すべき点</h3>
+      <div class="warning-box">
+        <ul style="margin: 0; padding-left: 20px; font-size: 14px;">
+          <li>従来はウォーターマーク停滞が遅延レコードを「オンタイム」扱いにする意図しない安全網として機能していた。有効化後はより多くのレコードが正しく late と判定されるため、<strong>allowed lateness が不足していると破棄が増える</strong></li>
+          <li>トリガー、累積モード、<code>PaneInfo</code> の処理が late パネを正しく扱えるか、<strong>有効化前に確認が必要</strong></li>
+          <li>有効化後は <code>droppedDueToLateness</code> カウンタと <code>per_stage_oldest_pending_element_age</code> メトリクスを監視し、破棄率が許容範囲内か継続的に確認する</li>
+          <li>無効化する場合は、オプションを外した置換ジョブを起動する。<strong>ウォーターマークは後退しない</strong>ため、新ジョブは旧ジョブのウォーターマークを引き継ぐ</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ユースケース -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <h3>📱 ユースケース 1: IoT デバイスのオフライン復帰によるバッファ データ流入</h3>
+        <p style="font-size: 14px;">
+          <strong>シナリオ</strong>: 工場のセンサーや車載デバイスがネットワーク断から復帰し、オフライン中にバッファした数時間分の過去タイムスタンプ付きデータを一斉送信する。従来はこの古いデータがウォーターマークを引き戻し、直近のリアルタイム集計の出力まで停滞していた。
+        </p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">Bash</span>
+            <span class="code-title">実装例</span>
+          </div>
+          <pre><code class="language-bash">gcloud dataflow flex-template run iot-aggregation \
+    --template-file-gcs-location=gs://my-bucket/templates/iot-agg.json \
+    --region=asia-northeast1 \
+    --enable-streaming-engine \
+    --additional-experiments=enable_eager_watermark_advancement</code></pre>
+        </div>
+        <p style="font-size: 14px; margin-bottom: 0;">
+          <strong>効果</strong>: リアルタイム データのウィンドウ集計はスケジュールどおり出力され、復帰デバイスの過去データは allowed lateness の範囲内で late パネとして並行処理される。ダッシュボードの更新遅延が解消される。
+        </p>
+      </div>
+
+      <div class="usecase">
+        <h3>📨 ユースケース 2: アイドル状態の Kafka パーティションへのバックログ流入</h3>
+        <p style="font-size: 14px;">
+          <strong>シナリオ</strong>: イベントタイム (<code>CreateTime</code>) を使用する Kafka ソースで、長時間アイドルだったパーティションに古いイベントのバックログが流入する。従来はパイプライン全体のウォーターマークが停滞し、イベントタイム タイマーに依存するステートフル処理 (セッション管理、タイムアウト検知など) が遅延していた。
+        </p>
+        <p style="font-size: 14px; margin-bottom: 0;">
+          <strong>効果</strong>: イベントタイム タイマーが予定どおり発火し、セッション確定やタイムアウト検知のレイテンシが安定する。バックログは並行処理されるため、データの取りこぼしもない (allowed lateness 内)。
+        </p>
+      </div>
+    </div>
+
+    <!-- 料金・リージョン -->
+    <div class="section">
+      <h2>💰 料金・利用可能リージョン</h2>
+      <div class="note-box">
+        <strong>💵 料金:</strong> 本機能自体の追加料金に関する記載は公式ドキュメントにありません。Streaming Engine の利用には通常の Streaming Engine 料金 (リソースベース課金またはデータ処理量課金) が適用されます。詳細は
+        <a href="https://cloud.google.com/dataflow/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Dataflow の料金</a> を参照してください。
+      </div>
+      <div class="note-box">
+        <strong>🌏 リージョン:</strong> 公式ドキュメントにリージョン制限の記載はありません。Streaming Engine は Dataflow がサポートされるすべてのリージョンで利用可能です。詳細は
+        <a href="https://docs.cloud.google.com/dataflow/docs/resources/locations" target="_blank" rel="noopener noreferrer" class="gc-link">Dataflow のロケーション</a> を参照してください。
+      </div>
+    </div>
+
+    <!-- 関連サービス -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card">
+        <strong>⚙️ Dataflow Streaming Engine</strong>
+        <p style="font-size: 14px; margin: 4px 0 0 0;">本機能の前提。パイプライン実行をワーカー VM から Dataflow サービス バックエンドに移し、リソース削減と柔軟なオートスケーリングを実現する</p>
+      </div>
+      <div class="card">
+        <strong>📨 Pub/Sub</strong>
+        <p style="font-size: 14px; margin: 4px 0 0 0;">代表的なストリーミング ソース。イベント タイムスタンプ属性を使用する場合、ソース ウォーターマークより古いメッセージが本機能の対象となる</p>
+      </div>
+      <div class="card">
+        <strong>📊 Cloud Monitoring</strong>
+        <p style="font-size: 14px; margin: 4px 0 0 0;"><code>per_stage_data_watermark_age_with_late_data</code> などの専用メトリクスで本機能の効果と破棄リスクを監視できる</p>
+      </div>
+      <div class="card">
+        <strong>🧩 Apache Beam (windowing / triggers / allowed lateness)</strong>
+        <p style="font-size: 14px; margin: 4px 0 0 0;">ウィンドウ戦略、トリガー、allowed lateness の設定が本機能の挙動 (late パネ出力と破棄) を決定する</p>
+      </div>
+    </div>
+
+    <!-- まとめ -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="success-box">
+        <p style="margin: 0;">
+          Eager Watermark Advancement の GA により、<strong>少数の遅延レコードがストリーミング パイプライン全体の出力を停滞させる長年の課題</strong>が、SDK アップグレード不要の<strong>サービス オプション 1 つで解消</strong>できるようになりました。
+          ウィンドウ集計やイベントタイム タイマーを使用する Streaming Engine ジョブを運用しているなら、まず <strong>allowed lateness が想定遅延をカバーしているかを確認</strong>した上で有効化し、
+          <code>droppedDueToLateness</code> カウンタと専用メトリクスで破棄率とレイテンシ削減効果を検証することを推奨します。
+        </p>
+      </div>
+      <div style="margin-top: 12px;">
+        <span class="badge">Dataflow</span>
+        <span class="badge">Streaming Engine</span>
+        <span class="badge">Watermark</span>
+        <span class="badge">Apache Beam</span>
+        <span class="badge badge-ga">GA</span>
+        <span class="badge">ストリーミング処理</span>
+        <span class="badge">イベントタイム</span>
+        <span class="badge">Windowing</span>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+      <p>📎 出典:</p>
+      <ul class="link-list" style="word-break: break-all;">
+        <li><a href="https://docs.cloud.google.com/release-notes#November_17_2026" target="_blank" rel="noopener noreferrer" class="gc-link">公式リリースノート (2026-11-17)</a></li>
+        <li><a href="https://docs.cloud.google.com/dataflow/docs/guides/eager-watermark-advancement" target="_blank" rel="noopener noreferrer" class="gc-link">Eager watermark advancement (公式ドキュメント)</a></li>
+        <li><a href="https://docs.cloud.google.com/dataflow/docs/concepts/streaming-pipelines" target="_blank" rel="noopener noreferrer" class="gc-link">ストリーミング パイプライン (ウォーターマークとウィンドウ)</a></li>
+        <li><a href="https://docs.cloud.google.com/dataflow/docs/streaming-engine" target="_blank" rel="noopener noreferrer" class="gc-link">Streaming Engine の使用</a></li>
+        <li><a href="https://cloud.google.com/dataflow/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">Dataflow の料金</a></li>
+      </ul>
+      <p>レポート: reports/2026/2026-11-17-dataflow-eager-watermark-advancement-ga.md | 生成日: 2026-11-18</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

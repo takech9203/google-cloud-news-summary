@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Composer: google-api-core パフォーマンス低下問題</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card-red {
+      border-left-color: var(--gc-red);
+    }
+
+    .card-green {
+      border-left-color: var(--gc-green);
+    }
+
+    .card-yellow {
+      border-left-color: var(--gc-yellow);
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 20px;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    .badge {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+      background: var(--gc-blue-600);
+    }
+
+    .badge-issue {
+      background: var(--gc-red);
+      color: #FFFFFF;
+    }
+
+    .badge-fixed {
+      background: var(--gc-green);
+      color: #FFFFFF;
+    }
+
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon {
+      color: var(--gc-green);
+      font-size: 18px;
+    }
+
+    .cross-icon {
+      color: var(--gc-red);
+      font-size: 18px;
+    }
+
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    .code-label {
+      display: inline-block;
+      background: #2D2D2D;
+      color: #9CDCFE;
+      padding: 4px 12px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-label + pre:not(.mermaid),
+    .code-label + .code-block {
+      border-top-left-radius: 0;
+      margin-top: 0;
+    }
+
+    code:not(pre code) {
+      background: var(--gc-surface-container-low);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--gc-blue-900);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background: var(--gc-surface-container-lowest);
+    }
+
+    tr:hover {
+      background: var(--gc-blue-50);
+    }
+
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .stat-card.red {
+      background: linear-gradient(135deg, var(--gc-red), #C62828);
+    }
+
+    .stat-card.green {
+      background: linear-gradient(135deg, var(--gc-green), #1B5E20);
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .before-card {
+      background: var(--gc-red-tint);
+      border: 2px solid var(--gc-red);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .before-card h3 {
+      color: var(--gc-red);
+      margin: 0 0 12px 0;
+      font-size: 16px;
+    }
+
+    .after-card {
+      background: var(--gc-green-tint);
+      border: 2px solid var(--gc-green);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .after-card h3 {
+      color: var(--gc-green);
+      margin: 0 0 12px 0;
+      font-size: 16px;
+    }
+
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .usecase-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .usecase-card {
+      background: var(--gc-blue-tint);
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid var(--gc-blue-200);
+    }
+
+    .usecase-card h4 {
+      color: var(--gc-blue-800);
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .steps-list {
+      counter-reset: step-counter;
+      list-style: none;
+      padding: 0;
+    }
+
+    .steps-list li {
+      counter-increment: step-counter;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin: 12px 0;
+      padding: 12px 16px;
+      background: var(--gc-surface);
+      border-radius: 8px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .steps-list li::before {
+      content: counter(step-counter);
+      background: var(--gc-blue-600);
+      color: white;
+      font-weight: 700;
+      font-size: 14px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a {
+      color: var(--gc-blue-600);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 24px;
+      }
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+      .stat-cards {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>Cloud Composer: google-api-core パフォーマンス低下問題</h1>
+        <div style="margin-top: 8px;">
+          <span class="badge">Cloud Composer</span>
+          <span class="badge badge-issue">Issue (既知の問題)</span>
+          <span class="badge badge-fixed">修正版リリース済み</span>
+        </div>
+      </div>
+      <div class="subtitle">2026-05-14</div>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section">
+      <h2>📋 概要</h2>
+      <p>Cloud Composer 環境にプリインストールされている <code>google-api-core</code> パッケージのバージョン <span class="highlight">2.28.0 ~ 2.30.2</span> において、環境パフォーマンスの低下を引き起こす問題が確認されました。</p>
+      <p>Managed Airflow (Gen 3) および Managed Airflow (Gen 2) の広範なビルドバージョンに影響しており、ワークフローのスケジューリングと実行の両面でパフォーマンスに影響を与えます。</p>
+
+      <div class="before-after">
+        <div class="before-card">
+          <h3>Before (問題発生中)</h3>
+          <div class="icon-text"><span class="cross-icon">&#x2717;</span><span>タスク実行時間が通常より長い</span></div>
+          <div class="icon-text"><span class="cross-icon">&#x2717;</span><span>queued から executing への遷移が遅延</span></div>
+          <div class="icon-text"><span class="cross-icon">&#x2717;</span><span>環境全体のパフォーマンス低下</span></div>
+        </div>
+        <div class="after-card">
+          <h3>After (修正適用後)</h3>
+          <div class="icon-text"><span class="check-icon">&#x2713;</span><span>正常なタスク実行速度に回復</span></div>
+          <div class="icon-text"><span class="check-icon">&#x2713;</span><span>スムーズなタスク状態遷移</span></div>
+          <div class="icon-text"><span class="check-icon">&#x2713;</span><span>安定した環境パフォーマンス</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Impact Statistics -->
+    <div class="section">
+      <h2>📊 影響の規模</h2>
+      <div class="stat-cards">
+        <div class="stat-card red">
+          <div class="stat-value">2.28.0~2.30.2</div>
+          <div class="stat-label">影響を受けるバージョン範囲</div>
+        </div>
+        <div class="stat-card red">
+          <div class="stat-value">Gen 2 + Gen 3</div>
+          <div class="stat-label">影響を受ける世代</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-value">&ge; 2.30.3</div>
+          <div class="stat-label">修正済みバージョン</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図</h2>
+      <p>問題の発生メカニズムと 2 つの解決策のフローを示します。</p>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    subgraph 問題の発生
+        A[Cloud Composer 環境] --> B[google-api-core 2.28.0~2.30.2]
+        B --> C[パフォーマンス低下]
+        C --> D[タスク実行時間の増大]
+        C --> E[キューから実行への遷移遅延]
+    end
+
+    subgraph 解決策1: アップグレード
+        F[環境バージョンのアップグレード] --> G[修正済みビルド]
+        G --> H[google-api-core 2.30.3+ または 2.27.0]
+        H --> I[正常なパフォーマンス]
+    end
+
+    subgraph 解決策2: 手動インストール
+        J[PyPI パッケージの更新] --> K[google-api-core >= 2.30.3]
+        K --> I
+    end
+
+    A -.->|対処| F
+    A -.->|対処| J
+        </pre>
+      </div>
+    </div>
+
+    <!-- Affected Versions -->
+    <div class="section">
+      <h2>&#x26A0;&#xFE0F; 影響を受けるバージョン</h2>
+
+      <h3 style="color: var(--gc-on-surface); margin-top: 16px; font-size: 18px;">Managed Airflow (Gen 3)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Airflow バージョン</th>
+            <th>影響を受けるビルド範囲</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Airflow 3.1.7</td>
+            <td>composer-3-airflow-3.1.7-build.0 ~ build.5</td>
+          </tr>
+          <tr>
+            <td>Airflow 3.1.0</td>
+            <td>composer-3-airflow-3.1.0-build.5 ~ build.10</td>
+          </tr>
+          <tr>
+            <td>Airflow 2.11.1</td>
+            <td>composer-3-airflow-2.11.1-build.0</td>
+          </tr>
+          <tr>
+            <td>Airflow 2.10.5</td>
+            <td>composer-3-airflow-2.10.5-build.22 ~ build.33</td>
+          </tr>
+          <tr>
+            <td>Airflow 2.9.3</td>
+            <td>composer-3-airflow-2.9.3-build.42 ~ build.53</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 style="color: var(--gc-on-surface); margin-top: 24px; font-size: 18px;">Managed Airflow (Gen 2)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Airflow バージョン</th>
+            <th>影響を受けるビルド範囲</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Airflow 2.11.1</td>
+            <td>composer-2.16.10-airflow-2.11.1</td>
+          </tr>
+          <tr>
+            <td>Airflow 2.10.5</td>
+            <td>composer-2.16.0-airflow-2.10.5 ~ composer-2.16.10-airflow-2.10.5</td>
+          </tr>
+          <tr>
+            <td>Airflow 2.9.3</td>
+            <td>composer-2.16.0-airflow-2.9.3 ~ composer-2.16.10-airflow-2.9.3</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Recommended Upgrade Targets -->
+    <div class="section">
+      <h2>&#x2705; 推奨アップグレード先</h2>
+
+      <h3 style="color: var(--gc-on-surface); margin-top: 16px; font-size: 18px;">Managed Airflow (Gen 3)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Airflow バージョン</th>
+            <th>推奨ビルド</th>
+            <th>備考</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Airflow 3.1.7</td>
+            <td>composer-3-airflow-3.1.7-build.7 以降</td>
+            <td>google-api-core 2.30.3+ を含む</td>
+          </tr>
+          <tr>
+            <td>Airflow 2.11.1</td>
+            <td>composer-3-airflow-2.11.1-build.3 以降</td>
+            <td>google-api-core 2.30.3+ を含む</td>
+          </tr>
+          <tr>
+            <td>Airflow 2.10.5</td>
+            <td>composer-3-airflow-2.10.5-build.36 以降</td>
+            <td>google-api-core 2.30.3+ を含む</td>
+          </tr>
+          <tr>
+            <td>Airflow 2.9.3</td>
+            <td>composer-3-airflow-2.9.3-build.54</td>
+            <td>google-api-core 2.27.0 を含む</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 style="color: var(--gc-on-surface); margin-top: 24px; font-size: 18px;">Managed Airflow (Gen 2)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Airflow バージョン</th>
+            <th>推奨ビルド</th>
+            <th>備考</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Airflow 2.11.1</td>
+            <td>composer-2.17.0-airflow-2.11.1 以降</td>
+            <td>google-api-core 2.30.3+ を含む</td>
+          </tr>
+          <tr>
+            <td>Airflow 2.10.5</td>
+            <td>composer-2.17.0-airflow-2.10.5 以降</td>
+            <td>google-api-core 2.30.3+ を含む</td>
+          </tr>
+          <tr>
+            <td>Airflow 2.11.1</td>
+            <td>composer-2.16.11-airflow-2.11.1</td>
+            <td>google-api-core 2.27.0 を含む</td>
+          </tr>
+          <tr>
+            <td>Airflow 2.10.5</td>
+            <td>composer-2.16.11-airflow-2.10.5</td>
+            <td>google-api-core 2.27.0 を含む</td>
+          </tr>
+          <tr>
+            <td>Airflow 2.9.3</td>
+            <td>composer-2.16.11-airflow-2.9.3</td>
+            <td>google-api-core 2.27.0 を含む</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Fix Method 1 -->
+    <div class="section">
+      <h2>&#x1F527; 対処方法 1: 環境バージョンのアップグレード (推奨)</h2>
+
+      <div class="note-box">
+        <strong>&#x1F4A1; 前提条件:</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li><code>composer.environments.update</code> 権限が必要</li>
+          <li>アップグレード前に全ての DAG を一時停止し、実行中のタスクの完了を待つこと</li>
+        </ul>
+      </div>
+
+      <h3 style="color: var(--gc-on-surface); margin-top: 20px; font-size: 16px;">Step 1: 現在のバージョンを確認</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud composer environments describe ENVIRONMENT_NAME \
+  --location LOCATION \
+  --format="value(config.softwareConfig.imageVersion)"</code></pre>
+
+      <h3 style="color: var(--gc-on-surface); margin-top: 20px; font-size: 16px;">Step 2: 利用可能なアップグレード先を確認</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud composer environments list-upgrades \
+  ENVIRONMENT_NAME \
+  --location LOCATION</code></pre>
+
+      <h3 style="color: var(--gc-on-surface); margin-top: 20px; font-size: 16px;">Step 3: 環境をアップグレード</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud composer environments update ENVIRONMENT_NAME \
+  --location LOCATION \
+  --image-version TARGET_VERSION</code></pre>
+
+      <h3 style="color: var(--gc-on-surface); margin-top: 20px; font-size: 16px;">実行例 (Gen 2)</h3>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud composer environments update my-composer-env \
+  --location us-central1 \
+  --image-version composer-2.17.0-airflow-2.11.1</code></pre>
+    </div>
+
+    <!-- Fix Method 2 -->
+    <div class="section">
+      <h2>&#x1F4E6; 対処方法 2: google-api-core の手動インストール</h2>
+      <p>環境バージョンのアップグレードがすぐに実施できない場合のワークアラウンドです。</p>
+
+      <div class="card">
+        <h4 style="margin: 0 0 12px 0; color: var(--gc-on-surface);">gcloud CLI を使用する場合</h4>
+        <span class="code-label">Bash</span>
+        <pre><code class="language-bash">gcloud composer environments update ENVIRONMENT_NAME \
+  --location LOCATION \
+  --update-pypi-package "google-api-core>=2.30.3"</code></pre>
+      </div>
+
+      <div class="card" style="margin-top: 16px;">
+        <h4 style="margin: 0 0 12px 0; color: var(--gc-on-surface);">Google Cloud Console を使用する場合</h4>
+        <ol style="margin: 0; padding-left: 20px; color: var(--gc-on-surface-variant);">
+          <li>Google Cloud Console で「Environments」ページに移動</li>
+          <li>対象の環境名をクリック</li>
+          <li>「PyPI packages」タブに移動</li>
+          <li>「Edit」をクリック</li>
+          <li>「Add package」をクリック</li>
+          <li>パッケージ名に <code>google-api-core</code>、バージョンに <code>&gt;=2.30.3</code> を入力</li>
+          <li>「Save」をクリック</li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- Diagnosis -->
+    <div class="section">
+      <h2>&#x1F50D; 影響の確認方法</h2>
+      <p>以下の兆候が見られる場合、この問題の影響を受けている可能性があります:</p>
+
+      <div class="warning-box">
+        <div class="icon-text"><span>&#x26A0;&#xFE0F;</span><span>Airflow UI でタスクが「queued」状態に長時間留まる</span></div>
+        <div class="icon-text"><span>&#x26A0;&#xFE0F;</span><span>タスクの実行時間が以前よりも明らかに長い</span></div>
+        <div class="icon-text"><span>&#x26A0;&#xFE0F;</span><span>スケジューラのパフォーマンスメトリクスに低下が見られる</span></div>
+      </div>
+
+      <p>現在の <code>google-api-core</code> のバージョンを確認するには:</p>
+      <span class="code-label">Bash</span>
+      <pre><code class="language-bash">gcloud beta composer environments list-packages \
+  ENVIRONMENT_NAME \
+  --location LOCATION | grep google-api-core</code></pre>
+    </div>
+
+    <!-- Considerations -->
+    <div class="section">
+      <h2>&#x1F4DD; 考慮すべき点</h2>
+      <div class="card card-yellow">
+        <div class="icon-text"><span>&#x26A0;&#xFE0F;</span><span>アップグレード操作中は DAG の実行を一時停止する必要がある</span></div>
+      </div>
+      <div class="card card-yellow">
+        <div class="icon-text"><span>&#x26A0;&#xFE0F;</span><span>Managed Airflow のリリースは段階的にリージョンに展開されるため、最新バージョンがすぐに利用できない場合がある</span></div>
+      </div>
+      <div class="card card-red">
+        <div class="icon-text"><span class="cross-icon">&#x2717;</span><span>以前のバージョンへのダウングレードはサポートされていない</span></div>
+      </div>
+      <div class="card">
+        <div class="icon-text"><span>&#x1F4A1;</span><span>PyPI パッケージの手動インストールは Cloud Build を使用するため、追加のビルド時間が発生する</span></div>
+      </div>
+      <div class="card">
+        <div class="icon-text"><span>&#x1F4A1;</span><span><code>google-api-core</code> のバージョンを更新する際、依存関係の競合がないか事前に確認すること</span></div>
+      </div>
+    </div>
+
+    <!-- Related Services -->
+    <div class="section">
+      <h2>&#x1F517; 関連サービス・機能</h2>
+      <div class="usecase-cards">
+        <div class="usecase-card">
+          <h4>&#x2699;&#xFE0F; Apache Airflow</h4>
+          <p>Cloud Composer の基盤となるワークフロー管理プラットフォーム</p>
+        </div>
+        <div class="usecase-card">
+          <h4>&#x1F4E6; google-api-core</h4>
+          <p>Google API クライアントライブラリの共通基盤パッケージ。API リクエストの実行、リトライロジック、認証などを担当</p>
+        </div>
+        <div class="usecase-card">
+          <h4>&#x1F3D7;&#xFE0F; Cloud Build</h4>
+          <p>PyPI パッケージの手動インストール時に使用されるビルドサービス</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section">
+      <h2>&#x1F4CC; まとめ</h2>
+      <div class="error-box">
+        <strong>影響:</strong> <code>google-api-core</code> バージョン 2.28.0 ~ 2.30.2 を含む Cloud Composer ビルドにおいて、タスク実行とスケジューリングのパフォーマンスが低下
+      </div>
+      <div class="success-box">
+        <strong>対処:</strong> 修正済みビルドへのアップグレード、または <code>google-api-core >= 2.30.3</code> の手動インストールを速やかに実施してください。本番ワークロードへの影響を最小限にするため、早急な対応が推奨されます。
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>&#x1F4CE; 出典・参考リンク:</strong></p>
+      <ul style="list-style: none; padding: 0; margin: 8px 0 0 0;">
+        <li style="margin: 4px 0;"><a href="https://cloud.google.com/release-notes#May_14_2026" target="_blank" rel="noopener noreferrer">Google Cloud Release Notes (2026-05-14)</a></li>
+        <li style="margin: 4px 0;"><a href="https://docs.cloud.google.com/composer/docs/composer-2/upgrade-environments" target="_blank" rel="noopener noreferrer">Cloud Composer 環境のアップグレード</a></li>
+        <li style="margin: 4px 0;"><a href="https://docs.cloud.google.com/composer/docs/composer-2/install-python-dependencies" target="_blank" rel="noopener noreferrer">Cloud Composer PyPI パッケージのインストール</a></li>
+        <li style="margin: 4px 0;"><a href="https://docs.cloud.google.com/composer/docs/composer-2/known-issues" target="_blank" rel="noopener noreferrer">Cloud Composer の既知の問題</a></li>
+        <li style="margin: 4px 0;"><a href="https://docs.cloud.google.com/composer/docs/composer-versions" target="_blank" rel="noopener noreferrer">Cloud Composer バージョン一覧</a></li>
+      </ul>
+      <p style="margin-top: 12px; color: var(--gc-outline);">Generated: 2026-05-14 | Cloud Composer google-api-core Performance Issue Infographic</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

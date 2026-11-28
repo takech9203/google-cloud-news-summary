@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apigee hybrid v1.15.11 パッチリリース - Valkey 移行の既定化と多数のセキュリティ修正</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Google Brand Colors */
+      --gc-blue: #4285F4;
+      --gc-red: #EA4335;
+      --gc-yellow: #FBBC04;
+      --gc-green: #34A853;
+
+      /* Google Cloud UI Blue Scale */
+      --gc-blue-900: #174EA6;
+      --gc-blue-800: #185ABC;
+      --gc-blue-700: #1967D2;
+      --gc-blue-600: #1A73E8;
+      --gc-blue-500: #4285F4;
+      --gc-blue-300: #669DF6;
+      --gc-blue-200: #8AB4F8;
+      --gc-blue-100: #AECBFA;
+      --gc-blue-50: #E8F0FE;
+
+      /* Text Colors */
+      --gc-on-surface: #202124;
+      --gc-on-surface-variant: #5F6368;
+      --gc-outline: #80868B;
+
+      /* Surface Colors */
+      --gc-surface: #FFFFFF;
+      --gc-surface-container-lowest: #F8F9FA;
+      --gc-surface-container-low: #F1F3F4;
+      --gc-surface-container: #E8EAED;
+      --gc-outline-variant: #DADCE0;
+
+      /* Semantic Tints */
+      --gc-blue-tint: #E8F0FE;
+      --gc-green-tint: #E6F4EA;
+      --gc-red-tint: #FCE8E6;
+      --gc-yellow-tint: #FEF7E0;
+      --gc-purple-tint: #F3E8FD;
+      --gc-teal-tint: #E0F7FA;
+
+      /* Extended Colors */
+      --gc-purple: #A142F4;
+      --gc-teal: #00BCD4;
+      --gc-orange: #FF6D00;
+    }
+
+    body {
+      background-color: var(--gc-surface);
+      font-family: 'Google Sans', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      color: var(--gc-on-surface-variant);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--gc-blue-600);
+    }
+
+    h1, .title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    h2, .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin-top: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gc-on-surface);
+      margin: 20px 0 8px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--gc-outline);
+    }
+
+    .section {
+      background: var(--gc-surface-container-low);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid var(--gc-outline-variant);
+    }
+
+    .highlight {
+      background-color: var(--gc-blue-50);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--gc-blue-800);
+      border-bottom: 2px solid var(--gc-blue-600);
+    }
+
+    .card {
+      background: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      border-left: 4px solid var(--gc-blue-600);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.08);
+    }
+
+    .card.security { border-left-color: var(--gc-red); }
+    .card.green { border-left-color: var(--gc-green); }
+    .card.orange { border-left-color: var(--gc-orange); }
+
+    .card-title {
+      font-weight: 700;
+      color: var(--gc-on-surface);
+      font-size: 16px;
+      margin-bottom: 8px;
+    }
+
+    .icon-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+      color: var(--gc-on-surface-variant);
+    }
+
+    .arrow {
+      color: var(--gc-blue-600);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .gc-link {
+      color: var(--gc-blue-600);
+      text-decoration: none;
+    }
+
+    .gc-link:hover {
+      color: var(--gc-blue-800);
+      text-decoration: underline;
+    }
+
+    /* サービスバッジ */
+    .badge,
+    .badge-ga,
+    .badge-preview,
+    .badge-deprecated {
+      display: inline-block;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.25px;
+      margin: 4px 8px 4px 0;
+    }
+
+    .badge { background: var(--gc-blue-600); }
+    .badge-ga { background: var(--gc-green); color: #FFFFFF; }
+    .badge-preview { background: var(--gc-orange); color: #FFFFFF; }
+    .badge-deprecated { background: var(--gc-red); color: #FFFFFF; }
+
+    /* Before/After 比較 */
+    .before-after {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    @media (max-width: 760px) {
+      .before-after { grid-template-columns: 1fr; }
+      h1 { font-size: 26px; }
+    }
+
+    .before-box {
+      background: var(--gc-red-tint);
+      border: 1px solid #F3C1BC;
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .after-box {
+      background: var(--gc-green-tint);
+      border: 1px solid #BCDCC5;
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .before-box h3, .after-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .before-box h3 { color: #C5221F; }
+    .after-box h3 { color: #188038; }
+
+    .before-box ul, .after-box ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .before-box li, .after-box li { margin-bottom: 8px; }
+
+    /* フロー図スタイル */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      background: var(--gc-surface);
+      border: 2px solid var(--gc-blue-600);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+      color: var(--gc-on-surface);
+      box-shadow: 0 1px 3px rgba(60, 64, 67, 0.12);
+      font-size: 14px;
+    }
+
+    .flow-arrow {
+      color: var(--gc-blue-600);
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* チェックリスト */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .check-icon { color: var(--gc-green); font-size: 18px; flex-shrink: 0; }
+    .cross-icon { color: var(--gc-red); font-size: 18px; flex-shrink: 0; }
+
+    /* コードブロック (Mermaid の pre を除外) */
+    .code-block,
+    pre:not(.mermaid) {
+      background: #1E1E1E;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: #E8E8E8;
+      margin: 16px 0;
+    }
+
+    .code-block { overflow: hidden; padding: 0; }
+    .code-block pre { margin: 0; padding: 0; border-radius: 0; }
+
+    .code-header {
+      background: #2D2D2D;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+    }
+
+    .code-lang { color: #9CDCFE; font-weight: bold; }
+    .code-title { color: #AAAAAA; }
+
+    .code-block code {
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px !important;
+      display: block;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      font-size: inherit;
+    }
+
+    /* インラインコード */
+    code:not(pre code) {
+      background: var(--gc-surface-container-lowest);
+      border: 1px solid var(--gc-outline-variant);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace;
+      font-size: 0.88em;
+      color: var(--gc-blue-900);
+      word-break: break-all;
+    }
+
+    /* テーブル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gc-outline-variant);
+      background: var(--gc-surface);
+    }
+
+    th {
+      background: var(--gc-blue-50);
+      color: var(--gc-blue-900);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid var(--gc-blue-200);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gc-outline-variant);
+      font-size: 14px;
+      vertical-align: top;
+    }
+
+    tr:nth-child(even) { background: var(--gc-surface-container-lowest); }
+    tr:hover { background: var(--gc-blue-50); }
+
+    /* 注意・警告ボックス */
+    .note-box {
+      background: var(--gc-blue-tint);
+      border-left: 4px solid var(--gc-blue-600);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-box {
+      background: var(--gc-yellow-tint);
+      border-left: 4px solid var(--gc-yellow);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .error-box {
+      background: var(--gc-red-tint);
+      border-left: 4px solid var(--gc-red);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .success-box {
+      background: var(--gc-green-tint);
+      border-left: 4px solid var(--gc-green);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    /* 統計カード */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--gc-blue-600), var(--gc-blue-800));
+      color: var(--gc-surface);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .stat-card.red { background: linear-gradient(135deg, #D93025, #A50E0E); }
+    .stat-card.green { background: linear-gradient(135deg, #1E8E3E, #0D652D); }
+
+    .stat-value {
+      font-size: 30px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label { font-size: 13px; opacity: 0.92; }
+
+    /* ユースケース */
+    .usecase {
+      background: var(--gc-blue-tint);
+      border: 1px solid var(--gc-blue-100);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin: 12px 0;
+    }
+
+    .usecase-title {
+      font-weight: 700;
+      color: var(--gc-blue-900);
+      margin-bottom: 8px;
+    }
+
+    .usecase p { margin: 6px 0; font-size: 14px; }
+
+    /* Mermaid コンテナ */
+    .mermaid-container {
+      background: #FFFFFF;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      border: 2px solid rgba(66, 133, 244, 0.3);
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    ul { padding-left: 24px; }
+    li { margin-bottom: 6px; }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gc-outline-variant);
+      font-size: 12px;
+      color: var(--gc-outline);
+    }
+
+    footer a { word-break: break-all; }
+    footer li { margin-bottom: 4px; }
+
+    .tags {
+      margin-top: 12px;
+      font-size: 13px;
+      color: var(--gc-blue-700);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ========== ヘッダー ========== -->
+    <div class="header">
+      <div>
+        <div style="margin-bottom: 8px;">
+          <span class="badge">☁️ Apigee hybrid</span>
+          <span class="badge badge-deprecated">🔐 Security</span>
+          <span class="badge" style="background: var(--gc-orange);">📦 Patch Release</span>
+        </div>
+        <h1>🚀 Apigee hybrid v1.15.11 パッチリリース</h1>
+        <div class="subtitle">Valkey 移行の既定化 (ApigeeRedis → ApigeeValkey) と多数のセキュリティ修正</div>
+      </div>
+      <div class="subtitle" style="text-align: right;">
+        <strong>リリース日</strong><br>2026-11-24
+      </div>
+    </div>
+
+    <!-- ========== 概要 ========== -->
+    <div class="section">
+      <h2>📌 概要</h2>
+      <p>
+        2026 年 11 月 24 日、Google Cloud は Apigee hybrid の更新バージョン <span class="highlight">v1.15.11</span> をリリースしました。
+        コンテナイメージは Helm チャートに統合されており、チャートのアップグレードでイメージも自動更新されます。
+      </p>
+      <p>
+        最大のポイントは、ApigeeRedis → ApigeeValkey の段階的移行 (phased migration) の一環として、
+        <span class="highlight"><code>ao.args.valkeyBackend</code> のデフォルトが <code>true</code> に変更</span>され、
+        ランタイムのキーバリューストアが Valkey に切り替わることです。
+      </p>
+
+      <div class="error-box">
+        <strong>⛔ 重要:</strong> v1.15.11 へアップグレードする前に、<strong>必ず v1.15.10 を経由する必要があります</strong> (v1.14 からの場合もまず v1.15.10 へ)。
+        <code>apigee-operator</code> のアップグレード時に ApigeeRedis が v1.15.10 経由で更新済みかを検証し、満たさない場合はエラーで停止します。
+      </div>
+
+      <div class="flow-diagram">
+        <div class="flow-step">🏷️ v1.14 /<br>v1.15.9 以前</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">📦 v1.15.10<br>(準備フェーズ・必須経由)</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">📦 v1.15.11<br>(Valkey 切替フェーズ)</div>
+      </div>
+
+      <div class="before-after">
+        <div class="before-box">
+          <h3>😰 アップデート前の課題 (Before)</h3>
+          <ul>
+            <li><code>ao.args.valkeyBackend</code> のデフォルトは <code>false</code> で、ランタイムの KVS は引き続き ApigeeRedis (Valkey 移行は未完了)</li>
+            <li><code>apigee-runtime</code> の管理ポート (例: 8843) でコネクションカウントがリークし、HPA の <code>AverageValue</code> が実態より膨張 → レプリカ数が <code>maxReplicas</code> に張り付き</li>
+            <li>別セッションやマスキングエラー介在時に、デバッグセッションでペイロード・クエリパラメータ・ヘッダー・フロー変数がマスクされず表示</li>
+            <li>OAuth 2.0 の <code>redirect_uri</code> 検証に非厳密なサブリソースマッチングによるバイパス、Jython サンドボックスエスケープ等の問題</li>
+            <li>OASValidation で大きな OpenAPI 3.0 仕様を扱うと Message Processor でメモリリーク・<code>OutOfMemoryError</code></li>
+            <li><code>synchronizer.pollInterval</code> 等の同期間隔設定が Helm チャート・オペレーターに無視される</li>
+          </ul>
+        </div>
+        <div class="after-box">
+          <h3>😊 アップデート後の改善 (After)</h3>
+          <ul>
+            <li><code>ao.args.valkeyBackend</code> がデフォルト <code>true</code> になり、ランタイムが ApigeeValkey を使用。v1.15.10 経由をオペレーターが自動検証</li>
+            <li>コネクションカウントリークが修正され、HPA が実際の負荷に基づき適切にスケール</li>
+            <li>デバッグセッションのマスキング処理が修正され、機微情報の露出リスクを低減</li>
+            <li><code>redirect_uri</code> 検証修正 + <code>&lt;EnforceStrictCallbackURI&gt;</code> の強制、Jython / JavaCallout / Script / JavaScript サンドボックス強化</li>
+            <li>OASValidation のコンパイル済み仕様をコンテンツハッシュで共有しメモリリーク解消。再帰スキーマは検証エラーとして報告</li>
+            <li><code>pollInterval</code> が有効化 (60 秒未満は 60 秒へ)。圧縮 SSE の破損、HTTP/2 疑似ヘッダー問題も修正。多数の CVE 対応 + 弱い DH TLS 暗号スイート無効化</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== アーキテクチャ図 ========== -->
+    <div class="section">
+      <h2>🏗️ アーキテクチャ図: Valkey 段階的移行とアップグレードパス</h2>
+      <div class="mermaid-container">
+        <pre class="mermaid">
+flowchart TD
+    V14(["🏷️ v1.14 / v1.15.9 以前"]) -- "まず全チャートを<br/>v1.15.10 へ" --> V1510["📦 v1.15.10 (準備フェーズ)<br/>ApigeeValkey CRD / apigee-valkey チャート導入<br/>ao.args.valkeyBackend = false"]
+    V1510 -- "helm upgrade" --> OP{"🔍 apigee-operator の検証:<br/>ApigeeRedis は v1.15.10 を<br/>経由して更新済みか?"}
+    OP -- "NG" --> STOP["⛔ アップグレード停止<br/>(先に v1.15.10 を適用)"]
+    OP -- "OK" --> V1511["📦 v1.15.11 (切替フェーズ)<br/>ao.args.valkeyBackend = true (デフォルト)<br/>+ バグ修正 / CVE 対応"]
+
+    subgraph Runtime["☸️ ランタイムプレーン"]
+        RT["🚀 apigee-runtime"] -- "切替後に使用" --> Valkey[("🟢 ApigeeValkey<br/>(レート制限カウンタ等の KVS)")]
+        RT -. "ロールバック用に維持<br/>(アンインストールしない)" .-> Redis[("🔴 ApigeeRedis")]
+    end
+    V1511 --> Runtime
+        </pre>
+      </div>
+      <p style="font-size: 14px;">
+        v1.15.11 は Valkey 移行の「<strong>切替フェーズ</strong>」にあたり、v1.15.10 (準備フェーズ) を必ず経由する必要があります。
+        <code>apigee-operator</code> がアップグレードパスを検証し、切替後もロールバックに備えて <code>apigee-redis</code> チャートは維持します。
+      </p>
+    </div>
+
+    <!-- ========== 主要機能 ========== -->
+    <div class="section">
+      <h2>⚙️ サービスアップデートの詳細 (主要機能)</h2>
+
+      <div class="card">
+        <div class="card-title">1️⃣ ApigeeRedis → ApigeeValkey 移行の既定化 (段階的移行の切替フェーズ)</div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>ao.args.valkeyBackend</code> のデフォルトが <code>true</code> に変更され、ランタイムの KVS が ApigeeValkey に移行</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>v1.15.11 の前に <strong>v1.15.10 の適用が必須</strong>。オペレーターのアップグレード時 (<code>--dry-run=server</code> 時も含む) に ApigeeRedis の <code>hybrid-version</code> ラベルが <code>1.15.10</code> 以降であることを検証し、満たさない場合は <code>ApigeeRedis default in namespace ...</code> で始まるエラーで停止</span></div>
+        <div class="icon-text"><span class="cross-icon">✗</span><span>検証をスキップする <code>disableMandatoryPreviousHybridVersionCheckForValkey</code> は設定しないこと (公式に非推奨)</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><code>overrides.yaml</code> の <code>redis</code> ブロックと同内容の <code>valkey</code> ブロックを追加 (<code>redis.image</code> はコピーしない)。<code>redis</code> ブロックがなければ <code>valkey</code> ブロックも不要</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>切替後も <code>apigee-redis</code> チャートはアンインストールせず、他のチャートと一緒にアップグレードを継続 (フォールバック・ロールバックに必要)</span></div>
+      </div>
+
+      <div class="card green">
+        <div class="card-title">2️⃣ ランタイム・運用面の主要な修正</div>
+        <div class="icon-text"><span class="check-icon">✓</span><span><strong>583672651</strong>: <code>apigee-runtime</code> HTTP サーバー管理ポート (例: 8843) のコネクションカウントリークを修正。HPA の <code>AverageValue</code> 膨張とレプリカ数の <code>maxReplicas</code> 張り付きを解消</span></div>
+        <div class="icon-text"><span class="check-icon">✓</span><span><strong>582790971</strong>: 別セッション・マスキングエラー介在時にデバッグセッションでペイロード等がマスクされず表示される問題を修正</span></div>
+        <div class="icon-text"><span class="check-icon">✓</span><span><strong>582790249</strong>: メッセージのない例外で失敗したポリシーの Execution エントリがデバッグトレースから欠落する問題を修正</span></div>
+        <div class="icon-text"><span class="check-icon">✓</span><span><strong>579213551</strong>: OASValidation の大きな OpenAPI 3.0 仕様によるメモリリーク・<code>OutOfMemoryError</code> を修正。コンパイル済み仕様をコンテンツハッシュで共有し、再帰スキーマは検証エラーとして報告</span></div>
+        <div class="icon-text"><span class="check-icon">✓</span><span><strong>572875915</strong>: <code>synchronizer.pollInterval</code>、<code>envs[].pollInterval</code> 等が無視される問題を修正 (60 秒未満は 60 秒に引き上げ)</span></div>
+        <div class="icon-text"><span class="check-icon">✓</span><span><strong>572025634</strong>: 圧縮された <code>text/event-stream</code> レスポンスが EventFlow を持つプロキシで破損する問題を修正 (圧縮済み SSE は EventFlow 処理をスキップしてパススルー)</span></div>
+        <div class="icon-text"><span class="check-icon">✓</span><span><strong>554114419</strong>: HTTP/2 フローで <code>createNew="true"</code> の <code>AssignMessage</code> / <code>HTTPModifier</code> / <code>RaiseFault</code> ポリシーが <code>:path</code> / <code>:authority</code> 疑似ヘッダーを設定できない問題を修正</span></div>
+      </div>
+
+      <div class="card security">
+        <div class="card-title">3️⃣ Apigee 固有のセキュリティ修正 🔐</div>
+        <div class="icon-text"><span class="check-icon">✓</span><span><strong>579642864</strong>: OAuth 2.0 の <code>redirect_uri</code> 検証における非厳密なサブリソースマッチングのバイパスを修正し、<code>GenerateAuthorizationCode</code> ポリシーで <code>&lt;EnforceStrictCallbackURI&gt;</code> を強制</span></div>
+        <div class="icon-text"><span class="check-icon">✓</span><span><strong>579642568</strong>: Jython サンドボックスエスケープを修正</span></div>
+        <div class="icon-text"><span class="check-icon">✓</span><span><strong>579640924</strong>: <code>JavaCallout</code>、<code>Script</code>、<code>JavaScript</code> ポリシーのサンドボックスを強化</span></div>
+        <div class="icon-text"><span class="check-icon">✓</span><span><strong>519116013</strong>: <code>apigee-hybrid-cassandra</code> コンテナのポート 7070 (Prometheus <code>jmx_exporter</code>) で弱い Diffie-Hellman (DH) TLS 暗号スイートを無効化</span></div>
+      </div>
+
+      <div class="card orange">
+        <div class="card-title">4️⃣ コンポーネント横断の CVE 対応 🛡️</div>
+        <div class="icon-text"><span class="arrow">→</span><span>インフラ系コンテナイメージに多数の CVE 修正を適用 (個別の列挙は公式リリースノートを参照)</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span>対象コンポーネント例: <code>apigee-asm-ingress</code> / <code>apigee-asm-istiod</code> (CVE-2026-111943、CVE-2026-116587、CVE-2026-128085 など)、<code>apigee-connect-agent</code> / <code>apigee-operators</code> / <code>apigee-redis</code> / <code>apigee-prometheus-adapter</code> (CVE-2026-97033〜97054 系列)、<code>apigee-fluent-bit</code> (CVE-2026-27171、CVE-2026-85091)、<code>apigee-hybrid-cassandra</code> / <code>apigee-hybrid-cassandra-client</code>、<code>apigee-mart-server</code> / <code>apigee-mint-task-scheduler</code>、<code>apigee-runtime</code> / <code>apigee-synchronizer</code> (CVE-2026-102554、CVE-2026-49875、CVE-2026-50645)、<code>apigee-stackdriver-logging-agent</code>、<code>apigee-open-telemetry-collector</code> など</span></div>
+      </div>
+    </div>
+
+    <!-- ========== 技術仕様 ========== -->
+    <div class="section">
+      <h2>🔬 技術仕様</h2>
+
+      <h3>📋 リリース概要</h3>
+      <table>
+        <tr><th style="width: 32%;">項目</th><th>詳細</th></tr>
+        <tr><td>バージョン</td><td>Apigee hybrid v1.15.11</td></tr>
+        <tr><td>リリース日</td><td>2026 年 11 月 24 日</td></tr>
+        <tr><td>リリース種別</td><td>パッチリリース (コンテナイメージは Helm チャートに統合)</td></tr>
+        <tr><td>前提バージョン</td><td><strong>v1.15.10 (必須)</strong>。v1.14 からの場合もまず v1.15.10 へ</td></tr>
+        <tr><td>主要変更</td><td><code>ao.args.valkeyBackend</code> のデフォルトが <code>true</code> に変更 (ランタイムが ApigeeValkey へ移行)</td></tr>
+        <tr><td>検証機構</td><td><code>apigee-operator</code> が ApigeeRedis の v1.15.10 経由更新を検証 (<code>--dry-run=server</code> でも実行)</td></tr>
+        <tr><td>アップグレード手順</td><td><a class="gc-link" href="https://docs.cloud.google.com/apigee/docs/hybrid/v1.15/upgrade" target="_blank" rel="noopener noreferrer">Upgrading Apigee hybrid to v1.15.11</a></td></tr>
+      </table>
+
+      <h3>🟢 Valkey 移行に関する構成ポイント</h3>
+      <table>
+        <tr><th style="width: 32%;">項目</th><th>詳細</th></tr>
+        <tr><td><code>ao.args.valkeyBackend</code></td><td>v1.15.11 でデフォルト <code>true</code>。<code>false</code> を明示設定している場合はその行を削除する</td></tr>
+        <tr><td><code>valkey</code> ブロック</td><td><code>overrides.yaml</code> の <code>redis</code> ブロックと同じプロパティ・値で追加 (<code>redis.image</code> はコピーしない)。<code>redis</code> ブロックがなければ不要</td></tr>
+        <tr><td>プライベートレジストリ</td><td><code>gcr.io/apigee-release/hybrid/apigee-valkey</code> イメージも他の hybrid イメージと同じタグでコピーする</td></tr>
+        <tr><td>Secret / Vault 利用時</td><td><code>redis.auth.secret</code> → <code>valkey.auth.secret</code> に同じ Secret を設定。Vault の <code>apigee-redis</code> ロールに <code>apigee-valkey-default</code> と <code>apigee-valkey-envoy-default</code> を追加</td></tr>
+        <tr><td><code>apigee-redis</code> チャート</td><td>切替後もアンインストールせず維持 (ApigeeValkey 非稼働時のフォールバックとロールバックに必要)</td></tr>
+        <tr><td>ロールバック</td><td>v1.15.10 へのロールバック手順が提供されており、ロールバック後はランタイムが ApigeeRedis に戻る</td></tr>
+      </table>
+
+      <h3>📝 overrides.yaml の例 (valkey ブロックの追加)</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">YAML</span>
+          <span class="code-title">overrides.yaml</span>
+        </div>
+        <pre><code class="language-yaml">redis:
+  auth:
+    password: "PASSWORD"
+  replicaCount: 2
+valkey:
+  auth:
+    password: "PASSWORD"
+  replicaCount: 2</code></pre>
+      </div>
+    </div>
+
+    <!-- ========== 設定方法 ========== -->
+    <div class="section">
+      <h2>🛠️ 設定方法 (アップグレード手順)</h2>
+
+      <h3>✅ 前提条件</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span>クラスタが Apigee hybrid <strong>v1.15.10 以降</strong>で稼働していること (v1.14 からの場合は先に v1.15.10 へアップグレード)</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>現行クラスタ構成を反映した <code>overrides.yaml</code> が利用できること</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span>Valkey 切替時にレート制限カウンタがゼロにリセットされるため、<strong>トラフィックの少ない時間帯</strong>にアップグレードを計画すること</span></div>
+
+      <h3>ステップ 1: ApigeeRedis のバージョン確認と overrides の更新</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">ApigeeRedis のバージョンラベル確認</span>
+        </div>
+        <pre><code class="language-bash"># ApigeeRedis リソースのバージョンラベルを確認 (1.15.10 以降であること)
+kubectl -n APIGEE_NAMESPACE get apigeeredis default \
+  -o jsonpath='{.metadata.labels.apigee\.cloud\.google\.com/hybrid-version}'</code></pre>
+      </div>
+      <p style="font-size: 14px;">
+        出力が空、または 1.15.10 より前の場合は、先に全チャートを v1.15.10 にアップグレードします。
+        あわせて <code>overrides.yaml</code> に <code>valkey</code> ブロックを追加し、<code>ao.args.valkeyBackend: false</code> を設定している場合はその行を削除します。
+      </p>
+
+      <h3>ステップ 2: CRD の更新とオペレーター・各チャートのアップグレード</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">Bash</span>
+          <span class="code-title">apigee-operator のアップグレード</span>
+        </div>
+        <pre><code class="language-bash"># 更新された Apigee CRD (ApigeeValkey CRD を含む) をインストールした後、
+# apigee-operator をアップグレード (ApigeeRedis の v1.15.10 経由更新が検証される)
+helm upgrade operator apigee-operator/ \
+  --install \
+  --namespace APIGEE_NAMESPACE \
+  --atomic \
+  -f overrides.yaml</code></pre>
+      </div>
+      <p style="font-size: 14px;">
+        オペレーターのアップグレード後、<code>apigee-valkey</code> チャートをインストールし、<code>default</code> という名前の ApigeeValkey リソースが稼働状態になるのを待ってから、組織 (org) と環境 (env) をアップグレードします。
+        <code>apigee-redis</code> チャートもアンインストールせず、他のチャートと一緒にアップグレードを継続します。
+        詳細な順序は「<a class="gc-link" href="https://docs.cloud.google.com/apigee/docs/hybrid/v1.15/upgrade" target="_blank" rel="noopener noreferrer">Upgrading Apigee hybrid to v1.15.11</a>」を参照してください。
+      </p>
+
+      <h3>ステップ 3: ランタイムが Valkey を使用していることを確認</h3>
+      <p style="font-size: 14px;">
+        組織・環境のアップグレード後、公式手順の「verify that the runtime uses Valkey」に従い、ランタイムが ApigeeValkey を使用していることを確認します。
+        問題が発生した場合は、v1.15.10 で使用していた overrides ファイルを用いた <strong>v1.15.10 へのロールバック手順</strong>が提供されています
+        (ロールバック後はランタイムが ApigeeRedis に戻り、レート制限カウンタは再度リセットされます)。
+      </p>
+    </div>
+
+    <!-- ========== メリット ========== -->
+    <div class="section">
+      <h2>💡 メリット</h2>
+      <h3>💼 ビジネス面</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>セキュリティリスクの低減</strong>: OAuth 2.0 の <code>redirect_uri</code> 検証バイパスやポリシーサンドボックスエスケープ、デバッグセッションでの機微情報露出といった API 基盤の根幹に関わる問題が修正され、コンプライアンス・監査対応の負担が軽減される</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>運用コストの最適化</strong>: HPA のレプリカ数が <code>maxReplicas</code> に張り付く問題の修正により、不要なランタイム Pod によるリソース消費が解消される</span></div>
+
+      <h3>🔧 技術面</h3>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>Valkey 移行の自動検証</strong>: <code>apigee-operator</code> がアップグレードパス (v1.15.10 経由) を自動検証するため、誤った順序でのアップグレードによる障害を未然に防げる</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>適用の容易さ</strong>: パッチリリースのコンテナイメージは Helm チャートに統合されており、通常のチャートアップグレードフローで修正済みイメージが自動反映される</span></div>
+      <div class="check-item"><span class="check-icon">✓</span><span><strong>安全なロールバック経路</strong>: <code>apigee-redis</code> チャートを維持する設計により、ApigeeValkey に問題が発生した場合でも v1.15.10 へのロールバックでランタイムを ApigeeRedis に戻せる</span></div>
+    </div>
+
+    <!-- ========== デメリット・制約事項 ========== -->
+    <div class="section">
+      <h2>⚠️ デメリット・制約事項</h2>
+
+      <h3>🚧 制限事項</h3>
+      <div class="error-box">
+        <div class="check-item" style="margin: 0 0 8px;"><span class="cross-icon">✗</span><span><strong>v1.15.10 の経由が必須</strong>: v1.15.9 以前や v1.14 から直接 v1.15.11 へはアップグレードできない。<code>apigee-operator</code> の検証により満たさない場合はエラーで停止する</span></div>
+        <div class="check-item" style="margin: 0;"><span class="cross-icon">✗</span><span>検証をスキップする <code>disableMandatoryPreviousHybridVersionCheckForValkey</code> は設定しないことが公式に明記されている</span></div>
+      </div>
+
+      <h3>🤔 考慮すべき点</h3>
+      <div class="warning-box">
+        <div class="check-item" style="margin: 0 0 8px;"><span class="cross-icon">!</span><span><strong>レート制限カウンタのリセット</strong>: ApigeeValkey への移行時に KVS 内のレート制限カウンタがゼロにリセットされる。ランタイム Pod の再起動中は新旧 Pod が別々のカウンタを保持するため、一時的にレート制限を超えるリクエストが許可される可能性がある。トラフィックの少ない時間帯での実施を推奨</span></div>
+        <div class="check-item" style="margin: 0 0 8px;"><span class="cross-icon">!</span><span><strong><code>apigee-redis</code> チャートの維持</strong>: 切替後もアンインストールしてはならない。ApigeeValkey が稼働していない場合のフォールバックとロールバックに必要</span></div>
+        <div class="check-item" style="margin: 0 0 8px;"><span class="cross-icon">!</span><span>Vault で Redis パスワードを管理している場合は、<code>apigee-redis</code> ロールの <code>bound_service_account_names</code> に <code>apigee-valkey-default</code> と <code>apigee-valkey-envoy-default</code> の追加が必要</span></div>
+        <div class="check-item" style="margin: 0 0 8px;"><span class="cross-icon">!</span><span>プライベートレジストリを使用している場合は <code>apigee-valkey</code> イメージの事前コピーが必要</span></div>
+        <div class="check-item" style="margin: 0;"><span class="cross-icon">!</span><span>修正された CVE は多数のコンポーネントにまたがるため、自組織の脆弱性スキャン指摘と公式リリースノートの CVE 一覧を突き合わせて対応状況を確認することが望ましい</span></div>
+      </div>
+    </div>
+
+    <!-- ========== ユースケース ========== -->
+    <div class="section">
+      <h2>🎯 ユースケース</h2>
+
+      <div class="usecase">
+        <div class="usecase-title">📈 ユースケース 1: HPA の異常スケールに悩む環境の是正</div>
+        <p><strong>シナリオ</strong>: <code>apigee-runtime</code> のレプリカ数が負荷に関係なく常に <code>maxReplicas</code> に張り付いており、クラスタリソースを過剰に消費している。</p>
+        <p><strong>効果</strong>: v1.15.11 の修正 (Bug ID: 583672651) により、管理ポートのコネクションカウントリークが解消され、HPA の <code>AverageValue</code> メトリクスが実際の負荷を反映するようになる。結果として適正なレプリカ数での運用が可能になり、ノードリソースのコストが最適化される。</p>
+      </div>
+
+      <div class="usecase">
+        <div class="usecase-title">🏦 ユースケース 2: 規制産業における OAuth フローの脆弱性対応</div>
+        <p><strong>シナリオ</strong>: 金融・医療など規制産業の API 基盤で OAuth 2.0 認可コードフローを利用しており、<code>redirect_uri</code> 検証バイパス (Bug ID: 579642864) のようなセキュリティ問題への SLA 内対応が求められている。</p>
+        <p><strong>効果</strong>: v1.15.11 への Helm チャートアップグレードのみで <code>redirect_uri</code> 検証修正と <code>&lt;EnforceStrictCallbackURI&gt;</code> の強制が適用され、サンドボックス強化 (Jython / JavaCallout / Script / JavaScript) もあわせて取り込める。</p>
+      </div>
+
+      <div class="usecase">
+        <div class="usecase-title">🗺️ ユースケース 3: Valkey 移行を含むバージョンアップ計画の策定</div>
+        <p><strong>シナリオ</strong>: v1.15.9 以前を運用中で、サポート継続のために最新パッチへの追随が必要だが、Redis → Valkey というデータストア移行が含まれるため慎重に計画したい。</p>
+        <p><strong>効果</strong>: v1.15.10 (準備) → v1.15.11 (切替) という公式の段階的移行パスに沿い、オペレーターの自動検証とロールバック手順を活用することで、リスクを抑えた移行計画を立てられる。レート制限カウンタのリセットを考慮し、低トラフィック時間帯に切替を実施する。</p>
+      </div>
+    </div>
+
+    <!-- ========== 料金・リージョン ========== -->
+    <div class="section">
+      <h2>💰 料金 / 🌏 利用可能リージョン</h2>
+      <div class="note-box">
+        <strong>💰 料金:</strong> 本アップデートはパッチリリースであり、料金体系の変更はありません。
+        Apigee の料金はサブスクリプション (Standard / Enterprise / Enterprise Plus) または従量課金 (Pay-as-you-go) で提供されます。
+        詳細は<a class="gc-link" href="https://cloud.google.com/apigee/pricing" target="_blank" rel="noopener noreferrer">料金ページ</a>を参照してください。
+      </div>
+      <div class="note-box">
+        <strong>🌏 利用可能リージョン:</strong> Apigee hybrid のランタイムプレーンはユーザー管理の Kubernetes クラスタ (GKE、他クラウド、オンプレミス) 上で稼働するため、本リリース自体に固有のリージョン制約はありません。
+        サポート対象プラットフォームは<a class="gc-link" href="https://docs.cloud.google.com/apigee/docs/hybrid/supported-platforms" target="_blank" rel="noopener noreferrer">公式ドキュメント</a>を参照してください。
+      </div>
+    </div>
+
+    <!-- ========== 関連サービス ========== -->
+    <div class="section">
+      <h2>🔗 関連サービス・機能</h2>
+      <div class="card green">
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Valkey (ApigeeValkey)</strong>: Redis 互換のオープンソースキーバリューストア。本リリースでランタイムの既定の KVS バックエンドとなり、レート制限カウンタなどを保持する</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>ApigeeRedis (apigee-redis)</strong>: 従来の KVS バックエンド。切替後もフォールバック・ロールバック用にチャートを維持する。本リリースでは CVE 修正も適用されている</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Helm</strong>: Apigee hybrid のインストール・アップグレード・構成管理の標準ツール。<code>apigee-valkey</code> チャートが移行の中核となる</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>HashiCorp Vault</strong>: Redis / Valkey のパスワードを外部シークレットマネージャーで管理している場合、Vault ロールへのサービスアカウント追加が必要</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Cloud Monitoring / HPA</strong>: コネクションカウントリーク修正により、ランタイムのオートスケーリング (Horizontal Pod Autoscaler) の挙動が正常化する</span></div>
+        <div class="icon-text"><span class="arrow">→</span><span><strong>Google Kubernetes Engine (GKE)</strong>: Apigee hybrid ランタイムプレーンの主要な稼働基盤</span></div>
+      </div>
+    </div>
+
+    <!-- ========== まとめ ========== -->
+    <div class="section">
+      <h2>📝 まとめ</h2>
+      <div class="success-box">
+        <p style="margin: 0;">
+          Apigee hybrid <strong>v1.15.11</strong> は、ApigeeRedis から ApigeeValkey への段階的移行の「<strong>切替フェーズ</strong>」にあたる重要なパッチリリースであり、
+          <code>ao.args.valkeyBackend</code> のデフォルトが <code>true</code> になるため <strong>v1.15.10 の経由が必須</strong>です。
+          HPA の異常スケールや OAuth <code>redirect_uri</code> 検証バイパス、ポリシーサンドボックスエスケープなど運用・セキュリティ両面の重要な修正と多数の CVE 対応が含まれるため、
+          v1.15 系の運用環境では、レート制限カウンタのリセットを考慮して低トラフィック時間帯に切替を計画し、検証環境での確認を経て早期に適用することを推奨します。
+        </p>
+      </div>
+      <div class="tags">
+        #ApigeeHybrid #Apigee #Valkey #Redis #Security #PatchRelease #Helm #Kubernetes #APIManagement #OAuth
+      </div>
+    </div>
+
+    <!-- ========== フッター (出典) ========== -->
+    <footer>
+      <p><strong>📎 出典・参考リンク</strong></p>
+      <ul style="padding-left: 20px;">
+        <li>公式リリースノート: <a href="https://docs.cloud.google.com/release-notes#November_24_2026" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/release-notes#November_24_2026</a></li>
+        <li>Apigee hybrid リリースノート: <a href="https://docs.cloud.google.com/apigee/docs/hybrid/release-notes" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/apigee/docs/hybrid/release-notes</a></li>
+        <li>Apigee hybrid v1.15.11 へのアップグレード手順 (Valkey 移行手順を含む): <a href="https://docs.cloud.google.com/apigee/docs/hybrid/v1.15/upgrade" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/apigee/docs/hybrid/v1.15/upgrade</a></li>
+        <li>ao.args.valkeyBackend 構成プロパティ: <a href="https://docs.cloud.google.com/apigee/docs/hybrid/v1.15/config-prop-ref#ao-args-valkeybackend" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/apigee/docs/hybrid/v1.15/config-prop-ref#ao-args-valkeybackend</a></li>
+        <li>新規インストール (The big picture): <a href="https://docs.cloud.google.com/apigee/docs/hybrid/v1.15/big-picture" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/apigee/docs/hybrid/v1.15/big-picture</a></li>
+        <li>Apigee リリースプロセス (コンテナイメージサポート): <a href="https://docs.cloud.google.com/apigee/docs/release/apigee-release-process#apigee-hybrid-container-images" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/apigee/docs/release/apigee-release-process#apigee-hybrid-container-images</a></li>
+        <li>外部シークレットマネージャー (Vault) でのデータ保管: <a href="https://docs.cloud.google.com/apigee/docs/hybrid/v1.15/storing-secrets-in-vault" target="_blank" rel="noopener noreferrer" class="gc-link">https://docs.cloud.google.com/apigee/docs/hybrid/v1.15/storing-secrets-in-vault</a></li>
+        <li>料金ページ: <a href="https://cloud.google.com/apigee/pricing" target="_blank" rel="noopener noreferrer" class="gc-link">https://cloud.google.com/apigee/pricing</a></li>
+      </ul>
+      <p>レポート: reports/2026/2026-11-24-apigee-hybrid-v1-15-11.md | 生成日: 2026-11-26</p>
+    </footer>
+  </div>
+
+  <!-- Mermaid.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4285F4',
+        primaryTextColor: '#202124',
+        primaryBorderColor: '#4285F4',
+        lineColor: '#4285F4',
+        secondaryColor: '#F1F3F4',
+        tertiaryColor: '#FAFAFA',
+        background: '#FFFFFF',
+        mainBkg: '#E8F0FE',
+        nodeBorder: '#4285F4',
+        clusterBkg: '#E8F0FE',
+        clusterBorder: '#4285F4',
+        edgeLabelBackground: '#FFFFFF',
+        textColor: '#202124'
+      }
+    });
+  </script>
+
+  <!-- highlight.js -->
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>
