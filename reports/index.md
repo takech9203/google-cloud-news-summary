@@ -5,6 +5,8 @@
 
 ## 2026 年
 
+- [2026-11-27 - Managed Service for Apache Spark: Managed Service for Apache Spark on GKE v2 (Private Preview)](2026/2026-11-27-managed-spark-on-gke-v2-private-preview.md)
+- [2026-11-26 - Managed Service for Apache Airflow: Beam Java オペレーターが JAVA_TOOL_OPTIONS 設定時にデッドロックする既知の問題と解決策](2026/2026-11-26-managed-airflow-beam-java-tool-options-deadlock.md)
 - [2026-11-26 - Managed Service for Apache Airflow: Agentic アップグレードチェックの提供開始](2026/2026-11-26-managed-airflow-agentic-upgrade-check.md)
 - [2026-11-25 - Google Cloud Contact Center as a Service (CCaaS): 高度なレポート機能が全リージョンで利用可能に (+ 6.38 プレリリースノート公開・バグ修正)](2026/2026-11-25-ccaas-advanced-reporting-all-regions.md)
 - [2026-11-25 - Compute Engine: 予約作成時の確約利用割引 (CUD) 同時購入が GA](2026/2026-11-25-compute-engine-cud-purchase-with-reservation-ga.md)
